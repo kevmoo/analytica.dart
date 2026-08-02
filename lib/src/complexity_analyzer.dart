@@ -1,15 +1,13 @@
 import 'dart:io';
-
 import 'package:analyzer/dart/analysis/features.dart';
 import 'package:analyzer/dart/analysis/utilities.dart';
 import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/dart/ast/visitor.dart';
 import 'package:analyzer/source/line_info.dart';
 import 'package:path/path.dart' as p;
-
 import 'cognitive_complexity_visitor.dart';
 
-/// Represents the analyzed cognitive complexity of a specific function or method.
+/// Represents the analyzed cognitive complexity of a specific declaration.
 class FunctionComplexity {
   final String filePath;
   final String name;
@@ -41,7 +39,7 @@ class FunctionComplexity {
 class ComplexityAnalyzer {
   final FeatureSet _featureSet = FeatureSet.latestLanguageVersion();
 
-  /// Analyzes a file or directory at [targetPath] and returns all analyzed declarations.
+  /// Analyzes a file or directory at [targetPath].
   List<FunctionComplexity> analyzePath(String targetPath) {
     final file = File(targetPath);
     final dir = Directory(targetPath);
@@ -65,10 +63,9 @@ class ComplexityAnalyzer {
         }
       }
     } else {
-      throw ArgumentError('Path does not exist: $targetPath');
+      throw FileSystemException('Path does not exist', targetPath);
     }
 
-    // Sort descending by score by default
     results.sort((a, b) => b.score.compareTo(a.score));
     return results;
   }
@@ -89,7 +86,6 @@ class ComplexityAnalyzer {
       result.unit.accept(finder);
       return finder.results;
     } catch (e) {
-      // Ignore unparseable files gracefully
       return [];
     }
   }
@@ -123,11 +119,18 @@ class _DeclarationFinder extends RecursiveAstVisitor<void> {
   String? _getEnclosingName(AstNode node) {
     var current = node.parent;
     while (current != null) {
-      if (current is ClassDeclaration) return current.namePart.typeName.lexeme;
-      if (current is EnumDeclaration) return current.namePart.typeName.lexeme;
-      if (current is MixinDeclaration) return current.name.lexeme;
-      if (current is ExtensionTypeDeclaration)
+      if (current is ClassDeclaration) {
         return current.namePart.typeName.lexeme;
+      }
+      if (current is EnumDeclaration) {
+        return current.namePart.typeName.lexeme;
+      }
+      if (current is MixinDeclaration) {
+        return current.name.lexeme;
+      }
+      if (current is ExtensionTypeDeclaration) {
+        return current.namePart.typeName.lexeme;
+      }
       if (current is ExtensionDeclaration) {
         return current.name?.lexeme ?? '<unnamed extension>';
       }
@@ -156,11 +159,9 @@ class _DeclarationFinder extends RecursiveAstVisitor<void> {
 
   @override
   void visitFunctionDeclaration(FunctionDeclaration node) {
-    // Avoid counting local nested functions as standalone top-level entries
     if (node.parent is CompilationUnit && !node.name.type.isKeyword) {
       _record(node.name.lexeme, node, node.functionExpression.body);
     }
-    // Do not call super to prevent descending into body and capturing local functions as top-level records
   }
 
   @override
@@ -173,7 +174,6 @@ class _DeclarationFinder extends RecursiveAstVisitor<void> {
         : '$prefix$rawName';
 
     _record(fullName, node, node.body);
-    // Do not call super to prevent descending into method body
   }
 
   @override
@@ -183,6 +183,5 @@ class _DeclarationFinder extends RecursiveAstVisitor<void> {
     final fullName = constName == null ? enclosing : '$enclosing.$constName';
 
     _record(fullName, node, node.body);
-    // Do not call super
   }
 }

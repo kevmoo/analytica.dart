@@ -5,11 +5,12 @@ import 'package:analyzer/dart/ast/visitor.dart';
 /// An AST visitor that calculates Cognitive Complexity algorithmically.
 ///
 /// Follows standard Cognitive Complexity rules:
-/// - Rule 1 (+0 Penalty): Null-aware operators, cascades, and switch case labels cost +0.
-/// - Rule 2 (+1 Base): Flow interruptions (`if`, `for`, `while`, `catch`, logical operators, `when` guards).
-///   An entire exhaustive `switch` statement or expression costs a flat +1 regardless of arm count.
-/// - Rule 3 (+D Depth): Structural nesting multiplier added to base cost for nested control flow.
-///   Exceptions: `else`, `else if`, and `catch` receive only a flat +1 penalty without depth multipliers.
+/// - Rule 1 (+0 Penalty): Null-aware operators and switch labels cost +0.
+/// - Rule 2 (+1 Base): Flow interruptions (`if`, `for`, `while`, `catch`,
+///   logical operators, and pattern `when` guards). Exhaustive `switch` blocks
+///   cost a flat +1 base regardless of arm count.
+/// - Rule 3 (+D Depth): Nesting multiplier added to base cost for nested flow.
+///   Exceptions: `else`, `else if`, and `catch` get flat +1 without depth.
 class CognitiveComplexityVisitor extends RecursiveAstVisitor<void> {
   int _score = 0;
   int _depth = 0;
@@ -29,16 +30,16 @@ class CognitiveComplexityVisitor extends RecursiveAstVisitor<void> {
 
   @override
   void visitIfStatement(IfStatement node) {
-    bool isElseIf = false;
+    var isElseIf = false;
     final parent = node.parent;
     if (parent is IfStatement) {
       isElseIf = parent.elseStatement == node;
     }
 
     if (isElseIf) {
-      _addScore(1); // else if gets flat +1
+      _addScore(1);
     } else {
-      _addScore(1 + _depth); // if gets 1 + nesting depth
+      _addScore(1 + _depth);
     }
 
     node.expression.accept(this);
@@ -55,7 +56,7 @@ class CognitiveComplexityVisitor extends RecursiveAstVisitor<void> {
           elseStmt.accept(this);
         });
       } else {
-        _addScore(1); // normal else gets flat +1
+        _addScore(1);
         _withIncrementedDepth(() {
           elseStmt.accept(this);
         });
@@ -65,7 +66,7 @@ class CognitiveComplexityVisitor extends RecursiveAstVisitor<void> {
 
   @override
   void visitIfElement(IfElement node) {
-    bool isElseIf = false;
+    var isElseIf = false;
     final parent = node.parent;
     if (parent is IfElement) {
       isElseIf = parent.elseElement == node;
@@ -137,7 +138,7 @@ class CognitiveComplexityVisitor extends RecursiveAstVisitor<void> {
 
   @override
   void visitSwitchStatement(SwitchStatement node) {
-    _addScore(1); // switch costs a flat +1 base regardless of arm count
+    _addScore(1);
     node.expression.accept(this);
     _withIncrementedDepth(() {
       for (final member in node.members) {
@@ -148,7 +149,7 @@ class CognitiveComplexityVisitor extends RecursiveAstVisitor<void> {
 
   @override
   void visitSwitchExpression(SwitchExpression node) {
-    _addScore(1); // switch expression also costs a flat +1 base
+    _addScore(1);
     node.expression.accept(this);
     _withIncrementedDepth(() {
       for (final caseArm in node.cases) {
@@ -169,7 +170,7 @@ class CognitiveComplexityVisitor extends RecursiveAstVisitor<void> {
 
   @override
   void visitCatchClause(CatchClause node) {
-    _addScore(1); // catch block costs flat +1
+    _addScore(1);
     _withIncrementedDepth(() {
       node.body.accept(this);
     });
@@ -193,14 +194,14 @@ class CognitiveComplexityVisitor extends RecursiveAstVisitor<void> {
 
   @override
   void visitWhenClause(WhenClause node) {
-    _addScore(1); // Treat pattern 'when' guard as a logical operator (flat +1)
+    _addScore(1);
     super.visitWhenClause(node);
   }
 
   @override
   void visitFunctionDeclaration(FunctionDeclaration node) {
     if (node.parent is! CompilationUnit) {
-      _addScore(1); // Penalty for non-top-level nested functions
+      _addScore(1);
     }
     super.visitFunctionDeclaration(node);
   }
@@ -227,14 +228,16 @@ class CognitiveComplexityVisitor extends RecursiveAstVisitor<void> {
     final operators = <TokenType>[];
     _collectLogicalOperators(node, operators);
 
-    if (operators.isEmpty) return;
+    if (operators.isEmpty) {
+      return;
+    }
 
     _addScore(1);
 
-    TokenType lastOp = operators.first;
-    for (int i = 1; i < operators.length; i++) {
+    var lastOp = operators.first;
+    for (var i = 1; i < operators.length; i++) {
       if (operators[i] != lastOp) {
-        _addScore(1); // Alternation penalty
+        _addScore(1);
         lastOp = operators[i];
       }
     }

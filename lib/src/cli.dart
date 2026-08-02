@@ -1,12 +1,11 @@
 import 'dart:convert';
 import 'dart:io';
-
 import 'package:args/args.dart';
 import 'package:io/io.dart';
-
 import 'complexity_analyzer.dart';
 
-/// Executes the Cognitive Complexity CLI with [args] and returns the exit code.
+/// Executes the Cognitive Complexity CLI with [args] and returns the exit
+/// code.
 Future<int> runCli(
   List<String> args, {
   StringSink? out,
@@ -53,7 +52,8 @@ Future<int> runCli(
     final threshold = int.tryParse(argResults['threshold'] as String);
     if (threshold == null || threshold < 0) {
       throw FormatException(
-        'Invalid threshold: ${argResults['threshold']}. Must be a non-negative integer.',
+        'Invalid threshold: ${argResults['threshold']}. '
+        'Must be a non-negative integer.',
       );
     }
 
@@ -63,7 +63,8 @@ Future<int> runCli(
       failThreshold = int.tryParse(failVal);
       if (failThreshold == null || failThreshold < 0) {
         throw FormatException(
-          'Invalid fail-threshold: $failVal. Must be a non-negative integer.',
+          'Invalid fail-threshold: $failVal. '
+          'Must be a non-negative integer.',
         );
       }
     }
@@ -97,7 +98,8 @@ Future<int> runCli(
         allResults.any((r) => r.score > failThreshold!)) {
       if (format == 'text') {
         stderrSink.writeln(
-          '\nError: One or more declarations exceeded the failure threshold ($failThreshold).',
+          '\nError: One or more declarations exceeded the '
+          'failure threshold ($failThreshold).',
         );
       }
       return 1; // Non-zero exit code for CI failure
@@ -108,8 +110,8 @@ Future<int> runCli(
     stderrSink.writeln('Error: ${e.message}');
     _printUsage(parser, stderrSink);
     return ExitCode.usage.code;
-  } on ArgumentError catch (e) {
-    stderrSink.writeln('Error: ${e.message}');
+  } on FileSystemException catch (e) {
+    stderrSink.writeln('Error: ${e.message} (${e.path})');
     return ExitCode.usage.code;
   } catch (e) {
     stderrSink.writeln('Fatal error: $e');
@@ -145,10 +147,11 @@ void _printTextReport(
     return;
   }
 
-  // Calculate table formatting widths
-  int maxNameLen = 'Declaration'.length;
+  var maxNameLen = 'Declaration'.length;
   for (final res in results) {
-    if (res.name.length > maxNameLen) maxNameLen = res.name.length;
+    if (res.name.length > maxNameLen) {
+      maxNameLen = res.name.length;
+    }
   }
 
   final headerScore = 'Score'.padLeft(5);
@@ -162,9 +165,8 @@ void _printTextReport(
     final scoreStr = res.score.toString().padLeft(5);
     final nameStr = res.name.padRight(maxNameLen);
     final locStr = '${res.filePath}:L${res.startLine}-${res.endLine}';
-    final violationMarker = (failThreshold != null && res.score > failThreshold)
-        ? ' [VIOLATION]'
-        : '';
+    final isViolation = failThreshold != null && res.score > failThreshold;
+    final violationMarker = isViolation ? ' [VIOLATION]' : '';
     sink.writeln('$scoreStr  $nameStr  $locStr$violationMarker');
   }
 }
