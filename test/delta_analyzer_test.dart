@@ -93,7 +93,7 @@ void main() {
         status: DeltaStatus.increased,
       );
 
-      final summary = DeltaSummary(
+      const summary = DeltaSummary(
         baseRef: 'main',
         targetRef: 'HEAD',
         filesAnalyzed: 1,
@@ -122,7 +122,7 @@ void main() {
         status: DeltaStatus.increased,
       );
 
-      final summary = DeltaSummary(
+      const summary = DeltaSummary(
         baseRef: 'origin/main',
         targetRef: 'HEAD',
         filesAnalyzed: 1,

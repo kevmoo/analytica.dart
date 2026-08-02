@@ -5,7 +5,7 @@ import 'package:path/path.dart' as p;
 class GitDiffService {
   final String? _workingDirectory;
 
-  const GitDiffService({String? this._workingDirectory});
+  const GitDiffService({this._workingDirectory});
 
   Future<ProcessResult> _runGit(List<String> args) =>
       Process.run('git', args, workingDirectory: _workingDirectory);
