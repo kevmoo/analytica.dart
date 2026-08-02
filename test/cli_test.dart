@@ -1,4 +1,5 @@
-import 'package:test/test.dart';
+import 'package:checks/checks.dart';
+import 'package:test/scaffolding.dart';
 import 'package:test_descriptor/test_descriptor.dart' as d;
 import 'package:test_process/test_process.dart';
 
@@ -27,11 +28,10 @@ int compute(int x) {
         '${d.sandbox}/project',
       ]);
 
-      await expectLater(
+      await check(
         process.stdout,
-        emitsThrough(contains('Score  Declaration')),
-      );
-      await expectLater(process.stdout, emitsThrough(contains('3  compute')));
+      ).emitsThrough((s) => s.contains('Score  Declaration'));
+      await check(process.stdout).emitsThrough((s) => s.contains('3  compute'));
       await process.shouldExit(0);
     });
 
@@ -60,11 +60,10 @@ class MyService {
           '${d.sandbox}/project_json',
         ]);
 
-        await expectLater(
-          process.stdout,
-          emitsThrough(
-            allOf(contains('"name":"MyService.handle"'), contains('"score":1')),
-          ),
+        await check(process.stdout).emitsThrough(
+          (s) => s
+            ..contains('"name":"MyService.handle"')
+            ..contains('"score":1'),
         );
         await process.shouldExit(0);
       },
@@ -95,11 +94,12 @@ void complexFunc(int a) {
         '${d.sandbox}/project_fail',
       ]);
 
-      await expectLater(process.stdout, emitsThrough(contains('[VIOLATION]')));
-      await expectLater(
+      await check(
+        process.stdout,
+      ).emitsThrough((s) => s.contains('[VIOLATION]'));
+      await check(
         process.stderr,
-        emitsThrough(contains('exceeded the failure threshold (2)')),
-      );
+      ).emitsThrough((s) => s.contains('exceeded the failure threshold (2)'));
       await process.shouldExit(1);
     });
   });

@@ -1,8 +1,9 @@
 import 'package:analyzer/dart/analysis/features.dart';
 import 'package:analyzer/dart/analysis/utilities.dart';
 import 'package:analyzer/dart/ast/ast.dart';
+import 'package:checks/checks.dart';
 import 'package:cognitive_complexity/cognitive_complexity.dart';
-import 'package:test/test.dart';
+import 'package:test/scaffolding.dart';
 
 int _getComplexity(String code) {
   var result = parseString(
@@ -44,19 +45,21 @@ int _getComplexity(String code) {
 void main() {
   group('Cognitive Complexity', () {
     test('Empty function', () {
-      expect(_getComplexity(''), 0);
+      check(_getComplexity('')).equals(0);
     });
 
     test('Simple if', () {
-      expect(_getComplexity('if (a) { print(a); }'), 1);
+      check(_getComplexity('if (a) { print(a); }')).equals(1);
     });
 
     test('If-else', () {
-      expect(_getComplexity('if (a) { print(a); } else { print(b); }'), 2);
+      check(
+        _getComplexity('if (a) { print(a); } else { print(b); }'),
+      ).equals(2);
     });
 
     test('Nested if', () {
-      expect(
+      check(
         _getComplexity('''
         if (a) {
           if (b) {
@@ -64,12 +67,11 @@ void main() {
           }
         }
       '''),
-        3,
-      );
+      ).equals(3);
     });
 
     test('Else-if chain', () {
-      expect(
+      check(
         _getComplexity('''
         if (a) {
           print(a);
@@ -81,12 +83,11 @@ void main() {
           print(d);
         }
       '''),
-        4,
-      );
+      ).equals(4);
     });
 
     test('Nested else-if chain', () {
-      expect(
+      check(
         _getComplexity('''
         if (a) {
           print(a);
@@ -96,18 +97,19 @@ void main() {
           }
         }
       '''),
-        5,
-      );
+      ).equals(5);
     });
 
     test('Loops', () {
-      expect(_getComplexity('for (var i = 0; i < 10; i++) { print(i); }'), 1);
-      expect(_getComplexity('while (a) { print(a); }'), 1);
-      expect(_getComplexity('do { print(a); } while (a);'), 1);
+      check(
+        _getComplexity('for (var i = 0; i < 10; i++) { print(i); }'),
+      ).equals(1);
+      check(_getComplexity('while (a) { print(a); }')).equals(1);
+      check(_getComplexity('do { print(a); } while (a);')).equals(1);
     });
 
     test('Nested loops', () {
-      expect(
+      check(
         _getComplexity('''
         for (var i = 0; i < 10; i++) {
           while (a) {
@@ -115,12 +117,11 @@ void main() {
           }
         }
       '''),
-        3,
-      );
+      ).equals(3);
     });
 
     test('Switch statement', () {
-      expect(
+      check(
         _getComplexity('''
         switch (x) {
           case 1: print(1); break;
@@ -128,12 +129,11 @@ void main() {
           default: print(3);
         }
       '''),
-        1,
-      );
+      ).equals(1);
     });
 
     test('Nested if inside switch', () {
-      expect(
+      check(
         _getComplexity('''
         switch (x) {
           case 1:
@@ -143,20 +143,19 @@ void main() {
             break;
         }
       '''),
-        3,
-      );
+      ).equals(3);
     });
 
     test('Ternary operator', () {
-      expect(_getComplexity('var x = a ? b : c;'), 1);
+      check(_getComplexity('var x = a ? b : c;')).equals(1);
     });
 
     test('Nested ternary', () {
-      expect(_getComplexity('var x = a ? (b ? c : d) : e;'), 3);
+      check(_getComplexity('var x = a ? (b ? c : d) : e;')).equals(3);
     });
 
     test('Catch clause', () {
-      expect(
+      check(
         _getComplexity('''
         try {
           print(1);
@@ -164,12 +163,11 @@ void main() {
           print(e);
         }
       '''),
-        1,
-      );
+      ).equals(1);
     });
 
     test('Nested catch', () {
-      expect(
+      check(
         _getComplexity('''
         try {
           try {
@@ -181,12 +179,11 @@ void main() {
           print(e);
         }
       '''),
-        2,
-      );
+      ).equals(2);
     });
 
     test('Nested catch inside catch', () {
-      expect(
+      check(
         _getComplexity('''
         try {
           print(1);
@@ -198,12 +195,11 @@ void main() {
           }
         }
       '''),
-        2,
-      );
+      ).equals(2);
     });
 
     test('If inside catch', () {
-      expect(
+      check(
         _getComplexity('''
         try {
           print(1);
@@ -213,36 +209,34 @@ void main() {
           }
         }
       '''),
-        3,
-      );
+      ).equals(3);
     });
 
     test('Logical operators (same type)', () {
-      expect(_getComplexity('if (a && b && c) { print(1); }'), 2);
+      check(_getComplexity('if (a && b && c) { print(1); }')).equals(2);
     });
 
     test('Logical operators (mixed type)', () {
-      expect(_getComplexity('if (a && b || c) { print(1); }'), 3);
+      check(_getComplexity('if (a && b || c) { print(1); }')).equals(3);
     });
 
     test('Logical operators (parenthesized same type)', () {
-      expect(_getComplexity('if ((a && b) && c) { print(1); }'), 2);
+      check(_getComplexity('if ((a && b) && c) { print(1); }')).equals(2);
     });
 
     test('Unlabeled break and continue', () {
-      expect(
+      check(
         _getComplexity('''
         while (a) {
           if (b) break;
           if (c) continue;
         }
       '''),
-        5,
-      );
+      ).equals(5);
     });
 
     test('Labeled break and continue', () {
-      expect(
+      check(
         _getComplexity('''
         outer: while (a) {
           while (b) {
@@ -251,36 +245,33 @@ void main() {
           }
         }
       '''),
-        11,
-      );
+      ).equals(11);
     });
 
     test('Switch expression with nested ternary', () {
-      expect(
+      check(
         _getComplexity('''
         var x = switch (y) {
           1 => a ? b : c,
           _ => 0,
         };
       '''),
-        3,
-      );
+      ).equals(3);
     });
 
     test('If with pattern and guard', () {
-      expect(
+      check(
         _getComplexity('''
         dynamic x;
         if (x case String s when s.isNotEmpty) {
           print(s);
         }
       '''),
-        2,
-      );
+      ).equals(2);
     });
 
     test('Collection control flow elements (IfElement & ForElement)', () {
-      expect(
+      check(
         _getComplexity('''
         final list = [
           if (a) 1,
@@ -288,12 +279,11 @@ void main() {
             if (item.isValid) item,
         ];
       '''),
-        4,
-      ); // if (a) -> 1, for -> 1, nested if -> 1 + 1 (depth) = 2. Total = 4.
+      ).equals(4);
     });
 
     test('Nested function', () {
-      expect(
+      check(
         _getComplexity('''
         void outer() {
           void inner() {
@@ -303,12 +293,11 @@ void main() {
           }
         }
       '''),
-        3,
-      );
+      ).equals(3);
     });
 
     test('Lambda expression nesting', () {
-      expect(
+      check(
         _getComplexity('''
         void foo() {
           var lambda = () {
@@ -318,8 +307,7 @@ void main() {
           };
         }
       '''),
-        2,
-      );
+      ).equals(2);
     });
 
     test('Before Refactoring Sample', () {
@@ -334,14 +322,14 @@ void main() {
               }
             } else {                         // D=1 -> +1 (else flat)
                 return 1000;
-            }
-          } else if (protocol == 'ftp') {    // D=0 -> +1 (else if flat) +3 (nested...)
+              }
+            } else if (protocol == 'ftp') {    // D=0 -> +1 (else if flat) +3 (nested...)
             return isSecure ? 10000 : 2000;
           }
           return 0;
         }
       ''';
-      expect(_getComplexity(code), 12);
+      check(_getComplexity(code)).equals(12);
     });
 
     test('After Refactoring Sample 1', () {
@@ -356,7 +344,7 @@ void main() {
           return 0;
         }
       ''';
-      expect(_getComplexity(code), 4);
+      check(_getComplexity(code)).equals(4);
     });
 
     test('After Refactoring Sample 2', () {
@@ -366,7 +354,7 @@ void main() {
           return retryCount > 3 ? 5000 : 3000;
         }
       ''';
-      expect(_getComplexity(code), 2);
+      check(_getComplexity(code)).equals(2);
     });
   });
 }

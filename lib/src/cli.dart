@@ -15,32 +15,30 @@ Future<int> runCli(
   final stdoutSink = out ?? stdout;
   final stderrSink = err ?? stderr;
 
-  final parser =
-      ArgParser()
-        ..addFlag(
-          'help',
-          abbr: 'h',
-          negatable: false,
-          help: 'Print this usage information.',
-        )
-        ..addOption(
-          'threshold',
-          abbr: 't',
-          defaultsTo: '0',
-          help: 'Minimum complexity score to include in output.',
-        )
-        ..addOption(
-          'fail-threshold',
-          abbr: 'f',
-          help:
-              'Exit with non-zero code if any function score exceeds this value.',
-        )
-        ..addOption(
-          'format',
-          defaultsTo: 'text',
-          allowed: ['text', 'json'],
-          help: 'Output format.',
-        );
+  final parser = ArgParser()
+    ..addFlag(
+      'help',
+      abbr: 'h',
+      negatable: false,
+      help: 'Print this usage information.',
+    )
+    ..addOption(
+      'threshold',
+      abbr: 't',
+      defaultsTo: '0',
+      help: 'Minimum complexity score to include in output.',
+    )
+    ..addOption(
+      'fail-threshold',
+      abbr: 'f',
+      help: 'Exit with non-zero code if any function score exceeds this value.',
+    )
+    ..addOption(
+      'format',
+      defaultsTo: 'text',
+      allowed: ['text', 'json'],
+      help: 'Output format.',
+    );
 
   try {
     final argResults = parser.parse(args);
@@ -81,8 +79,9 @@ Future<int> runCli(
     allResults.sort((a, b) => b.score.compareTo(a.score));
 
     // Filter by reporting threshold
-    final displayedResults =
-        allResults.where((r) => r.score >= threshold).toList();
+    final displayedResults = allResults
+        .where((r) => r.score >= threshold)
+        .toList();
 
     final format = argResults['format'] as String;
     if (format == 'json') {
@@ -163,10 +162,9 @@ void _printTextReport(
     final scoreStr = res.score.toString().padLeft(5);
     final nameStr = res.name.padRight(maxNameLen);
     final locStr = '${res.filePath}:L${res.startLine}-${res.endLine}';
-    final violationMarker =
-        (failThreshold != null && res.score > failThreshold)
-            ? ' [VIOLATION]'
-            : '';
+    final violationMarker = (failThreshold != null && res.score > failThreshold)
+        ? ' [VIOLATION]'
+        : '';
     sink.writeln('$scoreStr  $nameStr  $locStr$violationMarker');
   }
 }

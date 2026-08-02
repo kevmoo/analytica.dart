@@ -168,8 +168,9 @@ class _DeclarationFinder extends RecursiveAstVisitor<void> {
     final rawName = node.name.lexeme;
     final prefix = node.isGetter ? 'get ' : (node.isSetter ? 'set ' : '');
     final enclosing = _getEnclosingName(node);
-    final fullName =
-        enclosing != null ? '$prefix$enclosing.$rawName' : '$prefix$rawName';
+    final fullName = enclosing != null
+        ? '$prefix$enclosing.$rawName'
+        : '$prefix$rawName';
 
     _record(fullName, node, node.body);
     // Do not call super to prevent descending into method body
