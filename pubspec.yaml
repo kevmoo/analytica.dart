@@ -1,0 +1,21 @@
+name: cognitive_complexity
+description: Algorithmic Cognitive Complexity calculation library and CLI tool for Dart and Flutter.
+version: 0.1.0
+repository: https://github.com/kevmoo/cognitive_complexity.dart
+
+environment:
+  sdk: '^3.7.0'
+
+# Add regular dependencies here.
+dependencies:
+  analyzer: ^14.1.0
+  args: ^2.7.0
+  io: ^1.0.5
+  path: ^1.9.1
+  stack_trace: ^1.12.1
+
+dev_dependencies:
+  lints: ^6.0.0
+  test: ^1.31.2
+  test_descriptor: ^2.0.2
+  test_process: ^2.1.1
