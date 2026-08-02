@@ -65,7 +65,8 @@ class ComplexityDelta {
   };
 }
 
-/// Summarizes cognitive complexity delta metrics across a repository evaluation.
+/// Summarizes cognitive complexity delta metrics across a repository
+/// evaluation.
 class DeltaSummary {
   final String baseRef;
   final String targetRef;

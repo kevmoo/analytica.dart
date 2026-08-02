@@ -83,7 +83,7 @@ void main() {
       final outBuf = StringBuffer();
       final reporter = GitHubReporter(stdoutSink: outBuf);
 
-      final delta = ComplexityDelta(
+      const delta = ComplexityDelta(
         filePath: 'lib/service.dart',
         name: 'Service.execute',
         startLine: 12,
@@ -112,7 +112,7 @@ void main() {
       final outBuf = StringBuffer();
       final reporter = GitHubReporter(stdoutSink: outBuf);
 
-      final delta = ComplexityDelta(
+      const delta = ComplexityDelta(
         filePath: 'lib/parser.dart',
         name: 'Parser.parse',
         startLine: 1,
