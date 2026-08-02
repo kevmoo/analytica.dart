@@ -3,6 +3,8 @@ import 'dart:io';
 import 'package:args/args.dart';
 import 'package:io/io.dart';
 import 'complexity_analyzer.dart';
+import 'delta_analyzer.dart';
+import 'github_reporter.dart';
 
 /// Executes the Cognitive Complexity CLI with [args] and returns the exit
 /// code.
@@ -33,9 +35,24 @@ Future<int> runCli(
       help: 'Exit with non-zero code if any function score exceeds this value.',
     )
     ..addOption(
+      'git-diff',
+      abbr: 'd',
+      valueHelp: 'git-ref',
+      help:
+          'Git reference to compare against. Only evaluates modified '
+          'files and function complexity deltas.',
+    )
+    ..addFlag(
+      'fail-on-increase',
+      negatable: false,
+      help:
+          'When using --git-diff, exit with non-zero code if any function '
+          'increased in complexity.',
+    )
+    ..addOption(
       'format',
       defaultsTo: 'text',
-      allowed: ['text', 'json'],
+      allowed: ['text', 'json', 'github'],
       help: 'Output format.',
     );
 
@@ -48,64 +65,42 @@ Future<int> runCli(
     }
 
     final targets = argResults.rest.isEmpty ? ['lib'] : argResults.rest;
-
-    final threshold = int.tryParse(argResults['threshold'] as String);
-    if (threshold == null || threshold < 0) {
-      throw FormatException(
-        'Invalid threshold: ${argResults['threshold']}. '
-        'Must be a non-negative integer.',
+    final threshold = _parsePositiveInt(
+      argResults['threshold'] as String,
+      'threshold',
+    );
+    int? failThreshold;
+    if (argResults['fail-threshold'] != null) {
+      failThreshold = _parsePositiveInt(
+        argResults['fail-threshold'] as String,
+        'fail-threshold',
       );
     }
-
-    int? failThreshold;
-    final failVal = argResults['fail-threshold'] as String?;
-    if (failVal != null) {
-      failThreshold = int.tryParse(failVal);
-      if (failThreshold == null || failThreshold < 0) {
-        throw FormatException(
-          'Invalid fail-threshold: $failVal. '
-          'Must be a non-negative integer.',
-        );
-      }
-    }
-
-    final analyzer = ComplexityAnalyzer();
-    final allResults = <FunctionComplexity>[];
-
-    for (final target in targets) {
-      allResults.addAll(analyzer.analyzePath(target));
-    }
-
-    // Sort descending by complexity
-    allResults.sort((a, b) => b.score.compareTo(a.score));
-
-    // Filter by reporting threshold
-    final displayedResults = allResults
-        .where((r) => r.score >= threshold)
-        .toList();
 
     final format = argResults['format'] as String;
-    if (format == 'json') {
-      final jsonOutput = jsonEncode(
-        displayedResults.map((e) => e.toJson()).toList(),
+    final gitDiffBase = argResults['git-diff'] as String?;
+    final failOnIncrease = argResults['fail-on-increase'] as bool;
+
+    if (gitDiffBase != null) {
+      return await _handleDiffMode(
+        gitDiffBase: gitDiffBase,
+        targets: targets,
+        format: format,
+        failThreshold: failThreshold,
+        failOnIncrease: failOnIncrease,
+        out: stdoutSink,
+        err: stderrSink,
       );
-      stdoutSink.writeln(jsonOutput);
-    } else {
-      _printTextReport(displayedResults, threshold, stdoutSink, failThreshold);
     }
 
-    if (failThreshold != null &&
-        allResults.any((r) => r.score > failThreshold!)) {
-      if (format == 'text') {
-        stderrSink.writeln(
-          '\nError: One or more declarations exceeded the '
-          'failure threshold ($failThreshold).',
-        );
-      }
-      return 1; // Non-zero exit code for CI failure
-    }
-
-    return ExitCode.success.code;
+    return _handleRegularMode(
+      targets: targets,
+      threshold: threshold,
+      failThreshold: failThreshold,
+      format: format,
+      out: stdoutSink,
+      err: stderrSink,
+    );
   } on FormatException catch (e) {
     stderrSink.writeln('Error: ${e.message}');
     _printUsage(parser, stderrSink);
@@ -117,6 +112,111 @@ Future<int> runCli(
     stderrSink.writeln('Fatal error: $e');
     return 1;
   }
+}
+
+int _parsePositiveInt(String val, String name) {
+  final parsed = int.tryParse(val);
+  if (parsed == null || parsed < 0) {
+    throw FormatException(
+      'Invalid $name: $val. Must be a non-negative integer.',
+    );
+  }
+  return parsed;
+}
+
+Future<int> _handleDiffMode({
+  required String gitDiffBase,
+  required List<String> targets,
+  required String format,
+  required int? failThreshold,
+  required bool failOnIncrease,
+  required StringSink out,
+  required StringSink err,
+}) async {
+  final deltaAnalyzer = DeltaAnalyzer();
+  final summary = await deltaAnalyzer.computeDeltas(
+    gitDiffBase,
+    targetPaths: targets,
+  );
+
+  if (format == 'json') {
+    out.writeln(
+      jsonEncode(
+        summary.toJson(
+          failThreshold: failThreshold,
+          failOnIncrease: failOnIncrease,
+        ),
+      ),
+    );
+  } else if (format == 'github') {
+    final reporter = GitHubReporter(stdoutSink: out);
+    reporter.printReport(
+      deltaSummary: summary,
+      failThreshold: failThreshold,
+      failOnIncrease: failOnIncrease,
+    );
+  } else {
+    _printDeltaTextReport(summary, out, failThreshold, failOnIncrease);
+  }
+
+  final violations = summary.countViolations(
+    failThreshold: failThreshold,
+    failOnIncrease: failOnIncrease,
+  );
+  if (violations > 0) {
+    if (format == 'text') {
+      err.writeln(
+        '\nError: $violations declaration(s) triggered complexity '
+        'threshold violations or regressions.',
+      );
+    }
+    return 1;
+  }
+
+  return ExitCode.success.code;
+}
+
+int _handleRegularMode({
+  required List<String> targets,
+  required int threshold,
+  required int? failThreshold,
+  required String format,
+  required StringSink out,
+  required StringSink err,
+}) {
+  final analyzer = ComplexityAnalyzer();
+  final allResults = <FunctionComplexity>[];
+
+  for (final target in targets) {
+    allResults.addAll(analyzer.analyzePath(target));
+  }
+
+  allResults.sort((a, b) => b.score.compareTo(a.score));
+  final displayed = allResults.where((r) => r.score >= threshold).toList();
+
+  if (format == 'json') {
+    out.writeln(jsonEncode(displayed.map((e) => e.toJson()).toList()));
+  } else if (format == 'github') {
+    final reporter = GitHubReporter(stdoutSink: out);
+    reporter.printReport(
+      regularResults: displayed,
+      failThreshold: failThreshold,
+    );
+  } else {
+    _printTextReport(displayed, threshold, out, failThreshold);
+  }
+
+  if (failThreshold != null && allResults.any((r) => r.score > failThreshold)) {
+    if (format == 'text') {
+      err.writeln(
+        '\nError: One or more declarations exceeded the '
+        'failure threshold ($failThreshold).',
+      );
+    }
+    return 1;
+  }
+
+  return ExitCode.success.code;
 }
 
 void _printUsage(ArgParser parser, StringSink sink) {
@@ -149,9 +249,7 @@ void _printTextReport(
 
   var maxNameLen = 'Declaration'.length;
   for (final res in results) {
-    if (res.name.length > maxNameLen) {
-      maxNameLen = res.name.length;
-    }
+    if (res.name.length > maxNameLen) maxNameLen = res.name.length;
   }
 
   final headerScore = 'Score'.padLeft(5);
@@ -165,8 +263,63 @@ void _printTextReport(
     final scoreStr = res.score.toString().padLeft(5);
     final nameStr = res.name.padRight(maxNameLen);
     final locStr = '${res.filePath}:L${res.startLine}-${res.endLine}';
-    final isViolation = failThreshold != null && res.score > failThreshold;
-    final violationMarker = isViolation ? ' [VIOLATION]' : '';
+    final isVio = failThreshold != null && res.score > failThreshold;
+    final violationMarker = isVio ? ' [VIOLATION]' : '';
     sink.writeln('$scoreStr  $nameStr  $locStr$violationMarker');
   }
+}
+
+void _printDeltaTextReport(
+  DeltaSummary summary,
+  StringSink sink,
+  int? failThreshold,
+  bool failOnIncrease,
+) {
+  final deltas = summary.deltas.where((d) => d.status != DeltaStatus.unchanged);
+  if (deltas.isEmpty) {
+    sink.writeln('No modified or newly added Dart declarations detected.');
+    return;
+  }
+
+  var maxName = 'Declaration'.length;
+  for (final d in deltas) {
+    if (d.name.length > maxName) maxName = d.name.length;
+  }
+
+  final hdrDelta = 'Delta'.padLeft(6);
+  final hdrScore = 'Score'.padRight(10);
+  final hdrName = 'Declaration'.padRight(maxName);
+  final hdrLoc = 'Location';
+
+  sink.writeln('$hdrDelta  $hdrScore  $hdrName  $hdrLoc');
+  sink.writeln('-' * (6 + 2 + 10 + 2 + maxName + 2 + 30));
+
+  for (final d in deltas) {
+    final deltaStr = d.delta > 0
+        ? '+${d.delta}'
+        : (d.oldScore == null ? '+New' : '${d.delta}');
+    final scoreStr = d.oldScore != null && d.newScore != null
+        ? '${d.oldScore} -> ${d.newScore}'.padRight(10)
+        : '${d.newScore ?? "Deleted"}'.padRight(10);
+    final nameStr = d.name.padRight(maxName);
+    final locStr = '${d.filePath}:L${d.startLine}-${d.endLine}';
+    final isVio = d.isViolation(
+      failThreshold: failThreshold,
+      failOnIncrease: failOnIncrease,
+    );
+    final marker = isVio ? ' [VIOLATION]' : (d.delta < 0 ? ' [IMPROVED]' : '');
+
+    sink.writeln('${deltaStr.padLeft(6)}  $scoreStr  $nameStr  $locStr$marker');
+  }
+
+  final violations = summary.countViolations(
+    failThreshold: failThreshold,
+    failOnIncrease: failOnIncrease,
+  );
+  sink.writeln('-' * (6 + 2 + 10 + 2 + maxName + 2 + 30));
+  sink.writeln(
+    'Summary: ${summary.countAdded} added, ${summary.countIncreased} '
+    'increased, ${summary.countImproved} improved '
+    '(Net Delta: ${summary.netDelta} | Violations: $violations)',
+  );
 }
