@@ -1,4 +1,4 @@
-name: Cognitive Complexity Audit (Dogfooding)
+name: Cognitive Complexity Audit
 
 on:
   pull_request:
