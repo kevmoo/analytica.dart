@@ -1,5 +1,3 @@
-# Cognitive Complexity Calculator
-
 A deterministic, zero-token Cognitive Complexity calculation library, CLI
 tool, and GitHub Action for Dart and Flutter repositories.
 
@@ -25,10 +23,40 @@ Campbell.
 
 ## 💻 CLI Usage
 
-Run the scanner locally in your project root:
+You can run the scanner on-demand without installation, locally inside a project, or globally.
+
+### On-Demand (Recommended)
+
+Run the scanner directly in any Dart or Flutter project root using the Dart SDK:
+
+```bash
+dart run cognitive_complexity@ [options] [targets]
+```
+
+*(Note: The trailing `@` instructs the Dart VM to resolve and execute the latest published version of the package on-demand).*
+
+### Project Dependency
+
+Add the package to your `dev_dependencies` in `pubspec.yaml`:
+
+```yaml
+dev_dependencies:
+  cognitive_complexity: ^0.1.0
+```
+
+And run:
 
 ```bash
 dart run cognitive_complexity [options] [targets]
+```
+
+### Global Installation
+
+To install the scanner globally on your system:
+
+```bash
+dart install cognitive_complexity
+cognitive_complexity [options] [targets]
 ```
 
 ### Options
