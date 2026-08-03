@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:path/path.dart' as p;
+import 'complexity_analyzer.dart';
 
 /// A service wrapping Git commands for repository evaluation and diffing.
 class GitDiffService {
@@ -62,10 +63,7 @@ class GitDiffService {
       if (relPath.isEmpty || p.extension(relPath) != '.dart') {
         continue;
       }
-      final norm = p.normalize(relPath);
-      if (norm.contains('.dart_tool') ||
-          norm.contains('.git') ||
-          norm.contains('build${p.separator}')) {
+      if (isExcludedPath(relPath)) {
         continue;
       }
 

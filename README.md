@@ -21,6 +21,41 @@ Campbell.
 
 ---
 
+## Scoring Model
+
+Scores follow the [SonarSource Cognitive Complexity whitepaper][whitepaper]
+(G. Ann Campbell, v1.7):
+
+* **Structural (+1, plus current nesting depth)**: `if`, the conditional
+  (`?:`) operator, `switch` statements and expressions, `for` (including
+  `for-in` and `await for`), `while`, `do-while`, and `catch`. Each also
+  deepens nesting for its contents.
+* **Hybrid (flat +1, no nesting penalty)**: `else` and `else if`. An
+  `else if` chain does not deepen nesting — contents of every branch sit one
+  level below the head `if`.
+* **Fundamental (flat +1)**: each sequence of like logical operators
+  (`a && b && c` is +1) with +1 for each alternation between `&&` and `||`,
+  and labeled `break`/`continue`.
+* **Nesting only (+0)**: lambdas and local function declarations deepen
+  nesting for their contents but add nothing themselves.
+* **Free (+0)**: `try`/`finally`, `throw`/`rethrow`, early `return`,
+  unlabeled `break`/`continue`, null-aware operators (`??`, `??=`, `?.`),
+  `assert`, and `switch` case labels.
+
+Dart-specific interpretations of the spec:
+
+* Pattern `when` guards add +1 (a guard is an extra condition to evaluate).
+* Pattern-level combinators (`case 1 || 2:`, `case > 0 && < 10`) are free —
+  an or-pattern is the modern spelling of stacked case labels, which the
+  spec scores at zero.
+* The whitepaper's "+1 for each method in a recursion cycle" is not
+  implemented, matching SonarSource's own reference implementation
+  (sonar-java), which omits it as well.
+
+[whitepaper]: https://www.sonarsource.com/docs/CognitiveComplexity.pdf
+
+---
+
 ## 💻 CLI Usage
 
 You can run the scanner on-demand without installation, locally inside a project, or globally.

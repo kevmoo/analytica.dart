@@ -76,6 +76,22 @@ void main() {
       check(removed.oldScore).isNotNull().equals(1);
       check(removed.newScore).isNull();
     });
+
+    test('fail-on-increase ignores newly added functions', () {
+      const oldCode = 'void existing() {}';
+      const newCode = '''
+        void existing() {}
+        void brandNew(bool a) { if (a) print(1); }
+      ''';
+
+      final deltas = analyzer.computeDeltaForCode(oldCode, newCode);
+      final added = deltas.firstWhere((d) => d.name == 'brandNew');
+      check(added.status).equals(DeltaStatus.added);
+      // A new function has no baseline to increase from; it is governed by
+      // the fail threshold instead.
+      check(added.isViolation(failOnIncrease: true)).isFalse();
+      check(added.isViolation(failOnIncrease: true, failThreshold: 0)).isTrue();
+    });
   });
 
   group('GitHubReporter Annotation Emissions', () {

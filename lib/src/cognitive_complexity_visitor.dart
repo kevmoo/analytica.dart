@@ -2,15 +2,29 @@ import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/dart/ast/token.dart';
 import 'package:analyzer/dart/ast/visitor.dart';
 
-/// An AST visitor that calculates Cognitive Complexity algorithmically.
+/// An AST visitor that calculates Cognitive Complexity following the
+/// SonarSource whitepaper specification (G. Ann Campbell, v1.7).
 ///
-/// Follows standard Cognitive Complexity rules:
-/// - Rule 1 (+0 Penalty): Null-aware operators and switch labels cost +0.
-/// - Rule 2 (+1 Base): Flow interruptions (`if`, `for`, `while`, `catch`,
-///   logical operators, and pattern `when` guards). Exhaustive `switch` blocks
-///   cost a flat +1 base regardless of arm count.
-/// - Rule 3 (+D Depth): Nesting multiplier added to base cost for nested flow.
-///   Exceptions: `else`, `else if`, and `catch` get flat +1 without depth.
+/// - Structural increments (+1 plus the current nesting depth): `if`, the
+///   conditional (`?:`) operator, `switch` statements and expressions, `for`
+///   (including `for-in` and `await for`), `while`, `do-while`, and `catch`.
+///   Each also increases the nesting depth for its contents.
+/// - Hybrid increments (flat +1, no nesting penalty): `else` and `else if`.
+///   An `else if` chain does not deepen nesting: contents of every branch in
+///   the chain sit one level below the head `if`.
+/// - Fundamental increments (flat +1): each sequence of like logical
+///   operators (`&&`/`||`, with +1 for each alternation between them),
+///   labeled `break`/`continue`, and pattern `when` guards (a Dart-specific
+///   extension of the spec).
+/// - Nesting only (+0): lambdas and local function declarations increase
+///   depth for their contents but add no increment themselves.
+/// - Free (+0): `try`/`finally`, `throw`/`rethrow`, early `return`,
+///   unlabeled `break`/`continue`, null-aware operators (`??`, `?.`),
+///   `switch` case labels and patterns, and `assert`.
+///
+/// Known deviation: the whitepaper's "+1 for each method in a recursion
+/// cycle" is not implemented (matching SonarSource's own reference
+/// implementation, which omits it as well).
 class CognitiveComplexityVisitor extends RecursiveAstVisitor<void> {
   int _score = 0;
   int _depth = 0;
@@ -26,6 +40,16 @@ class CognitiveComplexityVisitor extends RecursiveAstVisitor<void> {
     _depth++;
     f();
     _depth--;
+  }
+
+  /// Accumulates the score of every non-null node in [nodes].
+  ///
+  /// Useful for scoring a declaration made of several disjoint parts, such
+  /// as a constructor's parameter list, initializers, and body.
+  void visitAll(Iterable<AstNode?> nodes) {
+    for (final node in nodes) {
+      node?.accept(this);
+    }
   }
 
   @override
@@ -52,9 +76,10 @@ class CognitiveComplexityVisitor extends RecursiveAstVisitor<void> {
     final elseStmt = node.elseStatement;
     if (elseStmt != null) {
       if (elseStmt is IfStatement) {
-        _withIncrementedDepth(() {
-          elseStmt.accept(this);
-        });
+        // `else if` links are hybrid increments: the chained `if` scores a
+        // flat +1 and its branches nest relative to the head `if`, so no
+        // extra depth is added here.
+        elseStmt.accept(this);
       } else {
         _addScore(1);
         _withIncrementedDepth(() {
@@ -88,9 +113,8 @@ class CognitiveComplexityVisitor extends RecursiveAstVisitor<void> {
     final elseEl = node.elseElement;
     if (elseEl != null) {
       if (elseEl is IfElement) {
-        _withIncrementedDepth(() {
-          elseEl.accept(this);
-        });
+        // Hybrid increment: same handling as `else if` statements.
+        elseEl.accept(this);
       } else {
         _addScore(1);
         _withIncrementedDepth(() {
@@ -138,7 +162,7 @@ class CognitiveComplexityVisitor extends RecursiveAstVisitor<void> {
 
   @override
   void visitSwitchStatement(SwitchStatement node) {
-    _addScore(1);
+    _addScore(1 + _depth);
     node.expression.accept(this);
     _withIncrementedDepth(() {
       for (final member in node.members) {
@@ -149,7 +173,7 @@ class CognitiveComplexityVisitor extends RecursiveAstVisitor<void> {
 
   @override
   void visitSwitchExpression(SwitchExpression node) {
-    _addScore(1);
+    _addScore(1 + _depth);
     node.expression.accept(this);
     _withIncrementedDepth(() {
       for (final caseArm in node.cases) {
@@ -170,7 +194,7 @@ class CognitiveComplexityVisitor extends RecursiveAstVisitor<void> {
 
   @override
   void visitCatchClause(CatchClause node) {
-    _addScore(1);
+    _addScore(1 + _depth);
     _withIncrementedDepth(() {
       node.body.accept(this);
     });
@@ -196,14 +220,6 @@ class CognitiveComplexityVisitor extends RecursiveAstVisitor<void> {
   void visitWhenClause(WhenClause node) {
     _addScore(1);
     super.visitWhenClause(node);
-  }
-
-  @override
-  void visitFunctionDeclaration(FunctionDeclaration node) {
-    if (node.parent is! CompilationUnit) {
-      _addScore(1);
-    }
-    super.visitFunctionDeclaration(node);
   }
 
   @override

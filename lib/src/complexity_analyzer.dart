@@ -35,6 +35,18 @@ class FunctionComplexity {
   String toString() => '$name ($filePath:L$startLine-$endLine): $score';
 }
 
+/// Whether [relativePath] sits inside a directory that should never be
+/// scanned (`.dart_tool`, `.git`, or `build` output).
+///
+/// Matches whole path segments, so `.github/` or `builders/` are not
+/// mistaken for `.git/` or `build/`.
+bool isExcludedPath(String relativePath) {
+  final segments = p.split(p.normalize(relativePath));
+  return segments.contains('.dart_tool') ||
+      segments.contains('.git') ||
+      segments.contains('build');
+}
+
 /// Analyzes Dart files and directories to compute Cognitive Complexity scores.
 class ComplexityAnalyzer {
   final FeatureSet _featureSet = FeatureSet.latestLanguageVersion();
@@ -53,10 +65,8 @@ class ComplexityAnalyzer {
     } else if (dir.existsSync()) {
       for (final entity in dir.listSync(recursive: true, followLinks: false)) {
         if (entity is File && p.extension(entity.path) == '.dart') {
-          final normalized = p.normalize(entity.path);
-          if (normalized.contains('.dart_tool') ||
-              normalized.contains('.git') ||
-              normalized.contains('build${p.separator}')) {
+          final relative = p.relative(entity.path, from: targetPath);
+          if (isExcludedPath(relative)) {
             continue;
           }
           results.addAll(analyzeFile(entity.path));
@@ -109,6 +119,12 @@ class ComplexityAnalyzer {
   }
 }
 
+String _accessorPrefix({required bool isGetter, required bool isSetter}) {
+  if (isGetter) return 'get ';
+  if (isSetter) return 'set ';
+  return '';
+}
+
 class _DeclarationFinder extends RecursiveAstVisitor<void> {
   final String filePath;
   final LineInfo lineInfo;
@@ -139,9 +155,12 @@ class _DeclarationFinder extends RecursiveAstVisitor<void> {
     return null;
   }
 
-  void _record(String name, AstNode declarationNode, AstNode bodyNode) {
+  /// Scores [parts] (parameter lists carry default values, constructors
+  /// carry initializers) with a single visitor so nothing outside the body
+  /// proper is missed.
+  void _record(String name, AstNode declarationNode, List<AstNode?> parts) {
     final visitor = CognitiveComplexityVisitor();
-    bodyNode.accept(visitor);
+    visitor.visitAll(parts);
 
     final startLoc = lineInfo.getLocation(declarationNode.offset);
     final endLoc = lineInfo.getLocation(declarationNode.end);
@@ -159,21 +178,33 @@ class _DeclarationFinder extends RecursiveAstVisitor<void> {
 
   @override
   void visitFunctionDeclaration(FunctionDeclaration node) {
-    if (node.parent is CompilationUnit && !node.name.type.isKeyword) {
-      _record(node.name.lexeme, node, node.functionExpression.body);
+    // Note: pseudo-keywords (`show`, `on`, ...) are legal declaration names
+    // and parse with keyword-typed name tokens, so no keyword filtering here.
+    if (node.parent is CompilationUnit) {
+      final prefix = _accessorPrefix(
+        isGetter: node.isGetter,
+        isSetter: node.isSetter,
+      );
+      _record('$prefix${node.name.lexeme}', node, [
+        node.functionExpression.parameters,
+        node.functionExpression.body,
+      ]);
     }
   }
 
   @override
   void visitMethodDeclaration(MethodDeclaration node) {
     final rawName = node.name.lexeme;
-    final prefix = node.isGetter ? 'get ' : (node.isSetter ? 'set ' : '');
+    final prefix = _accessorPrefix(
+      isGetter: node.isGetter,
+      isSetter: node.isSetter,
+    );
     final enclosing = _getEnclosingName(node);
     final fullName = enclosing != null
         ? '$prefix$enclosing.$rawName'
         : '$prefix$rawName';
 
-    _record(fullName, node, node.body);
+    _record(fullName, node, [node.parameters, node.body]);
   }
 
   @override
@@ -182,6 +213,6 @@ class _DeclarationFinder extends RecursiveAstVisitor<void> {
     final constName = node.name?.lexeme;
     final fullName = constName == null ? enclosing : '$enclosing.$constName';
 
-    _record(fullName, node, node.body);
+    _record(fullName, node, [node.parameters, ...node.initializers, node.body]);
   }
 }

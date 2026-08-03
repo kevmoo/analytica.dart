@@ -36,7 +36,9 @@ class ComplexityDelta {
   int get delta => (newScore ?? 0) - (oldScore ?? 0);
 
   bool isViolation({int? failThreshold, bool failOnIncrease = false}) {
-    if (failOnIncrease && delta > 0) {
+    // Newly added declarations have no baseline to "increase" from; they are
+    // governed by [failThreshold] alone.
+    if (failOnIncrease && status == DeltaStatus.increased) {
       return true;
     }
     if (failThreshold != null &&
