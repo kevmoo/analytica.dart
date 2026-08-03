@@ -1,4 +1,4 @@
-## 0.2.0-wip
+## 0.2.0
 
 Scoring fixes aligning with the SonarSource Cognitive Complexity whitepaper
 (v1.7) and its reference implementation (sonar-java):
