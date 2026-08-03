@@ -26,21 +26,16 @@ Campbell.
 Scores follow the [SonarSource Cognitive Complexity whitepaper][whitepaper]
 (G. Ann Campbell, v1.7):
 
-* **Structural (+1, plus current nesting depth)**: `if`, the conditional
-  (`?:`) operator, `switch` statements and expressions, `for` (including
-  `for-in` and `await for`), `while`, `do-while`, and `catch`. Each also
-  deepens nesting for its contents.
-* **Hybrid (flat +1, no nesting penalty)**: `else` and `else if`. An
-  `else if` chain does not deepen nesting — contents of every branch sit one
-  level below the head `if`.
-* **Fundamental (flat +1)**: each sequence of like logical operators
-  (`a && b && c` is +1) with +1 for each alternation between `&&` and `||`,
-  and labeled `break`/`continue`.
-* **Nesting only (+0)**: lambdas and local function declarations deepen
-  nesting for their contents but add nothing themselves.
-* **Free (+0)**: `try`/`finally`, `throw`/`rethrow`, early `return`,
-  unlabeled `break`/`continue`, null-aware operators (`??`, `??=`, `?.`),
-  `assert`, and `switch` case labels.
+| Construct / Syntax | Base Cost | Nesting Multiplier | Deepens Nesting? | Notes |
+| :--- | :---: | :---: | :---: | :--- |
+| **`if`, `for`, `while`, `do-while`, `catch` / `on`** | `+1` | `+D` (Current Depth) | **Yes** | Standard flow-breaking structures |
+| **`switch` Statements & Expressions** | `+1` | `+D` (Current Depth) | **Yes** | Entire block costs `+1` regardless of arm count |
+| **`else` / `else if`** | `+1` | `+0` (Flat penalty) | **No** | Branch contents sit one level below head `if` |
+| **Logical Operators (`&&`, `\|\|`)** | `+1` | `+0` (Flat penalty) | **No** | `+1` per sequence; `+1` for each alternation |
+| **Pattern `when` Guards** | `+1` | `+0` (Flat penalty) | **No** | Dart 3 specific interpretation |
+| **Lambdas & Local Functions** | `+0` | `+0` | **Yes** | Deepens nesting depth for enclosed bodies |
+| **Null-Aware (`??`, `?.`, `??=`), `assert`, `try` / `finally`** | `+0` | `+0` | **No** | Benign syntax; completely free |
+| **Switch Case Labels & Pattern Combinators** | `+0` | `+0` | **No** | Stacked arms / or-patterns (`1 \|\| 2`) are free |
 
 Dart-specific interpretations of the spec:
 
