@@ -205,3 +205,20 @@ If write permissions are not granted, the scanner will execute normally, and out
 
 #### Fork PR Security Note
 Workflows triggered by pull requests from external forks are executed with restricted read-only permissions by GitHub. For security reasons, the action will gracefully skip posting PR comments on forks to prevent Remote Code Execution (RCE) risks, while still validating code complexity in GHA annotations and build status.
+
+---
+
+## 🧠 AI Agent Integration (Skill)
+
+This repository packages an authoritative **Agent Skill** (`dart-cognitive-complexity`)
+designed to train LLMs and autonomous agents on Cognitive Complexity math,
+threshold boundaries, and structural Dart refactoring patterns (such as Dart 3
+switch expressions and guard clauses).
+
+### Installing the Skill
+
+You can install this skill into your AI agent environment:
+
+```bash
+npx skills add kevmoo/cognitive_complexity.dart --skill dart-cognitive-complexity
+```
