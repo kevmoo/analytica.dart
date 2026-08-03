@@ -7,6 +7,9 @@ on:
 jobs:
   audit:
     runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      contents: read
     steps:
       - name: Checkout Codebase
         uses: actions/checkout@v7

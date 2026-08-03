@@ -102,10 +102,10 @@ runs:
 
             if [ -n "$comment_id" ]; then
               echo "Updating existing comment (ID: $comment_id)..."
-              gh api -X PATCH "repos/$GITHUB_REPOSITORY/issues/comments/$comment_id" -F body=@"$GITHUB_STEP_SUMMARY" > /dev/null
+              gh api -X PATCH "repos/$GITHUB_REPOSITORY/issues/comments/$comment_id" -F body=@"$GITHUB_STEP_SUMMARY" > /dev/null || true
             else
               echo "Creating new PR comment..."
-              gh pr comment "$PR_NUMBER" --body-file "$GITHUB_STEP_SUMMARY" --repo "$GITHUB_REPOSITORY" > /dev/null
+              gh pr comment "$PR_NUMBER" --body-file "$GITHUB_STEP_SUMMARY" --repo "$GITHUB_REPOSITORY" > /dev/null || true
             fi
           fi
         fi
