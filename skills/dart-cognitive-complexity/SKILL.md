@@ -1,139 +1,102 @@
 ---
 name: dart-cognitive-complexity
-description: |-
-  Evaluates and reduces Cognitive Complexity in Dart and Flutter code using concrete mathematical scoring rules, exhaustive pattern matching, guard clauses, and method decomposition. Use when reviewing codebase readability, refactoring convoluted methods, or analyzing structural code health. Don't use for general code formatting, simple syntactic lints, or non-Dart/Flutter repositories.
+description: >-
+  Evaluates and reduces Cognitive Complexity in Dart and Flutter code using
+  deterministic CLI tooling and architectural refactoring patterns (exhaustive
+  pattern matching, guard clauses, method decomposition). Use when reviewing
+  codebase readability, remediating high-complexity warnings, or analyzing
+  structural code health. Don't use for general code formatting, simple syntactic
+  lints, or non-Dart/Flutter repositories.
 license: Apache-2.0
 key_features:
-  - Cognitive complexity scoring
-  - Dart 3 pattern matching
-  - Guard clause refactoring
+  - Automated CLI evaluation
+  - Dart 3 pattern matching refactorings
+  - Guard clause depth inversion
 ---
 
-## 1. When to use this skill
+## 1. When to Use This Skill
 
 Use this skill when analyzing Dart and Flutter codebase maintainability,
-evaluating function readability, or remediating high-complexity warning
-findings. Unlike traditional Cyclomatic Complexity (which linearly counts
-branching paths and punishes clean declarative table switches), Cognitive
-Complexity directly measures the comprehension friction required for a
-human or reviewing LLM to read and simulate control flow.
+evaluating function readability, or remediating high-complexity findings during
+code review or static analysis audits.
 
-Specifically, target methods and classes matching these indicators:
-*   **Deeply Nested Control Flow**: Functions exhibiting multiple layers of
-    enclosing conditionals (`if`, `for`, `while`), where indentation obscures
-    logic.
-*   **Convoluted Conditional Trees**: Functions employing verbose `if-else`
-    or `else if` chains instead of modern Dart 3 exhaustive pattern matching
-    or table-driven switches.
-*   **Monolithic Method Bodies**: Functions that breach operational complexity
-    thresholds during evaluation or static analysis audits.
-*   **God Classes**: Logic classes exceeding structural line-count ceilings
-    (excluding declarative Flutter `build` methods).
+Unlike Cyclomatic Complexity (which linearly counts control flow branching paths
+and punishes declarative table switches), Cognitive Complexity measures the
+mental friction required for a human engineer to read and simulate control flow.
+Rely on deterministic evaluation to target structures matching these indicators:
 
-### Discovery & Evaluation Commands
+* **Deeply Nested Control Flow**: Functions exhibiting multiple layers of enclosing
+  conditionals (`if`, `for`, `while`), where horizontal indentation obscures logic.
+* **Convoluted Conditional Trees**: Functions employing verbose `if-else` or
+  `else if` chains instead of modern Dart 3 exhaustive pattern matching or
+  table-driven switch expressions.
+* **Monolithic Method Bodies**: Functions breaching operational threshold ceilings.
+* **God Classes**: Logic classes exceeding structural line-count targets
+  (excluding declarative Flutter `build` methods).
 
-Run deterministic, zero-token evaluation commands to identify hot-spots and
-calculate complexity scores across the repository:
+---
+
+## 2. Automated Execution Strategy
+
+Execute the official package CLI directly in the terminal to retrieve exact
+complexity scores, file paths, line numbers, and breach warnings deterministically,
+without consuming token bandwidth on manual AST interpretation or arithmetic:
 
 ```bash
-# Evaluate cognitive complexity across the repository (targets default to lib/)
+# Display declarations with scores at or above the threshold (default target: lib/)
 dart run cognitive_complexity@ --threshold 15
 
-# Audit code review deltas in a branch or PR against main
+# Enforce strict build guardrails by failing (exit code 1) on threshold breaches
+dart run cognitive_complexity@ --fail-threshold 15
+
+# Audit code review deltas against main and fail on any score increase
 dart run cognitive_complexity@ --git-diff origin/main --fail-on-increase
 ```
 
 ---
 
-## 2. Algorithmic Scoring Rules for Dart
+## 3. Actionable Thresholds & Calibration
 
-Calculate Cognitive Complexity algorithmically using three deterministic
-scoring rules:
-
-### Rule 1: Benign Shorthand & Switches (+0 Penalty)
-No base points or nesting multipliers are added for idiomatic Dart syntax
-that consolidates operations into scannable expressions:
-*   **Null-Aware Operators & Cascades**: `??`, `?.`, `??=`, null-aware spreads
-    (`...?`), null-aware collection elements (`?item`), and cascade notation
-    (`..`) cost +0 points.
-*   **Dart 3 Switch Statements & Expressions**: An entire exhaustive `switch`
-    block costs exactly +1 base point, regardless of whether it evaluates
-    3 or 50 `case` or pattern arms. Case labels receive +0 points.
-
-### Rule 2: Flow Interruption (+1 Base)
-Add +1 base point whenever execution diverges from linear top-to-bottom
-reading flow:
-*   **Conditionals & Ternaries**: `if`, `else if`, `else`, and conditional
-    expressions (`cond ? x : y`).
-*   **Iterators**: `for`, `while`, `do-while`, and collection `for` / `if`
-    clauses inside list literals.
-*   **Exception Catching**: `catch` / `on` blocks (`try` and `finally` cost +0).
-*   **Logical Operator Switches**: Consecutive strings of identical operators
-    (`a && b && c`) count as +1 total. Alternating operator families
-    (`a && b || c`) adds +1 per alternation.
-
-### Rule 3: The Nesting Multiplier (+D Depth)
-Whenever a flow-breaking structure (from Rule 2) is nested inside another
-structural block, add its structural nesting depth (D) to the base cost:
-*   Top-level `if` (D=0): +1 base = +1 point.
-*   `for` loop nested inside that `if` (D=1): +1 base + 1 depth = +2 points.
-*   Inner `if` inside the `for` (D=2): +1 base + 2 depth = +3 points.
-*   **Flat Multiplicity Exceptions**: Unlike conditional openers and loops,
-    `else`, `else if`, and `catch` / `on` structures receive only a flat +1
-    base penalty without incurring depth nesting multipliers.
+* **Production Logic Functions**: Target score `<= 15`. Functions exceeding 15 points
+  mandate architectural refactoring.
+* **Test Methods (`_test.dart`)**: Target score `<= 40`. Test suites tolerate higher
+  setup sequences before decomposition is required.
+* **Class Size Ceiling**: Logic classes (services, domain objects, controllers)
+  should remain `<= 150` non-comment lines.
+* **Flutter UI Calibration**: Do not enforce the 150 LOC class ceiling on
+  declarative Flutter `build` methods, as widget wrappers consume vertical space
+  without increasing cognitive logic load. Instead, enforce a **Widget Tree
+  Nesting Ceiling** of maximum 5 horizontal indentation levels before extracting
+  discrete helper widget classes.
 
 ---
 
-## 3. Execution Strategy (Deterministic Evaluation)
+## 4. Dart Refactoring Patterns
 
-Do not waste token bandwidth calculating complexity scores by hand or
-delegating manual arithmetic to subagents. Leverage the automated CLI tool:
-*   **Automated CLI (Default)**: Always execute `dart run cognitive_complexity@ -t 15`
-    in the terminal to retrieve exact complexity scores, file paths, line
-    numbers, and breach warnings deterministically with zero token overhead.
-*   **Inline Computation (Micro-Scope Only)**: Calculate complexity scores
-    manually in chat solely when evaluating temporary code snippets (< 50 lines)
-    pasted directly into the conversation before saving them to disk.
-
----
-
-## 4. Actionable Thresholds & Calibration
-
-*   **Production Logic Functions**: Target score <= 15. Functions exceeding
-    15 points mandate architectural refactoring.
-*   **Test Methods (`_test.dart`)**: Target score <= 40. Test harnesses
-    tolerate higher structural setup sequences before decomposition is required.
-*   **Class Size Ceiling**: Logic classes (services, domain objects,
-    controllers) should remain <= 150 non-comment lines.
-*   **Flutter UI Calibration**: Do not enforce the 150 LOC class ceiling on
-    declarative Flutter `build` methods, as widget wrappers consume vertical
-    space without increasing cognitive logic load. Instead, enforce a
-    **Widget Tree Nesting Ceiling** of maximum 5 horizontal indentation
-    levels before extracting discrete helper widget classes.
-
----
-
-## 5. Refactoring Strategies & Dart Patterns
-
-When remediating functions that breach complexity ceilings, apply these
+When remediation is required for declarations flagged by the scanner, apply these
 Dart-specific architectural refactorings:
 
 ### Pattern A: Replace Nested If-Else with Dart 3 Switch Expression
 
-#### Before: Deeply Nested Conditionals (Score: 12)
+In Dart 3, an entire exhaustive switch expression incurs a single base penalty,
+regardless of how many pattern arms it contains. Converting deeply nested `if-else`
+trees into declarative tables removes repeated branching penalties and flattens
+nesting.
+
+#### Before: Nested Conditional Ladders (Score: 11)
 ```dart
 int resolveTimeout(String protocol, bool isSecure, int retryCount) {
-  if (protocol == 'http') {          // D=0 -> +1 (if)
-    if (isSecure) {                  // D=1 -> +2 (if + depth 1)
-      if (retryCount > 3) {          // D=2 -> +3 (if + depth 2)
+  if (protocol == 'http') {
+    if (isSecure) {
+      if (retryCount > 3) {
         return 5000;
-      } else {                       // D=2 -> +1 (else flat)
+      } else {
         return 3000;
       }
-    } else {                         // D=1 -> +1 (else flat)
+    } else {
       return 1000;
     }
-  } else if (protocol == 'ftp') {    // D=0 -> +1 (else if flat) +3 (nested...)
+  } else if (protocol == 'ftp') {
     return isSecure ? 10000 : 2000;
   }
   return 0;
@@ -143,14 +106,14 @@ int resolveTimeout(String protocol, bool isSecure, int retryCount) {
 #### After: Table-Driven Switch Expression (Score: 1)
 ```dart
 int resolveTimeout(String protocol, bool isSecure, int retryCount) =>
-    switch ((protocol, isSecure, retryCount)) {  // D=0 -> +1 (switch expression)
-      ('http', true, > 3) => 5000,               // Case arms cost +0
+    switch ((protocol, isSecure, retryCount)) {
+      ('http', true, > 3) => 5000,
       ('http', true, _) => 3000,
       ('http', false, _) => 1000,
       ('ftp', true, _) => 10000,
       ('ftp', false, _) => 2000,
       _ => 0,
-    };                                           // Total complexity reduction: 12 -> 1
+    };
 ```
 
 ---
@@ -164,10 +127,10 @@ multiplication from subsequent downstream logic.
 #### Before: Pyramid of Nesting (Score: 11)
 ```dart
 Future<void> syncPayload(User? user, Payload? data) async {
-  if (user != null) {                      // D=0 -> +1
-    if (user.hasPermission) {              // D=1 -> +2 (if + depth 1)
-      if (data != null && data.isValid) {  // D=2 -> +3 (if + depth 2) +1 (&&)
-        for (final item in data.items) {   // D=3 -> +1 (for) + 3 depth = +4
+  if (user != null) {
+    if (user.hasPermission) {
+      if (data != null && data.isValid) {
+        for (final item in data.items) {
           await repository.save(item);
         }
       }
@@ -179,10 +142,10 @@ Future<void> syncPayload(User? user, Payload? data) async {
 #### After: Early Exit Guard Clauses (Score: 5)
 ```dart
 Future<void> syncPayload(User? user, Payload? data) async {
-  if (user == null || !user.hasPermission) return; // D=0 -> +1 (if) +1 (||) = +2
-  if (data == null || !data.isValid) return;       // D=0 -> +1 (if) +1 (||) = +2
+  if (user == null || !user.hasPermission) return;
+  if (data == null || !data.isValid) return;
 
-  for (final item in data.items) {                 // D=0 -> +1 (for at zero depth)
+  for (final item in data.items) {
     await repository.save(item);
   }
 }
@@ -192,23 +155,31 @@ Future<void> syncPayload(User? user, Payload? data) async {
 
 ### Pattern C: Encapsulated Method Object Extraction
 
-When a monolithic function contains dense closures capturing heavy local
-variable state that prevents simple function extraction, migrate the function
-body into a dedicated private runner class using the
-**`encapsulated-method-object`** skill. Read the `encapsulated-method-object`
-skill instructions via `view_file` before applying this refactoring. Promoting
-local variables to class instance fields collapses closure nesting penalties
-and unlocks focused helper method decomposition.
+When a monolithic function contains dense closures capturing heavy local variable
+state that prevents simple function extraction, migrate the function body into a
+dedicated private runner class. Promoting local variables to class instance fields
+collapses closure nesting penalties and unlocks focused helper method
+decomposition.
+
+#### Refactoring Workflow
+1. Create a private class (e.g., `_PayloadProcessor`) accepting required state
+   through its constructor.
+2. Store mutable local variables as instance fields on the private class.
+3. Replace the original monolithic function body with a single instantiation and
+   method invocation on the runner object (`_PayloadProcessor(args).execute()`).
+4. Deconstruct the inner execution body into small, focused instance methods.
 
 ---
 
-## 6. Verification Guardrails
+## 5. Verification Guardrails
 
-Run these verification commands before submitting refactored code:
+Run these verification commands before committing refactored code:
 
-1.  **Code Presentation**: Run `dart format .` to maintain uniform syntactic
-    styling.
-2.  **Static Analysis**: Run `dart analyze` to ensure zero static warnings,
-    lint violations, or un-awaited asynchronous gaps.
-3.  **Test Fidelity**: Run `dart test` (or `flutter test`) to verify zero
-    behavioral drift across existing test suites.
+1. **Complexity Audit**: Run `dart run cognitive_complexity@ --fail-threshold 15`
+   to verify zero declarations exceed operational ceilings.
+2. **Code Presentation**: Run `dart format .` to maintain uniform syntactic
+   styling.
+3. **Static Analysis**: Run `dart analyze` to ensure zero static warnings, lint
+   violations, or un-awaited asynchronous gaps.
+4. **Test Fidelity**: Run `dart test` (or `flutter test`) to confirm zero
+   behavioral drift across existing test suites.
