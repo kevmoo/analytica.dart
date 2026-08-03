@@ -71,7 +71,32 @@ dart run cognitive_complexity@ --git-diff origin/main --fail-on-increase
 
 ---
 
-## 4. Dart Refactoring Patterns
+## 4. Pre-Refactoring Assessment & Test Coverage Gate
+
+High cognitive complexity strongly correlates with brittle, untested legacy logic.
+Before undertaking structural refactoring on flagged functions, enforce this
+verification baseline:
+
+1. **Test Harness Mapping**: Confirm an accompanying unit test file exists for
+   the target declaration (e.g., `lib/src/foo.dart` -> `test/foo_test.dart`).
+2. **Coverage Audit & Execution**:
+   * If the **`dart-collect-coverage`** companion skill is available in your
+     agent runtime, invoke it to check line and branch coverage on the targeted
+     declarations.
+   * At minimum, execute the relevant test suite (`dart test test/foo_test.dart`)
+     to confirm a passing green regression baseline before touching code.
+3. **Low-Coverage Safety Gate**: If tests are missing or coverage around the
+   flagged function is inadequate, pause execution and explicitly warn the user:
+   > ⚠️ **Low Test Coverage Warning**: Function `<name>` in `<path>` lacks unit
+   > test coverage. Structural refactoring risks silent behavioral regression.
+   
+   Offer clear remediation paths:
+   1. **(Recommended)** Write unit tests to lock in baseline behavior first.
+   2. Proceed with structural refactoring and verify functionality manually.
+
+---
+
+## 5. Dart Refactoring Patterns
 
 When remediation is required for declarations flagged by the scanner, apply these
 Dart-specific architectural refactorings:
@@ -161,6 +186,12 @@ dedicated private runner class. Promoting local variables to class instance fiel
 collapses closure nesting penalties and unlocks focused helper method
 decomposition.
 
+> **Companion Skill Hint**: If the **`encapsulated-method-object`** companion skill
+> is installed in your agent runtime, load and follow its instructions for
+> class-based encapsulation (it includes explicit overuse guardrails against
+> applying runner classes to stateless or sequential methods). Otherwise, execute
+> the standard refactoring workflow below.
+
 #### Refactoring Workflow
 1. Create a private class (e.g., `_PayloadProcessor`) accepting required state
    through its constructor.
@@ -171,7 +202,7 @@ decomposition.
 
 ---
 
-## 5. Verification Guardrails
+## 6. Verification Guardrails
 
 Run these verification commands before committing refactored code:
 
