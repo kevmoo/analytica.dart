@@ -22,23 +22,30 @@ class GitDiffService {
     return (res.stdout as String).trim();
   }
 
-  /// Finds Dart files modified between [baseRef] and HEAD using merge base.
+  /// Resolves the common ancestor commit SHA between [baseRef] and HEAD.
+  Future<String> getMergeBase(String baseRef) async {
+    final res = await _runGit(['merge-base', baseRef, 'HEAD']);
+    if (res.exitCode != 0) {
+      throw ArgumentError(
+        'Failed to resolve merge base for "$baseRef": '
+        '${(res.stderr as String).trim()}',
+      );
+    }
+    return (res.stdout as String).trim();
+  }
+
+  /// Finds Dart files modified between [baseCommit] and HEAD.
   Future<List<String>> getModifiedDartFiles(
-    String baseRef, {
+    String baseCommit, {
     List<String> targetPaths = const [],
   }) async {
     final repoRoot = await getRepoRoot();
-    final args = [
-      'diff',
-      '--name-only',
-      '--diff-filter=ACMR',
-      '$baseRef...HEAD',
-    ];
+    final args = ['diff', '--name-only', '--diff-filter=ACMR', baseCommit];
 
     final res = await _runGit(args);
     if (res.exitCode != 0) {
       throw ArgumentError(
-        'Git diff failed against base ref "$baseRef": '
+        'Git diff failed against base commit "$baseCommit": '
         '${(res.stderr as String).trim()}',
       );
     }
@@ -63,9 +70,14 @@ class GitDiffService {
       }
 
       final absPath = p.join(repoRoot, relPath);
-      if (targetPaths.isNotEmpty &&
-          !targetPaths.any((t) => absPath.startsWith(p.absolute(t)))) {
-        continue;
+      if (targetPaths.isNotEmpty) {
+        final matches = targetPaths.any((t) {
+          final absTarget = p.join(repoRoot, t);
+          return p.isWithin(absTarget, absPath) || p.equals(absTarget, absPath);
+        });
+        if (!matches) {
+          continue;
+        }
       }
 
       results.add(relPath);

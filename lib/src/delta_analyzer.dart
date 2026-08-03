@@ -105,30 +105,35 @@ class DeltaSummary {
   Map<String, dynamic> toJson({
     int? failThreshold,
     bool failOnIncrease = false,
-  }) => {
-    'base_ref': baseRef,
-    'target_ref': targetRef,
-    'summary': {
-      'files_analyzed': filesAnalyzed,
-      'declarations_changed': deltas.length,
-      'added': countAdded,
-      'increased': countIncreased,
-      'improved': countImproved,
-      'net_delta': netDelta,
-      'violations': countViolations(
-        failThreshold: failThreshold,
-        failOnIncrease: failOnIncrease,
-      ),
-    },
-    'deltas': deltas
-        .map(
-          (d) => d.toJson(
-            failThreshold: failThreshold,
-            failOnIncrease: failOnIncrease,
-          ),
-        )
-        .toList(),
-  };
+  }) {
+    final changedDeltas = deltas
+        .where((d) => d.status != DeltaStatus.unchanged)
+        .toList();
+    return {
+      'base_ref': baseRef,
+      'target_ref': targetRef,
+      'summary': {
+        'files_analyzed': filesAnalyzed,
+        'declarations_changed': changedDeltas.length,
+        'added': countAdded,
+        'increased': countIncreased,
+        'improved': countImproved,
+        'net_delta': netDelta,
+        'violations': countViolations(
+          failThreshold: failThreshold,
+          failOnIncrease: failOnIncrease,
+        ),
+      },
+      'deltas': changedDeltas
+          .map(
+            (d) => d.toJson(
+              failThreshold: failThreshold,
+              failOnIncrease: failOnIncrease,
+            ),
+          )
+          .toList(),
+    };
+  }
 }
 
 /// Evaluates git diffs to calculate cognitive complexity score deltas.
@@ -145,8 +150,9 @@ class DeltaAnalyzer {
     String baseRef, {
     List<String> targetPaths = const [],
   }) async {
+    final mergeBase = await _gitService.getMergeBase(baseRef);
     final modFiles = await _gitService.getModifiedDartFiles(
-      baseRef,
+      mergeBase,
       targetPaths: targetPaths,
     );
     final allDeltas = <ComplexityDelta>[];
@@ -155,7 +161,7 @@ class DeltaAnalyzer {
     final tasks = modFiles.map(
       (relPath) => pool.withResource(() async {
         final oldContent = await _gitService.getHistoricalFileContent(
-          baseRef,
+          mergeBase,
           relPath,
         );
         final newContent = await _gitService.getCurrentFileContent(relPath);

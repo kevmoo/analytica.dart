@@ -38,12 +38,16 @@ runs:
     - name: Resolve Diff Base & Fetch History
       id: prepare
       shell: bash
+      env:
+        INPUT_DIFF_BASE: ${{ inputs.diff-base }}
+        EVENT_NAME: ${{ github.event_name }}
+        BASE_REF: ${{ github.base_ref }}
       run: |
         diff_arg=""
-        base="${{ inputs.diff-base }}"
+        base="$INPUT_DIFF_BASE"
         if [ -z "$base" ]; then
-          if [ "${{ github.event_name }}" = "pull_request" ] || [ "${{ github.event_name }}" = "pull_request_target" ]; then
-            base="origin/${{ github.base_ref }}"
+          if [ "$EVENT_NAME" = "pull_request" ] || [ "$EVENT_NAME" = "pull_request_target" ]; then
+            base="origin/$BASE_REF"
           fi
         fi
         if [ -n "$base" ]; then
@@ -55,15 +59,29 @@ runs:
 
     - name: Execute Cognitive Complexity Scanner
       shell: bash
+      env:
+        INPUT_THRESHOLD: ${{ inputs.threshold }}
+        INPUT_FAIL_THRESHOLD: ${{ inputs.fail-threshold }}
+        INPUT_FAIL_ON_INCREASE: ${{ inputs.fail-on-increase }}
+        INPUT_FORMAT: ${{ inputs.format }}
+        INPUT_TARGETS: ${{ inputs.targets }}
+        DIFF_ARG: ${{ steps.prepare.outputs.diff_arg }}
+        ACTION_PATH: ${{ github.action_path }}
       run: |
         fail_inc_arg=""
-        if [ "${{ inputs.fail-on-increase }}" = "true" ]; then
+        if [ "$INPUT_FAIL_ON_INCREASE" = "true" ]; then
           fail_inc_arg="--fail-on-increase"
         fi
-        dart run --directory="${{ github.action_path }}" bin/cognitive_complexity.dart \
-          --threshold="${{ inputs.threshold }}" \
-          --fail-threshold="${{ inputs.fail-threshold }}" \
-          --format="${{ inputs.format }}" \
-          ${{ steps.prepare.outputs.diff_arg }} \
+        
+        # Navigate to action repo directory, run pub get to resolve dependencies deterministically
+        cd "$ACTION_PATH"
+        dart pub get >/dev/null
+        
+        # Execute the scanner CLI tool
+        dart run bin/cognitive_complexity.dart \
+          --threshold="$INPUT_THRESHOLD" \
+          --fail-threshold="$INPUT_FAIL_THRESHOLD" \
+          --format="$INPUT_FORMAT" \
+          $DIFF_ARG \
           $fail_inc_arg \
-          ${{ inputs.targets }}
+          $INPUT_TARGETS

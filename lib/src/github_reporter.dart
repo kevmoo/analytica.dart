@@ -9,11 +9,7 @@ class GitHubReporter {
 
   GitHubReporter({StringSink? stdoutSink, File? summaryFile})
     : _stdoutSink = stdoutSink ?? stdout,
-      _summaryFile =
-          summaryFile ??
-          (Platform.environment['GITHUB_STEP_SUMMARY'] != null
-              ? File(Platform.environment['GITHUB_STEP_SUMMARY']!)
-              : null);
+      _summaryFile = summaryFile;
 
   /// Generates diagnostic workflow annotations and updates step summary table.
   void printReport({

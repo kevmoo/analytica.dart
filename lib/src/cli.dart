@@ -16,6 +16,9 @@ Future<int> runCli(
   final stdoutSink = out ?? stdout;
   final stderrSink = err ?? stderr;
 
+  // Under GitHub Actions, the process is compiled/run from the action's folder.
+  // We re-align Directory.current to GITHUB_WORKSPACE so target scanning paths
+  // and git commands resolve against the user's project workspace repository.
   final workspace = Platform.environment['GITHUB_WORKSPACE'];
   if (workspace != null && workspace.isNotEmpty) {
     Directory.current = workspace;
@@ -85,6 +88,13 @@ Future<int> runCli(
     final format = argResults['format'] as String;
     final gitDiffBase = argResults['git-diff'] as String?;
     final failOnIncrease = argResults['fail-on-increase'] as bool;
+
+    if (failOnIncrease && gitDiffBase == null) {
+      stderrSink.writeln(
+        'Warning: --fail-on-increase has no effect unless --git-diff is '
+        'specified.',
+      );
+    }
 
     if (gitDiffBase != null) {
       if (gitDiffBase.trim().isEmpty) {
@@ -157,7 +167,10 @@ Future<int> _handleDiffMode({
       ),
     );
   } else if (format == 'github') {
-    final reporter = GitHubReporter(stdoutSink: out);
+    final reporter = GitHubReporter(
+      stdoutSink: out,
+      summaryFile: _resolveSummaryFile(),
+    );
     reporter.printReport(
       deltaSummary: summary,
       failThreshold: failThreshold,
@@ -205,7 +218,10 @@ int _handleRegularMode({
   if (format == 'json') {
     out.writeln(jsonEncode(displayed.map((e) => e.toJson()).toList()));
   } else if (format == 'github') {
-    final reporter = GitHubReporter(stdoutSink: out);
+    final reporter = GitHubReporter(
+      stdoutSink: out,
+      summaryFile: _resolveSummaryFile(),
+    );
     reporter.printReport(
       regularResults: displayed,
       failThreshold: failThreshold,
@@ -330,4 +346,10 @@ void _printDeltaTextReport(
     'increased, ${summary.countImproved} improved '
     '(Net Delta: ${summary.netDelta} | Violations: $violations)',
   );
+}
+
+File? _resolveSummaryFile() {
+  final path = Platform.environment['GITHUB_STEP_SUMMARY'];
+  if (path == null || path.isEmpty) return null;
+  return File(path);
 }
