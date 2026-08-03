@@ -2,6 +2,10 @@ name: 'Dart Cognitive Complexity Audit'
 description: 'Deterministic Cognitive Complexity calculator and Git diff regression scanner for Dart and Flutter repositories.'
 author: 'kevmoo'
 
+branding:
+  icon: 'trending-up'
+  color: 'blue'
+
 inputs:
   targets:
     description: 'Space-separated list of target files or directories to analyze.'
