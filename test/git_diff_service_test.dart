@@ -69,7 +69,8 @@ void main() {
       final mergeBase = await git.getMergeBase('feat/test');
       check(mergeBase).isNotEmpty();
 
-      // Verify that mergeBase has the feature.dart file missing (since it was before divergence)
+      // Verify that mergeBase has the feature.dart file missing
+      // (since it was before divergence)
       final gitShow = await Process.run('git', [
         'show',
         '$mergeBase:lib/feature.dart',

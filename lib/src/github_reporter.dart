@@ -7,9 +7,8 @@ class GitHubReporter {
   final StringSink _stdoutSink;
   final File? _summaryFile;
 
-  GitHubReporter({StringSink? stdoutSink, File? summaryFile})
-    : _stdoutSink = stdoutSink ?? stdout,
-      _summaryFile = summaryFile;
+  GitHubReporter({StringSink? stdoutSink, File? this._summaryFile})
+    : _stdoutSink = stdoutSink ?? stdout;
 
   /// Generates diagnostic workflow annotations and updates step summary table.
   void printReport({
