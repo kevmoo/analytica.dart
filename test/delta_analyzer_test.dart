@@ -142,7 +142,7 @@ void main() {
     test(
       'computes deltas for mocked modified files and returns sorted summary',
       () async {
-        final fakeGit = FakeGitDiffService(
+        const fakeGit = FakeGitDiffService(
           modifiedFiles: ['lib/foo.dart', 'lib/bar.dart'],
           historicalContent: {
             'lib/foo.dart': 'void main() { if (a) { if (b) {} } }', // score 3
@@ -176,7 +176,7 @@ void main() {
   });
 }
 
-class FakeGitDiffService implements GitDiffService {
+class FakeGitDiffService extends GitDiffService {
   final List<String> modifiedFiles;
   final Map<String, String> historicalContent;
   final Map<String, String> currentContent;
@@ -186,9 +186,6 @@ class FakeGitDiffService implements GitDiffService {
     required this.historicalContent,
     required this.currentContent,
   });
-
-  @override
-  String? get _workingDirectory => null;
 
   @override
   Future<String> getRepoRoot() async => '/root';
