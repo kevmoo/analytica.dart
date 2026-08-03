@@ -17,7 +17,7 @@ Campbell.
 * **Deterministic Engine**: Calculates complexity algorithmically without invoking
   LLM calls or external network requests.
 * **Git Diff Analysis**: Compares current workspace declarations against a target
-  base ref to isolate complexity deltas ($\Delta$) in modified functions.
+  base ref to isolate complexity deltas (Δ) in modified functions.
 * **Lightweight GitHub Action**: Exposes workflow annotations and step summaries
   for CI check integration.
 
@@ -37,7 +37,7 @@ dart run cognitive_complexity [options] [targets]
 * `-f, --fail-threshold <value>`: Ceilings score. Exits with code `1` if any
   declaration exceeds this value.
 * `-d, --git-diff <git-ref>`: Compares current code against a git commit/ref,
-  evaluating complexity deltas ($\Delta$) on modified functions.
+  evaluating complexity deltas (Δ) on modified functions.
 * `--fail-on-increase`: When using `--git-diff`, exits with code `1` if any
   modified function experienced a complexity score increase.
 * `--format <text|json|github>`: Report output formatting (default: `text`).
