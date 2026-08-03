@@ -1,3 +1,4 @@
+import 'package:pool/pool.dart';
 import 'complexity_analyzer.dart';
 import 'git_diff_service.dart';
 
@@ -150,24 +151,27 @@ class DeltaAnalyzer {
     );
     final allDeltas = <ComplexityDelta>[];
 
-    for (final relPath in modFiles) {
-      final oldContent = await _gitService.getHistoricalFileContent(
-        baseRef,
-        relPath,
-      );
-      final newContent = await _gitService.getCurrentFileContent(relPath);
+    final pool = Pool(8);
+    final tasks = modFiles.map(
+      (relPath) => pool.withResource(() async {
+        final oldContent = await _gitService.getHistoricalFileContent(
+          baseRef,
+          relPath,
+        );
+        final newContent = await _gitService.getCurrentFileContent(relPath);
 
-      final fileDeltas = computeDeltaForCode(
-        oldContent,
-        newContent,
-        filePath: relPath,
-      );
+        return computeDeltaForCode(oldContent, newContent, filePath: relPath);
+      }),
+    );
+
+    final results = await Future.wait(tasks);
+    for (final fileDeltas in results) {
       allDeltas.addAll(fileDeltas);
     }
 
-    // Sort by absolute delta magnitude descending, then new score
+    // Sort by delta descending (regression prioritization), then new score
     allDeltas.sort((a, b) {
-      final comp = b.delta.abs().compareTo(a.delta.abs());
+      final comp = b.delta.compareTo(a.delta);
       if (comp != 0) return comp;
       return (b.newScore ?? 0).compareTo(a.newScore ?? 0);
     });

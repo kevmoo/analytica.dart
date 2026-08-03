@@ -16,6 +16,11 @@ Future<int> runCli(
   final stdoutSink = out ?? stdout;
   final stderrSink = err ?? stderr;
 
+  final workspace = Platform.environment['GITHUB_WORKSPACE'];
+  if (workspace != null && workspace.isNotEmpty) {
+    Directory.current = workspace;
+  }
+
   final parser = ArgParser()
     ..addFlag(
       'help',
@@ -65,13 +70,13 @@ Future<int> runCli(
     }
 
     final targets = argResults.rest.isEmpty ? ['lib'] : argResults.rest;
-    final threshold = _parsePositiveInt(
+    final threshold = _parseNonNegativeInt(
       argResults['threshold'] as String,
       'threshold',
     );
     int? failThreshold;
     if (argResults['fail-threshold'] != null) {
-      failThreshold = _parsePositiveInt(
+      failThreshold = _parseNonNegativeInt(
         argResults['fail-threshold'] as String,
         'fail-threshold',
       );
@@ -82,6 +87,9 @@ Future<int> runCli(
     final failOnIncrease = argResults['fail-on-increase'] as bool;
 
     if (gitDiffBase != null) {
+      if (gitDiffBase.trim().isEmpty) {
+        throw const FormatException('Git diff base reference cannot be empty.');
+      }
       return await _handleDiffMode(
         gitDiffBase: gitDiffBase,
         targets: targets,
@@ -114,7 +122,7 @@ Future<int> runCli(
   }
 }
 
-int _parsePositiveInt(String val, String name) {
+int _parseNonNegativeInt(String val, String name) {
   final parsed = int.tryParse(val);
   if (parsed == null || parsed < 0) {
     throw FormatException(

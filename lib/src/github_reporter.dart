@@ -38,8 +38,8 @@ class GitHubReporter {
           summaryBuf.toString(),
           mode: FileMode.append,
         );
-      } catch (_) {
-        // Suppress file write failures if GITHUB_STEP_SUMMARY is inaccessible
+      } catch (e) {
+        stderr.writeln('Warning: Failed to write to step summary file: $e');
       }
     }
   }

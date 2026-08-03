@@ -137,4 +137,75 @@ void main() {
       );
     });
   });
+
+  group('DeltaAnalyzer with Mocked GitDiffService', () {
+    test(
+      'computes deltas for mocked modified files and returns sorted summary',
+      () async {
+        final fakeGit = FakeGitDiffService(
+          modifiedFiles: ['lib/foo.dart', 'lib/bar.dart'],
+          historicalContent: {
+            'lib/foo.dart': 'void main() { if (a) { if (b) {} } }', // score 3
+            'lib/bar.dart': 'void run() {}', // score 0
+          },
+          currentContent: {
+            'lib/foo.dart': 'void main() { if (a) {} }', // score 1 (delta -2)
+            'lib/bar.dart':
+                'void run() { if (a) { if (b) {} } }', // score 3 (delta +3)
+          },
+        );
+
+        final analyzer = DeltaAnalyzer(gitService: fakeGit);
+        final summary = await analyzer.computeDeltas('main');
+
+        check(summary.filesAnalyzed).equals(2);
+        check(summary.deltas).length.equals(2);
+
+        // Sorting order: delta descending (+3 first, then -2)
+        final first = summary.deltas[0];
+        check(first.name).equals('run');
+        check(first.delta).equals(3);
+        check(first.status).equals(DeltaStatus.increased);
+
+        final second = summary.deltas[1];
+        check(second.name).equals('main');
+        check(second.delta).equals(-2);
+        check(second.status).equals(DeltaStatus.improved);
+      },
+    );
+  });
+}
+
+class FakeGitDiffService implements GitDiffService {
+  final List<String> modifiedFiles;
+  final Map<String, String> historicalContent;
+  final Map<String, String> currentContent;
+
+  const FakeGitDiffService({
+    required this.modifiedFiles,
+    required this.historicalContent,
+    required this.currentContent,
+  });
+
+  @override
+  String? get _workingDirectory => null;
+
+  @override
+  Future<String> getRepoRoot() async => '/root';
+
+  @override
+  Future<List<String>> getModifiedDartFiles(
+    String baseRef, {
+    List<String> targetPaths = const [],
+  }) async => modifiedFiles;
+
+  @override
+  Future<String> getHistoricalFileContent(
+    String baseRef,
+    String relativePath,
+  ) async => historicalContent[relativePath] ?? '';
+
+  @override
+  Future<String> getCurrentFileContent(String relativePath) async =>
+      currentContent[relativePath] ?? '';
 }

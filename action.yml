@@ -44,7 +44,7 @@ runs:
         fi
         if [ -n "$base" ]; then
           echo "Fetching Git object history for diff base $base..."
-          git fetch origin "${base#origin/}" --depth=1 2>/dev/null || true
+          git fetch origin "${base#origin/}" 2>/dev/null || true
           diff_arg="--git-diff=$base"
         fi
         echo "diff_arg=$diff_arg" >> "$GITHUB_OUTPUT"
