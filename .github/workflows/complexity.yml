@@ -1,0 +1,26 @@
+name: Cognitive Complexity Audit (Dogfooding)
+
+on:
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Codebase
+        uses: actions/checkout@v4
+        with:
+          # Fetch full history so merge-base comparison can locate common ancestor
+          fetch-depth: 0
+
+      - name: Setup Dart SDK
+        uses: dart-lang/setup-dart@v1
+
+      - name: Self-Dogfood Complexity Check
+        # Uses the action definition in the current workspace (branch HEAD code!)
+        uses: ./
+        with:
+          diff-base: origin/${{ github.base_ref }}
+          fail-threshold: 15
+          fail-on-increase: true
