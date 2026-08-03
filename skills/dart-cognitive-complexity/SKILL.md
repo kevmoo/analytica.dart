@@ -10,8 +10,9 @@ description: >-
 license: Apache-2.0
 key_features:
   - Automated CLI evaluation
+  - 3-tier execution scope matrix
+  - Interactive refactoring triage
   - Dart 3 pattern matching refactorings
-  - Guard clause depth inversion
 ---
 
 ## 1. When to Use This Skill
@@ -36,21 +37,38 @@ Rely on deterministic evaluation to target structures matching these indicators:
 
 ---
 
-## 2. Automated Execution Strategy
+## 2. Automated Execution & Scope Resolution
 
 Execute the official package CLI directly in the terminal to retrieve exact
-complexity scores, file paths, line numbers, and breach warnings deterministically,
-without consuming token bandwidth on manual AST interpretation or arithmetic:
+complexity scores deterministically without LLM arithmetic or AST interpretation.
+Select the execution scope based on the user's task instructions:
+
+### Tier 1: Targeted Scope (Specific File, Directory, or Class)
+When the user references a discrete component (e.g., "check complexity in
+`lib/src/auth/`" or "audit `order_service.dart`"), pass explicit targets:
 
 ```bash
-# Display declarations with scores at or above the threshold (default target: lib/)
-dart run cognitive_complexity@ --threshold 15
+dart run cognitive_complexity@ --threshold 15 lib/src/auth/
+```
 
-# Enforce strict build guardrails by failing (exit code 1) on threshold breaches
-dart run cognitive_complexity@ --fail-threshold 15
+### Tier 2: Delta Scope (Pull Request, Branch, or Pre-flight Audit)
+When reviewing a feature branch, active commit stack, or PR, avoid full-project
+scanning. Isolate evaluation strictly to modified declarations against trunk:
 
-# Audit code review deltas against main and fail on any score increase
+```bash
 dart run cognitive_complexity@ --git-diff origin/main --fail-on-increase
+```
+
+### Tier 3: Whole-Project Scope (Default Naked Invocation)
+When invoked without targeting parameters ("scan my project for complexity" or
+`/cognitive-complexity`), audit the standard source and test roots:
+
+```bash
+# Production logic target (threshold 15)
+dart run cognitive_complexity@ --threshold 15 lib/
+
+# Test harness target (threshold 40)
+dart run cognitive_complexity@ --threshold 40 test/
 ```
 
 ---
@@ -71,7 +89,35 @@ dart run cognitive_complexity@ --git-diff origin/main --fail-on-increase
 
 ---
 
-## 4. Pre-Refactoring Assessment & Test Coverage Gate
+## 4. The Triage & Confirmation Protocol (Audit Before Action)
+
+Discovering high-complexity functions during an audit does not grant permission
+to autonomously refactor the entire repository. To prevent unwanted diff bloat
+and preserve historical code stability, adhere to a strict 2-stage workflow:
+
+### Stage 1: Read-Only Audit & Reporting (Mandatory Stop)
+When threshold breaches are detected, **do not mutate code immediately**.
+Output a ranked Markdown **Complexity Triage Report** directly in chat (or to an
+artifact for extensive findings) containing:
+* Flagged function name and clickable file local path.
+* Current complexity score versus operational ceiling.
+* Recommended refactoring strategy (Pattern A, B, or C) and unit test status.
+
+### Stage 2: Interactive User Selection (Confirmation Gate)
+Pause execution and prompt the user (via interactive choice or chat) to select
+the desired sequencing:
+1. **(Recommended) Refactor Top Hotspot Only**: Target the single highest-scoring
+   declaration first, verify via unit tests, and present diffs cleanly.
+2. **Selective Batch Refactor**: Remediate a user-specified subset of functions.
+3. **Report-Only / Exit**: Acknowledge complexity scores without code mutation.
+
+> **Explicit Bypass Exception**: Skip Stage 1 triage only when the user provides
+> an explicit remediation directive upfront (e.g., "Refactor `processOrder` in
+> `lib/src/order.dart` to fix complexity").
+
+---
+
+## 5. Pre-Refactoring Assessment & Test Coverage Gate
 
 High cognitive complexity strongly correlates with brittle, untested legacy logic.
 Before undertaking structural refactoring on flagged functions, enforce this
@@ -96,7 +142,7 @@ verification baseline:
 
 ---
 
-## 5. Dart Refactoring Patterns
+## 6. Dart Refactoring Patterns
 
 When remediation is required for declarations flagged by the scanner, apply these
 Dart-specific architectural refactorings:
@@ -202,7 +248,7 @@ decomposition.
 
 ---
 
-## 6. Verification Guardrails
+## 7. Verification Guardrails
 
 Run these verification commands before committing refactored code:
 
