@@ -191,6 +191,9 @@ class FakeGitDiffService extends GitDiffService {
   Future<String> getRepoRoot() async => '/root';
 
   @override
+  Future<String> getMergeBase(String baseRef) async => 'mock-merge-base';
+
+  @override
   Future<List<String>> getModifiedDartFiles(
     String baseRef, {
     List<String> targetPaths = const [],
