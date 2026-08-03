@@ -67,6 +67,8 @@ runs:
         INPUT_TARGETS: ${{ inputs.targets }}
         DIFF_ARG: ${{ steps.prepare.outputs.diff_arg }}
         ACTION_PATH: ${{ github.action_path }}
+        GH_TOKEN: ${{ github.token }}
+        PR_NUMBER: ${{ github.event.pull_request.number }}
       run: |
         fail_inc_arg=""
         if [ "$INPUT_FAIL_ON_INCREASE" = "true" ]; then
@@ -77,7 +79,8 @@ runs:
         cd "$ACTION_PATH"
         dart pub get >/dev/null
         
-        # Execute the scanner CLI tool
+        # Execute the scanner CLI tool and capture exit code
+        set +e
         dart run bin/cognitive_complexity.dart \
           --threshold="$INPUT_THRESHOLD" \
           --fail-threshold="$INPUT_FAIL_THRESHOLD" \
@@ -85,3 +88,26 @@ runs:
           $DIFF_ARG \
           $fail_inc_arg \
           $INPUT_TARGETS
+        exit_code=$?
+        set -e
+
+        # If running inside a PR context and GH_TOKEN is present, post or update sticky comment
+        if [ -n "$PR_NUMBER" ] && [ -n "$GH_TOKEN" ]; then
+          if [ -f "$GITHUB_STEP_SUMMARY" ] && [ -s "$GITHUB_STEP_SUMMARY" ]; then
+            echo "Searching for existing complexity audit comment on PR #$PR_NUMBER..."
+            
+            # Find the ID of any existing comment containing our tracking marker
+            comment_id=$(gh api "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/comments" \
+              --jq '.[] | select(.body | contains("<!-- complexity-comment-marker -->")) | .id' | head -n 1)
+
+            if [ -n "$comment_id" ]; then
+              echo "Updating existing comment (ID: $comment_id)..."
+              gh api -X PATCH "repos/$GITHUB_REPOSITORY/issues/comments/$comment_id" -F body=@"$GITHUB_STEP_SUMMARY" > /dev/null
+            else
+              echo "Creating new PR comment..."
+              gh pr comment "$PR_NUMBER" --body-file "$GITHUB_STEP_SUMMARY" --repo "$GITHUB_REPOSITORY" > /dev/null
+            fi
+          fi
+        fi
+
+        exit $exit_code

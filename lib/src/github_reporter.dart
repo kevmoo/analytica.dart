@@ -18,6 +18,7 @@ class GitHubReporter {
     bool failOnIncrease = false,
   }) {
     final summaryBuf = StringBuffer();
+    summaryBuf.writeln('<!-- complexity-comment-marker -->');
     summaryBuf.writeln('# 📊 Cognitive Complexity Analysis');
     summaryBuf.writeln();
 
