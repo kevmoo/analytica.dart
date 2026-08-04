@@ -41,6 +41,11 @@ Rely on deterministic evaluation to target structures matching these indicators:
 
 Execute the official package CLI directly in the terminal to retrieve exact
 complexity scores deterministically without LLM arithmetic or AST interpretation.
+
+> **SDK Compatibility Note**: Executing `dart run cognitive_complexity@` requires
+> Dart SDK version **3.12.0 or greater** installed in the host environment. Verify
+> compatibility via `dart --version` before initiating scans.
+
 Select the execution scope based on the user's task instructions:
 
 ### Tier 1: Targeted Scope (Specific File, Directory, or Class)

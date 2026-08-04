@@ -53,7 +53,7 @@ Dart-specific interpretations of the spec:
 
 ## 💻 CLI Usage
 
-You can run the scanner on-demand without installation, locally inside a project, or globally.
+You can run the scanner on-demand without installation, locally inside a project, or globally. *(Requires Dart SDK **3.12.0 or greater**)*.
 
 ### On-Demand (Recommended)
 
@@ -208,7 +208,7 @@ Workflows triggered by pull requests from external forks are executed with restr
 This repository packages an authoritative **Agent Skill** (`dart-cognitive-complexity`)
 designed to train LLMs and autonomous agents on Cognitive Complexity math,
 threshold boundaries, and structural Dart refactoring patterns (such as Dart 3
-switch expressions and guard clauses).
+switch expressions and guard clauses). *(Note: Executing automated skill scans via CLI requires Dart SDK version **3.12.0 or greater** in the agent runtime).*
 
 ### Installing the Skill
 
