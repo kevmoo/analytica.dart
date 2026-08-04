@@ -1,3 +1,7 @@
+## 0.2.1
+
+- Broaden `analyzer` compatibility to support versions `12.x` through `14.x`.
+
 ## 0.2.0
 
 Scoring fixes aligning with the SonarSource Cognitive Complexity whitepaper

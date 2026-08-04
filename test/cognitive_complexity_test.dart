@@ -591,9 +591,7 @@ void main() {
       check(results.single.score).equals(2);
     });
 
-    test(
-      'Enclosing names resolved across declarations',
-      () {
+    test('Enclosing names resolved across declarations', () {
       final results = analyzer.analyzeCode('''
         class C { void mC() {} }
         enum E { a; void mE() {} }
@@ -601,13 +599,9 @@ void main() {
         extension Ext on int { void mExt() {} }
         extension type Et(int i) { void mEt() {} }
       ''');
-      check(results.map((r) => r.name)).unorderedEquals([
-        'C.mC',
-        'E.mE',
-        'M.mM',
-        'Ext.mExt',
-        'Et.mEt',
-      ]);
+      check(
+        results.map((r) => r.name),
+      ).unorderedEquals(['C.mC', 'E.mE', 'M.mM', 'Ext.mExt', 'Et.mEt']);
     });
   });
 }
