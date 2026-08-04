@@ -133,35 +133,29 @@ class _DeclarationFinder extends RecursiveAstVisitor<void> {
   _DeclarationFinder({required this.filePath, required this.lineInfo});
 
   static String? _getDeclarationName(AstNode decl) {
-    // ignore: avoid_dynamic_calls
-    final d = decl as dynamic;
-    try {
-      // ignore: avoid_dynamic_calls
-      final namePart = d.namePart;
-      if (namePart != null) {
-        try {
-          // ignore: avoid_dynamic_calls
-          final typeName = namePart.typeName;
-          if (typeName != null) {
-            // ignore: avoid_dynamic_calls
-            return typeName.lexeme as String;
-          }
-        } catch (_) {}
-      }
-    } catch (_) {}
-
-    try {
-      // ignore: avoid_dynamic_calls
-      final name = d.name;
-      if (name != null) {
-        try {
-          // ignore: avoid_dynamic_calls
-          return name.lexeme as String;
-        } catch (_) {}
-      }
-    } catch (_) {}
-
+    if (decl is ClassDeclaration) {
+      return decl.namePart.typeName.lexeme;
+    }
+    if (decl is EnumDeclaration) {
+      return decl.namePart.typeName.lexeme;
+    }
+    if (decl is MixinDeclaration) {
+      return decl.name.lexeme;
+    }
+    if (decl is ExtensionDeclaration) {
+      return decl.name?.lexeme ?? '<unnamed extension>';
+    }
     if (decl is ExtensionTypeDeclaration) {
+      final d = decl as dynamic;
+      try {
+        // ignore: avoid_dynamic_calls
+        final namePart = d.namePart;
+        if (namePart != null) {
+          // ignore: avoid_dynamic_calls
+          return namePart.typeName.lexeme as String;
+        }
+      } catch (_) {}
+
       try {
         // ignore: avoid_dynamic_calls
         final pc = d.primaryConstructor;
@@ -171,11 +165,6 @@ class _DeclarationFinder extends RecursiveAstVisitor<void> {
         }
       } catch (_) {}
     }
-
-    if (decl is ExtensionDeclaration) {
-      return '<unnamed extension>';
-    }
-
     return null;
   }
 
