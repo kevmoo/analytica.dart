@@ -11,7 +11,7 @@ environment:
 
 # Add regular dependencies here.
 dependencies:
-  analyzer: ^14.1.0
+  analyzer: '>=7.0.0 <13.0.0'
   args: ^2.7.0
   io: ^1.0.5
   path: ^1.9.1
@@ -21,6 +21,6 @@ dependencies:
 dev_dependencies:
   checks: ^0.3.1
   dart_flutter_team_lints: ^3.5.2
-  test: ^1.31.2
+  test: ^1.25.0
   test_descriptor: ^2.0.2
   test_process: ^2.1.1

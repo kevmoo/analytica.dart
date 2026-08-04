@@ -132,23 +132,62 @@ class _DeclarationFinder extends RecursiveAstVisitor<void> {
 
   _DeclarationFinder({required this.filePath, required this.lineInfo});
 
+  static String? _getDeclarationName(AstNode decl) {
+    // ignore: avoid_dynamic_calls
+    final d = decl as dynamic;
+    try {
+      // ignore: avoid_dynamic_calls
+      final namePart = d.namePart;
+      if (namePart != null) {
+        try {
+          // ignore: avoid_dynamic_calls
+          final typeName = namePart.typeName;
+          if (typeName != null) {
+            // ignore: avoid_dynamic_calls
+            return typeName.lexeme as String;
+          }
+        } catch (_) {}
+      }
+    } catch (_) {}
+
+    try {
+      // ignore: avoid_dynamic_calls
+      final name = d.name;
+      if (name != null) {
+        try {
+          // ignore: avoid_dynamic_calls
+          return name.lexeme as String;
+        } catch (_) {}
+      }
+    } catch (_) {}
+
+    if (decl is ExtensionTypeDeclaration) {
+      try {
+        // ignore: avoid_dynamic_calls
+        final pc = d.primaryConstructor;
+        if (pc != null) {
+          // ignore: avoid_dynamic_calls
+          return pc.beginToken.lexeme as String;
+        }
+      } catch (_) {}
+    }
+
+    if (decl is ExtensionDeclaration) {
+      return '<unnamed extension>';
+    }
+
+    return null;
+  }
+
   String? _getEnclosingName(AstNode node) {
     var current = node.parent;
     while (current != null) {
-      if (current is ClassDeclaration) {
-        return current.namePart.typeName.lexeme;
-      }
-      if (current is EnumDeclaration) {
-        return current.namePart.typeName.lexeme;
-      }
-      if (current is MixinDeclaration) {
-        return current.name.lexeme;
-      }
-      if (current is ExtensionTypeDeclaration) {
-        return current.namePart.typeName.lexeme;
-      }
-      if (current is ExtensionDeclaration) {
-        return current.name?.lexeme ?? '<unnamed extension>';
+      if (current is ClassDeclaration ||
+          current is EnumDeclaration ||
+          current is MixinDeclaration ||
+          current is ExtensionTypeDeclaration ||
+          current is ExtensionDeclaration) {
+        return _getDeclarationName(current);
       }
       current = current.parent;
     }
