@@ -590,5 +590,22 @@ void main() {
       check(results.single.name).equals('f');
       check(results.single.score).equals(2);
     });
+
+    test('Enclosing names are properly resolved for class, enum, mixin, extension, and extension type methods', () {
+      final results = analyzer.analyzeCode('''
+        class C { void mC() {} }
+        enum E { a; void mE() {} }
+        mixin M { void mM() {} }
+        extension Ext on int { void mExt() {} }
+        extension type Et(int i) { void mEt() {} }
+      ''');
+      check(results.map((r) => r.name)).unorderedEquals([
+        'C.mC',
+        'E.mE',
+        'M.mM',
+        'Ext.mExt',
+        'Et.mEt',
+      ]);
+    });
   });
 }
