@@ -591,7 +591,9 @@ void main() {
       check(results.single.score).equals(2);
     });
 
-    test('Enclosing names are properly resolved for class, enum, mixin, extension, and extension type methods', () {
+    test(
+      'Enclosing names resolved across declarations',
+      () {
       final results = analyzer.analyzeCode('''
         class C { void mC() {} }
         enum E { a; void mE() {} }
