@@ -63,20 +63,26 @@ class ComplexityAnalyzer {
         results.addAll(analyzeFile(targetPath));
       }
     } else if (dir.existsSync()) {
-      for (final entity in dir.listSync(recursive: true, followLinks: false)) {
-        if (entity is File && p.extension(entity.path) == '.dart') {
-          final relative = p.relative(entity.path, from: targetPath);
-          if (isExcludedPath(relative)) {
-            continue;
-          }
-          results.addAll(analyzeFile(entity.path));
-        }
-      }
+      results.addAll(_analyzeDirectory(dir, targetPath));
     } else {
       throw FileSystemException('Path does not exist', targetPath);
     }
 
     results.sort((a, b) => b.score.compareTo(a.score));
+    return results;
+  }
+
+  List<FunctionComplexity> _analyzeDirectory(Directory dir, String targetPath) {
+    final results = <FunctionComplexity>[];
+    for (final entity in dir.listSync(recursive: true, followLinks: false)) {
+      if (entity is File && p.extension(entity.path) == '.dart') {
+        final relative = p.relative(entity.path, from: targetPath);
+        if (isExcludedPath(relative)) {
+          continue;
+        }
+        results.addAll(analyzeFile(entity.path));
+      }
+    }
     return results;
   }
 
