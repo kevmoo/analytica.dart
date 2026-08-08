@@ -120,26 +120,7 @@ class InBlockVisitor extends RecursiveAstVisitor<void> {
       return;
     }
 
-    // Ignore property access on objects (e.g. obj.field = 123)
-    if (node.parent is PropertyAccess) {
-      final pa = node.parent as PropertyAccess;
-      if (pa.propertyName == node) {
-        super.visitSimpleIdentifier(node);
-        return;
-      }
-    }
-
-    // Ignore prefixed identifier property names (e.g. p.field)
-    if (node.parent is PrefixedIdentifier) {
-      final pi = node.parent as PrefixedIdentifier;
-      if (pi.identifier == node) {
-        super.visitSimpleIdentifier(node);
-        return;
-      }
-    }
-
-    // Ignore named argument labels (e.g. foo(argName: value))
-    if (node.parent is Label) {
+    if (_isPropertyOrLabel(node)) {
       super.visitSimpleIdentifier(node);
       return;
     }
@@ -165,6 +146,31 @@ class InBlockVisitor extends RecursiveAstVisitor<void> {
       return;
     }
 
+    _recordUsage(declOffset, node, element, isDeclaredInsideSlice);
+
+    super.visitSimpleIdentifier(node);
+  }
+
+  bool _isPropertyOrLabel(SimpleIdentifier node) {
+    final parent = node.parent;
+    if (parent is PropertyAccess && parent.propertyName == node) {
+      return true;
+    }
+    if (parent is PrefixedIdentifier && parent.identifier == node) {
+      return true;
+    }
+    if (parent is Label) {
+      return true;
+    }
+    return false;
+  }
+
+  void _recordUsage(
+    int declOffset,
+    SimpleIdentifier node,
+    VariableElement element,
+    bool isDeclaredInsideSlice,
+  ) {
     final isDeclaredBeforeSlice =
         declOffset >= 0 && declOffset < sliceStartOffset;
     final isWrite = node.inSetterContext();
@@ -213,8 +219,6 @@ class InBlockVisitor extends RecursiveAstVisitor<void> {
         );
       }
     }
-
-    super.visitSimpleIdentifier(node);
   }
 
   @override

@@ -74,26 +74,7 @@ class PostBlockVisitor extends RecursiveAstVisitor<void> {
       return;
     }
 
-    // Ignore property access on objects
-    if (node.parent is PropertyAccess) {
-      final pa = node.parent as PropertyAccess;
-      if (pa.propertyName == node) {
-        super.visitSimpleIdentifier(node);
-        return;
-      }
-    }
-
-    // Ignore prefixed identifiers
-    if (node.parent is PrefixedIdentifier) {
-      final pi = node.parent as PrefixedIdentifier;
-      if (pi.identifier == node) {
-        super.visitSimpleIdentifier(node);
-        return;
-      }
-    }
-
-    // Ignore named argument labels
-    if (node.parent is Label) {
+    if (_isPropertyOrLabel(node)) {
       super.visitSimpleIdentifier(node);
       return;
     }
@@ -104,6 +85,26 @@ class PostBlockVisitor extends RecursiveAstVisitor<void> {
       return;
     }
 
+    _recordLiveOutput(element, node);
+
+    super.visitSimpleIdentifier(node);
+  }
+
+  bool _isPropertyOrLabel(SimpleIdentifier node) {
+    final parent = node.parent;
+    if (parent is PropertyAccess && parent.propertyName == node) {
+      return true;
+    }
+    if (parent is PrefixedIdentifier && parent.identifier == node) {
+      return true;
+    }
+    if (parent is Label) {
+      return true;
+    }
+    return false;
+  }
+
+  void _recordLiveOutput(VariableElement element, SimpleIdentifier node) {
     final declOffset = _resolveOffset(element);
     final typeName = _resolveTypeName(element);
     final currentLine = lineInfo.getLocation(node.offset).lineNumber;
@@ -139,8 +140,6 @@ class PostBlockVisitor extends RecursiveAstVisitor<void> {
         );
       }
     }
-
-    super.visitSimpleIdentifier(node);
   }
 
   String _resolveTypeName(VariableElement element) {

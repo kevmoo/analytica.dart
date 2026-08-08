@@ -195,6 +195,22 @@ void _printTextReport(DataFlowResult result, StringSink sink) {
   sink.writeln('Enclosing: ${result.enclosingDeclaration}');
   sink.writeln();
 
+  _printInputs(sink, result);
+  _printMutations(sink, result);
+  _printOutputs(sink, result);
+  _printEscapes(result, sink);
+
+  sink.writeln('Suggested Signature:');
+  sink.writeln('  ${result.suggestedSignature}');
+  sink.writeln();
+
+  final status = result.isCleanlyExtractable
+      ? '✅ Cleanly Extractable'
+      : '❌ Extraction Blocked by Control Flow Escapes';
+  sink.writeln('Status: $status');
+}
+
+void _printInputs(StringSink sink, DataFlowResult result) {
   sink.writeln('Inbound Parameters (Inputs):');
   if (result.inputs.isEmpty) {
     sink.writeln('  • None');
@@ -205,7 +221,9 @@ void _printTextReport(DataFlowResult result, StringSink sink) {
     }
   }
   sink.writeln();
+}
 
+void _printMutations(StringSink sink, DataFlowResult result) {
   sink.writeln('Mutations (Modified Variables):');
   if (result.mutations.isEmpty) {
     sink.writeln('  • None');
@@ -218,7 +236,9 @@ void _printTextReport(DataFlowResult result, StringSink sink) {
     }
   }
   sink.writeln();
+}
 
+void _printOutputs(StringSink sink, DataFlowResult result) {
   sink.writeln('Outbound Returns (Outputs):');
   if (result.outputs.isEmpty) {
     sink.writeln('  • None');
@@ -228,7 +248,9 @@ void _printTextReport(DataFlowResult result, StringSink sink) {
     }
   }
   sink.writeln();
+}
 
+void _printEscapes(DataFlowResult result, StringSink sink) {
   if (result.escapes.isNotEmpty) {
     sink.writeln('⚠️ Control Flow Escapes Detected:');
     for (final escape in result.escapes) {
@@ -236,13 +258,4 @@ void _printTextReport(DataFlowResult result, StringSink sink) {
     }
     sink.writeln();
   }
-
-  sink.writeln('Suggested Signature:');
-  sink.writeln('  ${result.suggestedSignature}');
-  sink.writeln();
-
-  final status = result.isCleanlyExtractable
-      ? '✅ Cleanly Extractable'
-      : '❌ Extraction Blocked by Control Flow Escapes';
-  sink.writeln('Status: $status');
 }
