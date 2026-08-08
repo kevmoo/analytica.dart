@@ -1,6 +1,6 @@
 import 'dart:io';
 import 'package:checks/checks.dart';
-import 'package:cognitive_complexity/src/git_diff_service.dart';
+import 'package:cognitive_complexity/src/complexity/git_diff_service.dart';
 import 'package:path/path.dart' as p;
 import 'package:test/test.dart';
 import 'package:test_descriptor/test_descriptor.dart' as d;

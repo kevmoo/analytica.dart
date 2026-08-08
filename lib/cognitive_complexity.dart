@@ -7,8 +7,8 @@
 /// diagnostic reporting capabilities.
 library;
 
-export 'src/cognitive_complexity_visitor.dart';
-export 'src/complexity_analyzer.dart';
-export 'src/delta_analyzer.dart';
-export 'src/git_diff_service.dart';
-export 'src/github_reporter.dart';
+export 'src/complexity/cognitive_complexity_visitor.dart';
+export 'src/complexity/complexity_analyzer.dart';
+export 'src/complexity/delta_analyzer.dart';
+export 'src/complexity/git_diff_service.dart';
+export 'src/complexity/github_reporter.dart';
