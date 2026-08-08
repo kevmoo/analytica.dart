@@ -3,6 +3,7 @@ import 'package:analyzer/dart/analysis/analysis_context_collection.dart';
 import 'package:analyzer/dart/analysis/results.dart';
 import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/dart/ast/visitor.dart';
+import 'package:analyzer/source/line_info.dart';
 import 'package:path/path.dart' as p;
 import 'models.dart';
 import 'signature_synthesizer.dart';
@@ -111,7 +112,11 @@ class DataFlowAnalyzer {
         ? unitResult.unit.end
         : lineInfo.getOffsetOfLine(endLine) - 1;
 
-    final locator = _EnclosingDeclarationVisitor(startOffset, endOffset);
+    final locator = _EnclosingDeclarationVisitor(
+      startOffset,
+      endLine,
+      lineInfo,
+    );
     unitResult.unit.accept(locator);
     final enclosingNode = locator.enclosing;
 
@@ -184,14 +189,16 @@ class DataFlowAnalyzer {
 
 class _EnclosingDeclarationVisitor extends RecursiveAstVisitor<void> {
   final int startOffset;
-  final int endOffset;
+  final int endLine;
+  final LineInfo lineInfo;
   AstNode? enclosing;
 
-  _EnclosingDeclarationVisitor(this.startOffset, this.endOffset);
+  _EnclosingDeclarationVisitor(this.startOffset, this.endLine, this.lineInfo);
 
   @override
   void visitFunctionDeclaration(FunctionDeclaration node) {
-    if (node.offset <= startOffset && node.end >= endOffset) {
+    if (node.offset <= startOffset &&
+        lineInfo.getLocation(node.end).lineNumber >= endLine) {
       enclosing = node;
     }
     super.visitFunctionDeclaration(node);
@@ -199,7 +206,8 @@ class _EnclosingDeclarationVisitor extends RecursiveAstVisitor<void> {
 
   @override
   void visitMethodDeclaration(MethodDeclaration node) {
-    if (node.offset <= startOffset && node.end >= endOffset) {
+    if (node.offset <= startOffset &&
+        lineInfo.getLocation(node.end).lineNumber >= endLine) {
       enclosing = node;
     }
     super.visitMethodDeclaration(node);
@@ -207,7 +215,8 @@ class _EnclosingDeclarationVisitor extends RecursiveAstVisitor<void> {
 
   @override
   void visitConstructorDeclaration(ConstructorDeclaration node) {
-    if (node.offset <= startOffset && node.end >= endOffset) {
+    if (node.offset <= startOffset &&
+        lineInfo.getLocation(node.end).lineNumber >= endLine) {
       enclosing = node;
     }
     super.visitConstructorDeclaration(node);

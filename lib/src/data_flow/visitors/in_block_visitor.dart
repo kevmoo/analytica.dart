@@ -115,7 +115,10 @@ class InBlockVisitor extends RecursiveAstVisitor<void> {
     }
 
     final element = _resolveElement(node);
-    if (element is! VariableElement) {
+    if (element is! VariableElement ||
+        element is FieldElement ||
+        element is TopLevelVariableElement ||
+        element is PropertyInducingElement) {
       super.visitSimpleIdentifier(node);
       return;
     }
@@ -240,7 +243,7 @@ class InBlockVisitor extends RecursiveAstVisitor<void> {
   @override
   void visitBreakStatement(BreakStatement node) {
     if (_isWithinSlice(node)) {
-      if (!_isEnclosedByLoopWithinSlice(node)) {
+      if (!_isEnclosedByBreakableWithinSlice(node)) {
         escapes.add(
           ControlFlowEscape(
             type: ControlFlowEscapeType.loopBreak,
@@ -295,13 +298,26 @@ class InBlockVisitor extends RecursiveAstVisitor<void> {
     return false;
   }
 
-  bool _isEnclosedByLoopWithinSlice(AstNode node) {
+  bool _isEnclosedByBreakableWithinSlice(AstNode node) {
     var current = node.parent;
     while (current != null && current.offset >= sliceStartOffset) {
       if (current is ForStatement ||
           current is WhileStatement ||
           current is DoStatement ||
           current is SwitchStatement) {
+        return true;
+      }
+      current = current.parent;
+    }
+    return false;
+  }
+
+  bool _isEnclosedByLoopWithinSlice(AstNode node) {
+    var current = node.parent;
+    while (current != null && current.offset >= sliceStartOffset) {
+      if (current is ForStatement ||
+          current is WhileStatement ||
+          current is DoStatement) {
         return true;
       }
       current = current.parent;

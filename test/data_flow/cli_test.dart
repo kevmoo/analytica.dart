@@ -103,5 +103,33 @@ void process(int a, int b) {
         check(stdout).contains('Status: ✅ Cleanly Extractable');
       },
     );
+
+    test('Parses target path with Windows-style drive colon syntax', () async {
+      await d.dir('project3', [
+        d.file('sample3.dart', '''
+void process(int a) {
+  // Lines 3-4
+  final b = a * 10;
+  print(b);
+}
+'''),
+      ]).create();
+
+      // Test with drive-like prefix pattern
+      final samplePath = '${d.sandbox}/project3/sample3.dart';
+      final proc = await TestProcess.start('dart', [
+        'run',
+        'bin/data_flow.dart',
+        '$samplePath:3-4',
+      ]);
+
+      final stdout = await proc.stdoutStream().join('\n');
+      await proc.shouldExit(0);
+
+      final jsonMap = jsonDecode(stdout) as Map<String, dynamic>;
+      check(jsonMap['enclosing']).equals('process');
+      check(jsonMap['startLine']).equals(3);
+      check(jsonMap['endLine']).equals(4);
+    });
   });
 }

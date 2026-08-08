@@ -69,7 +69,10 @@ class PostBlockVisitor extends RecursiveAstVisitor<void> {
     }
 
     final element = _resolveElement(node);
-    if (element is! VariableElement) {
+    if (element is! VariableElement ||
+        element is FieldElement ||
+        element is TopLevelVariableElement ||
+        element is PropertyInducingElement) {
       super.visitSimpleIdentifier(node);
       return;
     }

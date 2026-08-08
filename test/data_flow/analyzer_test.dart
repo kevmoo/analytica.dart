@@ -212,5 +212,50 @@ class Service {
       ).deepEquals(['prefix', 'id']);
       check(result.outputs.map((o) => o.name).toList()).deepEquals(['message']);
     });
+
+    test('Ignores top-level constants and static fields from inputs', () async {
+      const code = '''
+const String globalConfig = 'PROD';
+
+class App {
+  static const int maxRetries = 3;
+
+  void run(int attempt) {
+    // Target: Lines 8-9
+    final shouldRetry = attempt < maxRetries;
+    print('\$globalConfig: \$shouldRetry');
+  }
+}
+''';
+
+      final result = await analyzer.analyzeSource(
+        sourceCode: code,
+        startLine: 8,
+        endLine: 9,
+      );
+
+      check(result.inputs.map((i) => i.name).toList()).deepEquals(['attempt']);
+      check(result.mutations).isEmpty();
+      check(result.outputs).isEmpty();
+    });
+
+    test('Handles slice extending to closing line of function', () async {
+      const code = '''
+void helper(int x) {
+  // Target: Lines 3-4
+  final y = x * 2;
+  print(y);
+}
+''';
+
+      final result = await analyzer.analyzeSource(
+        sourceCode: code,
+        startLine: 3,
+        endLine: 4,
+      );
+
+      check(result.isCleanlyExtractable).isTrue();
+      check(result.inputs.map((i) => i.name).toList()).deepEquals(['x']);
+    });
   });
 }

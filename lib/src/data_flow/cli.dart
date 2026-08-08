@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:args/args.dart';
 import 'package:io/io.dart';
+import 'package:path/path.dart' as p;
 import 'data_flow_analyzer.dart';
 import 'models.dart';
 
@@ -98,20 +99,18 @@ ArgParser _buildParser() => ArgParser()
   var filePath = rawTarget;
   var linesString = argResults['lines'] as String?;
 
-  if (rawTarget.contains(':')) {
-    final parts = rawTarget.split(':');
-    if (parts.length == 2 && parts[1].contains('-')) {
-      if (linesString != null) {
-        throw const FormatException(
-          'Target lines specified both via --lines and file path.',
-        );
-      }
-      filePath = parts[0];
-      linesString = parts[1];
+  final match = RegExp(r'^(.*?):(\d+(?:-\d+)?)$').firstMatch(rawTarget);
+  if (match != null) {
+    if (linesString != null) {
+      throw const FormatException(
+        'Target lines specified both via --lines and file path.',
+      );
     }
+    filePath = match.group(1)!;
+    linesString = match.group(2)!;
   }
 
-  return (filePath: filePath, linesString: linesString);
+  return (filePath: p.normalize(filePath), linesString: linesString);
 }
 
 Future<void> _executeAnalysis({
