@@ -1,3 +1,10 @@
+## 0.2.2-wip
+
+- Introduce `data_flow` analysis tool and library (`package:cognitive_complexity/data_flow.dart`):
+  - Added `DataFlowAnalyzer` to extract reaching definitions (inputs), variable mutations, and live outputs for arbitrary statement slices.
+  - Added `SignatureSynthesizer` to automatically generate Dart 3 Record method signatures (`({TypeA a, TypeB b})`).
+  - Added `data_flow` CLI with agent-first JSON formatting by default and formatted text reports.
+
 ## 0.2.1
 
 - Broaden `analyzer` compatibility to support versions `12.x` through `14.x`.
