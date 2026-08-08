@@ -96,27 +96,28 @@ class GitHubReporter {
       return;
     }
 
+    _renderDeltaTable(summary, failThreshold, failOnIncrease, summaryBuf);
+  }
+
+  void _renderDeltaTable(
+    DeltaSummary summary,
+    int? failThreshold,
+    bool failOnIncrease,
+    StringBuffer summaryBuf,
+  ) {
     summaryBuf.writeln('| Status | Declaration | Location | Delta | Score |');
     summaryBuf.writeln('| :---: | :--- | :--- | :---: | :---: |');
 
     for (final d in summary.deltas) {
       if (d.status == DeltaStatus.unchanged) {
-        continue; // Suppress unchanged functions from table to maximize signal
+        continue;
       }
 
       final isVio = d.isViolation(
         failThreshold: failThreshold,
         failOnIncrease: failOnIncrease,
       );
-      var icon = '⚪';
-      if (isVio || d.status == DeltaStatus.increased) {
-        icon = isVio ? '🔴' : '🟡';
-      } else if (d.status == DeltaStatus.improved) {
-        icon = '🟢';
-      } else if (d.status == DeltaStatus.added) {
-        icon = '🔵';
-      }
-
+      final icon = _getDeltaIcon(d, isVio);
       final loc = '${d.filePath}:L${d.startLine}-${d.endLine}';
       final deltaStr = d.delta > 0 ? '+${d.delta}' : '${d.delta}';
       final scoreStr = d.oldScore != null && d.newScore != null
@@ -129,6 +130,14 @@ class GitHubReporter {
 
       _emitDiagnostic(d, failThreshold, failOnIncrease);
     }
+  }
+
+  String _getDeltaIcon(ComplexityDelta d, bool isViolation) {
+    if (isViolation) return '🔴';
+    if (d.status == DeltaStatus.increased) return '🟡';
+    if (d.status == DeltaStatus.improved) return '🟢';
+    if (d.status == DeltaStatus.added) return '🔵';
+    return '⚪';
   }
 
   void _emitDiagnostic(ComplexityDelta d, int? failThreshold, bool failInc) {

@@ -318,6 +318,27 @@ void _printDeltaTextReport(
   sink.writeln('$hdrDelta  $hdrScore  $hdrName  $hdrLoc');
   sink.writeln('-' * (6 + 2 + 10 + 2 + maxName + 2 + 30));
 
+  _printDeltaRows(deltas, maxName, failThreshold, failOnIncrease, sink);
+
+  final violations = summary.countViolations(
+    failThreshold: failThreshold,
+    failOnIncrease: failOnIncrease,
+  );
+  sink.writeln('-' * (6 + 2 + 10 + 2 + maxName + 2 + 30));
+  sink.writeln(
+    'Summary: ${summary.countAdded} added, ${summary.countIncreased} '
+    'increased, ${summary.countImproved} improved '
+    '(Net Delta: ${summary.netDelta} | Violations: $violations)',
+  );
+}
+
+void _printDeltaRows(
+  Iterable<ComplexityDelta> deltas,
+  int maxName,
+  int? failThreshold,
+  bool failOnIncrease,
+  StringSink sink,
+) {
   for (final d in deltas) {
     final deltaStr = d.delta > 0
         ? '+${d.delta}'
@@ -331,21 +352,16 @@ void _printDeltaTextReport(
       failThreshold: failThreshold,
       failOnIncrease: failOnIncrease,
     );
-    final marker = isVio ? ' [VIOLATION]' : (d.delta < 0 ? ' [IMPROVED]' : '');
+    final marker = _formatDeltaMarker(d, isVio);
 
     sink.writeln('${deltaStr.padLeft(6)}  $scoreStr  $nameStr  $locStr$marker');
   }
+}
 
-  final violations = summary.countViolations(
-    failThreshold: failThreshold,
-    failOnIncrease: failOnIncrease,
-  );
-  sink.writeln('-' * (6 + 2 + 10 + 2 + maxName + 2 + 30));
-  sink.writeln(
-    'Summary: ${summary.countAdded} added, ${summary.countIncreased} '
-    'increased, ${summary.countImproved} improved '
-    '(Net Delta: ${summary.netDelta} | Violations: $violations)',
-  );
+String _formatDeltaMarker(ComplexityDelta d, bool isViolation) {
+  if (isViolation) return ' [VIOLATION]';
+  if (d.delta < 0) return ' [IMPROVED]';
+  return '';
 }
 
 File? _resolveSummaryFile() {
