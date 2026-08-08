@@ -14,6 +14,9 @@ Campbell.
   guards (`when` clauses), and collection control flow structures.
 * **Deterministic Engine**: Calculates complexity algorithmically without invoking
   LLM calls or external network requests.
+* **Statement Data-Flow Analysis**: Inspects reaching definitions (inputs),
+  variable mutations, and downstream live reads (outputs) for arbitrary statement
+  slices to power automated method extraction.
 * **Git Diff Analysis**: Compares current workspace declarations against a target
   base ref to isolate complexity deltas (Δ) in modified functions.
 * **Lightweight GitHub Action**: Exposes workflow annotations and step summaries
@@ -126,6 +129,53 @@ void main() {
   for (final res in results) {
     print('${res.name}: score is ${res.score} (${res.filePath}:L${res.startLine})');
   }
+}
+```
+
+---
+
+## 🔄 Data-Flow Analysis (Extract Method Helper)
+
+In addition to complexity scoring, this package includes a **statement-level data-flow analyzer** and CLI tool (`data_flow`) designed to accelerate safe, automated refactoring (such as method extraction).
+
+Given a target Dart file and contiguous statement line slice, it extracts:
+* **Inputs**: Variables declared outside the slice that are read inside it.
+* **Mutations**: Variables declared outside the slice that are reassigned or mutated inside it.
+* **Outputs**: Variables declared or mutated inside the slice that remain live downstream.
+* **Control Flow Escapes**: Flags unextractable jumps (`return`, `break`, `continue`, `yield`) targeting outer scopes.
+* **Synthesized Signature**: Automatically generates an idiomatic Dart 3 Record return signature (e.g. `({String name, int count})`) when multiple variables are live downstream.
+
+### CLI Usage
+
+```bash
+# Run data-flow analysis on a target slice (JSON output by default)
+dart run cognitive_complexity:data_flow lib/src/my_file.dart:45-80
+
+# Output human-readable terminal report
+dart run cognitive_complexity:data_flow --format=text lib/src/my_file.dart:45-80
+
+# Specify proposed helper method name
+dart run cognitive_complexity:data_flow --name=_processItem lib/src/my_file.dart:45-80
+```
+
+### Programmatic Data-Flow API
+
+```dart
+import 'package:cognitive_complexity/data_flow.dart';
+
+void main() async {
+  const analyzer = DataFlowAnalyzer();
+  final result = await analyzer.analyzeFile(
+    filePath: 'lib/src/service.dart',
+    startLine: 45,
+    endLine: 80,
+    methodName: '_processUser',
+  );
+
+  print('Cleanly extractable: ${result.isCleanlyExtractable}');
+  print('Inputs: ${result.inputs.map((u) => u.name).join(', ')}');
+  print('Outputs: ${result.outputs.map((u) => u.name).join(', ')}');
+  print('Proposed Signature: ${result.suggestedSignature}');
 }
 ```
 
