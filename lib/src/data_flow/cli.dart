@@ -13,44 +13,15 @@ Future<int> runCli(
 }) async {
   final stdoutSink = out ?? stdout;
   final stderrSink = err ?? stderr;
-
-  final parser = ArgParser()
-    ..addFlag(
-      'help',
-      abbr: 'h',
-      negatable: false,
-      help: 'Print this usage information.',
-    )
-    ..addOption(
-      'lines',
-      abbr: 'l',
-      help:
-          'Target 1-based line range of the code block to extract '
-          '(e.g. 45-80).',
-    )
-    ..addOption(
-      'name',
-      abbr: 'n',
-      defaultsTo: '_extracted',
-      help: 'Name for the proposed extracted helper function.',
-    )
-    ..addOption(
-      'format',
-      abbr: 'f',
-      defaultsTo: 'json',
-      allowed: ['json', 'text'],
-      help: 'Output format.',
-    );
+  final parser = _buildParser();
 
   try {
-    // 1. Fast path for --help: ignores all other arguments and exits cleanly.
     if (args.contains('-h') || args.contains('--help')) {
       _printUsage(parser, stdoutSink);
       return ExitCode.success.code;
     }
 
     final argResults = parser.parse(args);
-
     if (argResults['help'] as bool) {
       _printUsage(parser, stdoutSink);
       return ExitCode.success.code;
@@ -62,24 +33,7 @@ Future<int> runCli(
       return ExitCode.usage.code;
     }
 
-    final rawTarget = argResults.rest.first;
-    var filePath = rawTarget;
-    var linesString = argResults['lines'] as String?;
-
-    // Check if target contains path:start-end syntax
-    if (rawTarget.contains(':')) {
-      final parts = rawTarget.split(':');
-      if (parts.length == 2 && parts[1].contains('-')) {
-        if (linesString != null) {
-          throw const FormatException(
-            'Target lines specified both via --lines and file path.',
-          );
-        }
-        filePath = parts[0];
-        linesString = parts[1];
-      }
-    }
-
+    final (:filePath, :linesString) = _resolveTarget(argResults);
     if (linesString == null || linesString.trim().isEmpty) {
       stderrSink.writeln(
         'Error: Target line range is required '
@@ -89,25 +43,13 @@ Future<int> runCli(
       return ExitCode.usage.code;
     }
 
-    final lineBounds = _parseLineBounds(linesString);
-    final methodName = argResults['name'] as String;
-    final format = argResults['format'] as String;
-
-    const analyzer = DataFlowAnalyzer();
-    final result = await analyzer.analyzeFile(
+    await _executeAnalysis(
       filePath: filePath,
-      startLine: lineBounds.$1,
-      endLine: lineBounds.$2,
-      methodName: methodName,
+      linesString: linesString,
+      methodName: argResults['name'] as String,
+      format: argResults['format'] as String,
+      stdoutSink: stdoutSink,
     );
-
-    if (format == 'json') {
-      stdoutSink.writeln(
-        const JsonEncoder.withIndent('  ').convert(result.toJson()),
-      );
-    } else {
-      _printTextReport(result, stdoutSink);
-    }
 
     return ExitCode.success.code;
   } on FormatException catch (e) {
@@ -120,6 +62,80 @@ Future<int> runCli(
   } catch (e) {
     stderrSink.writeln('Fatal error: $e');
     return 1;
+  }
+}
+
+ArgParser _buildParser() => ArgParser()
+  ..addFlag(
+    'help',
+    abbr: 'h',
+    negatable: false,
+    help: 'Print this usage information.',
+  )
+  ..addOption(
+    'lines',
+    abbr: 'l',
+    help:
+        'Target 1-based line range of the code block to extract '
+        '(e.g. 45-80).',
+  )
+  ..addOption(
+    'name',
+    abbr: 'n',
+    defaultsTo: '_extracted',
+    help: 'Name for the proposed extracted helper function.',
+  )
+  ..addOption(
+    'format',
+    abbr: 'f',
+    defaultsTo: 'json',
+    allowed: ['json', 'text'],
+    help: 'Output format.',
+  );
+
+({String filePath, String? linesString}) _resolveTarget(ArgResults argResults) {
+  final rawTarget = argResults.rest.first;
+  var filePath = rawTarget;
+  var linesString = argResults['lines'] as String?;
+
+  if (rawTarget.contains(':')) {
+    final parts = rawTarget.split(':');
+    if (parts.length == 2 && parts[1].contains('-')) {
+      if (linesString != null) {
+        throw const FormatException(
+          'Target lines specified both via --lines and file path.',
+        );
+      }
+      filePath = parts[0];
+      linesString = parts[1];
+    }
+  }
+
+  return (filePath: filePath, linesString: linesString);
+}
+
+Future<void> _executeAnalysis({
+  required String filePath,
+  required String linesString,
+  required String methodName,
+  required String format,
+  required StringSink stdoutSink,
+}) async {
+  final lineBounds = _parseLineBounds(linesString);
+  const analyzer = DataFlowAnalyzer();
+  final result = await analyzer.analyzeFile(
+    filePath: filePath,
+    startLine: lineBounds.$1,
+    endLine: lineBounds.$2,
+    methodName: methodName,
+  );
+
+  if (format == 'json') {
+    stdoutSink.writeln(
+      const JsonEncoder.withIndent('  ').convert(result.toJson()),
+    );
+  } else {
+    _printTextReport(result, stdoutSink);
   }
 }
 
