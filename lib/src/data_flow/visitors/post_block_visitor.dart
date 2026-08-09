@@ -1,5 +1,3 @@
-// ignore_for_file: avoid_dynamic_calls
-
 import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/dart/ast/visitor.dart';
 import 'package:analyzer/dart/element/element.dart';
@@ -28,39 +26,6 @@ class PostBlockVisitor extends RecursiveAstVisitor<void> {
 
   bool _isAfterSlice(AstNode node) => node.offset > sliceEndOffset;
 
-  Element? _resolveElement(SimpleIdentifier node) {
-    try {
-      final dynamic d = node;
-      try {
-        final dynamic elem = d.element;
-        if (elem is Element) return elem;
-      } catch (_) {}
-      try {
-        final dynamic elem = d.staticElement;
-        if (elem is Element) return elem;
-      } catch (_) {}
-    } catch (_) {}
-    return null;
-  }
-
-  int _resolveOffset(Element element) {
-    try {
-      final dynamic d = element;
-      try {
-        final dynamic fragment = d.firstFragment;
-        if (fragment != null) {
-          final dynamic offset = fragment.nameOffset;
-          if (offset is int) return offset;
-        }
-      } catch (_) {}
-      try {
-        final dynamic offset = d.nameOffset;
-        if (offset is int) return offset;
-      } catch (_) {}
-    } catch (_) {}
-    return -1;
-  }
-
   @override
   void visitSimpleIdentifier(SimpleIdentifier node) {
     if (!_isAfterSlice(node)) {
@@ -68,7 +33,7 @@ class PostBlockVisitor extends RecursiveAstVisitor<void> {
       return;
     }
 
-    final element = _resolveElement(node);
+    final element = node.element;
     if (element is! VariableElement ||
         element is FieldElement ||
         element is TopLevelVariableElement ||
@@ -145,20 +110,10 @@ class PostBlockVisitor extends RecursiveAstVisitor<void> {
     }
   }
 
+  int _resolveOffset(Element element) => element.firstFragment.nameOffset ?? -1;
+
   String _resolveTypeName(VariableElement element) {
-    try {
-      final dynamic type = element.type;
-      final dynamic display = type.getDisplayString();
-      if (display is String && display.isNotEmpty) return display;
-    } catch (_) {
-      try {
-        final dynamic type = element.type;
-        final dynamic display = type.getDisplayString(withNullability: true);
-        if (display is String && display.isNotEmpty) return display;
-      } catch (_) {
-        // Fallback
-      }
-    }
-    return 'dynamic';
+    final type = element.type.getDisplayString();
+    return type.isNotEmpty ? type : 'dynamic';
   }
 }
