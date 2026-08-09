@@ -155,5 +155,30 @@ void main() {
 
       check(sig).equals('Future<({int a, String b})> _compute() async');
     });
+    test(
+      'Synthesizes result fallback when record field name is only underscores',
+      () {
+        final sig = synthesizer.synthesize(
+          inputs: [],
+          outputs: [
+            const VariableUsage(
+              name: '_',
+              type: 'int',
+              declarationOffset: 10,
+              declarationLine: 2,
+            ),
+            const VariableUsage(
+              name: 'val',
+              type: 'String',
+              declarationOffset: 20,
+              declarationLine: 3,
+            ),
+          ],
+          methodName: '_fetchEmpty',
+        );
+
+        check(sig).equals('({int result, String val}) _fetchEmpty()');
+      },
+    );
   });
 }
