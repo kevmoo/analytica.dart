@@ -231,40 +231,57 @@ class _EnclosingDeclarationVisitor extends RecursiveAstVisitor<void> {
   }
 }
 
-String? _findSdkPath() {
-  if (Platform.environment.containsKey('DART_SDK')) {
-    final envSdk = Platform.environment['DART_SDK']!;
-    if (Directory(envSdk).existsSync()) return envSdk;
-  }
+String? _findSdkPath() =>
+    _findSdkFromEnv() ?? _findSdkFromExecutable() ?? _findSdkFromPath();
 
-  // Try resolving from Platform.resolvedExecutable
+String? _findSdkFromEnv() {
+  final envSdk = Platform.environment['DART_SDK'];
+  if (envSdk != null && Directory(envSdk).existsSync()) {
+    return envSdk;
+  }
+  return null;
+}
+
+String? _findSdkFromExecutable() {
   final exe = File(Platform.resolvedExecutable);
-  if (exe.existsSync()) {
-    try {
-      final resolved = exe.resolveSymbolicLinksSync();
-      final sdkCandidate = p.dirname(p.dirname(resolved));
-      if (_isValidSdk(sdkCandidate)) return sdkCandidate;
-    } catch (_) {}
-  }
+  if (!exe.existsSync()) return null;
 
-  // Try locating dart on PATH
-  final pathEnv = Platform.environment['PATH'] ?? '';
+  try {
+    final resolved = exe.resolveSymbolicLinksSync();
+    final candidate = p.dirname(p.dirname(resolved));
+    return _isValidSdk(candidate) ? candidate : null;
+  } catch (_) {
+    return null;
+  }
+}
+
+String? _findSdkFromPath() {
+  final pathEnv = Platform.environment['PATH'];
+  if (pathEnv == null || pathEnv.isEmpty) return null;
+
   final separator = Platform.isWindows ? ';' : ':';
+  final executableName = Platform.isWindows ? 'dart.exe' : 'dart';
+
   for (final dir in pathEnv.split(separator)) {
     if (dir.trim().isEmpty) continue;
-    final dartBinary = File(
-      p.join(dir, Platform.isWindows ? 'dart.exe' : 'dart'),
-    );
-    if (dartBinary.existsSync()) {
-      try {
-        final resolved = dartBinary.resolveSymbolicLinksSync();
-        final sdkCandidate = p.dirname(p.dirname(resolved));
-        if (_isValidSdk(sdkCandidate)) return sdkCandidate;
-      } catch (_) {}
-    }
+    final candidate = _resolveSdkFromDir(dir, executableName);
+    if (candidate != null) return candidate;
   }
 
   return null;
+}
+
+String? _resolveSdkFromDir(String dir, String executableName) {
+  final dartBinary = File(p.join(dir, executableName));
+  if (!dartBinary.existsSync()) return null;
+
+  try {
+    final resolved = dartBinary.resolveSymbolicLinksSync();
+    final candidate = p.dirname(p.dirname(resolved));
+    return _isValidSdk(candidate) ? candidate : null;
+  } catch (_) {
+    return null;
+  }
 }
 
 bool _isValidSdk(String path) {
