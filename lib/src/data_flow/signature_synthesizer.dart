@@ -25,7 +25,9 @@ class SignatureSynthesizer {
   }
 
   String _sanitizeRecordFieldName(String name) {
-    return name.replaceFirst(RegExp(r'^_+'), '');
+    var sanitized = name.replaceFirst(RegExp(r'^_+'), '');
+    if (sanitized.isEmpty) sanitized = 'result';
+    return sanitized;
   }
 
   String _buildReturnType(
