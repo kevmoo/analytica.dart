@@ -1,4 +1,4 @@
-## 0.2.2-wip
+## 0.2.2
 
 - Introduce `data_flow` analysis tool and library (`package:cognitive_complexity/data_flow.dart`):
   - Added `DataFlowAnalyzer` to extract reaching definitions (inputs), variable mutations, and live outputs for arbitrary statement slices.
