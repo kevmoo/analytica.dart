@@ -14,8 +14,12 @@ import 'visitors/post_block_visitor.dart';
 /// and live outputs for a code slice using Dart's resolved AST.
 class DataFlowAnalyzer {
   final SignatureSynthesizer synthesizer;
+  final String? sdkPath;
 
-  const DataFlowAnalyzer({this.synthesizer = const SignatureSynthesizer()});
+  const DataFlowAnalyzer({
+    this.synthesizer = const SignatureSynthesizer(),
+    this.sdkPath,
+  });
 
   /// Analyzes a file on disk by file path and 1-based line bounds.
   Future<DataFlowResult> analyzeFile({
@@ -30,7 +34,11 @@ class DataFlowAnalyzer {
       throw FileSystemException('Target file does not exist', filePath);
     }
 
-    final collection = AnalysisContextCollection(includedPaths: [absPath]);
+    final effectiveSdkPath = sdkPath ?? _findSdkPath();
+    final collection = AnalysisContextCollection(
+      includedPaths: [absPath],
+      sdkPath: effectiveSdkPath,
+    );
     final context = collection.contextFor(absPath);
     final unitResult = await context.currentSession.getResolvedUnit(absPath);
 
@@ -221,4 +229,47 @@ class _EnclosingDeclarationVisitor extends RecursiveAstVisitor<void> {
     }
     super.visitConstructorDeclaration(node);
   }
+}
+
+String? _findSdkPath() {
+  if (Platform.environment.containsKey('DART_SDK')) {
+    final envSdk = Platform.environment['DART_SDK']!;
+    if (Directory(envSdk).existsSync()) return envSdk;
+  }
+
+  // Try resolving from Platform.resolvedExecutable
+  final exe = File(Platform.resolvedExecutable);
+  if (exe.existsSync()) {
+    try {
+      final resolved = exe.resolveSymbolicLinksSync();
+      final sdkCandidate = p.dirname(p.dirname(resolved));
+      if (_isValidSdk(sdkCandidate)) return sdkCandidate;
+    } catch (_) {}
+  }
+
+  // Try locating dart on PATH
+  final pathEnv = Platform.environment['PATH'] ?? '';
+  final separator = Platform.isWindows ? ';' : ':';
+  for (final dir in pathEnv.split(separator)) {
+    if (dir.trim().isEmpty) continue;
+    final dartBinary = File(
+      p.join(dir, Platform.isWindows ? 'dart.exe' : 'dart'),
+    );
+    if (dartBinary.existsSync()) {
+      try {
+        final resolved = dartBinary.resolveSymbolicLinksSync();
+        final sdkCandidate = p.dirname(p.dirname(resolved));
+        if (_isValidSdk(sdkCandidate)) return sdkCandidate;
+      } catch (_) {}
+    }
+  }
+
+  return null;
+}
+
+bool _isValidSdk(String path) {
+  return Directory(p.join(path, 'lib', '_internal')).existsSync() ||
+      File(
+        p.join(path, 'bin', Platform.isWindows ? 'dart.exe' : 'dart'),
+      ).existsSync();
 }
