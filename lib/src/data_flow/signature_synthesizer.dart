@@ -15,11 +15,13 @@ class SignatureSynthesizer {
     final returnType = _buildReturnType(outputs, isAsync: isAsync);
     final params = _buildParameters(inputs);
     final asyncSuffix = isAsync ? ' async' : '';
-    final typeParamsStr = typeParameters.isNotEmpty
-        ? '<${typeParameters.join(', ')}>'
-        : '';
+    final typeParamsStr = _buildTypeParamsStr(typeParameters);
 
     return '$returnType $methodName$typeParamsStr($params)$asyncSuffix';
+  }
+
+  String _buildTypeParamsStr(List<String> typeParameters) {
+    return typeParameters.isNotEmpty ? '<${typeParameters.join(', ')}>' : '';
   }
 
   String _sanitizeRecordFieldName(String name) {

@@ -169,8 +169,17 @@ class InBlockVisitor extends RecursiveAstVisitor<void> {
     VariableElement element,
     bool isDeclaredInsideSlice,
   ) {
-    final isDeclaredBeforeSlice =
-        declOffset >= 0 && declOffset < sliceStartOffset;
+    if ((declOffset >= 0 && declOffset < sliceStartOffset) ||
+        (!isDeclaredInsideSlice && declOffset < sliceStartOffset)) {
+      _processValidUsage(declOffset, node, element);
+    }
+  }
+
+  void _processValidUsage(
+    int declOffset,
+    SimpleIdentifier node,
+    VariableElement element,
+  ) {
     final isWrite = node.inSetterContext();
     final isRead = node.inGetterContext();
     final currentLine = lineInfo.getLocation(node.offset).lineNumber;
@@ -185,65 +194,55 @@ class InBlockVisitor extends RecursiveAstVisitor<void> {
         ? staticType.getDisplayString()
         : _resolveTypeName(element);
 
-    if (isDeclaredBeforeSlice ||
-        (!isDeclaredInsideSlice && declOffset < sliceStartOffset)) {
-      final declLine = declOffset >= 0
-          ? lineInfo.getLocation(declOffset).lineNumber
-          : currentLine;
+    final declLine = declOffset >= 0
+        ? lineInfo.getLocation(declOffset).lineNumber
+        : currentLine;
 
-      if (isRead && !inputs.containsKey(element)) {
-        inputs[element] = VariableUsage(
+    if (isRead && !inputs.containsKey(element)) {
+      inputs[element] = VariableUsage(
+        name: element.name ?? node.name,
+        type: typeName,
+        declarationOffset: declOffset,
+        declarationLine: declLine,
+      );
+    }
+
+    if (isWrite) {
+      _addClosureEscapeIfRequired(node, currentLine, typeName);
+
+      final existing = inputs[element];
+      inputs[element] =
+          (existing ??
+                  VariableUsage(
+                    name: element.name ?? node.name,
+                    type: typeName,
+                    declarationOffset: declOffset,
+                    declarationLine: declLine,
+                  ))
+              .copyWith(
+                isMutated: true,
+                firstMutationLine: existing?.firstMutationLine ?? currentLine,
+              );
+
+      mutations[element] = VariableUsage(
+        name: element.name ?? node.name,
+        type: typeName,
+        declarationOffset: declOffset,
+        declarationLine: declLine,
+        isMutated: true,
+        firstMutationLine: currentLine,
+      );
+    } else {
+      inputs.putIfAbsent(
+        element,
+        () => VariableUsage(
           name: element.name ?? node.name,
           type: typeName,
           declarationOffset: declOffset,
           declarationLine: declLine,
-        );
-      }
-
-      if (isWrite) {
-        _addClosureEscapeIfRequired(node, currentLine, typeName);
-
-        final existing = inputs[element];
-        inputs[element] =
-            (existing ??
-                    VariableUsage(
-                      name: element.name ?? node.name,
-                      type: typeName,
-                      declarationOffset: declOffset,
-                      declarationLine: declLine,
-                    ))
-                .copyWith(
-                  isMutated: true,
-                  firstMutationLine: existing?.firstMutationLine ?? currentLine,
-                );
-
-        mutations[element] = VariableUsage(
-          name: element.name ?? node.name,
-          type: typeName,
-          isMutated: true,
-          declarationOffset: declOffset,
-          declarationLine: declLine,
-          firstMutationLine:
-              mutations[element]?.firstMutationLine ?? currentLine,
-        );
-      }
+        ),
+      );
     }
-  }
-
-  @override
-  void visitReturnStatement(ReturnStatement node) {
-    if (_isWithinSlice(node)) {
-      if (!_isInsideNestedFunction(node)) {
-        escapes.add(
-          ControlFlowEscape(
-            type: ControlFlowEscapeType.earlyReturn,
-            line: lineInfo.getLocation(node.offset).lineNumber,
-            description: 'Early return statement alters caller control flow',
-          ),
-        );
-      }
-    }
-    super.visitReturnStatement(node);
   }
 
   void _addConstructorInitializerEscape(AstNode node) {
@@ -322,59 +321,63 @@ class InBlockVisitor extends RecursiveAstVisitor<void> {
 
   @override
   void visitBreakStatement(BreakStatement node) {
-    if (_isWithinSlice(node)) {
-      if (node.label != null) {
-        final targetOffset = _resolveLabelTargetOffset(node.label!);
-        if (targetOffset < sliceStartOffset || targetOffset > sliceEndOffset) {
-          escapes.add(
-            ControlFlowEscape(
-              type: ControlFlowEscapeType.loopBreak,
-              line: lineInfo.getLocation(node.offset).lineNumber,
-              description:
-                  'Break statement targets label outside extracted slice',
-            ),
-          );
-        }
-      } else if (!_isEnclosedByBreakableWithinSlice(node)) {
+    if (_isWithinSlice(node)) _processBreak(node);
+    super.visitBreakStatement(node);
+  }
+
+  void _processBreak(BreakStatement node) {
+    if (node.label != null) {
+      final targetOffset = _resolveLabelTargetOffset(node.label!);
+      if (targetOffset < sliceStartOffset || targetOffset > sliceEndOffset) {
         escapes.add(
           ControlFlowEscape(
             type: ControlFlowEscapeType.loopBreak,
             line: lineInfo.getLocation(node.offset).lineNumber,
-            description: 'Break statement targets loop outside extracted slice',
+            description:
+                'Break statement targets label outside extracted slice',
           ),
         );
       }
+    } else if (!_isEnclosedByBreakableWithinSlice(node)) {
+      escapes.add(
+        ControlFlowEscape(
+          type: ControlFlowEscapeType.loopBreak,
+          line: lineInfo.getLocation(node.offset).lineNumber,
+          description: 'Break statement targets loop outside extracted slice',
+        ),
+      );
     }
-    super.visitBreakStatement(node);
   }
 
   @override
   void visitContinueStatement(ContinueStatement node) {
-    if (_isWithinSlice(node)) {
-      if (node.label != null) {
-        final targetOffset = _resolveLabelTargetOffset(node.label!);
-        if (targetOffset < sliceStartOffset || targetOffset > sliceEndOffset) {
-          escapes.add(
-            ControlFlowEscape(
-              type: ControlFlowEscapeType.loopContinue,
-              line: lineInfo.getLocation(node.offset).lineNumber,
-              description:
-                  'Continue statement targets label outside extracted slice',
-            ),
-          );
-        }
-      } else if (!_isEnclosedByLoopWithinSlice(node)) {
+    if (_isWithinSlice(node)) _processContinue(node);
+    super.visitContinueStatement(node);
+  }
+
+  void _processContinue(ContinueStatement node) {
+    if (node.label != null) {
+      final targetOffset = _resolveLabelTargetOffset(node.label!);
+      if (targetOffset < sliceStartOffset || targetOffset > sliceEndOffset) {
         escapes.add(
           ControlFlowEscape(
             type: ControlFlowEscapeType.loopContinue,
             line: lineInfo.getLocation(node.offset).lineNumber,
             description:
-                'Continue statement targets loop outside extracted slice',
+                'Continue statement targets label outside extracted slice',
           ),
         );
       }
+    } else if (!_isEnclosedByLoopWithinSlice(node)) {
+      escapes.add(
+        ControlFlowEscape(
+          type: ControlFlowEscapeType.loopContinue,
+          line: lineInfo.getLocation(node.offset).lineNumber,
+          description:
+              'Continue statement targets loop outside extracted slice',
+        ),
+      );
     }
-    super.visitContinueStatement(node);
   }
 
   @override
@@ -398,7 +401,7 @@ class InBlockVisitor extends RecursiveAstVisitor<void> {
       while (current != null) {
         if (current is LabeledStatement) {
           for (final l in current.labels) {
-            final String lName = _extractName(l);
+            final lName = _extractName(l);
             if (lName == targetName) {
               return current.offset;
             }
