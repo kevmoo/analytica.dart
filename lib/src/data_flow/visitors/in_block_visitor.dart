@@ -1,4 +1,5 @@
 import 'package:analyzer/dart/ast/ast.dart';
+import 'package:analyzer/dart/ast/token.dart';
 import 'package:analyzer/dart/ast/visitor.dart';
 import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/source/line_info.dart';
@@ -34,6 +35,22 @@ class InBlockVisitor extends RecursiveAstVisitor<void> {
 
   bool _isWithinSlice(AstNode node) =>
       node.offset >= sliceStartOffset && node.end <= sliceEndOffset;
+
+  @override
+  void visitReturnStatement(ReturnStatement node) {
+    if (_isWithinSlice(node)) {
+      if (!_isInsideNestedFunction(node)) {
+        escapes.add(
+          ControlFlowEscape(
+            type: ControlFlowEscapeType.earlyReturn,
+            line: lineInfo.getLocation(node.offset).lineNumber,
+            description: 'Early return statement alters caller control flow',
+          ),
+        );
+      }
+    }
+    super.visitReturnStatement(node);
+  }
 
   @override
   void visitAwaitExpression(AwaitExpression node) {
@@ -185,8 +202,7 @@ class InBlockVisitor extends RecursiveAstVisitor<void> {
     final currentLine = lineInfo.getLocation(node.offset).lineNumber;
 
     final staticType = node.staticType;
-    final typeString =
-        staticType?.getDisplayString(withNullability: false) ?? '';
+    final typeString = staticType?.getDisplayString() ?? '';
     final typeName =
         staticType != null &&
             !staticType.isDartCoreNull &&
@@ -245,6 +261,22 @@ class InBlockVisitor extends RecursiveAstVisitor<void> {
     }
   }
 
+  void _addClosureEscapeIfRequired(
+    AstNode node,
+    int currentLine,
+    String typeName,
+  ) {
+    if (_isInsideNestedFunction(node)) {
+      escapes.add(
+        ControlFlowEscape(
+          type: ControlFlowEscapeType.closureEscape,
+          line: currentLine,
+          description: 'Variable $typeName mutated inside a nested function',
+        ),
+      );
+    }
+  }
+
   void _addConstructorInitializerEscape(AstNode node) {
     if (_isWithinSlice(node)) {
       escapes.add(
@@ -295,7 +327,7 @@ class InBlockVisitor extends RecursiveAstVisitor<void> {
   void visitRethrowExpression(RethrowExpression node) {
     if (_isWithinSlice(node)) {
       var current = node.parent;
-      bool inCatch = false;
+      var inCatch = false;
       while (current != null) {
         if (current is CatchClause) {
           if (current.offset >= sliceStartOffset) {
@@ -396,7 +428,7 @@ class InBlockVisitor extends RecursiveAstVisitor<void> {
 
   int _resolveLabelTargetOffset(AstNode labelNode) {
     try {
-      final String targetName = _extractName(labelNode);
+      final targetName = _extractName(labelNode);
       var current = labelNode.parent;
       while (current != null) {
         if (current is LabeledStatement) {
@@ -413,18 +445,16 @@ class InBlockVisitor extends RecursiveAstVisitor<void> {
     return -1;
   }
 
-  String _extractName(dynamic node) {
+  String _extractName(Object? node) {
+    if (node == null) return '';
     try {
-      return node.name.lexeme.toString();
-    } catch (_) {}
-    try {
-      return node.name.name.toString();
-    } catch (_) {}
-    try {
-      return node.name.toString();
-    } catch (_) {}
-    try {
-      return node.label.name.toString();
+      if (node is SimpleIdentifier) return node.name;
+      final astNode = node as AstNode;
+      final tokens = astNode.childEntities.whereType<Token>();
+      if (tokens.isNotEmpty) return tokens.first.lexeme;
+      for (final entity in astNode.childEntities) {
+        if (entity is SimpleIdentifier) return entity.name;
+      }
     } catch (_) {}
     return '';
   }
@@ -438,23 +468,6 @@ class InBlockVisitor extends RecursiveAstVisitor<void> {
       current = current.parent;
     }
     return false;
-  }
-
-  void _addClosureEscapeIfRequired(
-    AstNode node,
-    int currentLine,
-    String typeName,
-  ) {
-    if (_isInsideNestedFunction(node)) {
-      escapes.add(
-        ControlFlowEscape(
-          type: ControlFlowEscapeType.closureEscape,
-          line: currentLine,
-          description:
-              'Variable \$typeName mutated inside a nested function/closure',
-        ),
-      );
-    }
   }
 
   bool _isEnclosedByBreakableWithinSlice(AstNode node) {

@@ -195,5 +195,95 @@ Iterable<int> countUp(int n) sync* {
       ).equals(ControlFlowEscapeType.yieldEscape);
       check(result.escapes.first.line).equals(4);
     });
+    test('VULN-02: Labeled jump targeting outer scope', () async {
+      const code = '''
+void testMethod() {
+  outerLoop:
+  for (var i = 0; i < 10; i++) {
+    // Target: Lines 5-7
+    for (var j = 0; j < 5; j++) {
+      if (j == 2) break outerLoop;
+    }
+  }
+}
+''';
+      final result = await analyzer.analyzeSource(
+        sourceCode: code,
+        startLine: 5,
+        endLine: 7,
+      );
+      check(result.isCleanlyExtractable).isFalse();
+      check(result.escapes).isNotEmpty();
+    });
+
+    test('VULN-07: rethrow outside catch scope', () async {
+      const code = '''
+void testMethod() {
+  try {
+    print('do');
+  } catch (e) {
+    // Target: Lines 6-7
+    print('Failed: \$e');
+    rethrow;
+  }
+}
+''';
+      final result = await analyzer.analyzeSource(
+        sourceCode: code,
+        startLine: 6,
+        endLine: 7,
+      );
+      check(result.isCleanlyExtractable).isFalse();
+    });
+
+    test(
+      'VULN-06: Variable mutation in escaping closures (closureEscape)',
+      () async {
+        const code = '''
+void testMethod(Button button) {
+  int count = 0;
+  // Target: Lines 4-6
+  button.onClick = () {
+    count++;
+  };
+}
+class Button {
+  void Function()? onClick;
+}
+''';
+        final result = await analyzer.analyzeSource(
+          sourceCode: code,
+          startLine: 4,
+          endLine: 6,
+        );
+        check(result.isCleanlyExtractable).isFalse();
+        check(
+          result.escapes.map((e) => e.type.name).toList(),
+        ).contains('closureEscape');
+      },
+    );
+
+    test('VULN-08: Slicing inside constructor initializer lists', () async {
+      const code = '''
+class Point {
+  final int x;
+  final int y;
+  // Target: Lines 6-6
+  Point(int a, int b) 
+      : x = a * 2, y = b * 2 {
+    print('constructed');
+  }
+}
+''';
+      final result = await analyzer.analyzeSource(
+        sourceCode: code,
+        startLine: 6,
+        endLine: 6,
+      );
+      check(result.isCleanlyExtractable).isFalse();
+      check(
+        result.escapes.map((e) => e.type.name).toList(),
+      ).contains('constructorInitializerEscape');
+    });
   });
 }
