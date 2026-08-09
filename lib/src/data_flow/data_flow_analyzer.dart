@@ -199,7 +199,7 @@ class DataFlowAnalyzer {
     if (tpl != null) {
       for (final typeParam in tpl.typeParameters) {
         final tpName = typeParam.name.lexeme;
-        final regex = RegExp('\\b$tpName\\b');
+        final regex = RegExp('\\b${RegExp.escape(tpName)}\\b');
         final isReferenced =
             inputList.any((i) => regex.hasMatch(i.type)) ||
             outputList.any((o) => regex.hasMatch(o.type));
