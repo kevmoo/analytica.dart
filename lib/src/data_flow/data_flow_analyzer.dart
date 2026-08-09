@@ -231,6 +231,8 @@ class _EnclosingDeclarationVisitor extends RecursiveAstVisitor<void> {
   }
 }
 
+// TODO: Replace manual SDK discovery helpers with package:cli_util once
+// https://github.com/dart-lang/tools/issues/2504 lands and is published.
 String? _findSdkPath() =>
     _findSdkFromEnv() ?? _findSdkFromExecutable() ?? _findSdkFromPath();
 
