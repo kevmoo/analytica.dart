@@ -234,15 +234,7 @@ class _EnclosingDeclarationVisitor extends RecursiveAstVisitor<void> {
 // TODO: Replace manual SDK discovery helpers with package:cli_util once
 // https://github.com/dart-lang/tools/issues/2504 lands and is published.
 String? _findSdkPath() =>
-    _findSdkFromEnv() ?? _findSdkFromExecutable() ?? _findSdkFromPath();
-
-String? _findSdkFromEnv() {
-  final envSdk = Platform.environment['DART_SDK'];
-  if (envSdk != null && Directory(envSdk).existsSync()) {
-    return envSdk;
-  }
-  return null;
-}
+    _findSdkFromExecutable() ?? _findSdkFromEnv() ?? _findSdkFromPath();
 
 String? _findSdkFromExecutable() {
   final exe = File(Platform.resolvedExecutable);
@@ -255,6 +247,14 @@ String? _findSdkFromExecutable() {
   } catch (_) {
     return null;
   }
+}
+
+String? _findSdkFromEnv() {
+  final envSdk = Platform.environment['DART_SDK'];
+  if (envSdk != null && _isValidSdk(envSdk)) {
+    return envSdk;
+  }
+  return null;
 }
 
 String? _findSdkFromPath() {
@@ -287,7 +287,12 @@ String? _resolveSdkFromDir(String dir, String executableName) {
 }
 
 bool _isValidSdk(String path) {
-  return Directory(p.join(path, 'lib', '_internal')).existsSync() ||
+  final internal = Directory(p.join(path, 'lib', '_internal'));
+  if (!internal.existsSync()) return false;
+  return File(p.join(internal.path, 'libraries.dart')).existsSync() ||
+      File(
+        p.join(internal.path, 'sdk_library_metadata', 'lib', 'libraries.dart'),
+      ).existsSync() ||
       File(
         p.join(path, 'bin', Platform.isWindows ? 'dart.exe' : 'dart'),
       ).existsSync();
