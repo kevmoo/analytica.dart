@@ -160,9 +160,12 @@ class DataFlowAnalyzer {
     final outputList = postBlockVisitor.liveOutputs.values.toList();
     final escapes = inBlockVisitor.escapes;
 
+    final typeParams = _extractTypeParams(enclosingNode, inputList, outputList);
+
     final signature = synthesizer.synthesize(
       inputs: inputList,
       outputs: outputList,
+      typeParameters: typeParams,
       methodName: methodName,
       isAsync: inBlockVisitor.hasAwait,
     );
@@ -179,6 +182,33 @@ class DataFlowAnalyzer {
       suggestedSignature: signature,
       isCleanlyExtractable: escapes.isEmpty,
     );
+  }
+
+  List<String> _extractTypeParams(
+    AstNode enclosingNode,
+    List<VariableUsage> inputList,
+    List<VariableUsage> outputList,
+  ) {
+    final typeParams = <String>[];
+    TypeParameterList? tpl;
+    if (enclosingNode is FunctionDeclaration) {
+      tpl = enclosingNode.functionExpression.typeParameters;
+    } else if (enclosingNode is MethodDeclaration) {
+      tpl = enclosingNode.typeParameters;
+    }
+    if (tpl != null) {
+      for (final typeParam in tpl.typeParameters) {
+        final tpName = typeParam.name.lexeme;
+        final regex = RegExp('\\b$tpName\\b');
+        final isReferenced =
+            inputList.any((i) => regex.hasMatch(i.type)) ||
+            outputList.any((o) => regex.hasMatch(o.type));
+        if (isReferenced) {
+          typeParams.add(tpName);
+        }
+      }
+    }
+    return typeParams;
   }
 
   String _getDeclarationName(AstNode node) {

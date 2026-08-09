@@ -40,7 +40,15 @@ class VariableUsage {
 }
 
 /// Identifies control flow jumps/escapes that affect functional extraction.
-enum ControlFlowEscapeType { earlyReturn, loopBreak, loopContinue, yieldEscape }
+enum ControlFlowEscapeType {
+  earlyReturn,
+  loopBreak,
+  loopContinue,
+  yieldEscape,
+  rethrowEscape,
+  closureEscape,
+  constructorInitializerEscape,
+}
 
 /// Represents a control flow escape found inside an extracted code block.
 class ControlFlowEscape {
