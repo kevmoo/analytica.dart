@@ -106,7 +106,7 @@ Output a ranked Markdown **Complexity Triage Report** directly in chat (or to an
 artifact for extensive findings) containing:
 * Flagged function name and clickable file local path.
 * Current complexity score versus operational ceiling.
-* Recommended refactoring strategy (Pattern A, B, D, or a Pattern C tier) and unit test status.
+* Recommended refactoring strategy (Pattern A, B, D, E, or a Pattern C tier) and unit test status.
 
 ### Stage 2: Interactive User Selection (Confirmation Gate)
 Pause execution and prompt the user (via interactive choice or chat) to select
@@ -244,33 +244,53 @@ dart run cognitive_complexity:data_flow@ lib/src/my_file.dart:45-80
 ```
 
 Its report (`inputs`, `mutations`, live `outputs`, control-flow escapes, and
-a synthesized Dart 3 record signature) selects the tier. These bullets are
-the ONLY selection rules:
+a synthesized Dart 3 record signature) selects the tier.
+
+**Slice at natural seams first.** If a slice reports control-flow escapes or
+a tightly coupled pair of mutable variables (`queue` + `visited`,
+`buffer` + `cursor`), the usual culprit is the slice boundary, not the code.
+Enlarge the slice to the whole loop or state machine and re-run `data_flow`:
+escapes targeting a loop inside the slice stop being escapes, coupled state
+becomes interior, and the enlarged slice usually extracts cleanly as
+Tier 1/2.
+
+These bullets are the ONLY selection rules:
 
 * **Cleanly extractable, ≤ 1 live output, ≤ 3 inputs** → Tier 2: extract a
   standard private helper returning that value.
-* **Cleanly extractable, 2–3 live outputs** → Tier 1: extract a static or
-  top-level function and use the synthesized record signature verbatim.
-* **4+ live outputs** → Tier 1 with a dedicated `Result` dataclass instead of
-  a wide record.
-* **Control-flow escapes** → not extractable as-is. For `return`, `break`,
-  or `continue` targeting outer scopes, restructure with guard clauses
-  (Pattern B) and re-run the analysis. For `yield`, restructure the
-  generator before attempting any extraction.
+* **Cleanly extractable, 2+ live outputs** → Tier 1: extract a static or
+  top-level function and use the synthesized named record signature
+  verbatim. Private, file-local slices use named records at ANY output
+  count — do NOT mint single-use `_XxxResult` dataclasses for them. Reserve
+  a dedicated `Result` dataclass for values that cross a public API or
+  library boundary, or that need methods or invariants. *Advisory*: 5+ live
+  outputs usually means the slice is cut at the wrong seam — try a
+  different boundary before shipping a wide record.
+* **Control-flow escapes** → apply in preference order:
+  1. Enlarge the slice to include the whole loop (natural seams, above) and
+     re-run the analysis.
+  2. If the loop *body* is itself the hotspot, extract it with an explicit
+     signal return (Pattern E) — never a `shouldBreak` boolean flag.
+  3. Use guard-clause inversion (Pattern B) when the escape exists only to
+     skip nested conditions — it fixes nesting, not escapes.
+  `yield` is none of these: restructure the generator before attempting any
+  extraction.
 * **Tier 3 gate (mutation-web check)** → Tier 3 requires recorded evidence,
   not judgment. Run `data_flow` on at least two distinct candidate slices of
   the function. Tier 3 is permitted ONLY if the intersection of their
   `mutations` variable names contains 3 or more entries — i.e. the same
   mutable variables thread through every candidate extraction. Paste the
   JSON reports into the Triage Report as evidence; without that evidence,
-  stay in Tier 1/2.
+  stay in Tier 1/2. A recurring 2-variable coupling never qualifies:
+  enlarge the slice, or take the domain-modeling exit (below).
 
 When choosing how to reduce complexity on a large Dart function, follow this **3-Tier Decision Hierarchy**:
 
 1. **Tier 1 — Pure Functional Decomposition (first choice)**: static or
-   top-level functions returning Dart 3 records
-   (`final (:data, :errors) = _stepOne(input);`), or a dedicated `Result` /
-   `Response` dataclass when the selection rules mandate one.
+   top-level functions returning Dart 3 named records
+   (`final (:data, :errors) = _stepOne(input);`); a dedicated `Result` /
+   `Response` dataclass only where the value crosses a public API or
+   library boundary or needs methods/invariants.
 2. **Tier 2 — Standard Extract Method (second choice)**: standard private
    helper methods taking <= 3 arguments.
 3. **Tier 3 — Encapsulated Method Object (last resort)**: permitted only
@@ -278,6 +298,14 @@ When choosing how to reduce complexity on a large Dart function, follow this **3
    read [references/method-object.md](references/method-object.md) for the
    extraction mechanics and mandatory idioms. Do not load or apply it
    speculatively.
+
+**Domain-modeling exit**: when the same tightly coupled mutable state keeps
+resurfacing across a function (a parser's `buffer` + `cursor`, a traversal's
+`queue` + `visited`), the code may be asking to become a real, cohesively
+*named* domain class (`Parser`, `GraphTraversal`) with a public, unit-tested
+API. That is domain modeling, not complexity remediation — it exits this
+rubric entirely and is not subject to the Tier 3 gate. The gate exists to
+ban single-use `_XxxRunner` facades, not real abstractions.
 
 ---
 
@@ -305,6 +333,44 @@ for (final raw in rawTasks) {
   _applyTask(raw);
 }
 ```
+
+---
+
+### Pattern E: Loop-Body Extraction with Signal Returns
+
+When a loop body must be extracted but contains `break`/`continue` targeting
+the loop, never smuggle the control flow through boolean flags
+(`shouldBreak` soup) — that raises cognitive load and hides termination
+conditions. Return an explicit signal and keep the loop keywords at the loop
+site:
+
+```dart
+enum _ScanAction { proceed, skip, halt }
+
+// Pure, independently testable helper.
+_ScanAction _classify(Entry entry, Set<String> seen) {
+  if (seen.contains(entry.id)) return _ScanAction.skip;
+  if (entry.isTerminal) return _ScanAction.halt;
+  return _ScanAction.proceed;
+}
+
+outer:
+for (final entry in entries) {
+  switch (_classify(entry, seen)) {
+    case _ScanAction.skip:
+      continue;
+    case _ScanAction.halt:
+      break outer;
+    case _ScanAction.proceed:
+      process(entry);
+  }
+}
+```
+
+Use a sealed class instead of an enum when the signal must carry a payload.
+The exhaustive `switch` keeps every termination path visible at the loop
+site. Prefer extracting the *entire loop* when `data_flow` shows it forms a
+natural seam; use Pattern E when the loop body alone is the hotspot.
 
 ---
 

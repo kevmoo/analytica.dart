@@ -5,7 +5,10 @@
 > passed with recorded evidence: `data_flow` reports on at least two distinct
 > candidate slices whose `mutations` variable names intersect in 3 or more
 > entries. If Tier 1 (records / `Result` dataclass) or Tier 2 (standard
-> private helpers) can express the extraction, use those instead.
+> private helpers) can express the extraction, use those instead. A
+> recurring 2-variable coupling (`queue` + `visited`, `buffer` + `cursor`)
+> never qualifies — enlarge the slice to the natural seam, or take the
+> domain-modeling exit in SKILL.md (a real named class, not a runner).
 
 This is a Dart-specific variation of Martin Fowler's classic refactoring
 **"Replace Method with Method Object"**.
@@ -14,6 +17,10 @@ This is a Dart-specific variation of Martin Fowler's classic refactoring
 
 * **The gate did not pass**: fewer than 3 shared mutable variables in the
   intersection, or only a single candidate slice was analyzed.
+* **A domain object is trying to be born**: if the coupled state has a
+  coherent domain identity (`Parser`, `GraphTraversal`, `Cursor`), model a
+  real named class with a public, unit-tested API instead of a private
+  runner — see the domain-modeling exit in SKILL.md.
 * **Simpler refactoring suffices**: state can be cleanly passed via
   parameters without bloating signatures — use standard private helpers.
 * **Sequential pipelines & transformations**: never convert pure linear

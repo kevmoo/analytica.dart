@@ -1,3 +1,22 @@
+## 0.2.2+2
+
+- Refine the skill's 3-Tier Decomposition Rubric per empirical feedback
+  (#19):
+  - "Slice at natural seams" rule: enlarge slices to whole loops/state
+    machines before classifying; solves coupled 2-variable state
+    (`queue` + `visited`) without weakening the Tier 3 gate (stays at >= 3
+    with recorded evidence).
+  - Named records for private/file-local slices at any output count;
+    dedicated `Result` dataclasses reserved for public API boundaries
+    (aligns the rubric with the `data_flow` signature synthesizer).
+  - Pattern E: loop-body extraction with explicit signal returns
+    (`enum`/sealed) instead of boolean control-flow flags; ordered
+    dispositions for control-flow escapes.
+  - Domain-modeling exit: promoting coupled state to a real named, tested
+    domain class is out of rubric scope — the gate bans `_Runner` facades,
+    not real abstractions.
+- No library or CLI code changes.
+
 ## 0.2.2+1
 
 - Update the `dart-cognitive-complexity` agent skill: anti-goodhart 3-tier
