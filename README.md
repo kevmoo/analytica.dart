@@ -74,7 +74,7 @@ Add the package to your `dev_dependencies` in `pubspec.yaml`:
 
 ```yaml
 dev_dependencies:
-  cognitive_complexity: ^0.2.0
+  cognitive_complexity: ^0.2.2
 ```
 
 And run:
@@ -112,7 +112,7 @@ Exposes programmatic analyzers for Dart and Flutter applications.
 Add to `pubspec.yaml`:
 ```yaml
 dependencies:
-  cognitive_complexity: ^0.2.0
+  cognitive_complexity: ^0.2.2
 ```
 
 ### Programmatic Scan Example
