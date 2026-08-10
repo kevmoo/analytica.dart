@@ -158,6 +158,17 @@ dart run cognitive_complexity:data_flow --format=text lib/src/my_file.dart:45-80
 dart run cognitive_complexity:data_flow --name=_processItem lib/src/my_file.dart:45-80
 ```
 
+Like the scanner, it also runs on-demand without a project dependency, and
+`dart install cognitive_complexity` puts a `data_flow` executable on your PATH:
+
+```bash
+# On-demand (resolves the latest published version)
+dart run cognitive_complexity:data_flow@ lib/src/my_file.dart:45-80
+
+# After global installation
+data_flow lib/src/my_file.dart:45-80
+```
+
 ### Programmatic Data-Flow API
 
 ```dart
