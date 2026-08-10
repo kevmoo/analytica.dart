@@ -6,6 +6,7 @@ import 'package:analyzer/dart/ast/visitor.dart';
 import 'package:analyzer/source/line_info.dart';
 import 'package:path/path.dart' as p;
 import 'models.dart';
+import 'sdk_discovery.dart';
 import 'signature_synthesizer.dart';
 import 'visitors/in_block_visitor.dart';
 import 'visitors/post_block_visitor.dart';
@@ -34,7 +35,26 @@ class DataFlowAnalyzer {
       throw FileSystemException('Target file does not exist', filePath);
     }
 
-    final effectiveSdkPath = sdkPath ?? _findSdkPath();
+    final provided = sdkPath;
+    if (provided != null && !isValidSdk(provided)) {
+      throw SdkDiscoveryException(
+        'The provided SDK path "$provided" does not point to a valid Dart '
+        'SDK root (missing lib/_internal).',
+      );
+    }
+
+    final effectiveSdkPath = provided ?? findSdkPath();
+    if (effectiveSdkPath == null) {
+      throw const SdkDiscoveryException(
+        'Cannot locate a Dart SDK for analysis. This happens when running as '
+        'a standalone AOT executable (e.g. '
+        '`dart run cognitive_complexity:data_flow@`), where the running '
+        'executable is not part of an SDK. Pass --sdk-path, set the DART_SDK '
+        'environment variable, or ensure a Dart SDK (or Flutter checkout) is '
+        'on PATH.',
+      );
+    }
+
     final collection = AnalysisContextCollection(
       includedPaths: [absPath],
       sdkPath: effectiveSdkPath,
@@ -320,71 +340,4 @@ class _EnclosingDeclarationVisitor extends RecursiveAstVisitor<void> {
     }
     super.visitConstructorDeclaration(node);
   }
-}
-
-// TODO: Replace manual SDK discovery helpers with package:cli_util once
-// https://github.com/dart-lang/tools/issues/2504 lands and is published.
-String? _findSdkPath() =>
-    _findSdkFromExecutable() ?? _findSdkFromEnv() ?? _findSdkFromPath();
-
-String? _findSdkFromExecutable() {
-  final exe = File(Platform.resolvedExecutable);
-  if (!exe.existsSync()) return null;
-
-  try {
-    final resolved = exe.resolveSymbolicLinksSync();
-    final candidate = p.dirname(p.dirname(resolved));
-    return _isValidSdk(candidate) ? candidate : null;
-  } catch (_) {
-    return null;
-  }
-}
-
-String? _findSdkFromEnv() {
-  final envSdk = Platform.environment['DART_SDK'];
-  if (envSdk != null && _isValidSdk(envSdk)) {
-    return envSdk;
-  }
-  return null;
-}
-
-String? _findSdkFromPath() {
-  final pathEnv = Platform.environment['PATH'];
-  if (pathEnv == null || pathEnv.isEmpty) return null;
-
-  final separator = Platform.isWindows ? ';' : ':';
-  final executableName = Platform.isWindows ? 'dart.exe' : 'dart';
-
-  for (final dir in pathEnv.split(separator)) {
-    if (dir.trim().isEmpty) continue;
-    final candidate = _resolveSdkFromDir(dir, executableName);
-    if (candidate != null) return candidate;
-  }
-
-  return null;
-}
-
-String? _resolveSdkFromDir(String dir, String executableName) {
-  final dartBinary = File(p.join(dir, executableName));
-  if (!dartBinary.existsSync()) return null;
-
-  try {
-    final resolved = dartBinary.resolveSymbolicLinksSync();
-    final candidate = p.dirname(p.dirname(resolved));
-    return _isValidSdk(candidate) ? candidate : null;
-  } catch (_) {
-    return null;
-  }
-}
-
-bool _isValidSdk(String path) {
-  final internal = Directory(p.join(path, 'lib', '_internal'));
-  if (!internal.existsSync()) return false;
-  return File(p.join(internal.path, 'libraries.dart')).existsSync() ||
-      File(
-        p.join(internal.path, 'sdk_library_metadata', 'lib', 'libraries.dart'),
-      ).existsSync() ||
-      File(
-        p.join(path, 'bin', Platform.isWindows ? 'dart.exe' : 'dart'),
-      ).existsSync();
 }

@@ -1,11 +1,24 @@
-## 0.2.2+3
+## 0.2.3
 
+- Fix `data_flow` crashing with `PathNotFoundException` when run as a
+  standalone AOT executable (`dart run cognitive_complexity:data_flow@` /
+  `dart install`), where SDK auto-discovery resolved to the app bundle
+  (#21):
+  - Fail fast with an actionable error (pass `--sdk-path`, set `DART_SDK`,
+    or put an SDK on `PATH`) instead of handing the analyzer an unresolved
+    SDK location.
+  - Teach `PATH`-based discovery the Flutter checkout layout: a
+    `flutter/bin/dart` wrapper script now resolves to
+    `flutter/bin/cache/dart-sdk`.
+  - Add a `FLUTTER_ROOT` discovery fallback.
+  - Add a `--sdk-path` option to the `data_flow` CLI (plumbed to the
+    existing `DataFlowAnalyzer.sdkPath` parameter); invalid explicit paths
+    are rejected with a clear error.
 - Update the `dart-cognitive-complexity` agent skill:
   - Add explicit rule under Tier 1/2 prescribing that extracted private helper
     routines that do not read or mutate class instance state (`this`) must be
     declared as private top-level functions (or `static` methods) rather than
     instance methods.
-- No library or CLI code changes.
 
 ## 0.2.2+2
 

@@ -5,6 +5,7 @@ import 'package:io/io.dart';
 import 'package:path/path.dart' as p;
 import 'data_flow_analyzer.dart';
 import 'models.dart';
+import 'sdk_discovery.dart';
 
 /// Executes the Data-Flow CLI with [args] and returns the exit code.
 Future<int> runCli(
@@ -49,6 +50,7 @@ Future<int> runCli(
       linesString: linesString,
       methodName: argResults['name'] as String,
       format: argResults['format'] as String,
+      sdkPath: argResults['sdk-path'] as String?,
       stdoutSink: stdoutSink,
     );
 
@@ -60,6 +62,9 @@ Future<int> runCli(
   } on FileSystemException catch (e) {
     stderrSink.writeln('Error: ${e.message} (${e.path})');
     return ExitCode.noInput.code;
+  } on SdkDiscoveryException catch (e) {
+    stderrSink.writeln('Error: $e');
+    return ExitCode.config.code;
   } catch (e) {
     stderrSink.writeln('Fatal error: $e');
     return 1;
@@ -92,6 +97,13 @@ ArgParser _buildParser() => ArgParser()
     defaultsTo: 'json',
     allowed: ['json', 'text'],
     help: 'Output format.',
+  )
+  ..addOption(
+    'sdk-path',
+    help:
+        'Path to the Dart SDK root used for analysis. Defaults to '
+        'auto-discovery (running VM, DART_SDK environment variable, PATH, '
+        'FLUTTER_ROOT).',
   );
 
 ({String filePath, String? linesString}) _resolveTarget(ArgResults argResults) {
@@ -118,10 +130,11 @@ Future<void> _executeAnalysis({
   required String linesString,
   required String methodName,
   required String format,
+  required String? sdkPath,
   required StringSink stdoutSink,
 }) async {
   final lineBounds = _parseLineBounds(linesString);
-  const analyzer = DataFlowAnalyzer();
+  final analyzer = DataFlowAnalyzer(sdkPath: sdkPath);
   final result = await analyzer.analyzeFile(
     filePath: filePath,
     startLine: lineBounds.$1,
