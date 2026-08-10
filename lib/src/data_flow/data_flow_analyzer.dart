@@ -152,6 +152,11 @@ class DataFlowAnalyzer {
       lineInfo: lineInfo,
       internalDeclarations: inBlockVisitor.internalDeclarations,
       mutations: inBlockVisitor.mutations,
+      enclosingLoopSpans: _collectEnclosingLoopSpans(
+        enclosingNode,
+        startOffset,
+        endOffset,
+      ),
     );
     enclosingNode.accept(postBlockVisitor);
 
@@ -211,6 +216,16 @@ class DataFlowAnalyzer {
     return typeParams;
   }
 
+  List<({int offset, int end})> _collectEnclosingLoopSpans(
+    AstNode enclosingNode,
+    int sliceStartOffset,
+    int sliceEndOffset,
+  ) {
+    final collector = _EnclosingLoopCollector(sliceStartOffset, sliceEndOffset);
+    enclosingNode.accept(collector);
+    return collector.spans;
+  }
+
   String _getDeclarationName(AstNode node) {
     if (node is FunctionDeclaration) {
       return node.name.lexeme;
@@ -222,6 +237,41 @@ class DataFlowAnalyzer {
       return node.name?.lexeme ?? 'new';
     }
     return 'unknown';
+  }
+}
+
+/// Collects the source spans of loops that strictly enclose the slice; loops
+/// contained in (or identical to) the slice have their back edge extracted
+/// along with it and carry no liveness outside the slice.
+class _EnclosingLoopCollector extends RecursiveAstVisitor<void> {
+  final int sliceStartOffset;
+  final int sliceEndOffset;
+  final List<({int offset, int end})> spans = [];
+
+  _EnclosingLoopCollector(this.sliceStartOffset, this.sliceEndOffset);
+
+  void _addIfEnclosing(AstNode node) {
+    if (node.offset < sliceStartOffset && node.end > sliceEndOffset) {
+      spans.add((offset: node.offset, end: node.end));
+    }
+  }
+
+  @override
+  void visitForStatement(ForStatement node) {
+    _addIfEnclosing(node);
+    super.visitForStatement(node);
+  }
+
+  @override
+  void visitWhileStatement(WhileStatement node) {
+    _addIfEnclosing(node);
+    super.visitWhileStatement(node);
+  }
+
+  @override
+  void visitDoStatement(DoStatement node) {
+    _addIfEnclosing(node);
+    super.visitDoStatement(node);
   }
 }
 

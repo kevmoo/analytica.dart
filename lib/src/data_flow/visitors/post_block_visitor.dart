@@ -13,6 +13,10 @@ class PostBlockVisitor extends RecursiveAstVisitor<void> {
   final Set<Element> internalDeclarations;
   final Map<Element, VariableUsage> mutations;
 
+  /// Source spans of loops that fully enclose the slice. A read anywhere
+  /// inside such a loop is reachable from the slice via the loop's back edge.
+  final List<({int offset, int end})> enclosingLoopSpans;
+
   /// Variables that are live after the block and must be returned.
   final Map<Element, VariableUsage> liveOutputs = {};
 
@@ -22,6 +26,7 @@ class PostBlockVisitor extends RecursiveAstVisitor<void> {
     required this.lineInfo,
     required this.internalDeclarations,
     required this.mutations,
+    this.enclosingLoopSpans = const [],
   });
 
   bool _isAfterSlice(AstNode node) => node.offset > sliceEndOffset;
@@ -29,6 +34,7 @@ class PostBlockVisitor extends RecursiveAstVisitor<void> {
   @override
   void visitSimpleIdentifier(SimpleIdentifier node) {
     if (!_isAfterSlice(node)) {
+      _maybeRecordLoopCarriedRead(node);
       super.visitSimpleIdentifier(node);
       return;
     }
@@ -97,17 +103,53 @@ class PostBlockVisitor extends RecursiveAstVisitor<void> {
     // afterwards.
     if (mutations.containsKey(element)) {
       if (!liveOutputs.containsKey(element)) {
-        final mutation = mutations[element]!;
-        liveOutputs[element] = VariableUsage(
-          name: element.name ?? node.name,
-          type: typeName,
-          isMutated: true,
-          declarationOffset: declOffset,
-          declarationLine: declLine,
-          firstMutationLine: mutation.firstMutationLine,
-        );
+        _recordMutatedOutput(element, node, declOffset);
       }
     }
+  }
+
+  /// A read inside an enclosing loop is downstream of the slice via the
+  /// loop's back edge, so a variable the slice mutates stays live even when
+  /// the read sits textually before the slice — provided the declaration
+  /// predates the loop (a binding declared inside the loop is re-created
+  /// each iteration and cannot carry the slice's write backwards).
+  void _maybeRecordLoopCarriedRead(SimpleIdentifier node) {
+    final element = node.element;
+    if (element is! VariableElement || !mutations.containsKey(element)) {
+      return;
+    }
+    if (liveOutputs.containsKey(element)) return;
+    if (_isPropertyOrLabel(node) || !node.inGetterContext()) return;
+
+    final declOffset = _resolveOffset(element);
+    for (final loop in enclosingLoopSpans) {
+      if (node.offset >= loop.offset &&
+          node.end <= loop.end &&
+          declOffset >= 0 &&
+          declOffset < loop.offset) {
+        _recordMutatedOutput(element, node, declOffset);
+        return;
+      }
+    }
+  }
+
+  void _recordMutatedOutput(
+    VariableElement element,
+    SimpleIdentifier node,
+    int declOffset,
+  ) {
+    final currentLine = lineInfo.getLocation(node.offset).lineNumber;
+    final declLine = declOffset >= 0
+        ? lineInfo.getLocation(declOffset).lineNumber
+        : currentLine;
+    liveOutputs[element] = VariableUsage(
+      name: element.name ?? node.name,
+      type: _resolveTypeName(element),
+      isMutated: true,
+      declarationOffset: declOffset,
+      declarationLine: declLine,
+      firstMutationLine: mutations[element]!.firstMutationLine,
+    );
   }
 
   int _resolveOffset(Element element) => element.firstFragment.nameOffset ?? -1;

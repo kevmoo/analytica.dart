@@ -13,6 +13,9 @@
   - Signatures now propagate `await for` async-ness, use use-site static types
     (preserving promotion), include enclosing type parameters with their
     bounds, and sanitize/deduplicate record field names.
+  - Liveness now follows loop back edges: a variable mutated in a slice inside
+    a loop is reported as an output when it is read anywhere in that loop,
+    even textually before the slice.
 
 ## 0.2.1
 
