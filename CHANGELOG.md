@@ -1,3 +1,11 @@
+## 0.2.2+1
+
+- Update the `dart-cognitive-complexity` agent skill: anti-goodhart 3-tier
+  decomposition rubric with deterministic tier selection via the `data_flow`
+  CLI, and a gated Tier 3 method-object reference
+  (`references/method-object.md`) absorbed from `kevmoo/kevmoo_skills`.
+- No library or CLI code changes.
+
 ## 0.2.2
 
 - Introduce `data_flow` analysis tool and library (`package:cognitive_complexity/data_flow.dart`):
