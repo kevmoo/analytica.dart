@@ -102,6 +102,12 @@ class InBlockVisitor extends RecursiveAstVisitor<void> {
               : currentLine;
           final typeName = _resolveTypeName(element);
 
+          _addClosureEscapeIfRequired(
+            node,
+            currentLine,
+            element.name ?? node.name.lexeme,
+          );
+
           mutations[element] = VariableUsage(
             name: element.name ?? node.name.lexeme,
             type: typeName,
@@ -224,7 +230,7 @@ class InBlockVisitor extends RecursiveAstVisitor<void> {
     }
 
     if (isWrite) {
-      _addClosureEscapeIfRequired(node, currentLine, typeName);
+      _addClosureEscapeIfRequired(node, currentLine, element.name ?? node.name);
 
       final existing = inputs[element];
       inputs[element] =
@@ -246,7 +252,7 @@ class InBlockVisitor extends RecursiveAstVisitor<void> {
         declarationOffset: declOffset,
         declarationLine: declLine,
         isMutated: true,
-        firstMutationLine: currentLine,
+        firstMutationLine: mutations[element]?.firstMutationLine ?? currentLine,
       );
     } else {
       inputs.putIfAbsent(
@@ -264,14 +270,15 @@ class InBlockVisitor extends RecursiveAstVisitor<void> {
   void _addClosureEscapeIfRequired(
     AstNode node,
     int currentLine,
-    String typeName,
+    String variableName,
   ) {
     if (_isInsideNestedFunction(node)) {
       escapes.add(
         ControlFlowEscape(
           type: ControlFlowEscapeType.closureEscape,
           line: currentLine,
-          description: 'Variable $typeName mutated inside a nested function',
+          description:
+              'Variable $variableName mutated inside a nested function',
         ),
       );
     }

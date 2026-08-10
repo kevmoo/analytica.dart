@@ -4,6 +4,15 @@
   - Added `DataFlowAnalyzer` to extract reaching definitions (inputs), variable mutations, and live outputs for arbitrary statement slices.
   - Added `SignatureSynthesizer` to automatically generate Dart 3 Record method signatures (`({TypeA a, TypeB b})`).
   - Added `data_flow` CLI with agent-first JSON formatting by default and formatted text reports.
+  - Hardened slice analysis: pattern assignments (`(a, b) = (b, a)`), pattern
+    variable declarations, labeled `break`/`continue` targeting outside the
+    slice, `rethrow` whose `catch` lies outside the slice, mutations of
+    captured variables inside nested closures, and constructor initializers.
+  - Added `ControlFlowEscapeType.closureEscape`, `rethrowEscape`, and
+    `constructorInitializerEscape`.
+  - Signatures now propagate `await for` async-ness, use use-site static types
+    (preserving promotion), include enclosing type parameters with their
+    bounds, and sanitize/deduplicate record field names.
 
 ## 0.2.1
 

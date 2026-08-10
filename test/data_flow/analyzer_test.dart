@@ -353,6 +353,45 @@ void process<T>(T item) {
       check(result.suggestedSignature).contains('<T>');
     });
 
+    test(
+      'Reports first mutation line when a variable is mutated twice',
+      () async {
+        const code = '''
+void twice() {
+  int x = 0;
+  // Target: Lines 4-5
+  x = 1;
+  x = 2;
+  // Post: Line 7
+  print(x);
+}
+''';
+        final result = await analyzer.analyzeSource(
+          sourceCode: code,
+          startLine: 4,
+          endLine: 5,
+        );
+        check(result.mutations.single.firstMutationLine).equals(4);
+        check(result.inputs.single.firstMutationLine).equals(4);
+      },
+    );
+
+    test('Preserves type parameter bounds in synthesized signature', () async {
+      const code = '''
+T process<T extends num>(T item) {
+  // Target: Line 3
+  print(item);
+  return item;
+}
+''';
+      final result = await analyzer.analyzeSource(
+        sourceCode: code,
+        startLine: 3,
+        endLine: 3,
+      );
+      check(result.suggestedSignature).contains('<T extends num>');
+    });
+
     test('VULN-10: Pattern variable declarations', () async {
       const code = '''
 void testMethod(List<int> list) {

@@ -260,6 +260,35 @@ class Button {
         check(
           result.escapes.map((e) => e.type.name).toList(),
         ).contains('closureEscape');
+        check(result.escapes.first.description).contains('count');
+      },
+    );
+
+    test(
+      'Pattern assignment inside nested closure is flagged as closureEscape',
+      () async {
+        const code = '''
+void testMethod(Button button) {
+  int a = 0;
+  int b = 1;
+  // Target: Lines 5-7
+  button.onClick = () {
+    (a, b) = (b, a);
+  };
+}
+class Button {
+  void Function()? onClick;
+}
+''';
+        final result = await analyzer.analyzeSource(
+          sourceCode: code,
+          startLine: 5,
+          endLine: 7,
+        );
+        check(result.isCleanlyExtractable).isFalse();
+        check(
+          result.escapes.map((e) => e.type.name).toList(),
+        ).contains('closureEscape');
       },
     );
 

@@ -40,9 +40,17 @@ class SignatureSynthesizer {
     } else if (outputs.length == 1) {
       baseType = outputs.first.type;
     } else {
+      final usedNames = <String>{};
       final fields = outputs
           .map((o) {
-            final cleanName = _sanitizeRecordFieldName(o.name);
+            var cleanName = _sanitizeRecordFieldName(o.name);
+            if (!usedNames.add(cleanName)) {
+              var suffix = 2;
+              while (!usedNames.add('$cleanName$suffix')) {
+                suffix++;
+              }
+              cleanName = '$cleanName$suffix';
+            }
             return '${o.type} $cleanName';
           })
           .join(', ');

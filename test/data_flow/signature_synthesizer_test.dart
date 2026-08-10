@@ -155,6 +155,55 @@ void main() {
 
       check(sig).equals('Future<({int a, String b})> _compute() async');
     });
+    test('Deduplicates record field names that collide after sanitization', () {
+      final sig = synthesizer.synthesize(
+        inputs: [],
+        outputs: [
+          const VariableUsage(
+            name: '_x',
+            type: 'int',
+            declarationOffset: 10,
+            declarationLine: 2,
+          ),
+          const VariableUsage(
+            name: 'x',
+            type: 'String',
+            declarationOffset: 20,
+            declarationLine: 3,
+          ),
+        ],
+        methodName: '_extracted',
+      );
+
+      check(sig).equals('({int x, String x2}) _extracted()');
+    });
+
+    test(
+      'Deduplicates result fallback when multiple names are only underscores',
+      () {
+        final sig = synthesizer.synthesize(
+          inputs: [],
+          outputs: [
+            const VariableUsage(
+              name: '_',
+              type: 'int',
+              declarationOffset: 10,
+              declarationLine: 2,
+            ),
+            const VariableUsage(
+              name: '__',
+              type: 'String',
+              declarationOffset: 20,
+              declarationLine: 3,
+            ),
+          ],
+          methodName: '_extracted',
+        );
+
+        check(sig).equals('({int result, String result2}) _extracted()');
+      },
+    );
+
     test(
       'Synthesizes result fallback when record field name is only underscores',
       () {

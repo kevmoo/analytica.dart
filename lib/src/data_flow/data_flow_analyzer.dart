@@ -204,7 +204,7 @@ class DataFlowAnalyzer {
             inputList.any((i) => regex.hasMatch(i.type)) ||
             outputList.any((o) => regex.hasMatch(o.type));
         if (isReferenced) {
-          typeParams.add(tpName);
+          typeParams.add(typeParam.toSource());
         }
       }
     }
