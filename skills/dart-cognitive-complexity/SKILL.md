@@ -140,7 +140,7 @@ verification baseline:
    flagged function is inadequate, pause execution and explicitly warn the user:
    > ⚠️ **Low Test Coverage Warning**: Function `<name>` in `<path>` lacks unit
    > test coverage. Structural refactoring risks silent behavioral regression.
-   
+
    Offer clear remediation paths:
    1. **(Recommended)** Write unit tests to lock in baseline behavior first.
    2. Proceed with structural refactoring and verify functionality manually.
@@ -229,27 +229,76 @@ Future<void> syncPayload(User? user, Payload? data) async {
 
 ---
 
-### Pattern C: Encapsulated Method Object Extraction
+### Pattern C: The 3-Tier Decomposition Rubric (Anti-Goodhart)
 
-When a monolithic function contains dense closures capturing heavy local variable
-state that prevents simple function extraction, migrate the function body into a
-dedicated private runner class. Promoting local variables to class instance fields
-collapses closure nesting penalties and unlocks focused helper method
-decomposition.
+**Anti-Goodhart Guardrail**: Do NOT blindly wrap monolithic functions in single-use runner classes with mutable instance variables just to bring scores below 15. Reducing the metric must never sacrifice transparent data flow or hide bugs.
 
-> **Companion Skill Hint**: If the **`encapsulated-method-object`** companion skill
-> is installed in your agent runtime, load and follow its instructions for
-> class-based encapsulation (it includes explicit overuse guardrails against
-> applying runner classes to stateless or sequential methods). Otherwise, execute
-> the standard refactoring workflow below.
+#### Deterministic Tier Selection via `data_flow`
 
-#### Refactoring Workflow
-1. Create a private class (e.g., `_PayloadProcessor`) accepting required state
-   through its constructor.
-2. Store mutable local variables as instance fields on the private class.
-3. Replace the original monolithic function body with a single instantiation and
-   method invocation on the runner object (`_PayloadProcessor(args).execute()`).
-4. Deconstruct the inner execution body into small, focused instance methods.
+Do not eyeball which tier a candidate slice belongs to. Run the companion
+statement-level data-flow analyzer on the exact line slice you intend to
+extract:
+
+```bash
+dart run cognitive_complexity:data_flow lib/src/my_file.dart:45-80
+```
+
+Its report (inputs, mutations, live outputs, control-flow escapes, and a
+synthesized Dart 3 record signature) selects the tier for you:
+
+* **Cleanly extractable, ≤ 3 live outputs** → Tier 1 or 2. Use the
+  synthesized record signature verbatim.
+* **4+ live outputs** → Tier 1 with a dedicated `Result` dataclass instead of
+  a wide record.
+* **Control-flow escapes (`return`/`break`/`continue` targeting outer
+  scopes)** → restructure with guard clauses (Pattern B) first, then re-run
+  the analysis.
+* **Dense mutation web across multiple slices** (the same 3+ mutable
+  variables threading through every candidate extraction) → only then is
+  Tier 3 on the table.
+
+When choosing how to reduce complexity on a large Dart function, follow this **3-Tier Decision Hierarchy**:
+
+1. **Tier 1 (First Choice - Pure Functional Decomposition)**:
+   - For sequential workflows, data pipelines, and validation suites.
+   - Extract static or top-level functions using Dart 3 records (`final (:data, :errors) = _stepOne(input);`).
+   - *Soft Cap*: Limit record returns to 3 simple values. If the pipeline yields 4+ distinct variables, mandate a dedicated `Result` or `Response` dataclass instead of a massive tuple to preserve schema readability.
+2. **Tier 2 (Second Choice - Standard Extract Method)**:
+   - For sub-routines requiring $\le3$ arguments without duplicating state. Extract standard private helper methods.
+3. **Tier 3 (Third Choice - Encapsulated Method Object / Runner Class)**:
+   - Reserved strictly for excessive "data trampolining"—when extracting standard methods would require passing the same 3+ mutable variables tightly coupled across multiple mutually recursive callbacks.
+   - **Gated Reference**: Read
+     [references/method-object.md](references/method-object.md) for the full
+     extraction mechanics and mandatory idioms — but ONLY after `data_flow`
+     analysis has demonstrated the mutation web described above. Do not load
+     or apply it speculatively.
+
+---
+
+### Pattern D: Fast-Fail Type Matching & Silent Data Swallowing
+
+When refactoring loops and type checks to reduce branching, **never** replace explicit type casts with pattern matching that silently drops data.
+
+**Flawed Structure (Silent Failure):**
+```dart
+for (final raw in rawTasks) {
+  // SILENTLY DROPS malformed data if raw is not a Map
+  if (raw case final Map<String, dynamic> taskMap) {
+    _applyTask(taskMap);
+  }
+}
+```
+
+**Correct Structure (Fast-Fail Preservation):**
+```dart
+for (final raw in rawTasks) {
+  if (raw is! Map<String, dynamic>) {
+    errors.add('Malformed task item (expected Map, got ${raw.runtimeType}): $raw');
+    continue;
+  }
+  _applyTask(raw);
+}
+```
 
 ---
 
