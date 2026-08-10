@@ -10,7 +10,7 @@ description: >-
 license: Apache-2.0
 key_features:
   - Automated CLI evaluation
-  - 3-tier execution scope matrix
+  - Scoped execution matrix (targeted / delta / full)
   - Interactive refactoring triage
   - Dart 3 pattern matching refactorings
 ---
@@ -48,7 +48,7 @@ complexity scores deterministically without LLM arithmetic or AST interpretation
 
 Select the execution scope based on the user's task instructions:
 
-### Tier 1: Targeted Scope (Specific File, Directory, or Class)
+### Scope 1: Targeted (Specific File, Directory, or Class)
 When the user references a discrete component (e.g., "check complexity in
 `lib/src/auth/`" or "audit `order_service.dart`"), pass explicit targets:
 
@@ -56,7 +56,7 @@ When the user references a discrete component (e.g., "check complexity in
 dart run cognitive_complexity@ --threshold 15 lib/src/auth/
 ```
 
-### Tier 2: Delta Scope (Pull Request, Branch, or Pre-flight Audit)
+### Scope 2: Delta (Pull Request, Branch, or Pre-flight Audit)
 When reviewing a feature branch, active commit stack, or PR, avoid full-project
 scanning. Isolate evaluation strictly to modified declarations against trunk:
 
@@ -64,7 +64,7 @@ scanning. Isolate evaluation strictly to modified declarations against trunk:
 dart run cognitive_complexity@ --git-diff origin/main --fail-on-increase
 ```
 
-### Tier 3: Whole-Project Scope (Default Naked Invocation)
+### Scope 3: Whole-Project (Default Naked Invocation)
 When invoked without targeting parameters ("scan my project for complexity" or
 `/cognitive-complexity`), audit the standard source and test roots:
 
@@ -106,7 +106,7 @@ Output a ranked Markdown **Complexity Triage Report** directly in chat (or to an
 artifact for extensive findings) containing:
 * Flagged function name and clickable file local path.
 * Current complexity score versus operational ceiling.
-* Recommended refactoring strategy (Pattern A, B, or C) and unit test status.
+* Recommended refactoring strategy (Pattern A, B, D, or a Pattern C tier) and unit test status.
 
 ### Stage 2: Interactive User Selection (Confirmation Gate)
 Pause execution and prompt the user (via interactive choice or chat) to select
@@ -236,42 +236,48 @@ Future<void> syncPayload(User? user, Payload? data) async {
 #### Deterministic Tier Selection via `data_flow`
 
 Do not eyeball which tier a candidate slice belongs to. Run the companion
-statement-level data-flow analyzer on the exact line slice you intend to
-extract:
+statement-level data-flow analyzer (on-demand form; same SDK 3.12.0+
+requirement as the scanner) on each line slice you intend to extract:
 
 ```bash
-dart run cognitive_complexity:data_flow lib/src/my_file.dart:45-80
+dart run cognitive_complexity:data_flow@ lib/src/my_file.dart:45-80
 ```
 
-Its report (inputs, mutations, live outputs, control-flow escapes, and a
-synthesized Dart 3 record signature) selects the tier for you:
+Its report (`inputs`, `mutations`, live `outputs`, control-flow escapes, and
+a synthesized Dart 3 record signature) selects the tier. These bullets are
+the ONLY selection rules:
 
-* **Cleanly extractable, ≤ 3 live outputs** → Tier 1 or 2. Use the
-  synthesized record signature verbatim.
+* **Cleanly extractable, ≤ 1 live output, ≤ 3 inputs** → Tier 2: extract a
+  standard private helper returning that value.
+* **Cleanly extractable, 2–3 live outputs** → Tier 1: extract a static or
+  top-level function and use the synthesized record signature verbatim.
 * **4+ live outputs** → Tier 1 with a dedicated `Result` dataclass instead of
   a wide record.
-* **Control-flow escapes (`return`/`break`/`continue` targeting outer
-  scopes)** → restructure with guard clauses (Pattern B) first, then re-run
-  the analysis.
-* **Dense mutation web across multiple slices** (the same 3+ mutable
-  variables threading through every candidate extraction) → only then is
-  Tier 3 on the table.
+* **Control-flow escapes** → not extractable as-is. For `return`, `break`,
+  or `continue` targeting outer scopes, restructure with guard clauses
+  (Pattern B) and re-run the analysis. For `yield`, restructure the
+  generator before attempting any extraction.
+* **Tier 3 gate (mutation-web check)** → Tier 3 requires recorded evidence,
+  not judgment. Run `data_flow` on at least two distinct candidate slices of
+  the function. Tier 3 is permitted ONLY if the intersection of their
+  `mutations` variable names contains 3 or more entries — i.e. the same
+  mutable variables thread through every candidate extraction. Paste the
+  JSON reports into the Triage Report as evidence; without that evidence,
+  stay in Tier 1/2.
 
 When choosing how to reduce complexity on a large Dart function, follow this **3-Tier Decision Hierarchy**:
 
-1. **Tier 1 (First Choice - Pure Functional Decomposition)**:
-   - For sequential workflows, data pipelines, and validation suites.
-   - Extract static or top-level functions using Dart 3 records (`final (:data, :errors) = _stepOne(input);`).
-   - *Soft Cap*: Limit record returns to 3 simple values. If the pipeline yields 4+ distinct variables, mandate a dedicated `Result` or `Response` dataclass instead of a massive tuple to preserve schema readability.
-2. **Tier 2 (Second Choice - Standard Extract Method)**:
-   - For sub-routines requiring $\le3$ arguments without duplicating state. Extract standard private helper methods.
-3. **Tier 3 (Third Choice - Encapsulated Method Object / Runner Class)**:
-   - Reserved strictly for excessive "data trampolining"—when extracting standard methods would require passing the same 3+ mutable variables tightly coupled across multiple mutually recursive callbacks.
-   - **Gated Reference**: Read
-     [references/method-object.md](references/method-object.md) for the full
-     extraction mechanics and mandatory idioms — but ONLY after `data_flow`
-     analysis has demonstrated the mutation web described above. Do not load
-     or apply it speculatively.
+1. **Tier 1 — Pure Functional Decomposition (first choice)**: static or
+   top-level functions returning Dart 3 records
+   (`final (:data, :errors) = _stepOne(input);`), or a dedicated `Result` /
+   `Response` dataclass when the selection rules mandate one.
+2. **Tier 2 — Standard Extract Method (second choice)**: standard private
+   helper methods taking <= 3 arguments.
+3. **Tier 3 — Encapsulated Method Object (last resort)**: permitted only
+   when the mutation-web check above passes with recorded evidence. Then
+   read [references/method-object.md](references/method-object.md) for the
+   extraction mechanics and mandatory idioms. Do not load or apply it
+   speculatively.
 
 ---
 
@@ -306,8 +312,10 @@ for (final raw in rawTasks) {
 
 Run these verification commands before committing refactored code:
 
-1. **Complexity Audit**: Run `dart run cognitive_complexity@ --fail-threshold 15`
-   to verify zero declarations exceed operational ceilings.
+1. **Complexity Audit**: Run `dart run cognitive_complexity@
+   --fail-threshold 15 <refactored files>` scoped to the files you touched.
+   Pre-existing breaches elsewhere in the project do not invalidate the
+   refactor.
 2. **Code Presentation**: Run `dart format .` to maintain uniform syntactic
    styling.
 3. **Static Analysis**: Run `dart analyze` to ensure zero static warnings, lint
