@@ -100,7 +100,10 @@ cognitive_complexity [options] [targets]
 * `-d, --git-diff <git-ref>`: Compares current code against a git commit/ref,
   evaluating complexity deltas (Δ) on modified functions.
 * `--fail-on-increase`: When using `--git-diff`, exits with code `1` if any
-  modified function experienced a complexity score increase.
+  modified function experienced a complexity score increase. When
+  `--fail-threshold` is also set, only increases that exceed the threshold
+  fail — increases within budget are reported but do not block. Omit
+  `--fail-threshold` for a strict ratchet (any increase fails).
 * `--format <text|json|github>`: Report output formatting (default: `text`).
 
 ---
@@ -244,7 +247,8 @@ jobs:
 * `fail-threshold`: Max complexity ceiling (default: `15`).
 * `diff-base`: Git ref to compare against (e.g. `origin/main`). Leave empty
   to compare full repository files.
-* `fail-on-increase`: Set `true` to block PR merge if complexity increases.
+* `fail-on-increase`: Set `true` to block PR merge on complexity increases
+  that exceed `fail-threshold` (or on any increase when no threshold is set).
 * `format`: Summary format: `github` (GHA annotations + summary), `text`, or `json`.
 
 ### Permissions & Security

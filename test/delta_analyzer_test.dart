@@ -59,6 +59,26 @@ void main() {
       check(d.isViolation(failOnIncrease: true)).isTrue();
     });
 
+    test('Threshold gates fail-on-increase when both are supplied', () {
+      const oldCode = 'void foo() { print("clean"); }';
+      const newCode = '''
+        void foo() {
+          if (a) {
+            if (b) print("worse");
+          }
+        }
+      ''';
+
+      final d = analyzer.computeDeltaForCode(oldCode, newCode).first;
+      check(d.newScore).isNotNull().equals(3);
+      // Within budget: the increase is reported but is not a violation.
+      check(d.isViolation(failOnIncrease: true, failThreshold: 15)).isFalse();
+      // Over budget: the increase is a violation.
+      check(d.isViolation(failOnIncrease: true, failThreshold: 2)).isTrue();
+      // No threshold: strict any-increase ratchet.
+      check(d.isViolation(failOnIncrease: true)).isTrue();
+    });
+
     test('Identifies newly added and removed functions across diff', () {
       const oldCode = 'void deletedFunc(int a) { if (a > 0) print(a); }';
       const newCode = 'void addedFunc(bool b) { if (b) print(1); }';

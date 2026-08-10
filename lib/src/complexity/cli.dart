@@ -55,7 +55,8 @@ Future<int> runCli(
       negatable: false,
       help:
           'When using --git-diff, exit with non-zero code if any function '
-          'increased in complexity.',
+          'increased in complexity. When --fail-threshold is also set, only '
+          'increases that exceed the threshold fail.',
     )
     ..addOption(
       'format',

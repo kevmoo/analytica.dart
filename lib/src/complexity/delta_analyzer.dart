@@ -38,7 +38,14 @@ class ComplexityDelta {
   bool isViolation({int? failThreshold, bool failOnIncrease = false}) {
     // Newly added declarations have no baseline to "increase" from; they are
     // governed by [failThreshold] alone.
-    if (failOnIncrease && status == DeltaStatus.increased) {
+    //
+    // When both flags are supplied, [failThreshold] gates [failOnIncrease]:
+    // an increase that stays within the threshold budget is reported but is
+    // not a violation. Without a threshold, any increase is a violation
+    // (strict ratchet).
+    if (failOnIncrease &&
+        status == DeltaStatus.increased &&
+        (failThreshold == null || (newScore ?? 0) > failThreshold)) {
       return true;
     }
     if (failThreshold != null &&

@@ -14,6 +14,12 @@
   - Add a `--sdk-path` option to the `data_flow` CLI (plumbed to the
     existing `DataFlowAnalyzer.sdkPath` parameter); invalid explicit paths
     are rejected with a clear error.
+- Fix `--fail-on-increase` ignoring `--fail-threshold`: when both are set,
+  an increase now only fails the run if the new score exceeds the
+  threshold. Sub-threshold increases are still reported (delta table, PR
+  comment) but no longer block healthy changes such as added error
+  handling. Without `--fail-threshold`, the strict any-increase ratchet is
+  unchanged.
 - Update the `dart-cognitive-complexity` agent skill:
   - Add explicit rule under Tier 1/2 prescribing that extracted private helper
     routines that do not read or mutate class instance state (`this`) must be

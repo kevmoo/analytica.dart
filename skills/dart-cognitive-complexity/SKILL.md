@@ -61,8 +61,13 @@ When reviewing a feature branch, active commit stack, or PR, avoid full-project
 scanning. Isolate evaluation strictly to modified declarations against trunk:
 
 ```bash
-dart run cognitive_complexity@ --git-diff origin/main --fail-on-increase
+dart run cognitive_complexity@ --git-diff origin/main --fail-threshold 15 --fail-on-increase
 ```
+
+With both flags set, only increases that exceed the threshold fail — healthy
+sub-threshold increases (e.g. added error handling) are reported without
+blocking. Omit `--fail-threshold` only when a strict any-increase ratchet is
+explicitly desired.
 
 ### Scope 3: Whole-Project (Default Naked Invocation)
 When invoked without targeting parameters ("scan my project for complexity" or
