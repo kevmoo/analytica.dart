@@ -305,7 +305,12 @@ resurfacing across a function (a parser's `buffer` + `cursor`, a traversal's
 *named* domain class (`Parser`, `GraphTraversal`) with a public, unit-tested
 API. That is domain modeling, not complexity remediation — it exits this
 rubric entirely and is not subject to the Tier 3 gate. The gate exists to
-ban single-use `_XxxRunner` facades, not real abstractions.
+ban single-use `_XxxRunner` facades, not real abstractions. To qualify for
+the exit, the class MUST have cohesive entity state, more than one public
+behavior, and its own dedicated test suite. A single-use private class with
+a constructor and one `run()` method is a runner no matter what it is
+renamed to (`_ScanEngine`, `_BatchProcessor`) and remains subject to the
+gate.
 
 ---
 
@@ -368,9 +373,11 @@ for (final entry in entries) {
 ```
 
 Use a sealed class instead of an enum when the signal must carry a payload.
-The exhaustive `switch` keeps every termination path visible at the loop
-site. Prefer extracting the *entire loop* when `data_flow` shows it forms a
-natural seam; use Pattern E when the loop body alone is the hotspot.
+Asynchronous classification works identically:
+`switch (await _classify(entry, seen))`. The exhaustive `switch` keeps
+every termination path visible at the loop site. Prefer extracting the
+*entire loop* when `data_flow` shows it forms a natural seam; use Pattern E
+when the loop body alone is the hotspot.
 
 ---
 
