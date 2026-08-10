@@ -15,7 +15,9 @@ class PostBlockVisitor extends RecursiveAstVisitor<void> {
 
   /// Source spans of loops that fully enclose the slice. A read anywhere
   /// inside such a loop is reachable from the slice via the loop's back edge.
-  final List<({int offset, int end})> enclosingLoopSpans;
+  /// A declaration at an offset below `carryBoundary` survives the back edge;
+  /// bindings declared at or past it are re-created each iteration.
+  final List<({int offset, int end, int carryBoundary})> enclosingLoopSpans;
 
   /// Variables that are live after the block and must be returned.
   final Map<Element, VariableUsage> liveOutputs = {};
@@ -126,7 +128,7 @@ class PostBlockVisitor extends RecursiveAstVisitor<void> {
       if (node.offset >= loop.offset &&
           node.end <= loop.end &&
           declOffset >= 0 &&
-          declOffset < loop.offset) {
+          declOffset < loop.carryBoundary) {
         _recordMutatedOutput(element, node, declOffset);
         return;
       }

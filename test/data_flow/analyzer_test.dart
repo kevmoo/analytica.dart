@@ -458,6 +458,51 @@ void perItem(List<int> items) {
       check(result.outputs).isEmpty();
     });
 
+    test(
+      'C-style loop header variable mutated in slice is loop-carried',
+      () async {
+        const code = '''
+void skipper(List<int> items) {
+  for (var i = 0; i < items.length; i++) {
+    // Target: Line 4
+    i += items[i];
+  }
+}
+''';
+        final result = await analyzer.analyzeSource(
+          sourceCode: code,
+          startLine: 4,
+          endLine: 4,
+        );
+        // The write to i feeds the loop condition and updater via the back
+        // edge; a void extraction would loop forever.
+        check(result.outputs.map((o) => o.name).toList()).deepEquals(['i']);
+        check(
+          result.suggestedSignature,
+        ).equals('int _extracted(int i, List<int> items)');
+      },
+    );
+
+    test('for-in loop variable mutated in slice is not loop-carried', () async {
+      const code = '''
+void rewrite(List<int> items) {
+  for (var item in items) {
+    print(item);
+    // Target: Line 5
+    item = item * 2;
+  }
+}
+''';
+      final result = await analyzer.analyzeSource(
+        sourceCode: code,
+        startLine: 5,
+        endLine: 5,
+      );
+      // item is re-bound from the iterator every iteration, so the slice's
+      // write never survives the back edge.
+      check(result.outputs).isEmpty();
+    });
+
     test('VULN-10: Pattern variable declarations', () async {
       const code = '''
 void testMethod(List<int> list) {

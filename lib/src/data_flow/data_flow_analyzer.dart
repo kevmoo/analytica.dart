@@ -216,7 +216,7 @@ class DataFlowAnalyzer {
     return typeParams;
   }
 
-  List<({int offset, int end})> _collectEnclosingLoopSpans(
+  List<({int offset, int end, int carryBoundary})> _collectEnclosingLoopSpans(
     AstNode enclosingNode,
     int sliceStartOffset,
     int sliceEndOffset,
@@ -246,31 +246,42 @@ class DataFlowAnalyzer {
 class _EnclosingLoopCollector extends RecursiveAstVisitor<void> {
   final int sliceStartOffset;
   final int sliceEndOffset;
-  final List<({int offset, int end})> spans = [];
+  final List<({int offset, int end, int carryBoundary})> spans = [];
 
   _EnclosingLoopCollector(this.sliceStartOffset, this.sliceEndOffset);
 
-  void _addIfEnclosing(AstNode node) {
+  void _addIfEnclosing(AstNode node, int carryBoundary) {
     if (node.offset < sliceStartOffset && node.end > sliceEndOffset) {
-      spans.add((offset: node.offset, end: node.end));
+      spans.add((
+        offset: node.offset,
+        end: node.end,
+        carryBoundary: carryBoundary,
+      ));
     }
   }
 
   @override
   void visitForStatement(ForStatement node) {
-    _addIfEnclosing(node);
+    // A C-style header declaration (`for (var i = 0; ...)`) carries its value
+    // across iterations via the condition and updaters, so it sits inside the
+    // carry boundary. A for-in variable is re-bound from the iterator every
+    // iteration and cannot carry a slice write backwards.
+    final boundary = node.forLoopParts is ForParts
+        ? node.body.offset
+        : node.offset;
+    _addIfEnclosing(node, boundary);
     super.visitForStatement(node);
   }
 
   @override
   void visitWhileStatement(WhileStatement node) {
-    _addIfEnclosing(node);
+    _addIfEnclosing(node, node.offset);
     super.visitWhileStatement(node);
   }
 
   @override
   void visitDoStatement(DoStatement node) {
-    _addIfEnclosing(node);
+    _addIfEnclosing(node, node.offset);
     super.visitDoStatement(node);
   }
 }
