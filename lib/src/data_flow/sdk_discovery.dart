@@ -82,15 +82,25 @@ String? _findSdkFromFlutterRoot() {
 /// wrapper script and the real SDK lives at `<flutter>/bin/cache/dart-sdk`.
 String? resolveSdkFromDir(String dir, String executableName) {
   final dartBinary = File(p.join(dir, executableName));
-  if (!dartBinary.existsSync()) return null;
-
-  try {
-    final resolved = dartBinary.resolveSymbolicLinksSync();
-    final candidate = p.dirname(p.dirname(resolved));
-    if (isValidSdk(candidate)) return candidate;
-  } catch (_) {
-    // Fall through to the Flutter wrapper probe.
+  if (dartBinary.existsSync()) {
+    try {
+      final resolved = dartBinary.resolveSymbolicLinksSync();
+      final candidate = p.dirname(p.dirname(resolved));
+      if (isValidSdk(candidate)) return candidate;
+    } catch (_) {
+      // Fall through to the Flutter wrapper probe.
+    }
   }
+
+  // Flutter checkouts ship wrapper scripts in `bin/` (`dart`, plus `dart.bat`
+  // on Windows — never `dart.exe`, which lives inside the cached SDK), so the
+  // exact executable probed above may be absent. Probe `cache/dart-sdk`
+  // whenever any Dart wrapper is present in the directory.
+  final hasDartWrapper =
+      dartBinary.existsSync() ||
+      File(p.join(dir, 'dart')).existsSync() ||
+      File(p.join(dir, 'dart.bat')).existsSync();
+  if (!hasDartWrapper) return null;
 
   final flutterCache = p.join(dir, 'cache', 'dart-sdk');
   return isValidSdk(flutterCache) ? flutterCache : null;

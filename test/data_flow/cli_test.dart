@@ -8,9 +8,12 @@ import 'package:test_descriptor/test_descriptor.dart' as d;
 import 'package:test_process/test_process.dart';
 
 void main() {
+  // Pin subprocesses to the SDK running the tests rather than PATH's `dart`.
+  final dartExe = Platform.resolvedExecutable;
+
   group('DataFlow CLI Integration', () {
     test('Displays usage help and exits with code 0 on --help', () async {
-      final proc = await TestProcess.start('dart', [
+      final proc = await TestProcess.start(dartExe, [
         'run',
         'bin/data_flow.dart',
         '--help',
@@ -25,7 +28,7 @@ void main() {
     });
 
     test('Exits with code 64 when no target file is provided', () async {
-      final proc = await TestProcess.start('dart', [
+      final proc = await TestProcess.start(dartExe, [
         'run',
         'bin/data_flow.dart',
       ]);
@@ -50,7 +53,7 @@ void runFlow(String token) {
 '''),
       ]).create();
 
-      final proc = await TestProcess.start('dart', [
+      final proc = await TestProcess.start(dartExe, [
         'run',
         'bin/data_flow.dart',
         '${d.sandbox}/project/sample.dart:4-6',
@@ -83,7 +86,7 @@ void process(int a, int b) {
 '''),
         ]).create();
 
-        final proc = await TestProcess.start('dart', [
+        final proc = await TestProcess.start(dartExe, [
           'run',
           'bin/data_flow.dart',
           '--format=text',
@@ -120,7 +123,7 @@ void process(int a) {
 
       // Test with drive-like prefix pattern
       final samplePath = '${d.sandbox}/project3/sample3.dart';
-      final proc = await TestProcess.start('dart', [
+      final proc = await TestProcess.start(dartExe, [
         'run',
         'bin/data_flow.dart',
         '$samplePath:3-4',
@@ -138,7 +141,7 @@ void process(int a) {
 
   group('SDK path resolution', () {
     test('Documents --sdk-path and DART_SDK in help text', () async {
-      final proc = await TestProcess.start('dart', [
+      final proc = await TestProcess.start(dartExe, [
         'run',
         'bin/data_flow.dart',
         '--help',
@@ -154,7 +157,7 @@ void process(int a) {
     test('Exits with config error for an invalid --sdk-path', () async {
       await d.dir('proj', [d.file('sample.dart', 'void main() {}\n')]).create();
 
-      final proc = await TestProcess.start('dart', [
+      final proc = await TestProcess.start(dartExe, [
         'run',
         'bin/data_flow.dart',
         '--sdk-path',
@@ -180,7 +183,7 @@ void process(int a) {
       ]).create();
 
       final sdkRoot = p.dirname(p.dirname(Platform.resolvedExecutable));
-      final proc = await TestProcess.start('dart', [
+      final proc = await TestProcess.start(dartExe, [
         'run',
         'bin/data_flow.dart',
         '--sdk-path',

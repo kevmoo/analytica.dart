@@ -71,6 +71,31 @@ void main() {
       ).equals(p.join(binDir, 'cache', 'dart-sdk'));
     });
 
+    test(
+      'resolves a Windows-style Flutter checkout when probing dart.exe',
+      () async {
+        await d.dir('flutter_win', [
+          d.dir('bin', [
+            // Windows Flutter checkouts ship dart.bat, never bin/dart.exe.
+            d.file('dart.bat', '@echo off\r\n'),
+            d.dir('cache', [
+              d.dir('dart-sdk', [
+                d.dir('lib', [
+                  d.dir('_internal', [d.file('libraries.dart', '')]),
+                ]),
+                d.dir('bin', [d.file('dart.exe', '')]),
+              ]),
+            ]),
+          ]),
+        ]).create();
+
+        final binDir = '${d.sandbox}/flutter_win/bin';
+        check(
+          resolveSdkFromDir(binDir, 'dart.exe'),
+        ).equals(p.join(binDir, 'cache', 'dart-sdk'));
+      },
+    );
+
     test('returns null when the directory has no dart executable', () async {
       await d.dir('empty').create();
 
