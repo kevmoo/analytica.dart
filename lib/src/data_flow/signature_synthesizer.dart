@@ -30,6 +30,16 @@ class SignatureSynthesizer {
     return sanitized;
   }
 
+  String _uniqueFieldName(String name, Set<String> usedNames) {
+    final base = _sanitizeRecordFieldName(name);
+    if (usedNames.add(base)) return base;
+    var suffix = 2;
+    while (!usedNames.add('$base$suffix')) {
+      suffix++;
+    }
+    return '$base$suffix';
+  }
+
   String _buildReturnType(
     List<VariableUsage> outputs, {
     required bool isAsync,
@@ -42,17 +52,7 @@ class SignatureSynthesizer {
     } else {
       final usedNames = <String>{};
       final fields = outputs
-          .map((o) {
-            var cleanName = _sanitizeRecordFieldName(o.name);
-            if (!usedNames.add(cleanName)) {
-              var suffix = 2;
-              while (!usedNames.add('$cleanName$suffix')) {
-                suffix++;
-              }
-              cleanName = '$cleanName$suffix';
-            }
-            return '${o.type} $cleanName';
-          })
+          .map((o) => '${o.type} ${_uniqueFieldName(o.name, usedNames)}')
           .join(', ');
       baseType = '({$fields})';
     }
