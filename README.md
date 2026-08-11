@@ -3,7 +3,8 @@ Asking an agent to "refactor the code to make it cleaner" is poorly defined and
 leaves the agent to make arbitrary decisions.
 
 This Dart package, GitHub Action, and AI agent skill make finding and fixing
-overly complex logic easy, reliable, and repeatable.
+overly complex logic easy, reliable, and repeatable by implementing the
+[Cognitive Complexity principles][whitepaper] articulated by SonarSource.
 
 ## ✨ Features
 
@@ -88,3 +89,5 @@ Explore in-depth documentation in the [`doc/`](doc/) directory:
   variable lifecycles, and automated method extraction helper.
 - 🤖 [GitHub Actions Guide](doc/github_actions.md): PR workflow setup,
   parameters reference, and fork security permissions.
+
+[whitepaper]: https://www.sonarsource.com/docs/CognitiveComplexity.pdf
