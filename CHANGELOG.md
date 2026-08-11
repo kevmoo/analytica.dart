@@ -1,3 +1,12 @@
+## 0.2.3+2
+
+- Streamline `README.md` into a focused, scannable TL;DR.
+- Extract deep-dive reference documentation into modular guides under `doc/`:
+  - `doc/scoring.md`: Scoring matrix, nesting multipliers, and Dart 3 AST rules.
+  - `doc/cli.md`: Command-line options, git diff delta evaluation, and CI ratcheting.
+  - `doc/data_flow.md`: Statement data-flow analysis, method extraction theory, and programmatic API.
+  - `doc/github_actions.md`: Complete GitHub Action workflow setup, parameters, and fork security permissions.
+
 ## 0.2.3+1
 
 - Add an example.
