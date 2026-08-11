@@ -7,7 +7,6 @@
 /// diagnostic reporting capabilities.
 library;
 
-export 'src/complexity/cognitive_complexity_visitor.dart';
 export 'src/complexity/complexity_analyzer.dart';
 export 'src/complexity/delta_analyzer.dart';
 export 'src/complexity/git_diff_service.dart';

@@ -3,6 +3,7 @@ import 'package:analyzer/dart/analysis/utilities.dart';
 import 'package:analyzer/dart/ast/ast.dart';
 import 'package:checks/checks.dart';
 import 'package:cognitive_complexity/cognitive_complexity.dart';
+import 'package:cognitive_complexity/src/complexity/cognitive_complexity_visitor.dart';
 import 'package:test/scaffolding.dart';
 
 int _getComplexity(String code) {

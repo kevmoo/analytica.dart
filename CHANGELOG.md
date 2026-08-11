@@ -1,3 +1,9 @@
+## 0.2.3+1
+
+- Add an example.
+- Remove accidental export of internal `CognitiveComplexityVisitor` from
+  `package:cognitive_complexity/cognitive_complexity.dart`.
+
 ## 0.2.3
 
 - Fix `data_flow` crashing with `PathNotFoundException` when run as a
