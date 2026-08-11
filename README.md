@@ -1,133 +1,48 @@
-A deterministic, zero-token Cognitive Complexity calculation library, CLI
-tool, and GitHub Action for Dart and Flutter repositories.
+A deterministic, zero-token Cognitive Complexity calculation library, CLI tool,
+and GitHub Action for Dart and Flutter repositories.
 
 Unlike Cyclomatic Complexity (which measures control flow branch density),
-Cognitive Complexity measures how difficult a method is for a human engineer
-to read and understand, following the whitepaper specification by G. Ann
+Cognitive Complexity measures how difficult code is for a human engineer to read
+and understand, following the [SonarSource whitepaper][whitepaper] by G. Ann
 Campbell.
 
----
+## ✨ Features
 
-## Features
-
-* **Modern Dart 3 AST Support**: Natively parses switch expressions, pattern
+- **Modern Dart 3 AST Support**: Natively parses switch expressions, pattern
   guards (`when` clauses), and collection control flow structures.
-* **Deterministic Engine**: Calculates complexity algorithmically without invoking
-  LLM calls or external network requests.
-* **Statement Data-Flow Analysis**: Inspects reaching definitions (inputs),
-  variable mutations, and downstream live reads (outputs) for arbitrary statement
-  slices to power automated method extraction.
-* **Git Diff Analysis**: Compares current workspace declarations against a target
-  base ref to isolate complexity deltas (Δ) in modified functions.
-* **Lightweight GitHub Action**: Exposes workflow annotations and step summaries
-  for CI check integration.
+- **Deterministic Engine**: Calculates complexity algorithmically without LLM
+  calls, external network requests, or token latency.
+- **Statement Data-Flow Analysis**: Evaluates variable inputs, mutations, and
+  downstream live outputs for arbitrary statement slices to power automated
+  method extraction.
+- **Git Diff Analysis & Ratchet**: Compares working copy changes against a
+  target base ref to isolate complexity deltas (Δ) in modified functions.
+- **Lightweight GitHub Action**: Exposes workflow annotations and markdown
+  summary tables for automated CI quality gates.
 
----
+## ⚡ Quick Start
 
-## Scoring Model
+### CLI (On-Demand)
 
-Scores follow the [SonarSource Cognitive Complexity whitepaper][whitepaper]
-(G. Ann Campbell, v1.7):
-
-| Construct / Syntax | Base Cost | Nesting Multiplier | Deepens Nesting? | Notes |
-| :--- | :---: | :---: | :---: | :--- |
-| **`if`, `for`, `while`, `do-while`, `catch` / `on`** | `+1` | `+D` (Current Depth) | **Yes** | Standard flow-breaking structures |
-| **`switch` Statements & Expressions** | `+1` | `+D` (Current Depth) | **Yes** | Entire block costs `+1` regardless of arm count |
-| **`else` / `else if`** | `+1` | `+0` (Flat penalty) | **No** | Branch contents sit one level below head `if` |
-| **Logical Operators (`&&`, `\|\|`)** | `+1` | `+0` (Flat penalty) | **No** | `+1` per sequence; `+1` for each alternation |
-| **Pattern `when` Guards** | `+1` | `+0` (Flat penalty) | **No** | Dart 3 specific interpretation |
-| **Lambdas & Local Functions** | `+0` | `+0` | **Yes** | Deepens nesting depth for enclosed bodies |
-| **Null-Aware (`??`, `?.`, `??=`), `assert`, `try` / `finally`** | `+0` | `+0` | **No** | Benign syntax; completely free |
-| **Switch Case Labels & Pattern Combinators** | `+0` | `+0` | **No** | Stacked arms / or-patterns (`1 \|\| 2`) are free |
-
-Dart-specific interpretations of the spec:
-
-* Pattern `when` guards add +1 (a guard is an extra condition to evaluate).
-* Pattern-level combinators (`case 1 || 2:`, `case > 0 && < 10`) are free —
-  an or-pattern is the modern spelling of stacked case labels, which the
-  spec scores at zero.
-* The whitepaper's "+1 for each method in a recursion cycle" is not
-  implemented, matching SonarSource's own reference implementation
-  (sonar-java), which omits it as well.
-
-[whitepaper]: https://www.sonarsource.com/docs/CognitiveComplexity.pdf
-
----
-
-## 💻 CLI Usage
-
-You can run the scanner on-demand without installation, locally inside a project, or globally. *(Requires Dart SDK **3.12.0 or greater**)*.
-
-### On-Demand (Recommended)
-
-Run the scanner directly in any Dart or Flutter project root using the Dart SDK:
+Run the scanner directly in any Dart or Flutter project without prior
+installation:
 
 ```bash
-dart run cognitive_complexity@ [options] [targets]
+dart run cognitive_complexity@
 ```
 
-*(Note: The trailing `@` instructs the Dart VM to resolve and execute the latest published version of the package on-demand).*
+_(Requires Dart SDK **3.12.0 or greater**)_.
 
-### Project Dependency
+### Library API
 
-Add the package to your `dev_dependencies` in `pubspec.yaml`:
-
-```yaml
-dev_dependencies:
-  cognitive_complexity: ^0.2.2
-```
-
-And run:
-
-```bash
-dart run cognitive_complexity [options] [targets]
-```
-
-### Global Installation
-
-To install the scanner globally on your system:
-
-```bash
-dart install cognitive_complexity
-cognitive_complexity [options] [targets]
-```
-
-### Options
-
-* `-t, --threshold <value>`: Minimum score to display in the terminal (default: `0`).
-* `-f, --fail-threshold <value>`: Ceilings score. Exits with code `1` if any
-  declaration exceeds this value.
-* `-d, --git-diff <git-ref>`: Compares current code against a git commit/ref,
-  evaluating complexity deltas (Δ) on modified functions.
-* `--fail-on-increase`: When using `--git-diff`, exits with code `1` if any
-  modified function experienced a complexity score increase. When
-  `--fail-threshold` is also set, only increases that exceed the threshold
-  fail — increases within budget are reported but do not block. Omit
-  `--fail-threshold` for a strict ratchet (any increase fails).
-* `--format <text|json|github>`: Report output formatting (default: `text`).
-
----
-
-## 📦 Library API Usage
-
-Exposes programmatic analyzers for Dart and Flutter applications.
-
-Add to `pubspec.yaml`:
-```yaml
-dependencies:
-  cognitive_complexity: ^0.2.2
-```
-
-### Programmatic Scan Example
+Add `cognitive_complexity` to your `pubspec.yaml`:
 
 ```dart
 import 'package:cognitive_complexity/cognitive_complexity.dart';
 
 void main() {
   final analyzer = ComplexityAnalyzer();
-
-  // Scan a directory or file path
-  final results = analyzer.analyzePath('lib/src');
+  final results = analyzer.analyzePath('lib');
 
   for (final res in results) {
     print('${res.name}: score is ${res.score} (${res.filePath}:L${res.startLine})');
@@ -135,150 +50,44 @@ void main() {
 }
 ```
 
----
+### GitHub Actions
 
-## 🔄 Data-Flow Analysis (Extract Method Helper)
-
-In addition to complexity scoring, this package includes a **statement-level data-flow analyzer** and CLI tool (`data_flow`) designed to accelerate safe, automated refactoring (such as method extraction).
-
-Given a target Dart file and contiguous statement line slice, it extracts:
-* **Inputs**: Variables declared outside the slice that are read inside it.
-* **Mutations**: Variables declared outside the slice that are reassigned or mutated inside it.
-* **Outputs**: Variables declared or mutated inside the slice that remain live downstream.
-* **Control Flow Escapes**: Flags unextractable jumps (`return`, `break`, `continue`, `yield`) targeting outer scopes.
-* **Synthesized Signature**: Automatically generates an idiomatic Dart 3 Record return signature (e.g. `({String name, int count})`) when multiple variables are live downstream.
-
-### CLI Usage
-
-```bash
-# Run data-flow analysis on a target slice (JSON output by default)
-dart run cognitive_complexity:data_flow lib/src/my_file.dart:45-80
-
-# Output human-readable terminal report
-dart run cognitive_complexity:data_flow --format=text lib/src/my_file.dart:45-80
-
-# Specify proposed helper method name
-dart run cognitive_complexity:data_flow --name=_processItem lib/src/my_file.dart:45-80
-```
-
-Like the scanner, it also runs on-demand without a project dependency, and
-`dart install cognitive_complexity` puts a `data_flow` executable on your PATH:
-
-```bash
-# On-demand (resolves the latest published version)
-dart run cognitive_complexity:data_flow@ lib/src/my_file.dart:45-80
-
-# After global installation
-data_flow lib/src/my_file.dart:45-80
-```
-
-### Programmatic Data-Flow API
-
-```dart
-import 'package:cognitive_complexity/data_flow.dart';
-
-void main() async {
-  const analyzer = DataFlowAnalyzer();
-  final result = await analyzer.analyzeFile(
-    filePath: 'lib/src/service.dart',
-    startLine: 45,
-    endLine: 80,
-    methodName: '_processUser',
-  );
-
-  print('Cleanly extractable: ${result.isCleanlyExtractable}');
-  print('Inputs: ${result.inputs.map((u) => u.name).join(', ')}');
-  print('Outputs: ${result.outputs.map((u) => u.name).join(', ')}');
-  print('Proposed Signature: ${result.suggestedSignature}');
-}
-```
-
----
-
-## 🤖 GitHub Actions Integration
-
-You can run complexity checks automatically on pull requests using the
-integrated composite GitHub Action.
-
-### PR Delta Audit Workflow Example
-
-This workflow scans only the files and functions modified in the pull request. It
-injects inline code review warnings directly on modified PR lines and prints a
-beautiful markdown transition table to the workflow summary.
-
-Create `.github/workflows/complexity.yml`:
+Add automated complexity audits to `.github/workflows/complexity.yml`:
 
 ```yaml
-name: Cognitive Complexity Audit
+- uses: actions/checkout@v4
+  with:
+    fetch-depth: 0
 
-on:
-  pull_request:
-    branches: [ main ]
+- uses: dart-lang/setup-dart@v1
 
-jobs:
-  audit:
-    runs-on: ubuntu-latest
-    permissions:
-      pull-requests: write # Required to post/update sticky PR comments
-      contents: read       # Required for actions/checkout
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v7
-        with:
-          # Fetch full history so merge-base comparison can locate common ancestor
-          fetch-depth: 0
-
-      - name: Setup Dart SDK
-        uses: dart-lang/setup-dart@v1
-
-      - name: Run Complexity Scanner
-        uses: kevmoo/cognitive_complexity.dart@main
-        with:
-          # Auto-configures pull request merge base comparison
-          diff-base: origin/${{ github.base_ref }}
-          fail-threshold: 15
-          fail-on-increase: true
+- uses: kevmoo/cognitive_complexity.dart@main
+  with:
+    diff-base: origin/${{ github.base_ref }}
+    fail-threshold: 15
+    fail-on-increase: true
 ```
 
-### Action Configuration Parameters (`with:`)
+## 🧠 AI Agent Integration
 
-* `targets`: Space-separated directories or files to scan (default: `lib`).
-* `threshold`: Minimum score to include in report tables (default: `0`).
-* `fail-threshold`: Max complexity ceiling (default: `15`).
-* `diff-base`: Git ref to compare against (e.g. `origin/main`). Leave empty
-  to compare full repository files.
-* `fail-on-increase`: Set `true` to block PR merge on complexity increases
-  that exceed `fail-threshold` (or on any increase when no threshold is set).
-* `format`: Summary format: `github` (GHA annotations + summary), `text`, or `json`.
-
-### Permissions & Security
-
-By default, GitHub Actions runs with read-only permissions. To enable posting and updating the sticky PR comment summary directly on the PR thread, you must explicitly grant write permissions to `pull-requests`:
-
-```yaml
-permissions:
-  pull-requests: write
-  contents: read
-```
-
-If write permissions are not granted, the scanner will execute normally, and output annotations and step summaries, but will skip posting the PR comment without failing the build.
-
-#### Fork PR Security Note
-Workflows triggered by pull requests from external forks are executed with restricted read-only permissions by GitHub. For security reasons, the action will gracefully skip posting PR comments on forks to prevent Remote Code Execution (RCE) risks, while still validating code complexity in GHA annotations and build status.
-
----
-
-## 🧠 AI Agent Integration (Skill)
-
-This repository packages an authoritative **Agent Skill** (`dart-cognitive-complexity`)
-designed to train LLMs and autonomous agents on Cognitive Complexity math,
-threshold boundaries, and structural Dart refactoring patterns (such as Dart 3
-switch expressions and guard clauses). *(Note: Executing automated skill scans via CLI requires Dart SDK version **3.12.0 or greater** in the agent runtime).*
-
-### Installing the Skill
-
-You can install this skill into your AI agent environment:
+This repository packages an agent skill (`dart-cognitive-complexity`) to train
+AI pair programmers on Cognitive Complexity scoring and refactoring patterns:
 
 ```bash
 npx skills add kevmoo/cognitive_complexity.dart --skill dart-cognitive-complexity
 ```
+
+## 📚 Documentation & Guides
+
+Explore in-depth documentation in the [`doc/`](doc/) directory:
+
+- 📐 [Scoring Model & Specification](doc/scoring.md): Complete scoring table,
+  nesting multipliers, and Dart 3 AST nuances.
+- 💻 [CLI Reference & CI Ratcheting](doc/cli.md): Command-line options, git diff
+  delta evaluation, and exit codes.
+- 🔄 [Statement Data-Flow Analysis](doc/data_flow.md): Statement slicing,
+  variable lifecycles, and automated method extraction helper.
+- 🤖 [GitHub Actions Guide](doc/github_actions.md): PR workflow setup,
+  parameters reference, and fork security permissions.
+
+[whitepaper]: https://www.sonarsource.com/docs/CognitiveComplexity.pdf
