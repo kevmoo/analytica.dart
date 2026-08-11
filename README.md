@@ -1,10 +1,9 @@
-A deterministic, zero-token Cognitive Complexity calculation library, CLI tool,
-and GitHub Action for Dart and Flutter repositories.
+Long, complex functions are hard for humans (and AI agents) to understand.
+Asking an agent to "refactor the code to make it cleaner" is poorly defined and
+leaves the agent to make arbitrary decisions.
 
-Unlike Cyclomatic Complexity (which measures control flow branch density),
-Cognitive Complexity measures how difficult code is for a human engineer to read
-and understand, following the [SonarSource whitepaper][whitepaper] by G. Ann
-Campbell.
+This Dart package, GitHub Action, and AI agent skill make finding and fixing
+overly complex logic easy, reliable, and repeatable.
 
 ## ✨ Features
 
@@ -89,5 +88,3 @@ Explore in-depth documentation in the [`doc/`](doc/) directory:
   variable lifecycles, and automated method extraction helper.
 - 🤖 [GitHub Actions Guide](doc/github_actions.md): PR workflow setup,
   parameters reference, and fork security permissions.
-
-[whitepaper]: https://www.sonarsource.com/docs/CognitiveComplexity.pdf
