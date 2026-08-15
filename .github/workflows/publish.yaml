@@ -6,7 +6,9 @@ on:
   pull_request:
     branches: [ main ]
   push:
-    tags: [ 'v[0-9]+.[0-9]+.[0-9]+*' ]
+    tags:
+      - '[a-zA-Z0-9_]+-v[0-9]+.[0-9]+.[0-9]+*'
+      - 'v[0-9]+.[0-9]+.[0-9]+*'
 
 jobs:
   publish:
