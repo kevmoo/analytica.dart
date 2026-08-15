@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:analytica/analyzer.dart';
 import 'package:analyzer/dart/analysis/results.dart';
 import 'package:analyzer/dart/ast/ast.dart' hide WildcardPattern;
@@ -32,13 +34,21 @@ class ZombieEngine {
     final topology = harvester.harvestTopology();
 
     final absolutePackagePath = p.normalize(p.absolute(options.packagePath));
+    final extraRootPaths = options.extraRoots
+        .map(
+          (r) =>
+              p.normalize(p.isAbsolute(r) ? r : p.join(absolutePackagePath, r)),
+        )
+        .where((path) => Directory(path).existsSync())
+        .toList();
     final contextHelper = AnalysisContextHelper(
-      includedPaths: [absolutePackagePath],
+      includedPaths: [absolutePackagePath, ...extraRootPaths],
       sdkPath: options.sdkPath,
     );
 
     final allNodes = <DeclarationNode>[];
     final elementToNode = <Element, DeclarationNode>{};
+    final locationToNode = <String, DeclarationNode>{};
     final idToNode = <String, DeclarationNode>{};
     final testSites = <TestBlockSite>[];
     final testSiteRawElements = <TestBlockSite, Set<Element>>{};
@@ -51,7 +61,9 @@ class ZombieEngine {
 
     // Step 1: Single-pass parse and resolution for all files in topology.
     for (final relPath in topology.allFiles) {
-      final absPath = p.join(absolutePackagePath, relPath);
+      final absPath = p.normalize(
+        p.isAbsolute(relPath) ? relPath : p.join(absolutePackagePath, relPath),
+      );
       final unitResult = await contextHelper.getResolvedUnit(absPath);
 
       if (unitResult == null) {
@@ -152,13 +164,22 @@ class ZombieEngine {
 
             allNodes.add(node);
             idToNode[id] = node;
+            locationToNode['${p.canonicalize(absPath)}#$name'] = node;
             if (element != null) {
               elementToNode[element] = node;
               if (element is TopLevelVariableElement) {
                 final getter = element.getter;
-                if (getter != null) elementToNode[getter] = node;
+                if (getter != null) {
+                  elementToNode[getter] = node;
+                  final getterKey = '${p.canonicalize(absPath)}#${getter.name}';
+                  locationToNode[getterKey] = node;
+                }
                 final setter = element.setter;
-                if (setter != null) elementToNode[setter] = node;
+                if (setter != null) {
+                  elementToNode[setter] = node;
+                  final setterKey = '${p.canonicalize(absPath)}#${setter.name}';
+                  locationToNode[setterKey] = node;
+                }
               }
             }
 
@@ -217,6 +238,7 @@ class ZombieEngine {
 
           allNodes.add(node);
           idToNode[id] = node;
+          locationToNode['${p.canonicalize(absPath)}#$name'] = node;
           if (element != null) {
             elementToNode[element] = node;
           }
@@ -251,12 +273,37 @@ class ZombieEngine {
       }
     }
 
+    DeclarationNode? resolveNodeForElement(Element elem) {
+      final direct = elementToNode[elem];
+      if (direct != null) return direct;
+
+      final sourcePath =
+          elem.library?.firstFragment.source.fullName ??
+          elem.firstFragment.libraryFragment?.source.fullName;
+      if (sourcePath == null) return null;
+
+      final canonicalPath = p.canonicalize(sourcePath);
+      final name = elem.name;
+      if (name != null) {
+        final match = locationToNode['$canonicalPath#$name'];
+        if (match != null) return match;
+      }
+
+      final topLevel = getTopLevelElement(elem);
+      if (topLevel != null && topLevel.name != null) {
+        final match = locationToNode['$canonicalPath#${topLevel.name}'];
+        if (match != null) return match;
+      }
+
+      return null;
+    }
+
     // Step 2: Connect reference edges and sealed hierarchies.
     for (final node in allNodes) {
       final outbound = nodeOutboundElements[node];
       if (outbound != null) {
         for (final refElem in outbound) {
-          final targetNode = elementToNode[refElem];
+          final targetNode = resolveNodeForElement(refElem);
           if (targetNode != null && targetNode.id != node.id) {
             node.outgoingTargetIds.add(targetNode.id);
           }
@@ -266,7 +313,7 @@ class ZombieEngine {
       final superElems = nodeDirectSuperElements[node];
       if (superElems != null) {
         for (final superElem in superElems) {
-          final parentNode = elementToNode[superElem];
+          final parentNode = resolveNodeForElement(superElem);
           if (parentNode != null && parentNode.isSealed) {
             sealedSubtypes.putIfAbsent(parentNode.id, () => {}).add(node.id);
           }
@@ -295,7 +342,7 @@ class ZombieEngine {
       final rawElems = testSiteRawElements[site];
       if (rawElems != null) {
         for (final elem in rawElems) {
-          final targetNode = elementToNode[elem];
+          final targetNode = resolveNodeForElement(elem);
           if (targetNode != null) {
             site.referencedDeclarationIds.add(targetNode.id);
           }

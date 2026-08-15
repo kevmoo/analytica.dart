@@ -15,9 +15,11 @@ export 'package:analytica/analyzer.dart'
 /// declaration or code block, strictly ignoring doc comments and comments.
 class ElementReferenceExtractor extends RecursiveAstVisitor<void> {
   final String packageRoot;
+  final String _canonicalPackageRoot;
   final Set<Element> referencedTopLevelElements = {};
 
-  ElementReferenceExtractor(this.packageRoot);
+  ElementReferenceExtractor(this.packageRoot)
+    : _canonicalPackageRoot = p.canonicalize(packageRoot);
 
   @override
   void visitComment(Comment node) {
@@ -38,10 +40,15 @@ class ElementReferenceExtractor extends RecursiveAstVisitor<void> {
     final sourcePath =
         elem.library?.firstFragment.source.fullName ??
         elem.firstFragment.libraryFragment?.source.fullName;
-    if (sourcePath != null && p.isWithin(packageRoot, sourcePath)) {
-      final topLevel = getTopLevelElement(elem);
-      if (topLevel != null) {
-        referencedTopLevelElements.add(topLevel);
+    if (sourcePath != null) {
+      final normalizedSource = p.normalize(sourcePath);
+      final canonicalSource = p.canonicalize(sourcePath);
+      if (p.isWithin(packageRoot, normalizedSource) ||
+          p.isWithin(_canonicalPackageRoot, canonicalSource)) {
+        final topLevel = getTopLevelElement(elem);
+        if (topLevel != null) {
+          referencedTopLevelElements.add(topLevel);
+        }
       }
     }
   }

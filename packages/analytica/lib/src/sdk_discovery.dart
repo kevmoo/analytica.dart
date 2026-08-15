@@ -19,7 +19,7 @@ String get sdkPath {
 /// Locates a Dart SDK root, probing in order: the running VM's executable,
 /// the `DART_SDK` environment variable, `dart` binaries on `PATH` (including
 /// Flutter checkouts, whose wrapper script hides the SDK under
-/// `bin/cache/dart-sdk`), and finally `FLUTTER_ROOT`.
+/// `bin/cache/dart-sdk`), `FLUTTER_ROOT`, and standard system SDK locations.
 ///
 /// Returns `null` when no valid SDK is found — notably when running as a
 /// standalone AOT executable (`dart compile exe`), where
@@ -28,7 +28,8 @@ String? findSdkPath() =>
     _findSdkFromExecutable() ??
     _findSdkFromEnv() ??
     _findSdkFromPath() ??
-    _findSdkFromFlutterRoot();
+    _findSdkFromFlutterRoot() ??
+    _findSdkFromStandardLocations();
 
 /// Throwing getter that returns the absolute path to the `dart` binary.
 ///
@@ -101,10 +102,34 @@ String? _findSdkFromFlutterRoot() {
   return isValidSdk(candidate) ? candidate : null;
 }
 
+String? _findSdkFromStandardLocations() {
+  final home =
+      Platform.environment['HOME'] ?? Platform.environment['USERPROFILE'];
+  final candidates = <String>[
+    if (home != null) ...[
+      p.join(home, 'github', 'flutter', 'bin', 'cache', 'dart-sdk'),
+      p.join(home, 'flutter', 'bin', 'cache', 'dart-sdk'),
+      p.join(home, '.flutter', 'bin', 'cache', 'dart-sdk'),
+    ],
+    if (!Platform.isWindows) ...[
+      '/usr/lib/google-dartlang',
+      '/usr/lib/dart',
+      '/usr/local/opt/dart/libexec',
+      '/opt/homebrew/opt/dart/libexec',
+    ],
+  ];
+
+  for (final candidate in candidates) {
+    if (isValidSdk(candidate)) return candidate;
+  }
+  return null;
+}
+
 /// Resolves an SDK root from a directory containing a `dart` executable.
 ///
 /// Handles the Flutter checkout layout, where `<flutter>/bin/dart` is a
-/// wrapper script and the real SDK lives at `<flutter>/bin/cache/dart-sdk`.
+/// wrapper script and the real SDK lives at `<flutter>/bin/cache/dart-sdk`,
+/// as well as custom smart dispatch wrapper scripts.
 String? resolveSdkFromDir(String dir, String executableName) {
   final dartBinary = File(p.join(dir, executableName));
   if (dartBinary.existsSync()) {
@@ -115,6 +140,9 @@ String? resolveSdkFromDir(String dir, String executableName) {
     } catch (_) {
       // Fall through to the Flutter wrapper probe.
     }
+
+    final scriptSdk = _extractSdkFromScript(dartBinary);
+    if (scriptSdk != null && isValidSdk(scriptSdk)) return scriptSdk;
   }
 
   // Flutter checkouts ship wrapper scripts in `bin/` (`dart`, plus `dart.bat`
@@ -129,6 +157,44 @@ String? resolveSdkFromDir(String dir, String executableName) {
 
   final flutterCache = p.join(dir, 'cache', 'dart-sdk');
   return isValidSdk(flutterCache) ? flutterCache : null;
+}
+
+/// Inspects a potential shell/batch wrapper script for embedded SDK paths.
+String? _extractSdkFromScript(File file) {
+  try {
+    final stat = file.statSync();
+    if (stat.type != FileSystemEntityType.file || stat.size > 64 * 1024) {
+      return null;
+    }
+
+    final contents = file.readAsStringSync();
+    final home =
+        Platform.environment['HOME'] ??
+        Platform.environment['USERPROFILE'] ??
+        '';
+
+    // Look for quoted or raw path references in the wrapper script
+    final pathRegex = RegExp(
+      r'''(?:["']?)([/~][^"'\s\n\r]+\b(?:dart-sdk|dart))(?:\b|["'])''',
+    );
+    for (final match in pathRegex.allMatches(contents)) {
+      var candidate = match.group(1);
+      if (candidate == null) continue;
+      if (home.isNotEmpty) {
+        candidate = candidate.replaceAll('\$HOME', home).replaceAll('~', home);
+      }
+
+      // If the path points to bin/dart, check its parent SDK
+      if (candidate.endsWith('dart')) {
+        final sdkCandidate = p.dirname(p.dirname(candidate));
+        if (isValidSdk(sdkCandidate)) return sdkCandidate;
+      }
+      if (isValidSdk(candidate)) return candidate;
+    }
+  } catch (_) {
+    // Non-fatal if script reading fails.
+  }
+  return null;
 }
 
 /// Alias for [isValidSdk].

@@ -113,7 +113,7 @@ environment:
       final decoded = jsonDecode(stdout) as Map<String, dynamic>;
       check(decoded['package']).equals('cli_pkg');
       final summary = decoded['summary'] as Map<String, dynamic>;
-      check(summary['pure_zombies_found']).equals(1);
+      check(summary['pureZombies']).equals(1);
 
       final zombies = decoded['zombies'] as List<dynamic>;
       check(zombies.length).equals(1);
@@ -177,7 +177,6 @@ environment:
 
       // stdout remains human-readable Markdown
       check(stdout).contains('# Zombie Code Analysis: ');
-      check(stdout).contains('');
 
       // json-output file was created and contains valid JSON payload
       final jsonFile = File(jsonOutPath);
@@ -186,7 +185,78 @@ environment:
           jsonDecode(jsonFile.readAsStringSync()) as Map<String, dynamic>;
       check(decoded['package']).equals('cli_json_file_pkg');
       final summary = decoded['summary'] as Map<String, dynamic>;
-      check(summary['pure_zombies_found']).equals(1);
+      check(summary['pureZombies']).equals(1);
+    });
+
+    test('supports --extra-roots to include companion tests', () async {
+      await d.dir('main_pkg', [
+        packageConfig('main_pkg'),
+        d.file('pubspec.yaml', '''
+name: main_pkg
+environment:
+  sdk: '^3.5.0'
+'''),
+        d.dir('lib', [
+          d.dir('src', [d.file('helper.dart', 'void internalHelper() {}')]),
+        ]),
+      ]).create();
+
+      await d.dir('companion_test_pkg', [
+        d.dir('.dart_tool', [
+          d.file('package_config.json', '''
+{
+  "configVersion": 2,
+  "packages": [
+    {
+      "name": "companion_test_pkg",
+      "rootUri": "../",
+      "packageUri": "lib/",
+      "languageVersion": "3.5"
+    },
+    {
+      "name": "main_pkg",
+      "rootUri": "../../main_pkg",
+      "packageUri": "lib/",
+      "languageVersion": "3.5"
+    }
+  ]
+}
+'''),
+        ]),
+        d.file('companion_test.dart', '''
+import 'package:main_pkg/src/helper.dart';
+
+void test(String desc, void Function() body) => body();
+
+void main() {
+  test('invokes internal helper', () {
+    internalHelper();
+  });
+}
+'''),
+      ]).create();
+
+      // Without extra roots, internalHelper is flagged as pure zombie
+      final proc1 = await runZombie(['--format=json', d.path('main_pkg')]);
+      final out1 = await proc1.stdoutStream().join('\n');
+      await proc1.shouldExit(0);
+      final json1 = jsonDecode(out1) as Map<String, dynamic>;
+      final summary1 = json1['summary'] as Map<String, dynamic>;
+      check(summary1['pureZombies']).equals(1);
+
+      // With extra roots, companion_test is treated as a test root
+      final proc2 = await runZombie([
+        '--format=json',
+        '--extra-roots=${d.path('companion_test_pkg')}',
+        d.path('main_pkg'),
+      ]);
+      final out2 = await proc2.stdoutStream().join('\n');
+      await proc2.shouldExit(0);
+      final json2 = jsonDecode(out2) as Map<String, dynamic>;
+      final summary2 = json2['summary'] as Map<String, dynamic>;
+      // Now it's reached by tests!
+      check(summary2['pureZombies']).equals(0);
+      check(summary2['testedZombies']).equals(1);
     });
 
     test('runs analysis and outputs Markdown with --format=github', () async {

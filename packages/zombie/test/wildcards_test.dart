@@ -236,8 +236,8 @@ void main() {
 
           final json = jsonDecode(stdout) as Map<String, dynamic>;
           final summary = json['summary'] as Map<String, dynamic>;
-          check(summary['pure_zombies_found']).equals(1);
-          check(summary['tested_zombies_found']).equals(0);
+          check(summary['pureZombies']).equals(1);
+          check(summary['testedZombies']).equals(0);
 
           final zombies = json['zombies'] as List<dynamic>;
           check(zombies.length).equals(1);
@@ -280,7 +280,7 @@ void actual_dead() {}
 
           final json = jsonDecode(stdout) as Map<String, dynamic>;
           final summary = json['summary'] as Map<String, dynamic>;
-          check(summary['pure_zombies_found']).equals(1);
+          check(summary['pureZombies']).equals(1);
 
           final zombies = json['zombies'] as List<dynamic>;
           check(zombies.length).equals(1);

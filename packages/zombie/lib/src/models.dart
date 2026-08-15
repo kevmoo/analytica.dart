@@ -8,16 +8,16 @@ export 'package:analytica/analytica.dart' show PackageResolutionException;
 enum ZombieClassification {
   /// An unexported declaration with zero incoming references from production or
   /// tests. Safe for immediate automated or manual deletion.
-  pureZombie('pure_zombie', 'Pure Zombie'),
+  pureZombie('pureZombie', 'Pure Zombie'),
 
   /// A declaration referenced exclusively by isolated unit/integration tests
   /// with no other live dependencies. Safe to delete along with its orphan
   /// test blocks.
-  testedZombie('tested_zombie', 'Tested Zombie'),
+  testedZombie('testedZombie', 'Tested Zombie'),
 
   /// A declaration referenced only in tests, but co-invoked within test blocks
   /// that also exercise live production code. Requires manual refactoring.
-  coInvokedHazard('co_invoked_hazard', 'Co-Invoked Test Hazard');
+  coInvokedHazard('coInvokedHazard', 'Co-Invoked Test Hazard');
 
   final String jsonValue;
   final String displayName;
@@ -25,9 +25,9 @@ enum ZombieClassification {
   const ZombieClassification(this.jsonValue, this.displayName);
 
   static ZombieClassification fromJson(String value) => switch (value) {
-    'pure_zombie' => pureZombie,
-    'tested_zombie' => testedZombie,
-    'co_invoked_hazard' => coInvokedHazard,
+    'pureZombie' => pureZombie,
+    'testedZombie' => testedZombie,
+    'coInvokedHazard' => coInvokedHazard,
     _ => throw ArgumentError.value(
       value,
       'value',
@@ -43,7 +43,7 @@ enum DeclarationKind {
   enumType('enum'),
   mixinType('mixin'),
   extension('extension'),
-  extensionType('extension_type'),
+  extensionType('extensionType'),
   typedefType('typedef'),
   variable('variable'),
   getter('getter'),
@@ -59,7 +59,7 @@ enum DeclarationKind {
     'enum' => enumType,
     'mixin' => mixinType,
     'extension' => extension,
-    'extension_type' => extensionType,
+    'extensionType' => extensionType,
     'typedef' => typedefType,
     'variable' => variable,
     'getter' => getter,
@@ -71,8 +71,8 @@ enum DeclarationKind {
 /// Suggested remediation action for a detected zombie.
 abstract final class SuggestedAction {
   static const String delete = 'delete';
-  static const String deleteWithOrphanTests = 'delete_with_orphan_tests';
-  static const String manualRefactorHazard = 'manual_refactor_hazard';
+  static const String deleteWithOrphanTests = 'deleteWithOrphanTests';
+  static const String manualRefactorHazard = 'manualRefactorHazard';
 }
 
 /// How code in `example/` is treated during reachability analysis.
@@ -107,15 +107,15 @@ enum AnalysisMode {
 
   /// Closed application universe: Unreferenced exports in `lib/**` can be
   /// flagged if not reached by executables or other roots.
-  closedApp('closed-app');
+  closedApp('closedApp');
 
-  final String jsonValue;
+  final String value;
 
-  const AnalysisMode(this.jsonValue);
+  const AnalysisMode(this.value);
 
   static AnalysisMode fromString(String value) => switch (value) {
     'library' => library,
-    'closed-app' => closedApp,
+    'closedApp' => closedApp,
     _ => throw ArgumentError.value(value, 'value', 'Unknown AnalysisMode'),
   };
 }
@@ -150,6 +150,7 @@ final class ZombieOptions {
   final FrameworkAdapter frameworkAdapter;
   final List<String> testSupportPatterns;
   final List<String> ignoreNamePatterns;
+  final List<String> extraRoots;
 
   const ZombieOptions({
     required this.packagePath,
@@ -164,6 +165,7 @@ final class ZombieOptions {
     this.frameworkAdapter = const CompositeFrameworkAdapter.defaults(),
     this.testSupportPatterns = const ['Fake*', 'Mock*'],
     this.ignoreNamePatterns = const [],
+    this.extraRoots = const [],
   });
 }
 
@@ -188,7 +190,7 @@ class OrphanTestSite {
     line: json['line'] as int,
     column: json['column'] as int,
     description: json['description'] as String?,
-    coInvokedHazard: json['co_invoked_hazard'] as bool? ?? false,
+    coInvokedHazard: json['coInvokedHazard'] as bool? ?? false,
   );
 
   Map<String, dynamic> toJson() => {
@@ -196,7 +198,7 @@ class OrphanTestSite {
     'line': line,
     'column': column,
     if (description != null) 'description': description,
-    'co_invoked_hazard': coInvokedHazard,
+    'coInvokedHazard': coInvokedHazard,
   };
 
   @override
@@ -241,9 +243,9 @@ class ZombieFinding {
     classification: ZombieClassification.fromJson(
       json['classification'] as String,
     ),
-    suggestedAction: json['suggested_action'] as String,
-    orphanTests: (json['orphan_tests'] as List<dynamic>?)
-        ?.map((e) => OrphanTestSite.fromJson(e as Map<String, dynamic>))
+    suggestedAction: json['suggestedAction'] as String,
+    orphanTests: (json['orphanTests'] as List<dynamic>?)
+        ?.map((t) => OrphanTestSite.fromJson(t as Map<String, dynamic>))
         .toList(),
   );
 
@@ -256,9 +258,9 @@ class ZombieFinding {
     'column': column,
     'length': length,
     'classification': classification.jsonValue,
-    'suggested_action': suggestedAction,
+    'suggestedAction': suggestedAction,
     if (orphanTests != null && orphanTests!.isNotEmpty)
-      'orphan_tests': orphanTests!.map((t) => t.toJson()).toList(),
+      'orphanTests': orphanTests!.map((t) => t.toJson()).toList(),
   };
 }
 
@@ -287,10 +289,10 @@ class ZombieReport {
     return ZombieReport(
       version: json['version'] as String,
       package: json['package'] as String,
-      totalDeclarations: summary['total_declarations'] as int,
-      pureZombiesFound: summary['pure_zombies_found'] as int,
-      testedZombiesFound: summary['tested_zombies_found'] as int,
-      coInvokedHazardsFound: summary['co_invoked_hazards_found'] as int,
+      totalDeclarations: summary['totalDeclarations'] as int,
+      pureZombiesFound: summary['pureZombies'] as int,
+      testedZombiesFound: summary['testedZombies'] as int,
+      coInvokedHazardsFound: summary['coInvokedHazards'] as int,
       zombies: (json['zombies'] as List<dynamic>)
           .map((e) => ZombieFinding.fromJson(e as Map<String, dynamic>))
           .toList(),
@@ -301,10 +303,10 @@ class ZombieReport {
     'version': version,
     'package': package,
     'summary': {
-      'total_declarations': totalDeclarations,
-      'pure_zombies_found': pureZombiesFound,
-      'tested_zombies_found': testedZombiesFound,
-      'co_invoked_hazards_found': coInvokedHazardsFound,
+      'totalDeclarations': totalDeclarations,
+      'pureZombies': pureZombiesFound,
+      'testedZombies': testedZombiesFound,
+      'coInvokedHazards': coInvokedHazardsFound,
     },
     'zombies': zombies.map((z) => z.toJson()).toList(),
   };

@@ -18,7 +18,7 @@ void main() {
       check(json['line']).equals(12);
       check(json['column']).equals(5);
       check(json['description']).equals('OldParser parses correctly');
-      check(json['co_invoked_hazard']).equals(false);
+      check(json['coInvokedHazard']).equals(false);
 
       final deserialized = OrphanTestSite.fromJson(json);
       check(deserialized.file).equals(site.file);
@@ -49,9 +49,9 @@ void main() {
       check(json['line']).equals(45);
       check(json['column']).equals(1);
       check(json['length']).equals(19);
-      check(json['classification']).equals('pure_zombie');
-      check(json['suggested_action']).equals('delete');
-      check(json.containsKey('orphan_tests')).isFalse();
+      check(json['classification']).equals('pureZombie');
+      check(json['suggestedAction']).equals('delete');
+      check(json.containsKey('orphanTests')).isFalse();
 
       final deserialized = ZombieFinding.fromJson(json);
       check(deserialized.id).equals(finding.id);
@@ -111,10 +111,10 @@ void main() {
       check(json['package']).equals('my_package');
 
       final summary = json['summary'] as Map<String, dynamic>;
-      check(summary['total_declarations']).equals(142);
-      check(summary['pure_zombies_found']).equals(1);
-      check(summary['tested_zombies_found']).equals(1);
-      check(summary['co_invoked_hazards_found']).equals(0);
+      check(summary['totalDeclarations']).equals(142);
+      check(summary['pureZombies']).equals(1);
+      check(summary['testedZombies']).equals(1);
+      check(summary['coInvokedHazards']).equals(0);
 
       final zombiesList = json['zombies'] as List<dynamic>;
       check(zombiesList.length).equals(2);
@@ -128,13 +128,13 @@ void main() {
 
     test('Enum fromJson and fromString conversions', () {
       check(
-        ZombieClassification.fromJson('pure_zombie'),
+        ZombieClassification.fromJson('pureZombie'),
       ).equals(ZombieClassification.pureZombie);
       check(
-        ZombieClassification.fromJson('tested_zombie'),
+        ZombieClassification.fromJson('testedZombie'),
       ).equals(ZombieClassification.testedZombie);
       check(
-        ZombieClassification.fromJson('co_invoked_hazard'),
+        ZombieClassification.fromJson('coInvokedHazard'),
       ).equals(ZombieClassification.coInvokedHazard);
 
       check(
@@ -151,7 +151,7 @@ void main() {
 
       check(AnalysisMode.fromString('library')).equals(AnalysisMode.library);
       check(
-        AnalysisMode.fromString('closed-app'),
+        AnalysisMode.fromString('closedApp'),
       ).equals(AnalysisMode.closedApp);
 
       check(OutputFormat.fromString('markdown')).equals(OutputFormat.markdown);
@@ -173,6 +173,7 @@ void main() {
         packagePath: '/path/to/pkg',
         testSupportPatterns: ['*Stub', 'CustomFixture*'],
         ignoreNamePatterns: ['*_generated', 'Ignored*'],
+        extraRoots: ['../companion_test', '/external/tests'],
       );
       check(
         customOptions.testSupportPatterns,
@@ -180,6 +181,43 @@ void main() {
       check(
         customOptions.ignoreNamePatterns,
       ).deepEquals(['*_generated', 'Ignored*']);
+      check(
+        customOptions.extraRoots,
+      ).deepEquals(['../companion_test', '/external/tests']);
+    });
+
+    test('ZombieReport deserializes camelCase JSON summary correctly', () {
+      final json = {
+        'version': '0.1.0-dev',
+        'package': 'test_pkg',
+        'summary': {
+          'totalDeclarations': 200,
+          'pureZombies': 5,
+          'testedZombies': 3,
+          'coInvokedHazards': 2,
+        },
+        'zombies': [
+          {
+            'id': 'unusedFunc',
+            'name': 'unusedFunc',
+            'kind': 'function',
+            'file': 'lib/src/a.dart',
+            'line': 10,
+            'column': 1,
+            'length': 10,
+            'classification': 'pureZombie',
+            'suggestedAction': 'delete',
+          },
+        ],
+      };
+
+      final report = ZombieReport.fromJson(json);
+      check(report.totalDeclarations).equals(200);
+      check(report.pureZombiesFound).equals(5);
+      check(report.testedZombiesFound).equals(3);
+      check(report.coInvokedHazardsFound).equals(2);
+      check(report.zombies.length).equals(1);
+      check(report.zombies.first.suggestedAction).equals('delete');
     });
   });
 }

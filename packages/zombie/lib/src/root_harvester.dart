@@ -80,6 +80,9 @@ class PackageTopology {
   /// Resolves the role of a given [relativeFilePath].
   FileRole roleOf(String relativeFilePath) {
     final normalized = p.normalize(relativeFilePath);
+    if (testFiles.contains(normalized)) {
+      return FileRole.test;
+    }
     if (normalized.startsWith('lib/src/') ||
         normalized.startsWith('lib/src\\')) {
       return FileRole.internalSrc;
@@ -154,14 +157,29 @@ class RootHarvester {
 
     if (!hasDirectConfig && !_hasEnclosingPackageConfig(options.packagePath)) {
       if (options.autoPubGet) {
-        final dartExe = findDartExecutable(sdkPath: options.sdkPath) ?? 'dart';
-        final result = Process.runSync(dartExe, [
-          'pub',
-          'get',
-        ], workingDirectory: options.packagePath);
+        final pubspecContent = pubspecFile.readAsStringSync();
+        final isFlutter =
+            pubspecContent.contains('sdk: flutter') ||
+            pubspecContent.contains('package:flutter');
+        final ProcessResult result;
+        if (isFlutter) {
+          final flutterExe = _findFlutterExecutable();
+          result = Process.runSync(flutterExe, [
+            'pub',
+            'get',
+          ], workingDirectory: options.packagePath);
+        } else {
+          final dartExe =
+              findDartExecutable(sdkPath: options.sdkPath) ?? 'dart';
+          result = Process.runSync(dartExe, [
+            'pub',
+            'get',
+          ], workingDirectory: options.packagePath);
+        }
         if (result.exitCode != 0) {
+          final toolName = isFlutter ? 'flutter' : 'dart';
           throw PackageResolutionException(
-            'Failed to resolve dependencies with "dart pub get":\n'
+            'Failed to resolve dependencies with "$toolName pub get":\n'
             '${result.stderr}',
             options.packagePath,
           );
@@ -170,8 +188,8 @@ class RootHarvester {
         throw PackageResolutionException(
           'Missing .dart_tool/package_config.json for '
           '"${options.packagePath}".\n'
-          'Please run "dart pub get" before running zombie '
-          '(or pass --pub-get).',
+          'Please run "dart pub get" (or "flutter pub get") before running '
+          'zombie (or pass --pub-get).',
           options.packagePath,
         );
       }
@@ -225,6 +243,29 @@ class RootHarvester {
           normalized.startsWith('web/') ||
           normalized.startsWith('web\\')) {
         auxiliary.add(normalized);
+      }
+    }
+
+    // Harvest files from extra roots (companion test suites, external roots)
+    for (final extraRoot in options.extraRoots) {
+      if (extraRoot.trim().isEmpty) continue;
+      final extraDir = Directory(
+        p.normalize(
+          p.isAbsolute(extraRoot)
+              ? extraRoot
+              : p.join(options.packagePath, extraRoot),
+        ),
+      );
+      if (!extraDir.existsSync()) continue;
+      for (final entity in extraDir.listSync(
+        recursive: true,
+        followLinks: false,
+      )) {
+        if (entity is! File || !entity.path.endsWith('.dart')) continue;
+        final relPath = p.relative(entity.path, from: options.packagePath);
+        if (_isExcluded(relPath)) continue;
+        final normalized = p.normalize(relPath);
+        test.add(normalized);
       }
     }
 
@@ -301,5 +342,18 @@ class RootHarvester {
       }
     } catch (_) {}
     return false;
+  }
+
+  String _findFlutterExecutable() {
+    final flutterRoot = Platform.environment['FLUTTER_ROOT'];
+    if (flutterRoot != null && flutterRoot.isNotEmpty) {
+      final exe = p.join(
+        flutterRoot,
+        'bin',
+        Platform.isWindows ? 'flutter.bat' : 'flutter',
+      );
+      if (File(exe).existsSync()) return exe;
+    }
+    return Platform.isWindows ? 'flutter.bat' : 'flutter';
   }
 }

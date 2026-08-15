@@ -37,7 +37,7 @@ ArgParser buildArgParser() {
       'mode',
       abbr: 'm',
       help: 'Package analysis mode.',
-      allowed: ['library', 'closed-app'],
+      allowed: ['library', 'closedApp'],
       defaultsTo: 'library',
     )
     ..addFlag(
@@ -65,11 +65,21 @@ ArgParser buildArgParser() {
           'ignore.',
       defaultsTo: '',
     )
+    ..addOption(
+      'extra-roots',
+      valueHelp: 'dir1,dir2',
+      help:
+          'Comma-separated list of additional root/test directories or '
+          'companion packages to include in reachability analysis.',
+      defaultsTo: '',
+    )
     ..addSdkPathOption()
     ..addFlag(
       'pub-get',
       negatable: false,
-      help: 'Automatically run "dart pub get" if dependencies are unresolved.',
+      help:
+          'Automatically run "dart pub get" (or "flutter pub get") if '
+          'dependencies are unresolved.',
     )
     ..addHelpFlag()
     ..addVersionFlag(help: 'Print zombie version.');
@@ -146,6 +156,7 @@ class ZombieCliRunner {
     final ignoreNamePatterns = _parseCommaSeparated(
       results.option('ignore-name-patterns'),
     );
+    final extraRoots = _parseCommaSeparated(results.option('extra-roots'));
 
     final options = ZombieOptions(
       packagePath: normalizedPath,
@@ -159,6 +170,7 @@ class ZombieCliRunner {
       jsonOutputPath: jsonOutputPath,
       testSupportPatterns: testSupportPatterns,
       ignoreNamePatterns: ignoreNamePatterns,
+      extraRoots: extraRoots,
     );
 
     try {

@@ -122,6 +122,33 @@ void main() {
       },
     );
 
+    test(
+      'resolves SDK from a custom shell wrapper script containing SDK path',
+      () async {
+        await d.dir('real_sdk', [
+          d.dir('lib', [
+            d.dir('_internal', [d.file('libraries.dart', '')]),
+          ]),
+          d.dir('bin', [d.file('dart', '')]),
+        ]).create();
+
+        final realSdkRoot = Directory(
+          '${d.sandbox}/real_sdk',
+        ).resolveSymbolicLinksSync();
+
+        await d.dir('custom_bin', [
+          d.file(
+            'dart',
+            '#!/usr/bin/env bash\n'
+                'exec "$realSdkRoot/bin/dart" "\$@"\n',
+          ),
+        ]).create();
+
+        final customBin = '${d.sandbox}/custom_bin';
+        check(resolveSdkFromDir(customBin, 'dart')).equals(realSdkRoot);
+      },
+    );
+
     test('returns null when the directory has no dart executable', () async {
       await d.dir('empty').create();
 

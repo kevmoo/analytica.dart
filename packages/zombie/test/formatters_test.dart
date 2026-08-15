@@ -76,9 +76,9 @@ void main() {
       check(decoded['package']).equals('test_pkg');
 
       final summary = decoded['summary'] as Map<String, dynamic>;
-      check(summary['pure_zombies_found']).equals(1);
-      check(summary['tested_zombies_found']).equals(1);
-      check(summary['co_invoked_hazards_found']).equals(1);
+      check(summary['pureZombies']).equals(1);
+      check(summary['testedZombies']).equals(1);
+      check(summary['coInvokedHazards']).equals(1);
 
       final zombies = decoded['zombies'] as List<dynamic>;
       check(zombies.length).equals(3);

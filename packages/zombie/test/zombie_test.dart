@@ -46,7 +46,7 @@ environment:
 
     const jsonFormatter = JsonFormatter();
     final jsonStr = jsonFormatter.format(report);
-    check(jsonStr).contains('"pure_zombies_found": 1');
+    check(jsonStr).contains('"pureZombies": 1');
 
     const mdFormatter = MarkdownFormatter();
     final mdStr = mdFormatter.format(report);
