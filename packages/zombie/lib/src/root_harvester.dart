@@ -151,32 +151,12 @@ class RootHarvester {
       );
     }
 
-    final hasDirectConfig = File(
-      p.join(options.packagePath, '.dart_tool', 'package_config.json'),
-    ).existsSync();
-
-    if (!hasDirectConfig && !_hasEnclosingPackageConfig(options.packagePath)) {
+    if (!hasPackageConfig(options.packagePath) &&
+        !hasEnclosingPackageConfig(options.packagePath)) {
       if (options.autoPubGet) {
-        final pubspecContent = pubspecFile.readAsStringSync();
-        final isFlutter =
-            pubspecContent.contains('sdk: flutter') ||
-            pubspecContent.contains('package:flutter');
-        final ProcessResult result;
-        if (isFlutter) {
-          final flutterExe = _findFlutterExecutable();
-          result = Process.runSync(flutterExe, [
-            'pub',
-            'get',
-          ], workingDirectory: options.packagePath);
-        } else {
-          final dartExe =
-              findDartExecutable(sdkPath: options.sdkPath) ?? 'dart';
-          result = Process.runSync(dartExe, [
-            'pub',
-            'get',
-          ], workingDirectory: options.packagePath);
-        }
+        final result = runPubGet(options.packagePath, sdkPath: options.sdkPath);
         if (result.exitCode != 0) {
+          final isFlutter = isFlutterPackage(options.packagePath);
           final toolName = isFlutter ? 'flutter' : 'dart';
           throw PackageResolutionException(
             'Failed to resolve dependencies with "$toolName pub get":\n'
@@ -326,34 +306,5 @@ class RootHarvester {
       multiLine: true,
     ).firstMatch(pubspecContent);
     return match?.group(1) ?? 'unknown_package';
-  }
-
-  bool _hasEnclosingPackageConfig(String packagePath) {
-    try {
-      var dir = Directory(packagePath).parent;
-      while (dir.path != dir.parent.path) {
-        final config = File(
-          p.join(dir.path, '.dart_tool', 'package_config.json'),
-        );
-        if (config.existsSync()) {
-          return true;
-        }
-        dir = dir.parent;
-      }
-    } catch (_) {}
-    return false;
-  }
-
-  String _findFlutterExecutable() {
-    final flutterRoot = Platform.environment['FLUTTER_ROOT'];
-    if (flutterRoot != null && flutterRoot.isNotEmpty) {
-      final exe = p.join(
-        flutterRoot,
-        'bin',
-        Platform.isWindows ? 'flutter.bat' : 'flutter',
-      );
-      if (File(exe).existsSync()) return exe;
-    }
-    return Platform.isWindows ? 'flutter.bat' : 'flutter';
   }
 }

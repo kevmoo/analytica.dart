@@ -220,3 +220,123 @@ bool isValidSdk(String path) {
         p.join(path, 'bin', Platform.isWindows ? 'dart.exe' : 'dart'),
       ).existsSync();
 }
+
+/// Throwing getter that returns the absolute or command path to `flutter`.
+///
+/// Throws [SdkDiscoveryException] if no Flutter executable can be located.
+String get flutterExecutable {
+  final exe = findFlutterExecutable();
+  if (exe == null) {
+    throw const SdkDiscoveryException(
+      'Cannot locate flutter executable. Set FLUTTER_ROOT or ensure flutter is '
+      'on PATH.',
+    );
+  }
+  return exe;
+}
+
+/// Locates the `flutter` CLI executable, probing `FLUTTER_ROOT`, `PATH`, and
+/// standard Flutter checkout directories.
+String? findFlutterExecutable({String? flutterRoot}) {
+  final root = flutterRoot ?? Platform.environment['FLUTTER_ROOT'];
+  final exeName = Platform.isWindows ? 'flutter.bat' : 'flutter';
+
+  if (root != null && root.isNotEmpty) {
+    final candidate = p.join(root, 'bin', exeName);
+    if (File(candidate).existsSync()) return candidate;
+  }
+
+  final pathEnv = Platform.environment['PATH'];
+  if (pathEnv != null && pathEnv.isNotEmpty) {
+    final separator = Platform.isWindows ? ';' : ':';
+    for (final dir in pathEnv.split(separator)) {
+      if (dir.trim().isEmpty) continue;
+      final candidate = p.join(dir, exeName);
+      if (File(candidate).existsSync()) return candidate;
+    }
+  }
+
+  final home =
+      Platform.environment['HOME'] ?? Platform.environment['USERPROFILE'];
+  if (home != null) {
+    final candidates = [
+      p.join(home, 'github', 'flutter', 'bin', exeName),
+      p.join(home, 'flutter', 'bin', exeName),
+      p.join(home, '.flutter', 'bin', exeName),
+    ];
+    for (final candidate in candidates) {
+      if (File(candidate).existsSync()) return candidate;
+    }
+  }
+
+  return exeName;
+}
+
+/// Whether the package at [packagePath] is a Flutter package (e.g. declares
+/// `sdk: flutter` or depends on `package:flutter`).
+bool isFlutterPackage(String packagePath) {
+  final pubspec = File(p.join(packagePath, 'pubspec.yaml'));
+  if (!pubspec.existsSync()) return false;
+  try {
+    return isFlutterPubspec(pubspec.readAsStringSync());
+  } catch (_) {
+    return false;
+  }
+}
+
+/// Whether [pubspecContent] indicates a Flutter package.
+bool isFlutterPubspec(String pubspecContent) {
+  return pubspecContent.contains('sdk: flutter') ||
+      pubspecContent.contains('package:flutter') ||
+      RegExp(r'^\s*flutter:\s*$', multiLine: true).hasMatch(pubspecContent);
+}
+
+/// Whether [packagePath] contains a `.dart_tool/package_config.json` file.
+bool hasPackageConfig(String packagePath) {
+  return File(
+    p.join(packagePath, '.dart_tool', 'package_config.json'),
+  ).existsSync();
+}
+
+/// Whether [packagePath] or any ancestor directory contains a
+/// `.dart_tool/package_config.json` file.
+bool hasEnclosingPackageConfig(String packagePath) {
+  try {
+    var dir = Directory(p.normalize(p.absolute(packagePath))).parent;
+    while (dir.path != dir.parent.path) {
+      final config = File(
+        p.join(dir.path, '.dart_tool', 'package_config.json'),
+      );
+      if (config.existsSync()) {
+        return true;
+      }
+      dir = dir.parent;
+    }
+  } catch (_) {}
+  return false;
+}
+
+/// Runs `pub get` (routing to `flutter pub get` or `dart pub get`) for the
+/// package at [packagePath].
+ProcessResult runPubGet(
+  String packagePath, {
+  String? sdkPath,
+  String? flutterRoot,
+  List<String> additionalArgs = const [],
+}) {
+  final isFlutter = isFlutterPackage(packagePath);
+  final String executable;
+  final List<String> args;
+
+  if (isFlutter) {
+    executable =
+        findFlutterExecutable(flutterRoot: flutterRoot) ??
+        (Platform.isWindows ? 'flutter.bat' : 'flutter');
+    args = ['pub', 'get', ...additionalArgs];
+  } else {
+    executable = findDartExecutable(sdkPath: sdkPath) ?? 'dart';
+    args = ['pub', 'get', ...additionalArgs];
+  }
+
+  return Process.runSync(executable, args, workingDirectory: packagePath);
+}

@@ -204,4 +204,82 @@ void main() {
       },
     );
   });
+
+  group('findFlutterExecutable & flutterExecutable', () {
+    test('finds flutter executable from flutterRoot override', () async {
+      final exeName = Platform.isWindows ? 'flutter.bat' : 'flutter';
+      await d.dir('custom_flutter', [
+        d.dir('bin', [d.file(exeName, '')]),
+      ]).create();
+
+      final root = '${d.sandbox}/custom_flutter';
+      final exe = findFlutterExecutable(flutterRoot: root);
+      check(exe).equals(p.join(root, 'bin', exeName));
+    });
+
+    test(
+      'returns default command name when no flutterRoot override exists',
+      () {
+        final exe = findFlutterExecutable();
+        check(exe).isNotNull();
+      },
+    );
+  });
+
+  group('Flutter package & pubspec detection', () {
+    test('detects Flutter package from sdk: flutter in pubspec', () async {
+      await d.dir('flutter_pkg', [
+        d.file('pubspec.yaml', '''
+name: flutter_pkg
+environment:
+  sdk: '^3.5.0'
+  flutter: '>=3.0.0'
+dependencies:
+  flutter:
+    sdk: flutter
+'''),
+      ]).create();
+
+      check(isFlutterPackage('${d.sandbox}/flutter_pkg')).isTrue();
+    });
+
+    test('detects pure Dart package as non-Flutter', () async {
+      await d.dir('dart_pkg', [
+        d.file('pubspec.yaml', '''
+name: dart_pkg
+environment:
+  sdk: '^3.5.0'
+'''),
+      ]).create();
+
+      check(isFlutterPackage('${d.sandbox}/dart_pkg')).isFalse();
+    });
+
+    test('returns false for non-existent directory', () {
+      check(isFlutterPackage('${d.sandbox}/non_existent_pkg')).isFalse();
+    });
+  });
+
+  group('hasPackageConfig & hasEnclosingPackageConfig', () {
+    test('detects direct .dart_tool/package_config.json', () async {
+      await d.dir('direct_pkg', [
+        d.dir('.dart_tool', [d.file('package_config.json', '{}')]),
+      ]).create();
+
+      check(hasPackageConfig('${d.sandbox}/direct_pkg')).isTrue();
+      check(hasEnclosingPackageConfig('${d.sandbox}/direct_pkg')).isFalse();
+    });
+
+    test('detects enclosing ancestor package config', () async {
+      await d.dir('workspace', [
+        d.dir('.dart_tool', [d.file('package_config.json', '{}')]),
+        d.dir('sub_pkg', [d.file('pubspec.yaml', 'name: sub_pkg')]),
+      ]).create();
+
+      check(hasPackageConfig('${d.sandbox}/workspace/sub_pkg')).isFalse();
+      check(
+        hasEnclosingPackageConfig('${d.sandbox}/workspace/sub_pkg'),
+      ).isTrue();
+    });
+  });
 }
