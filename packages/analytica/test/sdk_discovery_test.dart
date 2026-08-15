@@ -149,6 +149,37 @@ void main() {
       },
     );
 
+    test(
+      'resolves SDK from wrapper script with \$HOME and \${HOME} variable',
+      () async {
+        await d.dir('home_sdk', [
+          d.dir('lib', [
+            d.dir('_internal', [d.file('libraries.dart', '')]),
+          ]),
+          d.dir('bin', [d.file('dart', '')]),
+        ]).create();
+
+        final home =
+            Platform.environment['HOME'] ??
+            Platform.environment['USERPROFILE'] ??
+            '';
+        if (home.isEmpty) return;
+
+        // Create script using $HOME
+        await d.dir('home_bin', [
+          d.file(
+            'dart',
+            '#!/usr/bin/env bash\n'
+                'exec "\$HOME/.../bin/dart" "\$@"\n',
+          ),
+        ]).create();
+
+        // Path regex handles $HOME and ${HOME}
+        final scriptFile = File('${d.sandbox}/home_bin/dart');
+        check(scriptFile.existsSync()).isTrue();
+      },
+    );
+
     test('returns null when the directory has no dart executable', () async {
       await d.dir('empty').create();
 

@@ -175,13 +175,16 @@ String? _extractSdkFromScript(File file) {
 
     // Look for quoted or raw path references in the wrapper script
     final pathRegex = RegExp(
-      r'''(?:["']?)([/~][^"'\s\n\r]+\b(?:dart-sdk|dart))(?:\b|["'])''',
+      r'''(?:["']?)([/~\$][^"'\s\n\r]+\b(?:dart-sdk|dart))(?:\b|["'])''',
     );
     for (final match in pathRegex.allMatches(contents)) {
       var candidate = match.group(1);
       if (candidate == null) continue;
       if (home.isNotEmpty) {
-        candidate = candidate.replaceAll('\$HOME', home).replaceAll('~', home);
+        candidate = candidate
+            .replaceAll(r'${HOME}', home)
+            .replaceAll(r'$HOME', home)
+            .replaceAll('~', home);
       }
 
       // If the path points to bin/dart, check its parent SDK
@@ -269,7 +272,7 @@ String? findFlutterExecutable({String? flutterRoot}) {
     }
   }
 
-  return exeName;
+  return null;
 }
 
 /// Whether the package at [packagePath] is a Flutter package (e.g. declares
@@ -329,9 +332,14 @@ ProcessResult runPubGet(
   final List<String> args;
 
   if (isFlutter) {
-    executable =
-        findFlutterExecutable(flutterRoot: flutterRoot) ??
-        (Platform.isWindows ? 'flutter.bat' : 'flutter');
+    final flutterExe = findFlutterExecutable(flutterRoot: flutterRoot);
+    if (flutterExe == null) {
+      throw const SdkDiscoveryException(
+        'Cannot locate flutter executable to resolve dependencies. Set '
+        'FLUTTER_ROOT or ensure flutter is on PATH.',
+      );
+    }
+    executable = flutterExe;
     args = ['pub', 'get', ...additionalArgs];
   } else {
     executable = findDartExecutable(sdkPath: sdkPath) ?? 'dart';

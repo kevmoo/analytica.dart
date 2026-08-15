@@ -74,10 +74,10 @@ Designed for low token overhead and actionable precision, including co-invoked h
   "version": "0.1.0",
   "package": "my_package",
   "summary": {
-    "total_declarations": 142,
-    "pure_zombies_found": 2,
-    "tested_zombies_found": 1,
-    "co_invoked_hazards_found": 1
+    "totalDeclarations": 142,
+    "pureZombies": 2,
+    "testedZombies": 1,
+    "coInvokedHazards": 1
   },
   "zombies": [
     {
@@ -88,8 +88,8 @@ Designed for low token overhead and actionable precision, including co-invoked h
       "line": 45,
       "column": 1,
       "length": 19,
-      "classification": "pure_zombie",
-      "suggested_action": "delete"
+      "classification": "pureZombie",
+      "suggestedAction": "delete"
     },
     {
       "id": "OldParser",
@@ -99,15 +99,15 @@ Designed for low token overhead and actionable precision, including co-invoked h
       "line": 10,
       "column": 7,
       "length": 9,
-      "classification": "tested_zombie",
-      "suggested_action": "delete_with_orphan_tests",
-      "orphan_tests": [
+      "classification": "testedZombie",
+      "suggestedAction": "deleteWithOrphanTests",
+      "orphanTests": [
         {
           "file": "test/old_parser_test.dart",
           "line": 3,
           "column": 3,
           "description": "OldParser parses correctly",
-          "co_invoked_hazard": false
+          "coInvokedHazard": false
         }
       ]
     }
@@ -148,8 +148,9 @@ zombie [options] [target_path]
 | `--format` | `json` \| `markdown` (default: `markdown`) | Output formatting mode for stdout (json for agents/CI, markdown for humans). |
 | `--json-output` | `path/to/report.json` | Write machine-readable JSON analysis report to file (recommended for agents & CI). |
 | `--example-mode` | `demonstration` (default) \| `strict` \| `skip` | In `demonstration`, code in `example/` is a consumer root and immune from deletion. |
-| `--mode` | `library` (default) \| `closed-app` | In `library` (default), all non-`src` `lib/**` exports are preserved as Public API roots (Open-World Invariant). In `closed-app`, unreferenced exports are flagged. |
-| `--pub-get` | `false` (default) \| `true` | Automatically run `dart pub get` if `.dart_tool/package_config.json` is missing. |
+| `--mode` | `library` (default) \| `closedApp` | In `library` (default), all non-`src` `lib/**` exports are preserved as Public API roots (Open-World Invariant). In `closedApp`, unreferenced exports are flagged. |
+| `--extra-roots` | `<dir1,dir2>` (default: `""`) | Comma-separated list of additional root/test directories or companion packages to include in analysis. |
+| `--pub-get` | `false` (default) \| `true` | Automatically run `dart pub get` (or `flutter pub get`) if `.dart_tool/package_config.json` is missing. |
 | `--include-generated` | `false` (default) \| `true` | When false, ignores `*.g.dart`, `*.freezed.dart`. |
 | `--fail-on-zombies` | `false` (default) \| `true` | Exit with non-zero status code if any zombie is detected (for CI gates). |
 <!-- mdformat on -->
