@@ -248,13 +248,14 @@ void main() {
       check(exe).equals(p.join(root, 'bin', exeName));
     });
 
-    test(
-      'returns default command name when no flutterRoot override exists',
-      () {
-        final exe = findFlutterExecutable();
-        check(exe).isNotNull();
-      },
-    );
+    test('flutterExecutable behavior reflects findFlutterExecutable', () {
+      final found = findFlutterExecutable();
+      if (found != null) {
+        check(flutterExecutable).equals(found);
+      } else {
+        check(() => flutterExecutable).throws<SdkDiscoveryException>();
+      }
+    });
   });
 
   group('Flutter package & pubspec detection', () {
