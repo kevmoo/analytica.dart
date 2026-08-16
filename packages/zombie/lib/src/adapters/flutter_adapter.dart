@@ -111,36 +111,10 @@ class FlutterAdapter extends BaseFrameworkAdapter {
   @override
   bool isFrameworkEntryPoint(AnnotatedNode node, Element? element) {
     for (final meta in node.metadata) {
-      final rawName = meta.name.name;
-      final baseName = rawName.contains('.')
-          ? rawName.split('.').last
-          : rawName;
-      final constructorName = meta.constructorName?.name;
-      if (baseName == 'pragma' || constructorName == 'pragma') {
-        final args = meta.arguments?.arguments;
-        if (args != null && args.isNotEmpty) {
-          final firstArg = args.first;
-          String? pragmaName;
-          if (firstArg is SimpleStringLiteral) {
-            pragmaName = firstArg.value;
-          } else if (firstArg is StringLiteral) {
-            pragmaName = firstArg.stringValue;
-          } else {
-            for (final entity in firstArg.childEntities) {
-              if (entity is SimpleStringLiteral) {
-                pragmaName = entity.value;
-                break;
-              } else if (entity is StringLiteral) {
-                pragmaName = entity.stringValue;
-                break;
-              }
-            }
-          }
-          if (pragmaName != null &&
-              _flutterEntryPointPragmas.contains(pragmaName)) {
-            return true;
-          }
-        }
+      final pragmaName = extractPragmaName(meta);
+      if (pragmaName != null &&
+          _flutterEntryPointPragmas.contains(pragmaName)) {
+        return true;
       }
     }
     return false;

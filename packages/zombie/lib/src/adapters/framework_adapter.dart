@@ -58,3 +58,31 @@ abstract class BaseFrameworkAdapter implements FrameworkAdapter {
   @override
   bool isExternalBinding(Declaration node, Element? element) => false;
 }
+
+/// Extracts the first string argument of a `@pragma(...)` annotation, or `null`
+/// if [meta] is not a pragma or has no string argument.
+String? extractPragmaName(Annotation meta) {
+  final rawName = meta.name.name;
+  final baseName = rawName.contains('.') ? rawName.split('.').last : rawName;
+  final constructorName = meta.constructorName?.name;
+  if (baseName != 'pragma' && constructorName != 'pragma') return null;
+
+  final args = meta.arguments?.arguments;
+  if (args == null || args.isEmpty) return null;
+
+  final firstArg = args.first;
+  if (firstArg is SimpleStringLiteral) {
+    return firstArg.value;
+  } else if (firstArg is StringLiteral) {
+    return firstArg.stringValue;
+  } else {
+    for (final entity in firstArg.childEntities) {
+      if (entity is SimpleStringLiteral) {
+        return entity.value;
+      } else if (entity is StringLiteral) {
+        return entity.stringValue;
+      }
+    }
+  }
+  return null;
+}

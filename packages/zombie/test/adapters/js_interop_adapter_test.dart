@@ -75,6 +75,8 @@ extension type DomHTMLCanvasElement(JSObject _) {
 
 extension type JSAnyExtension(JSAny _) {}
 
+extension type JSUint8ArrayExtension(JSUint8Array _) {}
+
 extension type StandardStringExtension(String value) {
   int get len => value.length;
 }
@@ -86,6 +88,26 @@ class NormalClass {
 class ClassWithExternalMember {
   external void callJs();
 }
+
+class ClassWithJsParam {
+  void handle(JSObject event) {}
+}
+
+class ClassWithJsParamName {
+  void find(String JSStringKey) {}
+}
+
+extension type PureDartExtWithJsParam(String s) {
+  void log(JSObject e) {}
+}
+
+extension CanvasExtWithExternal on DomHTMLCanvasElement {
+  external void draw();
+}
+
+extension PureDartExt on String {
+  void customTrim() {}
+}
 ''',
         );
 
@@ -95,12 +117,24 @@ class ClassWithExternalMember {
         check(adapter.isExternalBinding(declarations[0], null)).isTrue();
         // JSAnyExtension
         check(adapter.isExternalBinding(declarations[1], null)).isTrue();
+        // JSUint8ArrayExtension
+        check(adapter.isExternalBinding(declarations[2], null)).isTrue();
         // StandardStringExtension (non-JS)
-        check(adapter.isExternalBinding(declarations[2], null)).isFalse();
-        // NormalClass
         check(adapter.isExternalBinding(declarations[3], null)).isFalse();
+        // NormalClass
+        check(adapter.isExternalBinding(declarations[4], null)).isFalse();
         // ClassWithExternalMember
-        check(adapter.isExternalBinding(declarations[4], null)).isTrue();
+        check(adapter.isExternalBinding(declarations[5], null)).isTrue();
+        // ClassWithJsParam (must NOT be treated as external binding)
+        check(adapter.isExternalBinding(declarations[6], null)).isFalse();
+        // ClassWithJsParamName (must NOT be treated as external binding)
+        check(adapter.isExternalBinding(declarations[7], null)).isFalse();
+        // PureDartExtWithJsParam (must NOT be treated as external binding)
+        check(adapter.isExternalBinding(declarations[8], null)).isFalse();
+        // CanvasExtWithExternal (has external member)
+        check(adapter.isExternalBinding(declarations[9], null)).isTrue();
+        // PureDartExt (normal extension)
+        check(adapter.isExternalBinding(declarations[10], null)).isFalse();
       });
     });
   });

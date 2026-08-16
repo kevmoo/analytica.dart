@@ -16,43 +16,42 @@ class JsInteropAdapter extends BaseFrameworkAdapter {
 
   static const _jsInteropAnnotations = {'JS', 'staticInterop', 'anonymous'};
 
+  static const _jsInteropTypeNames = {
+    'JSAny',
+    'JSObject',
+    'JSFunction',
+    'JSArray',
+    'JSString',
+    'JSNumber',
+    'JSBoolean',
+    'JSPromise',
+    'JSSymbol',
+    'JSBigInt',
+    'JSBoxedDartObject',
+    'JSTypedArray',
+    'JSUint8Array',
+    'JSInt8Array',
+    'JSUint8ClampedArray',
+    'JSInt16Array',
+    'JSUint16Array',
+    'JSInt32Array',
+    'JSUint32Array',
+    'JSFloat32Array',
+    'JSFloat64Array',
+    'JSArrayBuffer',
+    'JSDataView',
+    'JSExportedDartFunction',
+  };
+
   @override
   bool isFrameworkEntryPoint(AnnotatedNode node, Element? element) {
     for (final meta in node.metadata) {
-      final rawName = meta.name.name;
-      final baseName = rawName.contains('.')
-          ? rawName.split('.').last
-          : rawName;
-      final constructorName = meta.constructorName?.name;
-
-      if (baseName == 'pragma' || constructorName == 'pragma') {
-        final args = meta.arguments?.arguments;
-        if (args != null && args.isNotEmpty) {
-          final firstArg = args.first;
-          String? pragmaName;
-          if (firstArg is SimpleStringLiteral) {
-            pragmaName = firstArg.value;
-          } else if (firstArg is StringLiteral) {
-            pragmaName = firstArg.stringValue;
-          } else {
-            for (final entity in firstArg.childEntities) {
-              if (entity is SimpleStringLiteral) {
-                pragmaName = entity.value;
-                break;
-              } else if (entity is StringLiteral) {
-                pragmaName = entity.stringValue;
-                break;
-              }
-            }
-          }
-          final name = pragmaName;
-          if (name != null &&
-              _wasmEntryPointPragmas.any(
-                (p) => name == p || name.startsWith('$p:'),
-              )) {
-            return true;
-          }
-        }
+      final pragmaName = extractPragmaName(meta);
+      if (pragmaName != null &&
+          _wasmEntryPointPragmas.any(
+            (p) => pragmaName == p || pragmaName.startsWith('$p:'),
+          )) {
+        return true;
       }
     }
     return false;
@@ -81,44 +80,66 @@ class JsInteropAdapter extends BaseFrameworkAdapter {
       }
     }
 
-    // 3. Check for ExtensionTypeDeclaration or ClassDeclaration representing JS interop / having external members.
-    if (node is ExtensionTypeDeclaration || node is ClassDeclaration) {
-      var hasExternalMember = false;
-      var hasJsRepresentation = false;
-
-      void inspectEntities(Iterable<dynamic> entities) {
-        for (final entity in entities) {
-          if (entity is MethodDeclaration && entity.externalKeyword != null) {
-            hasExternalMember = true;
-          } else if (entity is FieldDeclaration &&
-              entity.externalKeyword != null) {
-            hasExternalMember = true;
-          } else if (entity is ConstructorDeclaration &&
-              entity.externalKeyword != null) {
-            hasExternalMember = true;
-          } else if (entity is FormalParameterList) {
-            final src = entity.toSource();
-            if (src.contains('JSObject') ||
-                src.contains('JSAny') ||
-                src.contains('JSString') ||
-                src.contains('JSNumber') ||
-                src.contains('JSBoolean') ||
-                src.contains('JSArray') ||
-                src.contains('JSPromise')) {
-              hasJsRepresentation = true;
-            }
-          } else if (entity is AstNode) {
-            inspectEntities(entity.childEntities);
-          }
+    // 3. ExtensionTypeDeclaration: Check direct representation or external
+    // members.
+    if (node is ExtensionTypeDeclaration) {
+      if (_hasExternalMember(node)) return true;
+      for (final child in node.childEntities) {
+        if (child is FormalParameterList) {
+          final src = child.toSource();
+          if (_hasJsRepresentationType(src)) return true;
+        } else if (child is AstNode &&
+            (child.runtimeType.toString().contains('Representation') ||
+                child.runtimeType.toString().contains('PrimaryConstructor'))) {
+          final src = child.toSource();
+          if (_hasJsRepresentationType(src)) return true;
         }
-      }
-
-      inspectEntities(node.childEntities);
-      if (hasJsRepresentation || hasExternalMember) {
-        return true;
       }
     }
 
+    // 4. ClassDeclaration, ExtensionDeclaration, MixinDeclaration,
+    // EnumDeclaration: Check direct external members.
+    if (node is ClassDeclaration ||
+        node is ExtensionDeclaration ||
+        node is MixinDeclaration ||
+        node is EnumDeclaration) {
+      if (_hasExternalMember(node)) return true;
+    }
+
+    return false;
+  }
+
+  static bool _hasJsRepresentationType(String src) {
+    for (final typeName in _jsInteropTypeNames) {
+      if (src.contains(typeName)) return true;
+    }
+    return false;
+  }
+
+  static bool _hasExternalMember(AstNode node) {
+    for (final child in node.childEntities) {
+      if (_isExternalMember(child)) return true;
+      if (child is AstNode &&
+          (child.runtimeType.toString().contains('Body') ||
+              child.runtimeType.toString().contains('Clause'))) {
+        for (final member in child.childEntities) {
+          if (_isExternalMember(member)) return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  static bool _isExternalMember(dynamic member) {
+    if (member is MethodDeclaration && member.externalKeyword != null) {
+      return true;
+    }
+    if (member is FieldDeclaration && member.externalKeyword != null) {
+      return true;
+    }
+    if (member is ConstructorDeclaration && member.externalKeyword != null) {
+      return true;
+    }
     return false;
   }
 }
