@@ -7,6 +7,7 @@ import '../root_harvester.dart';
 import 'build_runner_adapter.dart';
 import 'flutter_adapter.dart';
 import 'framework_adapter.dart';
+import 'js_interop_adapter.dart';
 import 'package_test_adapter.dart';
 
 /// Composite adapter that aggregates multiple [FrameworkAdapter] instances.
@@ -16,12 +17,13 @@ class CompositeFrameworkAdapter implements FrameworkAdapter {
   const CompositeFrameworkAdapter(this.adapters);
 
   /// Default composite adapter configuring [FlutterAdapter],
-  /// [BuildRunnerAdapter], and [PackageTestAdapter].
+  /// [BuildRunnerAdapter], [PackageTestAdapter], and [JsInteropAdapter].
   const CompositeFrameworkAdapter.defaults()
     : adapters = const [
         FlutterAdapter(),
         BuildRunnerAdapter(),
         PackageTestAdapter(),
+        JsInteropAdapter(),
       ];
 
   @override
@@ -63,6 +65,14 @@ class CompositeFrameworkAdapter implements FrameworkAdapter {
   bool isFrameworkEntryPoint(AnnotatedNode node, Element? element) {
     for (final adapter in adapters) {
       if (adapter.isFrameworkEntryPoint(node, element)) return true;
+    }
+    return false;
+  }
+
+  @override
+  bool isExternalJsInterop(Declaration node, Element? element) {
+    for (final adapter in adapters) {
+      if (adapter.isExternalJsInterop(node, element)) return true;
     }
     return false;
   }

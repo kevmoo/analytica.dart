@@ -29,7 +29,7 @@ void main() {
   group('CompositeFrameworkAdapter', () {
     test('defaults() constructor includes default standard adapters', () {
       const composite = CompositeFrameworkAdapter.defaults();
-      check(composite.adapters.length).equals(3);
+      check(composite.adapters.length).equals(4);
       check(composite.adapters.whereType<FlutterAdapter>().length).equals(1);
       check(
         composite.adapters.whereType<BuildRunnerAdapter>().length,
@@ -37,6 +37,7 @@ void main() {
       check(
         composite.adapters.whereType<PackageTestAdapter>().length,
       ).equals(1);
+      check(composite.adapters.whereType<JsInteropAdapter>().length).equals(1);
     });
 
     group('harvestRoots', () {

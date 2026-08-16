@@ -1616,5 +1616,66 @@ class DeadInternalService {}
       check(deadNames).not((it) => it.contains('CallerService'));
       check(deadNames).not((it) => it.contains('PlatformService'));
     });
+
+    test(
+      'identifies isExternalJsInterop and filters with ignoreExternalInterop',
+      () async {
+        await d.dir('js_interop_pkg', [
+          packageConfig('js_interop_pkg'),
+          d.file('pubspec.yaml', '''
+name: js_interop_pkg
+environment:
+  sdk: '^3.5.0'
+'''),
+          d.dir('lib', [
+            d.file('js_interop_pkg.dart', 'export "src/live.dart";'),
+            d.dir('src', [
+              d.file('live.dart', 'class LiveService {}'),
+              d.file('dom_bindings.dart', '''
+import 'dart:js_interop';
+
+@JS('HTMLCanvasElement')
+extension type DomCanvas(JSObject _) {
+  external int get width;
+}
+
+external void topLevelJsFunc();
+
+class DeadDartHelper {
+  void unused() {}
+}
+'''),
+            ]),
+          ]),
+        ]).create();
+
+        // 1. Default run: flags both JS interop and DeadDartHelper, but
+        // marks isExternalJsInterop.
+        final defaultReport = await analyzePackage(d.path('js_interop_pkg'));
+        final canvasZombie = defaultReport.zombies.firstWhere(
+          (z) => z.name == 'DomCanvas',
+        );
+        check(canvasZombie.isExternalJsInterop).isTrue();
+
+        final funcZombie = defaultReport.zombies.firstWhere(
+          (z) => z.name == 'topLevelJsFunc',
+        );
+        check(funcZombie.isExternalJsInterop).isTrue();
+
+        final dartZombie = defaultReport.zombies.firstWhere(
+          (z) => z.name == 'DeadDartHelper',
+        );
+        check(dartZombie.isExternalJsInterop).isFalse();
+
+        // 2. Run with ignoreExternalInterop: true.
+        final options = ZombieOptions(
+          packagePath: d.path('js_interop_pkg'),
+          ignoreExternalInterop: true,
+        );
+        final filteredReport = await ZombieEngine(options).analyze();
+        check(filteredReport.pureZombiesFound).equals(1);
+        check(filteredReport.zombies.single.name).equals('DeadDartHelper');
+      },
+    );
   });
 }

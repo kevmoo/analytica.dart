@@ -27,6 +27,11 @@ abstract interface class FrameworkAdapter {
   /// Whether [node] or [element] is a framework-specific entrypoint
   /// (e.g. `@pragma('vm:entry-point')`).
   bool isFrameworkEntryPoint(AnnotatedNode node, Element? element);
+
+  /// Whether [node] or [element] represents an external JavaScript or Wasm
+  /// interop declaration (e.g. extension type with external members or `@JS`
+  /// annotation).
+  bool isExternalJsInterop(Declaration node, Element? element);
 }
 
 /// Base adapter providing default no-op / false implementations of
@@ -49,4 +54,7 @@ abstract class BaseFrameworkAdapter implements FrameworkAdapter {
 
   @override
   bool isFrameworkEntryPoint(AnnotatedNode node, Element? element) => false;
+
+  @override
+  bool isExternalJsInterop(Declaration node, Element? element) => false;
 }
