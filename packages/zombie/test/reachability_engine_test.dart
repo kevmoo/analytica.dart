@@ -718,6 +718,54 @@ extension DeadOps on CustomNum {
     });
 
     test(
+      'reaches variables mutated via prefix and postfix operators',
+      () async {
+        await d.dir('prefix_postfix_pkg', [
+          packageConfig('prefix_postfix_pkg'),
+          d.file('pubspec.yaml', '''
+name: prefix_postfix_pkg
+environment:
+  sdk: '^3.5.0'
+'''),
+          d.dir('lib', [
+            d.file('prefix_postfix_pkg.dart', 'export "src/live.dart";'),
+            d.dir('src', [
+              d.file('live.dart', '''
+import 'vars.dart';
+
+class LiveContainer {
+  void mutatePrefix() {
+    ++prefixMutated;
+    --prefixMutated2;
+  }
+  void mutatePostfix() {
+    postfixMutated++;
+    postfixMutated2--;
+  }
+}
+'''),
+              d.file('vars.dart', '''
+int prefixMutated = 0;
+int prefixMutated2 = 0;
+int postfixMutated = 0;
+int postfixMutated2 = 0;
+int deadVar = 0;
+'''),
+            ]),
+          ]),
+        ]).create();
+
+        final report = await analyzePackage(d.path('prefix_postfix_pkg'));
+        final names = report.zombies.map((z) => z.name).toSet();
+        check(names).contains('deadVar');
+        check(names).not((it) => it.contains('prefixMutated'));
+        check(names).not((it) => it.contains('prefixMutated2'));
+        check(names).not((it) => it.contains('postfixMutated'));
+        check(names).not((it) => it.contains('postfixMutated2'));
+      },
+    );
+
+    test(
       'resolves same-package package: URIs in conditional imports',
       () async {
         await d.dir('package_uri_cond_pkg', [

@@ -97,12 +97,16 @@ class ElementReferenceExtractor extends RecursiveAstVisitor<void> {
   @override
   void visitPrefixExpression(PrefixExpression node) {
     _checkElement(node.element);
+    _checkElement(node.readElement);
+    _checkElement(node.writeElement);
     super.visitPrefixExpression(node);
   }
 
   @override
   void visitPostfixExpression(PostfixExpression node) {
     _checkElement(node.element);
+    _checkElement(node.readElement);
+    _checkElement(node.writeElement);
     super.visitPostfixExpression(node);
   }
 
