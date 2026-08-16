@@ -59,7 +59,7 @@ class JsInteropAdapter extends BaseFrameworkAdapter {
   }
 
   @override
-  bool isExternalJsInterop(Declaration node, Element? element) {
+  bool isExternalBinding(Declaration node, Element? element) {
     // 1. Check for external keyword on top-level function or variable.
     if (node is FunctionDeclaration && node.externalKeyword != null) {
       return true;

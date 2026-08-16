@@ -42,7 +42,7 @@ void normalFunc() {}
       });
     });
 
-    group('isExternalJsInterop', () {
+    group('isExternalBinding', () {
       test('matches external functions and top-level variables', () {
         final result = parseString(
           content: '''
@@ -58,10 +58,10 @@ int regularVar = 10;
 
         final declarations = result.unit.declarations;
 
-        check(adapter.isExternalJsInterop(declarations[0], null)).isTrue();
-        check(adapter.isExternalJsInterop(declarations[1], null)).isTrue();
-        check(adapter.isExternalJsInterop(declarations[2], null)).isFalse();
-        check(adapter.isExternalJsInterop(declarations[3], null)).isFalse();
+        check(adapter.isExternalBinding(declarations[0], null)).isTrue();
+        check(adapter.isExternalBinding(declarations[1], null)).isTrue();
+        check(adapter.isExternalBinding(declarations[2], null)).isFalse();
+        check(adapter.isExternalBinding(declarations[3], null)).isFalse();
       });
 
       test('matches JS extension types and classes with external members', () {
@@ -92,21 +92,21 @@ class ClassWithExternalMember {
         final declarations = result.unit.declarations;
 
         // DomHTMLCanvasElement
-        check(adapter.isExternalJsInterop(declarations[0], null)).isTrue();
+        check(adapter.isExternalBinding(declarations[0], null)).isTrue();
         // JSAnyExtension
-        check(adapter.isExternalJsInterop(declarations[1], null)).isTrue();
+        check(adapter.isExternalBinding(declarations[1], null)).isTrue();
         // StandardStringExtension (non-JS)
-        check(adapter.isExternalJsInterop(declarations[2], null)).isFalse();
+        check(adapter.isExternalBinding(declarations[2], null)).isFalse();
         // NormalClass
-        check(adapter.isExternalJsInterop(declarations[3], null)).isFalse();
+        check(adapter.isExternalBinding(declarations[3], null)).isFalse();
         // ClassWithExternalMember
-        check(adapter.isExternalJsInterop(declarations[4], null)).isTrue();
+        check(adapter.isExternalBinding(declarations[4], null)).isTrue();
       });
     });
   });
 
   group('CompositeFrameworkAdapter with JsInteropAdapter', () {
-    test('defaults() delegates isExternalJsInterop', () {
+    test('defaults() delegates isExternalBinding', () {
       const composite = CompositeFrameworkAdapter.defaults();
       final result = parseString(
         content: '''
@@ -116,8 +116,8 @@ void myDartFunction() {}
       );
 
       final decls = result.unit.declarations;
-      check(composite.isExternalJsInterop(decls[0], null)).isTrue();
-      check(composite.isExternalJsInterop(decls[1], null)).isFalse();
+      check(composite.isExternalBinding(decls[0], null)).isTrue();
+      check(composite.isExternalBinding(decls[1], null)).isFalse();
     });
   });
 }

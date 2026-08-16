@@ -1618,7 +1618,7 @@ class DeadInternalService {}
     });
 
     test(
-      'identifies isExternalJsInterop and filters with ignoreExternalInterop',
+      'identifies isExternalBinding and filters with ignoreExternalBindings',
       () async {
         await d.dir('js_interop_pkg', [
           packageConfig('js_interop_pkg'),
@@ -1650,27 +1650,27 @@ class DeadDartHelper {
         ]).create();
 
         // 1. Default run: flags both JS interop and DeadDartHelper, but
-        // marks isExternalJsInterop.
+        // marks isExternalBinding.
         final defaultReport = await analyzePackage(d.path('js_interop_pkg'));
         final canvasZombie = defaultReport.zombies.firstWhere(
           (z) => z.name == 'DomCanvas',
         );
-        check(canvasZombie.isExternalJsInterop).isTrue();
+        check(canvasZombie.isExternalBinding).isTrue();
 
         final funcZombie = defaultReport.zombies.firstWhere(
           (z) => z.name == 'topLevelJsFunc',
         );
-        check(funcZombie.isExternalJsInterop).isTrue();
+        check(funcZombie.isExternalBinding).isTrue();
 
         final dartZombie = defaultReport.zombies.firstWhere(
           (z) => z.name == 'DeadDartHelper',
         );
-        check(dartZombie.isExternalJsInterop).isFalse();
+        check(dartZombie.isExternalBinding).isFalse();
 
-        // 2. Run with ignoreExternalInterop: true.
+        // 2. Run with ignoreExternalBindings: true.
         final options = ZombieOptions(
           packagePath: d.path('js_interop_pkg'),
-          ignoreExternalInterop: true,
+          ignoreExternalBindings: true,
         );
         final filteredReport = await ZombieEngine(options).analyze();
         check(filteredReport.pureZombiesFound).equals(1);

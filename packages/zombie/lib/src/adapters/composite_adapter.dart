@@ -70,9 +70,9 @@ class CompositeFrameworkAdapter implements FrameworkAdapter {
   }
 
   @override
-  bool isExternalJsInterop(Declaration node, Element? element) {
+  bool isExternalBinding(Declaration node, Element? element) {
     for (final adapter in adapters) {
-      if (adapter.isExternalJsInterop(node, element)) return true;
+      if (adapter.isExternalBinding(node, element)) return true;
     }
     return false;
   }

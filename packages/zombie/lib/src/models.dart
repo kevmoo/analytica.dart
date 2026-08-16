@@ -151,7 +151,7 @@ final class ZombieOptions {
   final List<String> testSupportPatterns;
   final List<String> ignoreNamePatterns;
   final List<String> extraRoots;
-  final bool ignoreExternalInterop;
+  final bool ignoreExternalBindings;
 
   const ZombieOptions({
     required this.packagePath,
@@ -167,7 +167,7 @@ final class ZombieOptions {
     this.testSupportPatterns = const ['Fake*', 'Mock*'],
     this.ignoreNamePatterns = const [],
     this.extraRoots = const [],
-    this.ignoreExternalInterop = false,
+    this.ignoreExternalBindings = false,
   });
 }
 
@@ -220,7 +220,7 @@ class ZombieFinding {
   final ZombieClassification classification;
   final String suggestedAction;
   final List<OrphanTestSite>? orphanTests;
-  final bool isExternalJsInterop;
+  final bool isExternalBinding;
 
   const ZombieFinding({
     required this.id,
@@ -233,7 +233,7 @@ class ZombieFinding {
     required this.classification,
     required this.suggestedAction,
     this.orphanTests,
-    this.isExternalJsInterop = false,
+    this.isExternalBinding = false,
   });
 
   factory ZombieFinding.fromJson(Map<String, dynamic> json) => ZombieFinding(
@@ -251,7 +251,10 @@ class ZombieFinding {
     orphanTests: (json['orphanTests'] as List<dynamic>?)
         ?.map((t) => OrphanTestSite.fromJson(t as Map<String, dynamic>))
         .toList(),
-    isExternalJsInterop: json['isExternalJsInterop'] as bool? ?? false,
+    isExternalBinding:
+        json['isExternalBinding'] as bool? ??
+        json['isExternalJsInterop'] as bool? ??
+        false,
   );
 
   Map<String, dynamic> toJson() => {
@@ -264,7 +267,7 @@ class ZombieFinding {
     'length': length,
     'classification': classification.jsonValue,
     'suggestedAction': suggestedAction,
-    if (isExternalJsInterop) 'isExternalJsInterop': true,
+    if (isExternalBinding) 'isExternalBinding': true,
     if (orphanTests != null && orphanTests!.isNotEmpty)
       'orphanTests': orphanTests!.map((t) => t.toJson()).toList(),
   };
@@ -335,7 +338,7 @@ class DeclarationNode {
   final bool isTestSupport;
   final bool isSealed;
   final bool isNativeRoot;
-  final bool isExternalJsInterop;
+  final bool isExternalBinding;
   final String? sealedSuperclassName;
   final Element? sealedSuperclassElement;
   final Set<String> outgoingTargetIds;
@@ -355,7 +358,7 @@ class DeclarationNode {
     this.isTestSupport = false,
     this.isSealed = false,
     this.isNativeRoot = false,
-    this.isExternalJsInterop = false,
+    this.isExternalBinding = false,
     this.sealedSuperclassName,
     this.sealedSuperclassElement,
     Set<String>? outgoingTargetIds,
