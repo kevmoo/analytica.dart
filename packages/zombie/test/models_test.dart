@@ -168,12 +168,14 @@ void main() {
       check(defaultOptions.includeGenerated).isFalse();
       check(defaultOptions.failOnZombies).isFalse();
       check(defaultOptions.autoPubGet).isFalse();
+      check(defaultOptions.workspaceDiscovery).isTrue();
 
       const customOptions = ZombieOptions(
         packagePath: '/path/to/pkg',
         testSupportPatterns: ['*Stub', 'CustomFixture*'],
         ignoreNamePatterns: ['*_generated', 'Ignored*'],
         extraRoots: ['../companion_test', '/external/tests'],
+        workspaceDiscovery: false,
       );
       check(
         customOptions.testSupportPatterns,
@@ -184,6 +186,7 @@ void main() {
       check(
         customOptions.extraRoots,
       ).deepEquals(['../companion_test', '/external/tests']);
+      check(customOptions.workspaceDiscovery).isFalse();
     });
 
     test('ZombieReport deserializes camelCase JSON summary correctly', () {

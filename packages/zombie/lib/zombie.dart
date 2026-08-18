@@ -7,3 +7,4 @@ export 'src/formatters/markdown_formatter.dart';
 export 'src/models.dart';
 export 'src/reachability_engine.dart';
 export 'src/root_harvester.dart';
+export 'src/workspace_discovery.dart';

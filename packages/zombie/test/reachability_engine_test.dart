@@ -1677,5 +1677,317 @@ class DeadDartHelper {
         check(filteredReport.zombies.single.name).equals('DeadDartHelper');
       },
     );
+
+    test('automatically discovers sibling workspace consumer and protects '
+        'internal helper', () async {
+      await d.dir('ws_monorepo', [
+        d.dir('.git', []),
+        d.dir('packages', [
+          d.dir('core_pkg', [
+            d.dir('.dart_tool', [
+              d.file('package_config.json', '''
+{
+  "configVersion": 2,
+  "packages": [
+    {
+      "name": "core_pkg",
+      "rootUri": "../",
+      "packageUri": "lib/",
+      "languageVersion": "3.5"
+    }
+  ]
+}
+'''),
+            ]),
+            d.file('pubspec.yaml', '''
+name: core_pkg
+environment:
+  sdk: '^3.5.0'
+'''),
+            d.dir('lib', [
+              d.file('core_pkg.dart', 'export "src/live.dart";'),
+              d.dir('src', [
+                d.file('live.dart', 'void liveCore() {}'),
+                d.file('internal_helper.dart', 'void internalCoreHelper() {}'),
+                d.file('unused.dart', 'void deadCoreFunc() {}'),
+              ]),
+            ]),
+          ]),
+          d.dir('consumer_pkg', [
+            d.dir('.dart_tool', [
+              d.file('package_config.json', '''
+{
+  "configVersion": 2,
+  "packages": [
+    {
+      "name": "consumer_pkg",
+      "rootUri": "../",
+      "packageUri": "lib/",
+      "languageVersion": "3.5"
+    },
+    {
+      "name": "core_pkg",
+      "rootUri": "../../core_pkg",
+      "packageUri": "lib/",
+      "languageVersion": "3.5"
+    }
+  ]
+}
+'''),
+            ]),
+            d.file('pubspec.yaml', '''
+name: consumer_pkg
+environment:
+  sdk: '^3.5.0'
+dependencies:
+  core_pkg:
+    path: ../core_pkg
+'''),
+            d.dir('lib', [
+              d.file('consumer.dart', '''
+import 'package:core_pkg/src/internal_helper.dart';
+
+void useHelper() {
+  internalCoreHelper();
+}
+'''),
+            ]),
+          ]),
+        ]),
+      ]).create();
+
+      // 1. With workspace discovery (default: true) -> helper is protected!
+      final reportWithWs = await analyzePackage(
+        d.path('ws_monorepo/packages/core_pkg'),
+      );
+      check(reportWithWs.pureZombiesFound).equals(1);
+      check(reportWithWs.zombies.single.name).equals('deadCoreFunc');
+
+      // 2. With workspace discovery disabled -> helper is pure zombie!
+      final reportNoWs = await ZombieEngine(
+        ZombieOptions(
+          packagePath: d.path('ws_monorepo/packages/core_pkg'),
+          workspaceDiscovery: false,
+        ),
+      ).analyze();
+      check(reportNoWs.pureZombiesFound).equals(2);
+      final zombieNames = reportNoWs.zombies.map((z) => z.name).toSet();
+      check(zombieNames).contains('internalCoreHelper');
+      check(zombieNames).contains('deadCoreFunc');
+    });
+
+    test(
+      'supports unified --extra-roots with explicit .dart file and directory '
+      'splitting lib/test',
+      () async {
+        await d.dir('extra_roots_unification_pkg', [
+          packageConfig('extra_roots_unification_pkg'),
+          d.file('pubspec.yaml', '''
+name: extra_roots_unification_pkg
+environment:
+  sdk: '^3.5.0'
+'''),
+          d.dir('lib', [
+            d.file(
+              'extra_roots_unification_pkg.dart',
+              'export "src/live.dart";',
+            ),
+            d.dir('src', [
+              d.file('live.dart', 'void liveFunc() {}'),
+              d.file('file_root_helper.dart', 'void fileRootTarget() {}'),
+              d.file('dir_prod_helper.dart', 'void dirProdTarget() {}'),
+              d.file('dir_test_helper.dart', 'void dirTestTarget() {}'),
+              d.file('dead_all.dart', 'void deadAll() {}'),
+            ]),
+          ]),
+        ]).create();
+
+        await d.dir('external_file_root', [
+          d.dir('.dart_tool', [
+            d.file('package_config.json', '''
+{
+  "configVersion": 2,
+  "packages": [
+    {
+      "name": "external_file_root",
+      "rootUri": "../",
+      "packageUri": "lib/",
+      "languageVersion": "3.5"
+    },
+    {
+      "name": "extra_roots_unification_pkg",
+      "rootUri": "../../extra_roots_unification_pkg",
+      "packageUri": "lib/",
+      "languageVersion": "3.5"
+    }
+  ]
+}
+'''),
+          ]),
+          d.file('entrypoint.dart', '''
+import 'package:extra_roots_unification_pkg/src/file_root_helper.dart';
+
+void main() {
+  fileRootTarget();
+}
+'''),
+        ]).create();
+
+        await d.dir('external_companion_pkg', [
+          d.dir('.dart_tool', [
+            d.file('package_config.json', '''
+{
+  "configVersion": 2,
+  "packages": [
+    {
+      "name": "external_companion_pkg",
+      "rootUri": "../",
+      "packageUri": "lib/",
+      "languageVersion": "3.5"
+    },
+    {
+      "name": "extra_roots_unification_pkg",
+      "rootUri": "../../extra_roots_unification_pkg",
+      "packageUri": "lib/",
+      "languageVersion": "3.5"
+    }
+  ]
+}
+'''),
+          ]),
+          d.dir('lib', [
+            d.file('companion.dart', '''
+import 'package:extra_roots_unification_pkg/src/dir_prod_helper.dart';
+
+void companionProd() {
+  dirProdTarget();
+}
+'''),
+          ]),
+          d.dir('test', [
+            d.file('companion_test.dart', '''
+import 'package:extra_roots_unification_pkg/src/dir_test_helper.dart';
+
+void test(String desc, Function body) {}
+
+void main() {
+  test('companion test', () {
+    dirTestTarget();
+  });
+}
+'''),
+          ]),
+        ]).create();
+
+        final options = ZombieOptions(
+          packagePath: d.path('extra_roots_unification_pkg'),
+          extraRoots: [
+            d.path('external_file_root/entrypoint.dart'),
+            d.path('external_companion_pkg'),
+          ],
+          workspaceDiscovery: false,
+        );
+
+        final report = await ZombieEngine(options).analyze();
+        // deadAll is pureZombie
+        check(report.pureZombiesFound).equals(1);
+        check(report.zombies.any((z) => z.name == 'deadAll')).isTrue();
+
+        // dirTestTarget is testedZombie (reached via companion test/ split)
+        check(report.testedZombiesFound).equals(1);
+        final testedZombie = report.zombies.firstWhere(
+          (z) => z.name == 'dirTestTarget',
+        );
+        check(
+          testedZombie.classification,
+        ).equals(ZombieClassification.testedZombie);
+
+        // fileRootTarget and dirProdTarget are LIVE production roots!
+        final zombieNames = report.zombies.map((z) => z.name).toSet();
+        check(zombieNames).not((it) => it.contains('fileRootTarget'));
+        check(zombieNames).not((it) => it.contains('dirProdTarget'));
+      },
+    );
+
+    test(
+      'preserves reachability when sibling consumer uses internal helper from '
+      'lib/src/build/ subdirectory',
+      () async {
+        await d.dir('sibling_build_dir_repo', [
+          d.dir('.git', []),
+          d.dir('packages', [
+            d.dir('core_pkg', [
+              packageConfig('core_pkg'),
+              d.file('pubspec.yaml', '''
+name: core_pkg
+environment:
+  sdk: '^3.5.0'
+'''),
+              d.dir('lib', [
+                d.file('core_pkg.dart', 'export "src/live.dart";'),
+                d.dir('src', [
+                  d.file('live.dart', 'void liveCore() {}'),
+                  d.file('helper.dart', 'void buildGenHelper() {}'),
+                  d.file('dead.dart', 'void deadFunc() {}'),
+                ]),
+              ]),
+            ]),
+            d.dir('generator_pkg', [
+              d.dir('.dart_tool', [
+                d.file('package_config.json', '''
+{
+  "configVersion": 2,
+  "packages": [
+    {
+      "name": "generator_pkg",
+      "rootUri": "../",
+      "packageUri": "lib/",
+      "languageVersion": "3.5"
+    },
+    {
+      "name": "core_pkg",
+      "rootUri": "../../core_pkg",
+      "packageUri": "lib/",
+      "languageVersion": "3.5"
+    }
+  ]
+}
+'''),
+              ]),
+              d.file('pubspec.yaml', '''
+name: generator_pkg
+environment:
+  sdk: '^3.5.0'
+dependencies:
+  core_pkg:
+    path: ../core_pkg
+'''),
+              d.dir('lib', [
+                d.dir('src', [
+                  d.dir('build', [
+                    d.file('gen.dart', '''
+import 'package:core_pkg/src/helper.dart';
+
+void runGen() {
+  buildGenHelper();
+}
+'''),
+                  ]),
+                ]),
+              ]),
+            ]),
+          ]),
+        ]).create();
+
+        final report = await analyzePackage(
+          d.path('sibling_build_dir_repo/packages/core_pkg'),
+        );
+
+        check(report.pureZombiesFound).equals(1);
+        check(report.zombies.single.name).equals('deadFunc');
+        final zombieNames = report.zombies.map((z) => z.name).toSet();
+        check(zombieNames).not((it) => it.contains('buildGenHelper'));
+      },
+    );
   });
 }

@@ -4,6 +4,7 @@ import 'package:analytica/sdk_discovery.dart';
 import 'package:path/path.dart' as p;
 
 import 'models.dart';
+import 'workspace_discovery.dart';
 
 /// Role and classification of a Dart source file within a package layout.
 enum FileRole {
@@ -46,6 +47,8 @@ class PackageTopology {
   final List<String> auxiliaryFiles;
   final List<String> testFiles;
   final Set<String> frameworkRoots;
+  final List<String> extraProductionFiles;
+  final List<String> extraTestFiles;
 
   const PackageTopology({
     required this.packagePath,
@@ -57,6 +60,8 @@ class PackageTopology {
     required this.auxiliaryFiles,
     required this.testFiles,
     this.frameworkRoots = const {},
+    this.extraProductionFiles = const [],
+    this.extraTestFiles = const [],
   });
 
   /// Deprecated alias for [frameworkRoots].
@@ -75,13 +80,18 @@ class PackageTopology {
     ...demonstrationFiles,
     ...auxiliaryFiles,
     ...testFiles,
+    ...extraProductionFiles,
+    ...extraTestFiles,
   ];
 
   /// Resolves the role of a given [relativeFilePath].
   FileRole roleOf(String relativeFilePath) {
     final normalized = p.normalize(relativeFilePath);
-    if (testFiles.contains(normalized)) {
+    if (testFiles.contains(normalized) || extraTestFiles.contains(normalized)) {
       return FileRole.test;
+    }
+    if (extraProductionFiles.contains(normalized)) {
+      return FileRole.other;
     }
     if (normalized.startsWith('lib/src/') ||
         normalized.startsWith('lib/src\\')) {
@@ -184,6 +194,8 @@ class RootHarvester {
     final example = <String>[];
     final auxiliary = <String>[];
     final test = <String>[];
+    final extraProduction = <String>[];
+    final extraTest = <String>[];
 
     for (final entity in rootDir.listSync(
       recursive: true,
@@ -226,26 +238,84 @@ class RootHarvester {
       }
     }
 
-    // Harvest files from extra roots (companion test suites, external roots)
+    // Discover companion consumers in workspace if enabled
+    if (options.workspaceDiscovery) {
+      const discovery = WorkspaceConsumerDiscovery();
+      final discovered = discovery.discoverConsumers(
+        packagePath: options.packagePath,
+        targetPackageName: packageName,
+      );
+      for (final root in discovered.productionRoots) {
+        final relPath = p.relative(root, from: options.packagePath);
+        if (!_isExcludedFromExtraRoot(relPath)) {
+          extraProduction.add(p.normalize(relPath));
+        }
+      }
+      for (final root in discovered.testRoots) {
+        final relPath = p.relative(root, from: options.packagePath);
+        if (!_isExcludedFromExtraRoot(relPath)) {
+          extraTest.add(p.normalize(relPath));
+        }
+      }
+    }
+
+    // Harvest files from extra roots (explicit files or companion directories)
     for (final extraRoot in options.extraRoots) {
       if (extraRoot.trim().isEmpty) continue;
-      final extraDir = Directory(
-        p.normalize(
-          p.isAbsolute(extraRoot)
-              ? extraRoot
-              : p.join(options.packagePath, extraRoot),
-        ),
+      final extraPath = p.normalize(
+        p.isAbsolute(extraRoot)
+            ? extraRoot
+            : p.join(options.packagePath, extraRoot),
       );
+
+      final extraFile = File(extraPath);
+      if (extraFile.existsSync() && extraPath.endsWith('.dart')) {
+        final relPath = p.relative(extraPath, from: options.packagePath);
+        if (!_isExcludedFromExtraRoot(relPath)) {
+          extraProduction.add(p.normalize(relPath));
+        }
+        continue;
+      }
+
+      final extraDir = Directory(extraPath);
       if (!extraDir.existsSync()) continue;
-      for (final entity in extraDir.listSync(
-        recursive: true,
-        followLinks: false,
-      )) {
-        if (entity is! File || !entity.path.endsWith('.dart')) continue;
-        final relPath = p.relative(entity.path, from: options.packagePath);
-        if (_isExcluded(relPath)) continue;
-        final normalized = p.normalize(relPath);
-        test.add(normalized);
+
+      final libSubdir = Directory(p.join(extraPath, 'lib'));
+      final testSubdir = Directory(p.join(extraPath, 'test'));
+
+      if (libSubdir.existsSync() || testSubdir.existsSync()) {
+        if (libSubdir.existsSync()) {
+          for (final entity in libSubdir.listSync(
+            recursive: true,
+            followLinks: false,
+          )) {
+            if (entity is! File || !entity.path.endsWith('.dart')) continue;
+            final relPath = p.relative(entity.path, from: options.packagePath);
+            if (_isExcludedFromExtraRoot(relPath)) continue;
+            extraProduction.add(p.normalize(relPath));
+          }
+        }
+        if (testSubdir.existsSync()) {
+          for (final entity in testSubdir.listSync(
+            recursive: true,
+            followLinks: false,
+          )) {
+            if (entity is! File || !entity.path.endsWith('.dart')) continue;
+            final relPath = p.relative(entity.path, from: options.packagePath);
+            if (_isExcludedFromExtraRoot(relPath)) continue;
+            extraTest.add(p.normalize(relPath));
+          }
+        }
+      } else {
+        for (final entity in extraDir.listSync(
+          recursive: true,
+          followLinks: false,
+        )) {
+          if (entity is! File || !entity.path.endsWith('.dart')) continue;
+          final relPath = p.relative(entity.path, from: options.packagePath);
+          if (_isExcludedFromExtraRoot(relPath)) continue;
+          extraTest.add(p.normalize(relPath));
+        }
       }
     }
 
@@ -258,6 +328,8 @@ class RootHarvester {
       demonstrationFiles: example,
       auxiliaryFiles: auxiliary,
       testFiles: test,
+      extraProductionFiles: extraProduction,
+      extraTestFiles: extraTest,
     );
 
     final frameworkRoots = options.frameworkAdapter.harvestRoots(
@@ -276,6 +348,8 @@ class RootHarvester {
       auxiliaryFiles: auxiliary,
       testFiles: test,
       frameworkRoots: frameworkRoots,
+      extraProductionFiles: extraProduction,
+      extraTestFiles: extraTest,
     );
   }
 
@@ -285,6 +359,25 @@ class RootHarvester {
     if (segments.contains('.dart_tool') ||
         segments.contains('.git') ||
         segments.first == 'build') {
+      return true;
+    }
+
+    if (!options.includeGenerated) {
+      final filename = p.basename(relativePath);
+      if (filename.endsWith('.g.dart') ||
+          filename.endsWith('.freezed.dart') ||
+          filename.endsWith('.mocks.dart')) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  bool _isExcludedFromExtraRoot(String relativePath) {
+    final segments = p.split(p.normalize(relativePath));
+    if (segments.isEmpty) return false;
+    if (segments.contains('.dart_tool') || segments.contains('.git')) {
       return true;
     }
 

@@ -152,6 +152,7 @@ final class ZombieOptions {
   final List<String> ignoreNamePatterns;
   final List<String> extraRoots;
   final bool ignoreExternalBindings;
+  final bool workspaceDiscovery;
 
   const ZombieOptions({
     required this.packagePath,
@@ -168,6 +169,7 @@ final class ZombieOptions {
     this.ignoreNamePatterns = const [],
     this.extraRoots = const [],
     this.ignoreExternalBindings = false,
+    this.workspaceDiscovery = true,
   });
 }
 

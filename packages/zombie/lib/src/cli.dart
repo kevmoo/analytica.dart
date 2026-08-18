@@ -81,6 +81,13 @@ ArgParser buildArgParser() {
           'declarations.',
       defaultsTo: false,
     )
+    ..addFlag(
+      'workspace-discovery',
+      defaultsTo: true,
+      help:
+          'Automatically discover and ingest consumer roots from sibling '
+          'packages in the enclosing workspace.',
+    )
     ..addSdkPathOption()
     ..addFlag(
       'pub-get',
@@ -157,6 +164,7 @@ class ZombieCliRunner {
     final failOnZombies = results.flag('fail-on-zombies');
     final autoPubGet = results.flag('pub-get');
     final ignoreExternalBindings = results.flag('ignore-external-bindings');
+    final workspaceDiscovery = results.flag('workspace-discovery');
     final sdkPath = results.option('sdk-path');
     final jsonOutputPath = results.option('json-output');
     final testSupportPatterns = _parseCommaSeparated(
@@ -176,6 +184,7 @@ class ZombieCliRunner {
       failOnZombies: failOnZombies,
       autoPubGet: autoPubGet,
       ignoreExternalBindings: ignoreExternalBindings,
+      workspaceDiscovery: workspaceDiscovery,
       sdkPath: sdkPath,
       jsonOutputPath: jsonOutputPath,
       testSupportPatterns: testSupportPatterns,

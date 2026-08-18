@@ -48,6 +48,7 @@ void main() {
       check(stdout).contains('--mode');
       check(stdout).contains('--pub-get');
       check(stdout).contains('fail-on-zombies');
+      check(stdout).contains('workspace-discovery');
     });
 
     test('--version displays version and exits 0', () async {
@@ -338,6 +339,96 @@ environment:
         ]);
 
         await proc.shouldExit(0);
+      },
+    );
+
+    test(
+      'supports --no-workspace-discovery to disable workspace discovery',
+      () async {
+        await d.dir('cli_ws_monorepo', [
+          d.dir('.git', []),
+          d.dir('packages', [
+            d.dir('core_pkg', [
+              packageConfig('core_pkg'),
+              d.file('pubspec.yaml', '''
+name: core_pkg
+environment:
+  sdk: '^3.5.0'
+'''),
+              d.dir('lib', [
+                d.file('core_pkg.dart', 'export "src/live.dart";'),
+                d.dir('src', [
+                  d.file('live.dart', 'void live() {}'),
+                  d.file('helper.dart', 'void internalHelper() {}'),
+                ]),
+              ]),
+            ]),
+            d.dir('consumer_pkg', [
+              d.dir('.dart_tool', [
+                d.file('package_config.json', '''
+{
+  "configVersion": 2,
+  "packages": [
+    {
+      "name": "consumer_pkg",
+      "rootUri": "../",
+      "packageUri": "lib/",
+      "languageVersion": "3.5"
+    },
+    {
+      "name": "core_pkg",
+      "rootUri": "../../core_pkg",
+      "packageUri": "lib/",
+      "languageVersion": "3.5"
+    }
+  ]
+}
+'''),
+              ]),
+              d.file('pubspec.yaml', '''
+name: consumer_pkg
+environment:
+  sdk: '^3.5.0'
+dependencies:
+  core_pkg:
+    path: ../core_pkg
+'''),
+              d.dir('lib', [
+                d.file('consumer.dart', '''
+import 'package:core_pkg/src/helper.dart';
+
+void useHelper() {
+  internalHelper();
+}
+'''),
+              ]),
+            ]),
+          ]),
+        ]).create();
+
+        // 1. By default, workspace discovery is active -> helper is protected
+        // (0 pure zombies).
+        final proc1 = await runZombie([
+          '--format=json',
+          d.path('cli_ws_monorepo/packages/core_pkg'),
+        ]);
+        final out1 = await proc1.stdoutStream().join('\n');
+        await proc1.shouldExit(0);
+        final json1 = jsonDecode(out1) as Map<String, dynamic>;
+        final summary1 = json1['summary'] as Map<String, dynamic>;
+        check(summary1['pureZombies']).equals(0);
+
+        // 2. With --no-workspace-discovery, helper is flagged as pure zombie
+        final proc2 = await runZombie([
+          '--format=json',
+          '--no-workspace-discovery',
+          d.path('cli_ws_monorepo/packages/core_pkg'),
+        ]);
+        final out2 = await proc2.stdoutStream().join('\n');
+        await proc2.shouldExit(0);
+        final json2 = jsonDecode(out2) as Map<String, dynamic>;
+        final summary2 = json2['summary'] as Map<String, dynamic>;
+        check(summary2['pureZombies']).equals(1);
       },
     );
   });

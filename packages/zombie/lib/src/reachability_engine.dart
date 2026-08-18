@@ -34,15 +34,31 @@ class ZombieEngine {
     final topology = harvester.harvestTopology();
 
     final absolutePackagePath = p.normalize(p.absolute(options.packagePath));
-    final extraRootPaths = options.extraRoots
-        .map(
-          (r) =>
-              p.normalize(p.isAbsolute(r) ? r : p.join(absolutePackagePath, r)),
-        )
-        .where((path) => Directory(path).existsSync())
-        .toList();
+    final extraPaths = <String>{};
+    for (final extra in options.extraRoots) {
+      if (extra.trim().isEmpty) continue;
+      final resolved = p.normalize(
+        p.isAbsolute(extra) ? extra : p.join(absolutePackagePath, extra),
+      );
+      if (FileSystemEntity.typeSync(resolved) !=
+          FileSystemEntityType.notFound) {
+        extraPaths.add(resolved);
+      }
+    }
+    for (final file in [
+      ...topology.extraProductionFiles,
+      ...topology.extraTestFiles,
+    ]) {
+      final resolved = p.normalize(
+        p.isAbsolute(file) ? file : p.join(absolutePackagePath, file),
+      );
+      if (FileSystemEntity.typeSync(resolved) !=
+          FileSystemEntityType.notFound) {
+        extraPaths.add(resolved);
+      }
+    }
     final contextHelper = AnalysisContextHelper(
-      includedPaths: [absolutePackagePath, ...extraRootPaths],
+      includedPaths: [absolutePackagePath, ...extraPaths],
       sdkPath: options.sdkPath,
     );
 
@@ -462,6 +478,13 @@ class ZombieEngine {
     for (final node in allNodes) {
       if (topology.roleOf(node.relativeFilePath) == FileRole.test) {
         testRoots.add(node.id);
+      }
+    }
+
+    // 3.7 Extra and companion production roots.
+    for (final node in allNodes) {
+      if (topology.extraProductionFiles.contains(node.relativeFilePath)) {
+        productionRoots.add(node.id);
       }
     }
 

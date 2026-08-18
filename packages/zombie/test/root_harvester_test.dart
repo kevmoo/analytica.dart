@@ -223,5 +223,78 @@ targets:
         check(topology.frameworkRoots).contains('factorySingleQuoted');
       },
     );
+
+    test('harvests companion roots via workspace discovery', () async {
+      await d.dir('harvester_ws', [
+        d.dir('.git', []),
+        d.dir('packages', [
+          d.dir('target_pkg', [
+            packageConfig('target_pkg'),
+            d.file('pubspec.yaml', 'name: target_pkg\n'),
+            d.dir('lib', [d.file('target.dart', 'void main() {}')]),
+          ]),
+          d.dir('consumer_pkg', [
+            packageConfig('consumer_pkg'),
+            d.file('pubspec.yaml', '''
+name: consumer_pkg
+dependencies:
+  target_pkg: any
+'''),
+            d.dir('lib', [d.file('consumer.dart', 'void fn() {}')]),
+            d.dir('test', [d.file('consumer_test.dart', 'void fn() {}')]),
+          ]),
+        ]),
+      ]).create();
+
+      final options = ZombieOptions(
+        packagePath: d.path('harvester_ws/packages/target_pkg'),
+        workspaceDiscovery: true,
+      );
+
+      final harvester = RootHarvester(options);
+      final topology = harvester.harvestTopology();
+
+      check(topology.extraProductionFiles).length.equals(1);
+      check(topology.extraProductionFiles.single).contains('consumer.dart');
+      check(topology.extraTestFiles).length.equals(1);
+      check(topology.extraTestFiles.single).contains('consumer_test.dart');
+    });
+
+    test(
+      'harvests explicit .dart file as extraProductionFiles and splits lib/test directories',
+      () async {
+        await d.dir('harvester_extra_roots', [
+          packageConfig('harvester_extra_roots'),
+          d.file('pubspec.yaml', 'name: harvester_extra_roots\n'),
+          d.dir('lib', [d.file('main.dart', 'void main() {}')]),
+        ]).create();
+
+        await d.dir('external_file', [
+          d.file('standalone.dart', 'void standalone() {}'),
+        ]).create();
+
+        await d.dir('external_dir', [
+          d.dir('lib', [d.file('prod.dart', 'void prod() {}')]),
+          d.dir('test', [d.file('t.dart', 'void t() {}')]),
+        ]).create();
+
+        final options = ZombieOptions(
+          packagePath: d.path('harvester_extra_roots'),
+          extraRoots: [
+            d.path('external_file/standalone.dart'),
+            d.path('external_dir'),
+          ],
+          workspaceDiscovery: false,
+        );
+
+        final harvester = RootHarvester(options);
+        final topology = harvester.harvestTopology();
+
+        check(
+          topology.extraProductionFiles,
+        ).length.equals(2); // standalone.dart & prod.dart
+        check(topology.extraTestFiles).length.equals(1); // t.dart
+      },
+    );
   });
 }
