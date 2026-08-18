@@ -37,7 +37,7 @@ ArgParser buildArgParser() {
       'mode',
       abbr: 'm',
       help: 'Package analysis mode.',
-      allowed: ['library', 'closed-app', 'closedApp'],
+      allowed: ['library', 'closed-app'],
       defaultsTo: 'library',
     )
     ..addFlag(

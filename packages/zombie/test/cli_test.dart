@@ -59,7 +59,7 @@ void main() {
       check(stdout).contains('zombie version: 0.1.0');
     });
 
-    test('--mode accepts closed-app and closedApp', () async {
+    test('--mode accepts closed-app', () async {
       await d.dir('mode_pkg', [
         packageConfig('mode_pkg'),
         d.file('pubspec.yaml', '''

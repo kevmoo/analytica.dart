@@ -151,7 +151,7 @@ void main() {
 
       check(AnalysisMode.fromString('library')).equals(AnalysisMode.library);
       check(
-        AnalysisMode.fromString('closedApp'),
+        AnalysisMode.fromString('closed-app'),
       ).equals(AnalysisMode.closedApp);
 
       check(OutputFormat.fromString('markdown')).equals(OutputFormat.markdown);

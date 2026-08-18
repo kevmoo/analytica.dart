@@ -107,7 +107,7 @@ enum AnalysisMode {
 
   /// Closed application universe: Unreferenced exports in `lib/**` can be
   /// flagged if not reached by executables or other roots.
-  closedApp('closedApp');
+  closedApp('closed-app');
 
   final String value;
 
@@ -115,7 +115,7 @@ enum AnalysisMode {
 
   static AnalysisMode fromString(String value) => switch (value) {
     'library' => library,
-    'closed-app' || 'closedApp' => closedApp,
+    'closed-app' => closedApp,
     _ => throw ArgumentError.value(value, 'value', 'Unknown AnalysisMode'),
   };
 }
