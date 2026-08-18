@@ -36,20 +36,20 @@ identifying unused top-level declarations, classes, functions, and variables.
 Run the analyzer directly in any Dart or Flutter project:
 
 ```bash
-dart run zombie
+dart run zombie@
 ```
 
 Analyze a closed standalone application:
 
 ```bash
-dart run zombie --mode=closed-app
+dart run zombie@ --mode=closed-app
 ```
 
 Output results as JSON or Markdown:
 
 ```bash
-dart run zombie --format=json
-dart run zombie --format=markdown
+dart run zombie@ --format=json
+dart run zombie@ --format=markdown
 ```
 
 ### Library API
@@ -70,12 +70,3 @@ void main() async {
   }
 }
 ```
-
-## 📚 Documentation & Specifications
-
-Explore in-depth documentation in the [`doc/`](doc/) directory:
-
-- 📋 [Product Requirements & Architecture](doc/prd.md): Overview and design goals.
-- 📐 [Technical Approach & Engine Design](doc/approach.md): Reachability graph and AST traversal.
-- 🏷️ [Taxonomy: Top-Level Declarations](doc/taxonomy.md): Classification rules and root types.
-- 🔬 [Taxonomy: Internal Members & Enums](doc/taxonomy_phase2.md): Sub-member analysis specification.
