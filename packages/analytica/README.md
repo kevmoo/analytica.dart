@@ -31,13 +31,6 @@ helpers for Dart CLI tools and analyzers.
 
 ## ⚡ Usage
 
-Add `analytica` to your `pubspec.yaml`:
-
-```yaml
-dependencies:
-  analytica: ^0.1.0
-```
-
 ### SDK Discovery
 
 ```dart
@@ -57,8 +50,7 @@ void main() {
 import 'package:analytica/git.dart';
 
 void main() async {
-  final gitService = GitDiffService();
-  final diffs = await gitService.getDiff(baseRef: 'origin/main');
+  final diffs = await GitDiffService().getDiff(baseRef: 'origin/main');
 
   for (final fileDiff in diffs) {
     print('Modified file: ${fileDiff.path}');
