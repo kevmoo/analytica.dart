@@ -29,7 +29,7 @@ enum FileRole {
   /// Other files outside standard topologies.
   other;
 
-  /// Whether declarations in this file are candidates for zombie detection.
+  /// Whether declarations in this file are candidates for undead detection.
   bool get isCandidateTarget => switch (this) {
     internalSrc || executable || auxiliary => true,
     _ => false,

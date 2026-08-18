@@ -5,7 +5,7 @@ helpers for Dart CLI tools and analyzers.
 > This package provides foundational infrastructure for tools in the
 > [`analytica.dart`](https://github.com/kevmoo/analytica.dart) monorepo (such as
 > [`pkg:cognitive_complexity`](https://pub.dev/packages/cognitive_complexity) and
-> `pkg:zombie`). APIs are primarily tailored for internal tool composition and
+> `pkg:undead`). APIs are primarily tailored for internal tool composition and
 > may evolve with tool requirements.
 
 ## ✨ Features

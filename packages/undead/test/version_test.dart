@@ -7,7 +7,12 @@ import 'package:yaml/yaml.dart';
 
 void main() {
   test('undeadVersion matches pubspec.yaml', () {
-    final pubspecFile = File('pubspec.yaml');
+    final pubspecFile =
+        File('pubspec.yaml').existsSync() &&
+            (loadYaml(File('pubspec.yaml').readAsStringSync()) as YamlMap)
+                .containsKey('version')
+        ? File('pubspec.yaml')
+        : File('packages/undead/pubspec.yaml');
     check(pubspecFile.existsSync()).isTrue();
 
     final content = pubspecFile.readAsStringSync();

@@ -25,8 +25,8 @@ enum UndeadClassification {
   const UndeadClassification(this.jsonValue, this.displayName);
 
   static UndeadClassification fromJson(String value) => switch (value) {
-    'pureUndead' || 'pureUndead' => pureUndead,
-    'testedUndead' || 'testedUndead' => testedUndead,
+    'pureUndead' || 'pureZombie' => pureUndead,
+    'testedUndead' || 'testedZombie' => testedUndead,
     'coInvokedHazard' => coInvokedHazard,
     _ => throw ArgumentError.value(
       value,
@@ -68,7 +68,7 @@ enum DeclarationKind {
   };
 }
 
-/// Suggested remediation action for a detected zombie.
+/// Suggested remediation action for a detected undead declaration.
 abstract final class SuggestedAction {
   static const String delete = 'delete';
   static const String deleteWithOrphanTests = 'deleteWithOrphanTests';

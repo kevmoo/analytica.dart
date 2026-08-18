@@ -11,9 +11,9 @@ For Phase 2/3 internal class members and enum pruning, see [taxonomy_phase2.md](
 
 ## 2. User Scenarios & Personas
 
-### 2.1 Primary User Flow: Agent-First (`/zombies`)
-* **Trigger**: Developer types `/zombies` (or runs the `zombie` skill) in their IDE agent (Jetski, Claude Code, Gemini CLI, Cursor).
-* **Execution**: The agent invokes the `zombie` CLI against the target codebase.
+### 2.1 Primary User Flow: Agent-First (`/undead`)
+* **Trigger**: Developer types `/undead` (or runs the `undead` skill) in their IDE agent (Jetski, Claude Code, Gemini CLI, Cursor).
+* **Execution**: The agent invokes the `undead` CLI against the target codebase.
 * **Token Efficiency**: The tool returns a structured, minimal-token representation so the agent can quickly inspect findings, propose deletions/refactors, and remediate dead code without blowing context limits.
 * **Output Modes**:
   * **JSON (`--format=json`)**: Machine-readable structured payload for agent parsing and programmatic workflows.
@@ -21,10 +21,12 @@ For Phase 2/3 internal class members and enum pruning, see [taxonomy_phase2.md](
 
 ```mermaid
 flowchart LR
-    User["User in IDE (/zombies)"] --> Agent["Agent Skill"]
-    Agent --> CLI["zombie CLI --format=json"]
-    CLI --> Engine["Package Reachability Engine"]
-    Engine --> Output["Structured Diagnostic Payload"]
+    User["User in IDE (/undead)"] --> Agent["Agent Skill"]
+    Agent --> CLI["undead CLI --format=json"]
+    Engine["Package Reachability Engine"]
+    Output["Structured Diagnostic Payload"]
+    CLI --> Engine
+    Engine --> Output
     Output --> Agent
     Agent --> Actions["Propose Safe Deletions / Auto-Fixes"]
 ```
@@ -75,11 +77,11 @@ Designed for low token overhead and actionable precision, including co-invoked h
   "package": "my_package",
   "summary": {
     "totalDeclarations": 142,
-    "pureUndeads": 2,
-    "testedUndeads": 1,
+    "pureUndead": 2,
+    "testedUndead": 1,
     "coInvokedHazards": 1
   },
-  "zombies": [
+  "undead": [
     {
       "id": "calculateLegacyHash",
       "name": "calculateLegacyHash",
@@ -116,10 +118,10 @@ Designed for low token overhead and actionable precision, including co-invoked h
 ```
 
 ### 4.2 Markdown Output Model (Human / Reviewer)
-* High-level summary of total scanned declarations vs zombies found.
+* High-level summary of total scanned declarations vs undead declarations found.
 * Categorized tables:
-  * **Pure Zombies** (Safe to delete).
-  * **Tested Zombies & Orphan Tests** (Delete implementation + delete associated unit test blocks).
+  * **Pure Undead** (Safe to delete).
+  * **Tested Undead & Orphan Tests** (Delete implementation + delete associated unit test blocks).
   * **Co-Invoked Test Hazards** (Require manual refactoring).
 
 ---

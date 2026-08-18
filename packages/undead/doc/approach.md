@@ -108,7 +108,7 @@ export 'src/live.dart';
   ]).create();
 
   final report = await analyzePackage(d.path('pkg'));
-  check(report.zombies).single.which((it) => it
+  check(report.undead).single.which((it) => it
     ..name.equals('deadFunc')
     ..classification.equals(UndeadClassification.pureUndead)
   );
@@ -120,4 +120,4 @@ CLI integration tests launch `bin/undead.dart` via `TestProcess.start(Platform.r
 * `--format=json` payload schema conformance.
 * `--format=markdown` table rendering.
 * `--example-mode=demonstration` vs `strict`.
-* `--fail-on-zombies` exit code handling (0 vs 1).
+* `--fail-on-undead` exit code handling (0 vs 1).
