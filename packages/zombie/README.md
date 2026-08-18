@@ -1,15 +1,15 @@
 Deterministic reachability and dead/unused declaration analysis for Dart and
 Flutter packages.
 
-`zombie` performs whole-package AST analysis using `package:analyzer` to build a
-reachability graph from known entrypoints to all internal declarations,
+`zombie` performs whole-package AST analysis using `package:analyzer` to build
+a reachability graph from known entrypoints to all internal declarations,
 identifying unused top-level declarations, classes, functions, and variables.
 
 ## ✨ Features
 
 - **Dual Analysis Modes**:
-  - **Open-World** (Default): Treats all non-`src` `lib/**` exports as public API
-    roots. Ideal for reusable libraries and packages.
+  - **Open-World** (Default): Treats all non-`src` `lib/**` exports as public
+    API roots. Ideal for reusable libraries and packages.
   - **Closed-App** (`--mode=closed-app`): Traces execution strictly from
     executable entrypoints (`bin/**`, `lib/main.dart`, `lib/main_*.dart`).
 - **Framework Adapters**:

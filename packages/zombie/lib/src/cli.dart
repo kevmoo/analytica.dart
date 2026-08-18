@@ -9,7 +9,7 @@ import 'formatters/markdown_formatter.dart';
 import 'models.dart';
 import 'reachability_engine.dart';
 
-const String zombieVersion = '0.1.0-dev';
+const String zombieVersion = '0.1.0';
 
 /// Configures and parses CLI arguments for `pkg:zombie`.
 ArgParser buildArgParser() {
@@ -37,7 +37,7 @@ ArgParser buildArgParser() {
       'mode',
       abbr: 'm',
       help: 'Package analysis mode.',
-      allowed: ['library', 'closedApp'],
+      allowed: ['library', 'closed-app', 'closedApp'],
       defaultsTo: 'library',
     )
     ..addFlag(

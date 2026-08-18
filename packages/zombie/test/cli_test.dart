@@ -56,7 +56,22 @@ void main() {
       final stdout = await proc.stdoutStream().join('\n');
       await proc.shouldExit(0);
 
-      check(stdout).contains('zombie version: 0.1.0-dev');
+      check(stdout).contains('zombie version: 0.1.0');
+    });
+
+    test('--mode accepts closed-app and closedApp', () async {
+      await d.dir('mode_pkg', [
+        packageConfig('mode_pkg'),
+        d.file('pubspec.yaml', '''
+name: mode_pkg
+environment:
+  sdk: '^3.5.0'
+'''),
+        d.dir('lib', [d.file('main.dart', 'void main() {}')]),
+      ]).create();
+
+      final proc = await runZombie(['--mode=closed-app', d.path('mode_pkg')]);
+      await proc.shouldExit(0);
     });
 
     test('invalid argument exits with code 64 (usage)', () async {

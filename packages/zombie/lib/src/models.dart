@@ -115,7 +115,7 @@ enum AnalysisMode {
 
   static AnalysisMode fromString(String value) => switch (value) {
     'library' => library,
-    'closedApp' => closedApp,
+    'closed-app' || 'closedApp' => closedApp,
     _ => throw ArgumentError.value(value, 'value', 'Unknown AnalysisMode'),
   };
 }
