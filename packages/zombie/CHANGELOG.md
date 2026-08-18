@@ -1,3 +1,6 @@
-## 0.1.0-wip
+## 0.1.0
 
-- Initial work-in-progress release.
+- Initial release of reachability and dead/unused declaration analyzer.
+- Support for CLI execution, package entrypoint harvesting, and Flutter/test framework adapters.
+- Deterministic analysis modes: open-world (libraries) and closed-app (standalone/executables).
+- Custom suppression directives: `// zombie:ignore` and `// zombie:ignore_for_file`.
