@@ -1,3 +1,3 @@
-## 0.1.0-wip
+## 0.1.0
 
-- Initial work-in-progress release.
+- Initial release of core utilities, SDK discovery, Git integration, and CI reporting.

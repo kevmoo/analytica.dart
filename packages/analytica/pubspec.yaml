@@ -1,6 +1,6 @@
 name: analytica
 description: Core utilities, SDK discovery, Git integration, and CI reporting for Dart analysis tools.
-version: 0.1.0-wip
+version: 0.1.0
 repository: https://github.com/kevmoo/analytica.dart/tree/main/packages/analytica
 
 resolution: workspace
