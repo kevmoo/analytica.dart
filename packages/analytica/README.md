@@ -17,8 +17,10 @@ helpers for Dart CLI tools and analyzers.
   - Discovers `.dart_tool/package_config.json` across parent directories and
     Pub Workspaces.
 - **AST & Analysis Utilities (`package:analytica/analyzer.dart`)**:
-  - `ContextHelper`: Lightweight setup for `package:analyzer` analysis contexts.
-  - `CommentParser`: Parses file-level and declaration-level ignore directives.
+  - `AnalysisContextHelper`: Lightweight setup for `package:analyzer` analysis
+    contexts.
+  - `CommentDirectiveParser`: Parses file-level and declaration-level ignore
+    directives.
   - `AstHelpers`: Traversal utilities for enclosing declarations and token spans.
   - `WildcardPattern`: Zero-dependency glob-like pattern matcher (`*`, `?`).
 - **Git Integration (`package:analytica/git.dart`)**:
@@ -50,11 +52,11 @@ void main() {
 import 'package:analytica/git.dart';
 
 void main() async {
-  final diffs = await GitDiffService().getDiff(baseRef: 'origin/main');
+  final diffs = await GitDiffService().getParsedDiff('origin/main');
 
   for (final fileDiff in diffs) {
     print('Modified file: ${fileDiff.path}');
-    print('Changed lines: ${fileDiff.modifiedLines}');
+    print('Changed ranges: ${fileDiff.addedOrModifiedLineRanges}');
   }
 }
 ```
