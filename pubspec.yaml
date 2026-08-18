@@ -7,4 +7,4 @@ environment:
 workspace:
   - packages/analytica
   - packages/cognitive_complexity
-  - packages/zombie
+  - packages/undead

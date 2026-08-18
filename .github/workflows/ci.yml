@@ -57,8 +57,8 @@ jobs:
         working-directory: packages/cognitive_complexity
         run: dart test
         if: always() && steps.install.outcome == 'success'
-      - name: Run tests (zombie)
-        working-directory: packages/zombie
+      - name: Run tests (undead)
+        working-directory: packages/undead
         run: dart test
         if: always() && steps.install.outcome == 'success'
 
