@@ -7,12 +7,49 @@ class MarkdownFormatter {
 
   String format(UndeadReport report) {
     final buffer = StringBuffer();
-    buffer.writeln('# Undead Code Analysis: `${report.package}`');
-    buffer.writeln();
+    buffer.writeln('# Undead Code Analysis: `${report.package}`\n');
 
-    // Summary Section
-    buffer.writeln('### Summary');
-    buffer.writeln();
+    _writeSummary(buffer, report);
+
+    if (report.undead.isEmpty) {
+      buffer.writeln('🎉 **No undead declarations detected across package.**');
+      return buffer.toString();
+    }
+
+    _writePureUndead(
+      buffer,
+      report.undead
+          .where((z) => z.classification == UndeadClassification.pureUndead)
+          .toList(),
+    );
+    _writeTestedUndead(
+      buffer,
+      report.undead
+          .where((z) => z.classification == UndeadClassification.testedUndead)
+          .toList(),
+    );
+    _writeCoInvokedHazards(
+      buffer,
+      report.undead
+          .where(
+            (z) => z.classification == UndeadClassification.coInvokedHazard,
+          )
+          .toList(),
+    );
+    _writePrivateCandidates(
+      buffer,
+      report.undead
+          .where(
+            (z) => z.classification == UndeadClassification.privateCandidate,
+          )
+          .toList(),
+    );
+
+    return buffer.toString();
+  }
+
+  static void _writeSummary(StringBuffer buffer, UndeadReport report) {
+    buffer.writeln('### Summary\n');
     buffer.writeln('| Metric | Count |');
     buffer.writeln('| :--- | :--- |');
     buffer.writeln(
@@ -29,103 +66,95 @@ class MarkdownFormatter {
       );
     }
     buffer.writeln();
+  }
 
-    if (report.undead.isEmpty) {
-      buffer.writeln('🎉 **No undead declarations detected across package.**');
-      return buffer.toString();
-    }
-
-    final pureUndead = report.undead
-        .where((z) => z.classification == UndeadClassification.pureUndead)
-        .toList();
-    final testedUndead = report.undead
-        .where((z) => z.classification == UndeadClassification.testedUndead)
-        .toList();
-    final coInvokedHazards = report.undead
-        .where((z) => z.classification == UndeadClassification.coInvokedHazard)
-        .toList();
-    final privateCandidates = report.undead
-        .where((z) => z.classification == UndeadClassification.privateCandidate)
-        .toList();
-
-    if (pureUndead.isNotEmpty) {
-      buffer.writeln('## Pure Undead (Safe to Delete)');
-      buffer.writeln();
-      buffer.writeln('| Symbol | Kind | Location | Suggested Action |');
-      buffer.writeln('| :--- | :--- | :--- | :--- |');
-      for (final z in pureUndead) {
-        final loc = '${z.file}:${z.line}:${z.column}';
-        buffer.writeln(
-          '| `${z.name}` | ${z.kind.jsonValue} | `$loc` | Delete declaration |',
-        );
-      }
-      buffer.writeln();
-    }
-
-    if (testedUndead.isNotEmpty) {
-      buffer.writeln('## Tested Undead (Orphan Tests)');
-      buffer.writeln();
+  static void _writePureUndead(
+    StringBuffer buffer,
+    List<UndeadFinding> findings,
+  ) {
+    if (findings.isEmpty) return;
+    buffer.writeln('## Pure Undead (Safe to Delete)\n');
+    buffer.writeln('| Symbol | Kind | Location | Suggested Action |');
+    buffer.writeln('| :--- | :--- | :--- | :--- |');
+    for (final z in findings) {
+      final loc = '${z.file}:${z.line}:${z.column}';
       buffer.writeln(
-        '| Symbol | Kind | Location | Orphan Test Sites | Suggested Action |',
+        '| `${z.name}` | ${z.kind.jsonValue} | `$loc` | Delete declaration |',
       );
-      buffer.writeln('| :--- | :--- | :--- | :--- | :--- |');
-      for (final z in testedUndead) {
-        final loc = '${z.file}:${z.line}:${z.column}';
-        final testSites = (z.orphanTests ?? [])
-            .map((t) {
-              final desc = t.description != null ? ' ("${t.description}")' : '';
-              return '`${t.file}:${t.line}`$desc';
-            })
-            .join('<br>');
-        buffer.writeln(
-          '| `${z.name}` | ${z.kind.jsonValue} | `$loc` | $testSites | '
-          'Delete declaration + orphan test block |',
-        );
-      }
-      buffer.writeln();
     }
+    buffer.writeln();
+  }
 
-    if (coInvokedHazards.isNotEmpty) {
+  static void _writeTestedUndead(
+    StringBuffer buffer,
+    List<UndeadFinding> findings,
+  ) {
+    if (findings.isEmpty) return;
+    buffer.writeln('## Tested Undead (Orphan Tests)\n');
+    buffer.writeln(
+      '| Symbol | Kind | Location | Orphan Test Sites | Suggested Action |',
+    );
+    buffer.writeln('| :--- | :--- | :--- | :--- | :--- |');
+    for (final z in findings) {
+      final loc = '${z.file}:${z.line}:${z.column}';
+      final testSites = (z.orphanTests ?? [])
+          .map((t) {
+            final desc = t.description != null ? ' ("${t.description}")' : '';
+            return '`${t.file}:${t.line}`$desc';
+          })
+          .join('<br>');
       buffer.writeln(
-        '## Co-Invoked Test Hazards (Manual Refactoring Required)',
+        '| `${z.name}` | ${z.kind.jsonValue} | `$loc` | $testSites | '
+        'Delete declaration + orphan test block |',
       );
-      buffer.writeln();
+    }
+    buffer.writeln();
+  }
+
+  static void _writeCoInvokedHazards(
+    StringBuffer buffer,
+    List<UndeadFinding> findings,
+  ) {
+    if (findings.isEmpty) return;
+    buffer.writeln(
+      '## Co-Invoked Test Hazards (Manual Refactoring Required)\n',
+    );
+    buffer.writeln(
+      '| Symbol | Kind | Location | Co-Invoked Test Sites | '
+      'Suggested Action |',
+    );
+    buffer.writeln('| :--- | :--- | :--- | :--- | :--- |');
+    for (final z in findings) {
+      final loc = '${z.file}:${z.line}:${z.column}';
+      final testSites = (z.orphanTests ?? [])
+          .map((t) {
+            final desc = t.description != null ? ' ("${t.description}")' : '';
+            return '`${t.file}:${t.line}`$desc';
+          })
+          .join('<br>');
       buffer.writeln(
-        '| Symbol | Kind | Location | Co-Invoked Test Sites | '
-        'Suggested Action |',
+        '| `${z.name}` | ${z.kind.jsonValue} | `$loc` | $testSites | '
+        'Manual refactoring required |',
       );
-      buffer.writeln('| :--- | :--- | :--- | :--- | :--- |');
-      for (final z in coInvokedHazards) {
-        final loc = '${z.file}:${z.line}:${z.column}';
-        final testSites = (z.orphanTests ?? [])
-            .map((t) {
-              final desc = t.description != null ? ' ("${t.description}")' : '';
-              return '`${t.file}:${t.line}`$desc';
-            })
-            .join('<br>');
-        buffer.writeln(
-          '| `${z.name}` | ${z.kind.jsonValue} | `$loc` | $testSites | '
-          'Manual refactoring required |',
-        );
-      }
-      buffer.writeln();
     }
+    buffer.writeln();
+  }
 
-    if (privateCandidates.isNotEmpty) {
-      buffer.writeln('## Private Candidates (Suggest Library-Private)');
-      buffer.writeln();
-      buffer.writeln('| Symbol | Kind | Location | Suggested Action |');
-      buffer.writeln('| :--- | :--- | :--- | :--- |');
-      for (final z in privateCandidates) {
-        final loc = '${z.file}:${z.line}:${z.column}';
-        buffer.writeln(
-          '| `${z.name}` | ${z.kind.jsonValue} | `$loc` | '
-          'Make library-private (prefix with `_`) |',
-        );
-      }
-      buffer.writeln();
+  static void _writePrivateCandidates(
+    StringBuffer buffer,
+    List<UndeadFinding> findings,
+  ) {
+    if (findings.isEmpty) return;
+    buffer.writeln('## Private Candidates (Suggest Library-Private)\n');
+    buffer.writeln('| Symbol | Kind | Location | Suggested Action |');
+    buffer.writeln('| :--- | :--- | :--- | :--- |');
+    for (final z in findings) {
+      final loc = '${z.file}:${z.line}:${z.column}';
+      buffer.writeln(
+        '| `${z.name}` | ${z.kind.jsonValue} | `$loc` | '
+        'Make library-private (prefix with `_`) |',
+      );
     }
-
-    return buffer.toString();
+    buffer.writeln();
   }
 }

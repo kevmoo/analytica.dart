@@ -90,44 +90,12 @@ class UndeadEngine {
       final role = topology.roleOf(relPath);
 
       // Collect conditional imports in directives.
-      for (final directive in unitResult.unit.directives) {
-        if (directive is NamespaceDirective &&
-            directive.configurations.isNotEmpty) {
-          final targets = <String>{};
-          final defaultUri = directive.uri.stringValue;
-          if (defaultUri != null && defaultUri.isNotEmpty) {
-            final resolvedTarget = _resolveUri(
-              relPath,
-              defaultUri,
-              topology.packageName,
-            );
-            if (resolvedTarget != null) {
-              targets.add(resolvedTarget);
-            }
-          }
-          for (final config in directive.configurations) {
-            final uriStr = config.uri.stringValue;
-            if (uriStr != null && uriStr.isNotEmpty) {
-              final resolvedTarget = _resolveUri(
-                relPath,
-                uriStr,
-                topology.packageName,
-              );
-              if (resolvedTarget != null) {
-                targets.add(resolvedTarget);
-              }
-            }
-          }
-          if (targets.isNotEmpty) {
-            final allGroupFiles = {relPath, ...targets};
-            for (final file in allGroupFiles) {
-              conditionalTargets
-                  .putIfAbsent(file, () => {})
-                  .addAll(allGroupFiles.where((f) => f != file));
-            }
-          }
-        }
-      }
+      _collectConditionalImports(
+        directives: unitResult.unit.directives,
+        relPath: relPath,
+        packageName: topology.packageName,
+        conditionalTargets: conditionalTargets,
+      );
 
       // Collect file-level export directive references.
       final fileDirectivesExtractor = ElementReferenceExtractor(
@@ -340,19 +308,13 @@ class UndeadEngine {
           final targetNode = resolveNodeForElement(refElem);
           if (targetNode != null && targetNode.id != node.id) {
             node.outgoingTargetIds.add(targetNode.id);
-            if (isTestNode) {
-              testReferencedIds.add(targetNode.id);
-              crossLibraryReferenced.add(targetNode.id);
-            } else {
-              final isCrossLibrary =
-                  (node.element?.library != null &&
-                      targetNode.element?.library != null)
-                  ? node.element!.library != targetNode.element!.library
-                  : node.relativeFilePath != targetNode.relativeFilePath;
-              if (isCrossLibrary) {
-                crossLibraryReferenced.add(targetNode.id);
-              }
-            }
+            _trackEdge(
+              node,
+              targetNode,
+              isTestNode: isTestNode,
+              crossLibraryReferenced: crossLibraryReferenced,
+              testReferencedIds: testReferencedIds,
+            );
           }
         }
       }
@@ -365,19 +327,13 @@ class UndeadEngine {
             if (parentNode.isSealed) {
               sealedSubtypes.putIfAbsent(parentNode.id, () => {}).add(node.id);
             }
-            if (isTestNode) {
-              testReferencedIds.add(parentNode.id);
-              crossLibraryReferenced.add(parentNode.id);
-            } else {
-              final isCrossLibrary =
-                  (node.element?.library != null &&
-                      parentNode.element?.library != null)
-                  ? node.element!.library != parentNode.element!.library
-                  : node.relativeFilePath != parentNode.relativeFilePath;
-              if (isCrossLibrary) {
-                crossLibraryReferenced.add(parentNode.id);
-              }
-            }
+            _trackEdge(
+              node,
+              parentNode,
+              isTestNode: isTestNode,
+              crossLibraryReferenced: crossLibraryReferenced,
+              testReferencedIds: testReferencedIds,
+            );
           }
         }
       }
@@ -686,48 +642,17 @@ class UndeadEngine {
     }
 
     var privateCandidates = 0;
-
     if (options.suggestPrivate) {
-      for (final node in allNodes) {
-        final role = topology.roleOf(node.relativeFilePath);
-        final isCandidateScope = switch (role) {
-          FileRole.internalSrc => true,
-          FileRole.publicLib when options.mode == AnalysisMode.closedApp =>
-            true,
-          _ => false,
-        };
-
-        if (!isCandidateScope) continue;
-        if (node.name.startsWith('_')) continue;
-        if (node.isIgnored) continue;
-        if (node.isNativeRoot) continue;
-        if (node.isExternalBinding) continue;
-        if (node.isTestSupport) continue;
-        if (WildcardPattern.anyMatch(_ignoreNameWildcards, node.name)) continue;
-        if (WildcardPattern.anyMatch(_testSupportWildcards, node.name)) {
-          continue;
-        }
-        if (exportedNodeIds.contains(node.id)) continue;
-        if (!productionLive.contains(node.id)) continue;
-        if (crossLibraryReferenced.contains(node.id)) continue;
-        if (testReferencedIds.contains(node.id)) continue;
-
-        privateCandidates++;
-        findings.add(
-          UndeadFinding(
-            id: node.name,
-            name: node.name,
-            kind: node.kind,
-            file: node.relativeFilePath,
-            line: node.line,
-            column: node.column,
-            length: node.length,
-            classification: UndeadClassification.privateCandidate,
-            suggestedAction: SuggestedAction.makePrivate,
-            isExternalBinding: node.isExternalBinding,
-          ),
-        );
-      }
+      final candidates = _collectPrivateCandidates(
+        allNodes: allNodes,
+        topology: topology,
+        exportedNodeIds: exportedNodeIds,
+        productionLive: productionLive,
+        crossLibraryReferenced: crossLibraryReferenced,
+        testReferencedIds: testReferencedIds,
+      );
+      privateCandidates = candidates.length;
+      findings.addAll(candidates);
     }
 
     findings.sort((a, b) {
@@ -749,6 +674,144 @@ class UndeadEngine {
       undead: findings,
     );
   }
+
+  static Set<String> _extractDirectiveTargets(
+    NamespaceDirective directive,
+    String relPath,
+    String packageName,
+  ) {
+    final targets = <String>{};
+    final defaultUri = directive.uri.stringValue;
+    if (defaultUri != null && defaultUri.isNotEmpty) {
+      final resolved = _resolveUri(relPath, defaultUri, packageName);
+      if (resolved != null) {
+        targets.add(resolved);
+      }
+    }
+    for (final config in directive.configurations) {
+      final uriStr = config.uri.stringValue;
+      if (uriStr != null && uriStr.isNotEmpty) {
+        final resolved = _resolveUri(relPath, uriStr, packageName);
+        if (resolved != null) {
+          targets.add(resolved);
+        }
+      }
+    }
+    return targets;
+  }
+
+  static void _collectConditionalImports({
+    required List<Directive> directives,
+    required String relPath,
+    required String packageName,
+    required Map<String, Set<String>> conditionalTargets,
+  }) {
+    for (final directive in directives) {
+      if (directive is! NamespaceDirective ||
+          directive.configurations.isEmpty) {
+        continue;
+      }
+      final targets = _extractDirectiveTargets(directive, relPath, packageName);
+      if (targets.isEmpty) continue;
+
+      final allGroupFiles = {relPath, ...targets};
+      for (final file in allGroupFiles) {
+        conditionalTargets
+            .putIfAbsent(file, () => {})
+            .addAll(allGroupFiles.where((f) => f != file));
+      }
+    }
+  }
+
+  static bool _isCrossLibrary(DeclarationNode source, DeclarationNode target) {
+    final sourceLib = source.element?.library;
+    final targetLib = target.element?.library;
+    if (sourceLib != null && targetLib != null) {
+      return sourceLib != targetLib;
+    }
+    return source.relativeFilePath != target.relativeFilePath;
+  }
+
+  static void _trackEdge(
+    DeclarationNode source,
+    DeclarationNode target, {
+    required bool isTestNode,
+    required Set<String> crossLibraryReferenced,
+    required Set<String> testReferencedIds,
+  }) {
+    if (isTestNode) {
+      testReferencedIds.add(target.id);
+      crossLibraryReferenced.add(target.id);
+    } else if (_isCrossLibrary(source, target)) {
+      crossLibraryReferenced.add(target.id);
+    }
+  }
+
+  bool _isPrivateCandidate(
+    DeclarationNode node, {
+    required PackageTopology topology,
+    required Set<String> exportedNodeIds,
+    required Set<String> productionLive,
+    required Set<String> crossLibraryReferenced,
+    required Set<String> testReferencedIds,
+  }) {
+    final role = topology.roleOf(node.relativeFilePath);
+    final isCandidateScope = switch (role) {
+      FileRole.internalSrc => true,
+      FileRole.publicLib when options.mode == AnalysisMode.closedApp => true,
+      _ => false,
+    };
+
+    if (!isCandidateScope) return false;
+    if (node.name.startsWith('_')) return false;
+    if (node.isIgnored) return false;
+    if (node.isNativeRoot) return false;
+    if (node.isExternalBinding) return false;
+    if (node.isTestSupport) return false;
+    if (WildcardPattern.anyMatch(_ignoreNameWildcards, node.name)) return false;
+    if (WildcardPattern.anyMatch(_testSupportWildcards, node.name)) {
+      return false;
+    }
+    if (exportedNodeIds.contains(node.id)) return false;
+    if (!productionLive.contains(node.id)) return false;
+    if (crossLibraryReferenced.contains(node.id)) return false;
+    if (testReferencedIds.contains(node.id)) return false;
+    return true;
+  }
+
+  List<UndeadFinding> _collectPrivateCandidates({
+    required List<DeclarationNode> allNodes,
+    required PackageTopology topology,
+    required Set<String> exportedNodeIds,
+    required Set<String> productionLive,
+    required Set<String> crossLibraryReferenced,
+    required Set<String> testReferencedIds,
+  }) => allNodes
+      .where(
+        (node) => _isPrivateCandidate(
+          node,
+          topology: topology,
+          exportedNodeIds: exportedNodeIds,
+          productionLive: productionLive,
+          crossLibraryReferenced: crossLibraryReferenced,
+          testReferencedIds: testReferencedIds,
+        ),
+      )
+      .map(
+        (node) => UndeadFinding(
+          id: node.name,
+          name: node.name,
+          kind: node.kind,
+          file: node.relativeFilePath,
+          line: node.line,
+          column: node.column,
+          length: node.length,
+          classification: UndeadClassification.privateCandidate,
+          suggestedAction: SuggestedAction.makePrivate,
+          isExternalBinding: node.isExternalBinding,
+        ),
+      )
+      .toList();
 
   Set<String> _runBfs({
     required Set<String> startIds,
@@ -816,7 +879,7 @@ class UndeadEngine {
     return (DeclarationKind.function, false);
   }
 
-  String? _resolveUri(
+  static String? _resolveUri(
     String currentRelPath,
     String uriString,
     String packageName,
