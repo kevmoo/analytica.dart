@@ -458,5 +458,3 @@ Determine the package version dynamically:
   `dart run cognitive_complexity@ --version`.
 * If invoked with a specific version constraint (e.g.
   `cognitive_complexity@0.2.3`), use that exact version.
-
-

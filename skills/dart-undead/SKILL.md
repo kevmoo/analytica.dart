@@ -248,5 +248,3 @@ Determine the package version dynamically:
 * Check `pubspec.lock` in the workspace or run `dart run undead@ --version`.
 * If invoked with a specific version constraint (e.g. `undead@0.1.0`), use that
   exact version.
-
-
