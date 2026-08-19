@@ -57,7 +57,7 @@ void main() {
       final stdout = await proc.stdoutStream().join('\n');
       await proc.shouldExit(0);
 
-      check(stdout).contains('undead version: 0.1.0');
+      check(stdout).contains('undead version: 0.1.1-wip');
     });
 
     test('--mode accepts closed-app', () async {
