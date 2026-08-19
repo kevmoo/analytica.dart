@@ -13,6 +13,7 @@ key_features:
   - Scoped execution matrix (targeted / delta / full)
   - Interactive refactoring triage
   - Dart 3 pattern matching refactorings
+  - Reproducible PR provenance injection
 ---
 
 ## 1. When to Use This Skill
@@ -407,3 +408,43 @@ Run these verification commands before committing refactored code:
    violations, or un-awaited asynchronous gaps.
 4. **Test Fidelity**: Run `dart test` (or `flutter test`) to confirm zero
    behavioral drift across existing test suites.
+
+---
+
+## 8. Pull Request & Commit Provenance Protocol
+
+When staging refactored code and preparing a commit message or Pull Request:
+
+### 1. User Confirmation Gate (Prompt-Gated Offer)
+Before writing the PR description or commit body, explicitly ask the user (e.g.
+via `ask_question` or interactive confirmation) whether to include a **Tool
+Provenance & Reproduction block**.
+
+### 2. Standardized Provenance Block Format
+When confirmed, append the following markdown block to the PR description or
+commit body so reviewers understand where the changes originated and can rerun
+the audit locally:
+
+```markdown
+### 🤖 Tool Provenance & Reproduction
+
+This refactoring was guided by [`cognitive_complexity`](https://pub.dev/packages/cognitive_complexity) (v`<version>`).
+
+To reproduce or re-evaluate cognitive complexity scores:
+```bash
+<exact command line used, e.g. dart run cognitive_complexity@ --threshold 15 lib/src/foo.dart>
+```
+
+<!-- If statement data-flow analysis was used during decomposition: -->
+```bash
+dart run cognitive_complexity:data_flow@ <file>:<start_line>-<end_line>
+```
+```
+
+### 3. Version Resolution
+Determine the package version dynamically:
+* Check `pubspec.lock` in the workspace or run
+  `dart run cognitive_complexity@ --version`.
+* If invoked with a specific version constraint (e.g.
+  `cognitive_complexity@0.2.3`), use that exact version.
+

@@ -14,6 +14,7 @@ key_features:
   - Co-invoked test hazard detection
   - Sealed class & framework entrypoint protection
   - Safe 2-stage triage & deletion protocol
+  - Reproducible PR provenance injection
 ---
 
 # Dart Undead (`dart-undead`)
@@ -211,3 +212,37 @@ graph TD
 4. **Clean Diff Staging**: Inspect modifications using `git diff --stat` (or
    isolate in a temporary feature branch/worktree) to ensure only intended
    declarations were removed.
+
+--------------------------------------------------------------------------------
+
+## 6. Pull Request & Commit Provenance Protocol
+
+When staging pruned code and preparing a commit message or Pull Request:
+
+### 1. User Confirmation Gate (Prompt-Gated Offer)
+Before writing the PR description or commit body, explicitly prompt the user
+(e.g. via `ask_question` or interactive confirmation) whether to include a
+**Tool Provenance & Reproduction block**.
+
+### 2. Standardized Provenance Block Format
+When confirmed, append the following markdown block to the PR description or
+commit body so reviewers understand where the deletions originated and can
+rerun the reachability analysis locally:
+
+```markdown
+### 🤖 Tool Provenance & Reproduction
+
+Dead code detection and reachability analysis performed with [`pkg:undead`](https://pub.dev/packages/undead) (v`<version>`).
+
+To reproduce or re-run this reachability audit locally:
+```bash
+<exact command line used, e.g. dart run undead@ --mode=closed-app or dart run undead@>
+```
+```
+
+### 3. Version Resolution
+Determine the package version dynamically:
+* Check `pubspec.lock` in the workspace or run `dart run undead@ --version`.
+* If invoked with a specific version constraint (e.g. `undead@0.1.0`), use that
+  exact version.
+
