@@ -87,7 +87,5 @@ Explore in-depth documentation in the [`doc/`](doc/) directory:
   delta evaluation, and exit codes.
 - 🔄 [Statement Data-Flow Analysis](doc/data_flow.md): Statement slicing,
   variable lifecycles, and automated method extraction helper.
-- 🤖 [GitHub Actions Guide](doc/github_actions.md): PR workflow setup,
-  parameters reference, and fork security permissions.
 
 [whitepaper]: https://www.sonarsource.com/docs/CognitiveComplexity.pdf
