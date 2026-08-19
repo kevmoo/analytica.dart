@@ -17,7 +17,12 @@ enum UndeadClassification {
 
   /// A declaration referenced only in tests, but co-invoked within test blocks
   /// that also exercise live production code. Requires manual refactoring.
-  coInvokedHazard('coInvokedHazard', 'Co-Invoked Test Hazard');
+  coInvokedHazard('coInvokedHazard', 'Co-Invoked Test Hazard'),
+
+  /// A declaration referenced only within its declaring library (and its parts)
+  /// with zero cross-library references and zero test references. Candidate to
+  /// be made library-private.
+  privateCandidate('privateCandidate', 'Private Candidate');
 
   final String jsonValue;
   final String displayName;
@@ -28,6 +33,7 @@ enum UndeadClassification {
     'pureUndead' => pureUndead,
     'testedUndead' => testedUndead,
     'coInvokedHazard' => coInvokedHazard,
+    'privateCandidate' => privateCandidate,
     _ => throw ArgumentError.value(
       value,
       'value',
@@ -73,6 +79,7 @@ abstract final class SuggestedAction {
   static const String delete = 'delete';
   static const String deleteWithOrphanTests = 'deleteWithOrphanTests';
   static const String manualRefactorHazard = 'manualRefactorHazard';
+  static const String makePrivate = 'makePrivate';
 }
 
 /// How code in `example/` is treated during reachability analysis.
@@ -153,6 +160,7 @@ final class UndeadOptions {
   final List<String> extraRoots;
   final bool ignoreExternalBindings;
   final bool workspaceDiscovery;
+  final bool suggestPrivate;
 
   const UndeadOptions({
     required this.packagePath,
@@ -170,6 +178,7 @@ final class UndeadOptions {
     this.extraRoots = const [],
     this.ignoreExternalBindings = false,
     this.workspaceDiscovery = true,
+    this.suggestPrivate = false,
   });
 }
 
@@ -283,6 +292,7 @@ class UndeadReport {
   final int pureUndeadFound;
   final int testedUndeadFound;
   final int coInvokedHazardsFound;
+  final int privateCandidatesFound;
   final List<UndeadFinding> undead;
 
   const UndeadReport({
@@ -292,6 +302,7 @@ class UndeadReport {
     required this.pureUndeadFound,
     required this.testedUndeadFound,
     required this.coInvokedHazardsFound,
+    this.privateCandidatesFound = 0,
     required this.undead,
   });
 
@@ -311,6 +322,10 @@ class UndeadReport {
           (summary['testedUndeads'] as int?) ??
           0,
       coInvokedHazardsFound: summary['coInvokedHazards'] as int,
+      privateCandidatesFound:
+          (summary['privateCandidates'] as int?) ??
+          (summary['privateCandidate'] as int?) ??
+          0,
       undead: findingsList
           .map((e) => UndeadFinding.fromJson(e as Map<String, dynamic>))
           .toList(),
@@ -325,6 +340,7 @@ class UndeadReport {
       'pureUndead': pureUndeadFound,
       'testedUndead': testedUndeadFound,
       'coInvokedHazards': coInvokedHazardsFound,
+      'privateCandidates': privateCandidatesFound,
     },
     'undead': undead.map((z) => z.toJson()).toList(),
   };

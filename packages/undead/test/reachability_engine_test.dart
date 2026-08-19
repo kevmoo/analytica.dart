@@ -1989,5 +1989,198 @@ void runGen() {
         check(undeadNames).not((it) => it.contains('buildGenHelper'));
       },
     );
+
+    group('suggestPrivate candidate detection', () {
+      test(
+        'detects declaration only used within same library when suggestPrivate '
+        'is enabled',
+        () async {
+          await d.dir('suggest_private_pkg', [
+            packageConfig('suggest_private_pkg'),
+            d.file('pubspec.yaml', '''
+name: suggest_private_pkg
+environment:
+  sdk: '^3.5.0'
+'''),
+            d.dir('lib', [
+              d.file('suggest_private_pkg.dart', '''
+export 'src/service.dart' show PublicService;
+'''),
+              d.dir('src', [
+                d.file('service.dart', '''
+class PublicService {
+  void run() {
+    internalHelper();
+  }
+}
+
+void internalHelper() {}
+'''),
+              ]),
+            ]),
+          ]).create();
+
+          // Without suggestPrivate: internalHelper is live, 0 undead findings.
+          final defaultReport = await analyzePackage(
+            d.path('suggest_private_pkg'),
+            options: const UndeadOptions(
+              packagePath: '',
+              suggestPrivate: false,
+            ),
+          );
+          check(defaultReport.undead).isEmpty();
+          check(defaultReport.privateCandidatesFound).equals(0);
+
+          // With suggestPrivate: internalHelper is flagged as privateCandidate.
+          final privateReport = await analyzePackage(
+            d.path('suggest_private_pkg'),
+            options: const UndeadOptions(packagePath: '', suggestPrivate: true),
+          );
+          check(privateReport.privateCandidatesFound).equals(1);
+          check(privateReport.undead.length).equals(1);
+
+          final candidate = privateReport.undead.single;
+          check(candidate.name).equals('internalHelper');
+          check(candidate.kind).equals(DeclarationKind.function);
+          check(
+            candidate.classification,
+          ).equals(UndeadClassification.privateCandidate);
+          check(candidate.suggestedAction).equals(SuggestedAction.makePrivate);
+        },
+      );
+
+      test('honors part and part of directives within same library', () async {
+        await d.dir('part_private_pkg', [
+          packageConfig('part_private_pkg'),
+          d.file('pubspec.yaml', '''
+name: part_private_pkg
+environment:
+  sdk: '^3.5.0'
+'''),
+          d.dir('lib', [
+            d.file('part_private_pkg.dart', '''
+export 'src/main_lib.dart' show Service;
+'''),
+            d.dir('src', [
+              d.file('main_lib.dart', '''
+part 'part_lib.dart';
+
+class Service {
+  void doWork() {
+    partWorker();
+  }
+}
+
+void internalWorker() {}
+'''),
+              d.file('part_lib.dart', '''
+part of 'main_lib.dart';
+
+void partWorker() {
+  internalWorker();
+}
+'''),
+            ]),
+          ]),
+        ]).create();
+
+        final report = await analyzePackage(
+          d.path('part_private_pkg'),
+          options: const UndeadOptions(packagePath: '', suggestPrivate: true),
+        );
+
+        check(report.privateCandidatesFound).equals(2);
+        final names = report.undead.map((u) => u.name).toSet();
+        check(names).contains('internalWorker');
+        check(names).contains('partWorker');
+      });
+
+      test('does not flag declarations used across libraries', () async {
+        await d.dir('cross_lib_pkg', [
+          packageConfig('cross_lib_pkg'),
+          d.file('pubspec.yaml', '''
+name: cross_lib_pkg
+environment:
+  sdk: '^3.5.0'
+'''),
+          d.dir('lib', [
+            d.file('cross_lib_pkg.dart', '''
+export 'src/consumer.dart';
+'''),
+            d.dir('src', [
+              d.file('provider.dart', '''
+void sharedHelper() {}
+'''),
+              d.file('consumer.dart', '''
+import 'provider.dart';
+
+class Consumer {
+  void use() {
+    sharedHelper();
+  }
+}
+'''),
+            ]),
+          ]),
+        ]).create();
+
+        final report = await analyzePackage(
+          d.path('cross_lib_pkg'),
+          options: const UndeadOptions(packagePath: '', suggestPrivate: true),
+        );
+
+        check(report.privateCandidatesFound).equals(0);
+        check(report.undead).isEmpty();
+      });
+
+      test('does not flag declarations referenced in test files', () async {
+        await d.dir('tested_private_pkg', [
+          packageConfig('tested_private_pkg'),
+          d.file('pubspec.yaml', '''
+name: tested_private_pkg
+environment:
+  sdk: '^3.5.0'
+'''),
+          d.dir('lib', [
+            d.file('tested_private_pkg.dart', '''
+export 'src/live.dart';
+'''),
+            d.dir('src', [
+              d.file('live.dart', '''
+class LiveService {
+  void run() {
+    testHelper();
+  }
+}
+
+void testHelper() {}
+'''),
+            ]),
+          ]),
+          d.dir('test', [
+            d.file('live_test.dart', '''
+import 'package:tested_private_pkg/src/live.dart';
+
+void test(String desc, Function body) {}
+
+void main() {
+  test('tests helper', () {
+    testHelper();
+  });
+}
+'''),
+          ]),
+        ]).create();
+
+        final report = await analyzePackage(
+          d.path('tested_private_pkg'),
+          options: const UndeadOptions(packagePath: '', suggestPrivate: true),
+        );
+
+        // testHelper is referenced in test/live_test.dart, so it must not be suggested for privatization.
+        check(report.privateCandidatesFound).equals(0);
+        check(report.undead).isEmpty();
+      });
+    });
   });
 }

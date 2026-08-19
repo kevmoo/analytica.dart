@@ -142,6 +142,9 @@ void main() {
       check(
         UndeadClassification.fromJson('coInvokedHazard'),
       ).equals(UndeadClassification.coInvokedHazard);
+      check(
+        UndeadClassification.fromJson('privateCandidate'),
+      ).equals(UndeadClassification.privateCandidate);
 
       check(
         DeclarationKind.fromJson('class'),
@@ -175,6 +178,7 @@ void main() {
       check(defaultOptions.failOnUndead).isFalse();
       check(defaultOptions.autoPubGet).isFalse();
       check(defaultOptions.workspaceDiscovery).isTrue();
+      check(defaultOptions.suggestPrivate).isFalse();
 
       const customOptions = UndeadOptions(
         packagePath: '/path/to/pkg',
@@ -182,6 +186,7 @@ void main() {
         ignoreNamePatterns: ['*_generated', 'Ignored*'],
         extraRoots: ['../companion_test', '/external/tests'],
         workspaceDiscovery: false,
+        suggestPrivate: true,
       );
       check(
         customOptions.testSupportPatterns,
@@ -193,6 +198,7 @@ void main() {
         customOptions.extraRoots,
       ).deepEquals(['../companion_test', '/external/tests']);
       check(customOptions.workspaceDiscovery).isFalse();
+      check(customOptions.suggestPrivate).isTrue();
     });
 
     test('UndeadReport deserializes camelCase JSON summary correctly', () {

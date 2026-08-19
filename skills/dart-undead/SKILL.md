@@ -115,6 +115,7 @@ dart run undead@ --example-mode=demonstration
 | `--ignore-name-patterns` | Comma-separated wildcards for names to ignore. | `""` |
 | `--[no-]workspace-discovery` | Discover consumer roots from sibling packages in workspace. | `true` |
 | `--[no-]ignore-external-bindings` | Preserve unreferenced `@JS()` and FFI facades. | `false` |
+| `--[no-]suggest-private` | Identify top-level declarations that can be made library-private. | `false` |
 | `--pub-get` | Auto-run `dart pub get` / `flutter pub get` if needed. | `false` |
 | `--fail-on-undead` | Exit with non-zero code (1) on findings (useful for CI). | `false` |
 

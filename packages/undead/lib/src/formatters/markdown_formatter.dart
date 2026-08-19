@@ -23,6 +23,11 @@ class MarkdownFormatter {
     buffer.writeln(
       '| **Co-Invoked Hazards** | ${report.coInvokedHazardsFound} |',
     );
+    if (report.privateCandidatesFound > 0) {
+      buffer.writeln(
+        '| **Private Candidates** | ${report.privateCandidatesFound} |',
+      );
+    }
     buffer.writeln();
 
     if (report.undead.isEmpty) {
@@ -38,6 +43,9 @@ class MarkdownFormatter {
         .toList();
     final coInvokedHazards = report.undead
         .where((z) => z.classification == UndeadClassification.coInvokedHazard)
+        .toList();
+    final privateCandidates = report.undead
+        .where((z) => z.classification == UndeadClassification.privateCandidate)
         .toList();
 
     if (pureUndead.isNotEmpty) {
@@ -98,6 +106,21 @@ class MarkdownFormatter {
         buffer.writeln(
           '| `${z.name}` | ${z.kind.jsonValue} | `$loc` | $testSites | '
           'Manual refactoring required |',
+        );
+      }
+      buffer.writeln();
+    }
+
+    if (privateCandidates.isNotEmpty) {
+      buffer.writeln('## Private Candidates (Suggest Library-Private)');
+      buffer.writeln();
+      buffer.writeln('| Symbol | Kind | Location | Suggested Action |');
+      buffer.writeln('| :--- | :--- | :--- | :--- |');
+      for (final z in privateCandidates) {
+        final loc = '${z.file}:${z.line}:${z.column}';
+        buffer.writeln(
+          '| `${z.name}` | ${z.kind.jsonValue} | `$loc` | '
+          'Make library-private (prefix with `_`) |',
         );
       }
       buffer.writeln();

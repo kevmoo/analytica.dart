@@ -47,6 +47,7 @@ void main() {
       check(stdout).contains('--example-mode');
       check(stdout).contains('--mode');
       check(stdout).contains('--pub-get');
+      check(stdout).contains('suggest-private');
       check(stdout).contains('fail-on-undead');
       check(stdout).contains('workspace-discovery');
     });
@@ -443,5 +444,63 @@ void useHelper() {
         check(summary2['pureUndead']).equals(1);
       },
     );
+
+    test('supports --suggest-private to identify single-library internal '
+        'declarations', () async {
+      await d.dir('cli_suggest_private_pkg', [
+        packageConfig('cli_suggest_private_pkg'),
+        d.file('pubspec.yaml', '''
+name: cli_suggest_private_pkg
+environment:
+  sdk: '^3.5.0'
+'''),
+        d.dir('lib', [
+          d.file('cli_suggest_private_pkg.dart', '''
+export 'src/api.dart' show PublicApi;
+'''),
+          d.dir('src', [
+            d.file('api.dart', '''
+class PublicApi {
+  void call() {
+    onlyUsedHere();
+  }
+}
+
+void onlyUsedHere() {}
+'''),
+          ]),
+        ]),
+      ]).create();
+
+      // 1. Without --suggest-private, 0 undead
+      final proc1 = await runUndead([
+        '--format=json',
+        d.path('cli_suggest_private_pkg'),
+      ]);
+      final out1 = await proc1.stdoutStream().join('\n');
+      await proc1.shouldExit(0);
+      final json1 = jsonDecode(out1) as Map<String, dynamic>;
+      final summary1 = json1['summary'] as Map<String, dynamic>;
+      check(summary1['privateCandidates']).equals(0);
+      check(json1['undead'] as List).isEmpty();
+
+      // 2. With --suggest-private, onlyUsedHere is a private candidate
+      final proc2 = await runUndead([
+        '--format=json',
+        '--suggest-private',
+        d.path('cli_suggest_private_pkg'),
+      ]);
+      final out2 = await proc2.stdoutStream().join('\n');
+      await proc2.shouldExit(0);
+      final json2 = jsonDecode(out2) as Map<String, dynamic>;
+      final summary2 = json2['summary'] as Map<String, dynamic>;
+      check(summary2['privateCandidates']).equals(1);
+      final undeadList = json2['undead'] as List<dynamic>;
+      check(undeadList.length).equals(1);
+      final firstFinding = undeadList.first as Map<String, dynamic>;
+      check(firstFinding['name']).equals('onlyUsedHere');
+      check(firstFinding['classification']).equals('privateCandidate');
+      check(firstFinding['suggestedAction']).equals('makePrivate');
+    });
   });
 }

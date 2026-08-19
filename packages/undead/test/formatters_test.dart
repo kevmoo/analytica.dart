@@ -64,7 +64,19 @@ void main() {
             ),
           ],
         ),
+        UndeadFinding(
+          id: 'internalHelper',
+          name: 'internalHelper',
+          kind: DeclarationKind.function,
+          file: 'lib/src/internal.dart',
+          line: 10,
+          column: 1,
+          length: 14,
+          classification: UndeadClassification.privateCandidate,
+          suggestedAction: SuggestedAction.makePrivate,
+        ),
       ],
+      privateCandidatesFound: 1,
     );
 
     test('JsonFormatter generates valid and compliant JSON', () {
@@ -79,9 +91,10 @@ void main() {
       check(summary['pureUndead']).equals(1);
       check(summary['testedUndead']).equals(1);
       check(summary['coInvokedHazards']).equals(1);
+      check(summary['privateCandidates']).equals(1);
 
       final undead = decoded['undead'] as List<dynamic>;
-      check(undead.length).equals(3);
+      check(undead.length).equals(4);
     });
 
     test('MarkdownFormatter generates headers and categorized tables', () {
@@ -89,6 +102,7 @@ void main() {
       final output = formatter.format(sampleReport);
 
       check(output).contains('# Undead Code Analysis: `test_pkg`');
+      check(output).contains('| **Private Candidates** | 1 |');
       check(output).contains('## Pure Undead (Safe to Delete)');
       check(output).contains('`deadFunc`');
       check(output).contains('## Tested Undead (Orphan Tests)');
@@ -103,6 +117,9 @@ void main() {
       check(
         output,
       ).contains('`test/pipeline_test.dart:15` ("pipeline integration")');
+      check(output).contains('## Private Candidates (Suggest Library-Private)');
+      check(output).contains('`internalHelper`');
+      check(output).contains('Make library-private (prefix with `_`)');
     });
 
     test('MarkdownFormatter produces clean notice when 0 undead found', () {

@@ -327,13 +327,32 @@ class UndeadEngine {
     }
 
     // Step 2: Connect reference edges and sealed hierarchies.
+    final crossLibraryReferenced = <String>{};
+    final testReferencedIds = <String>{};
+
     for (final node in allNodes) {
+      final isTestNode =
+          topology.roleOf(node.relativeFilePath) == FileRole.test ||
+          topology.extraTestFiles.contains(node.relativeFilePath);
       final outbound = nodeOutboundElements[node];
       if (outbound != null) {
         for (final refElem in outbound) {
           final targetNode = resolveNodeForElement(refElem);
           if (targetNode != null && targetNode.id != node.id) {
             node.outgoingTargetIds.add(targetNode.id);
+            if (isTestNode) {
+              testReferencedIds.add(targetNode.id);
+              crossLibraryReferenced.add(targetNode.id);
+            } else {
+              final isCrossLibrary =
+                  (node.element?.library != null &&
+                      targetNode.element?.library != null)
+                  ? node.element!.library != targetNode.element!.library
+                  : node.relativeFilePath != targetNode.relativeFilePath;
+              if (isCrossLibrary) {
+                crossLibraryReferenced.add(targetNode.id);
+              }
+            }
           }
         }
       }
@@ -342,8 +361,23 @@ class UndeadEngine {
       if (superElems != null) {
         for (final superElem in superElems) {
           final parentNode = resolveNodeForElement(superElem);
-          if (parentNode != null && parentNode.isSealed) {
-            sealedSubtypes.putIfAbsent(parentNode.id, () => {}).add(node.id);
+          if (parentNode != null) {
+            if (parentNode.isSealed) {
+              sealedSubtypes.putIfAbsent(parentNode.id, () => {}).add(node.id);
+            }
+            if (isTestNode) {
+              testReferencedIds.add(parentNode.id);
+              crossLibraryReferenced.add(parentNode.id);
+            } else {
+              final isCrossLibrary =
+                  (node.element?.library != null &&
+                      parentNode.element?.library != null)
+                  ? node.element!.library != parentNode.element!.library
+                  : node.relativeFilePath != parentNode.relativeFilePath;
+              if (isCrossLibrary) {
+                crossLibraryReferenced.add(parentNode.id);
+              }
+            }
           }
         }
       }
@@ -362,6 +396,7 @@ class UndeadEngine {
       for (final sourceNode in sourceNodes) {
         for (final targetNode in targetNodes) {
           sourceNode.outgoingTargetIds.add(targetNode.id);
+          crossLibraryReferenced.add(targetNode.id);
         }
       }
     }
@@ -373,6 +408,8 @@ class UndeadEngine {
           final targetNode = resolveNodeForElement(elem);
           if (targetNode != null) {
             site.referencedDeclarationIds.add(targetNode.id);
+            testReferencedIds.add(targetNode.id);
+            crossLibraryReferenced.add(targetNode.id);
           }
         }
       }
@@ -381,6 +418,7 @@ class UndeadEngine {
     // Step 3: Identify roots for Production and Tests.
     final productionRoots = <String>{};
     final testRoots = <String>{};
+    final exportedNodeIds = <String>{};
 
     // 3.1 Public API roots (Open-World Invariant under library mode).
     if (options.mode == AnalysisMode.library) {
@@ -396,6 +434,8 @@ class UndeadEngine {
               final node = elementToNode[topLevel];
               if (node != null) {
                 productionRoots.add(node.id);
+                exportedNodeIds.add(node.id);
+                crossLibraryReferenced.add(node.id);
               }
             }
           }
@@ -405,6 +445,8 @@ class UndeadEngine {
         for (final node in allNodes) {
           if (node.relativeFilePath == relPath && !node.name.startsWith('_')) {
             productionRoots.add(node.id);
+            exportedNodeIds.add(node.id);
+            crossLibraryReferenced.add(node.id);
           }
         }
 
@@ -416,6 +458,8 @@ class UndeadEngine {
               if (node.relativeFilePath == targetRelPath &&
                   !node.name.startsWith('_')) {
                 productionRoots.add(node.id);
+                exportedNodeIds.add(node.id);
+                crossLibraryReferenced.add(node.id);
               }
             }
           }
@@ -641,6 +685,51 @@ class UndeadEngine {
       }
     }
 
+    var privateCandidates = 0;
+
+    if (options.suggestPrivate) {
+      for (final node in allNodes) {
+        final role = topology.roleOf(node.relativeFilePath);
+        final isCandidateScope = switch (role) {
+          FileRole.internalSrc => true,
+          FileRole.publicLib when options.mode == AnalysisMode.closedApp =>
+            true,
+          _ => false,
+        };
+
+        if (!isCandidateScope) continue;
+        if (node.name.startsWith('_')) continue;
+        if (node.isIgnored) continue;
+        if (node.isNativeRoot) continue;
+        if (node.isExternalBinding) continue;
+        if (node.isTestSupport) continue;
+        if (WildcardPattern.anyMatch(_ignoreNameWildcards, node.name)) continue;
+        if (WildcardPattern.anyMatch(_testSupportWildcards, node.name)) {
+          continue;
+        }
+        if (exportedNodeIds.contains(node.id)) continue;
+        if (!productionLive.contains(node.id)) continue;
+        if (crossLibraryReferenced.contains(node.id)) continue;
+        if (testReferencedIds.contains(node.id)) continue;
+
+        privateCandidates++;
+        findings.add(
+          UndeadFinding(
+            id: node.name,
+            name: node.name,
+            kind: node.kind,
+            file: node.relativeFilePath,
+            line: node.line,
+            column: node.column,
+            length: node.length,
+            classification: UndeadClassification.privateCandidate,
+            suggestedAction: SuggestedAction.makePrivate,
+            isExternalBinding: node.isExternalBinding,
+          ),
+        );
+      }
+    }
+
     findings.sort((a, b) {
       final fileComp = a.file.compareTo(b.file);
       if (fileComp != 0) return fileComp;
@@ -656,6 +745,7 @@ class UndeadEngine {
       pureUndeadFound: pureUndead,
       testedUndeadFound: testedUndead,
       coInvokedHazardsFound: coInvokedHazards,
+      privateCandidatesFound: privateCandidates,
       undead: findings,
     );
   }
@@ -816,7 +906,28 @@ Future<UndeadReport> analyzePackage(
   String packagePath, {
   UndeadOptions? options,
 }) async {
-  final opts = options ?? UndeadOptions(packagePath: packagePath);
+  final opts = options == null
+      ? UndeadOptions(packagePath: packagePath)
+      : (options.packagePath.isEmpty
+            ? UndeadOptions(
+                packagePath: packagePath,
+                format: options.format,
+                exampleMode: options.exampleMode,
+                mode: options.mode,
+                includeGenerated: options.includeGenerated,
+                failOnUndead: options.failOnUndead,
+                autoPubGet: options.autoPubGet,
+                sdkPath: options.sdkPath,
+                jsonOutputPath: options.jsonOutputPath,
+                frameworkAdapter: options.frameworkAdapter,
+                testSupportPatterns: options.testSupportPatterns,
+                ignoreNamePatterns: options.ignoreNamePatterns,
+                extraRoots: options.extraRoots,
+                ignoreExternalBindings: options.ignoreExternalBindings,
+                workspaceDiscovery: options.workspaceDiscovery,
+                suggestPrivate: options.suggestPrivate,
+              )
+            : options);
   final engine = UndeadEngine(opts);
   return engine.analyze();
 }

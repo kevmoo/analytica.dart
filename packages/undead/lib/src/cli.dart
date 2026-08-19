@@ -88,6 +88,13 @@ ArgParser buildArgParser() {
           'Automatically discover and ingest consumer roots from sibling '
           'packages in the enclosing workspace.',
     )
+    ..addFlag(
+      'suggest-private',
+      help:
+          'Detect and suggest making internal lib/src declarations private if '
+          'only used within their declaring library.',
+      defaultsTo: false,
+    )
     ..addSdkPathOption()
     ..addFlag(
       'pub-get',
@@ -165,6 +172,7 @@ class UndeadCliRunner {
     final autoPubGet = results.flag('pub-get');
     final ignoreExternalBindings = results.flag('ignore-external-bindings');
     final workspaceDiscovery = results.flag('workspace-discovery');
+    final suggestPrivate = results.flag('suggest-private');
     final sdkPath = results.option('sdk-path');
     final jsonOutputPath = results.option('json-output');
     final testSupportPatterns = _parseCommaSeparated(
@@ -185,6 +193,7 @@ class UndeadCliRunner {
       autoPubGet: autoPubGet,
       ignoreExternalBindings: ignoreExternalBindings,
       workspaceDiscovery: workspaceDiscovery,
+      suggestPrivate: suggestPrivate,
       sdkPath: sdkPath,
       jsonOutputPath: jsonOutputPath,
       testSupportPatterns: testSupportPatterns,
