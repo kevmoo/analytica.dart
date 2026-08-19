@@ -70,3 +70,12 @@ void main() async {
   }
 }
 ```
+
+## 🧠 AI Agent Integration
+
+This repository packages an agent skill (`dart-undead`) to train AI pair programmers on dead code audits, reachability analysis, and safe deletion protocols:
+
+```bash
+npx skills add kevmoo/analytica.dart --skill dart-undead
+```
+

@@ -11,3 +11,5 @@ Monorepo workspace for Dart static analysis, complexity metrics, data-flow analy
 ## Skills
 
 * [`dart-cognitive-complexity`](skills/dart-cognitive-complexity): LLM agent skill for automated cognitive complexity audits and semantic data-flow refactoring.
+* [`dart-undead`](skills/dart-undead): LLM agent skill for deterministic reachability and dead declaration analysis in Dart/Flutter packages.
+
