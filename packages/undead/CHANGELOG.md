@@ -7,4 +7,6 @@
   (standalone/executables).
 - Custom suppression directives: `// undead:ignore` and
   `// undead:ignore_for_file`.
+- Support `--suggest-private` flag to detect unexported top-level declarations
+  that can be made library-private.
 

@@ -79,6 +79,12 @@ runs:
         cd "$ACTION_PATH"
         dart pub get >/dev/null
         
+        # Auto-detect monorepos when default 'lib' target does not exist
+        targets="$INPUT_TARGETS"
+        if [ "$targets" = "lib" ] && [ ! -d "lib" ] && [ -d "packages" ]; then
+          targets="packages"
+        fi
+        
         # Execute the scanner CLI tool and capture exit code
         set +e
         dart run cognitive_complexity \
@@ -87,7 +93,7 @@ runs:
           --format="$INPUT_FORMAT" \
           $DIFF_ARG \
           $fail_inc_arg \
-          $INPUT_TARGETS
+          $targets
         exit_code=$?
         set -e
 
