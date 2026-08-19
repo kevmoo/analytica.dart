@@ -25,8 +25,8 @@ enum UndeadClassification {
   const UndeadClassification(this.jsonValue, this.displayName);
 
   static UndeadClassification fromJson(String value) => switch (value) {
-    'pureUndead' || 'pureZombie' => pureUndead,
-    'testedUndead' || 'testedZombie' => testedUndead,
+    'pureUndead' => pureUndead,
+    'testedUndead' => testedUndead,
     'coInvokedHazard' => coInvokedHazard,
     _ => throw ArgumentError.value(
       value,
@@ -297,10 +297,7 @@ class UndeadReport {
 
   factory UndeadReport.fromJson(Map<String, dynamic> json) {
     final summary = json['summary'] as Map<String, dynamic>;
-    final findingsList =
-        (json['undead'] as List<dynamic>?) ??
-        (json['zombies'] as List<dynamic>?) ??
-        const [];
+    final findingsList = (json['undead'] as List<dynamic>?) ?? const [];
     return UndeadReport(
       version: json['version'] as String,
       package: json['package'] as String,

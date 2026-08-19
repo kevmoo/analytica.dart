@@ -47,7 +47,6 @@ ArgParser buildArgParser() {
     )
     ..addFlag(
       'fail-on-undead',
-      aliases: ['fail-on-zombies'],
       help:
           'Exit with non-zero code (1) if any undead declaration is detected.',
       defaultsTo: false,

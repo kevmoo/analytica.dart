@@ -91,13 +91,13 @@ class CustomServiceEntry {
 @CustomServiceEntry()
 void annotatedEntryPoint() {}
 
-// Tested zombie referenced only in customTestRunner:
+// Tested undead referenced only in customTestRunner:
 void deadOnlyTested() {}
 
 // Co-invoked hazard referenced in customTestRunner along with live code:
 void deadCoInvoked() {}
 
-// Pure zombie:
+// Pure undead:
 void pureUndead() {}
 '''),
           ]),
@@ -138,15 +138,15 @@ void main() {
       );
 
       // Verify custom roots and entrypoints are preserved
-      final zombieNames = report.undead.map((z) => z.name).toSet();
-      check(zombieNames).not((it) => it.contains('customServerEntrypoint'));
-      check(zombieNames).not((it) => it.contains('usedByCustomEntrypoint'));
-      check(zombieNames).not((it) => it.contains('annotatedEntryPoint'));
+      final undeadNames = report.undead.map((z) => z.name).toSet();
+      check(undeadNames).not((it) => it.contains('customServerEntrypoint'));
+      check(undeadNames).not((it) => it.contains('usedByCustomEntrypoint'));
+      check(undeadNames).not((it) => it.contains('annotatedEntryPoint'));
 
-      // Verify pure zombie detected
-      check(zombieNames).contains('pureUndead');
+      // Verify pure undead detected
+      check(undeadNames).contains('pureUndead');
 
-      // Verify tested zombie classified via customTestRunner
+      // Verify tested undead classified via customTestRunner
       final tested = report.undead.firstWhere(
         (z) => z.name == 'deadOnlyTested',
       );
@@ -213,13 +213,13 @@ void main() {
           ),
         );
 
-        final zombieNames = report.undead.map((z) => z.name).toSet();
+        final undeadNames = report.undead.map((z) => z.name).toSet();
 
         // Since Flutter and BuildRunner adapters are not active:
         // AndroidPluginClass and builderFactory are NOT harvested as roots,
-        // so they are pure zombies!
-        check(zombieNames).contains('AndroidPluginClass');
-        check(zombieNames).contains('builderFactory');
+        // so they are pure undeads!
+        check(undeadNames).contains('AndroidPluginClass');
+        check(undeadNames).contains('builderFactory');
 
         // Since PackageTestAdapter is not active:
         // test(...) is not recognized as a test call site, so deadTested has
@@ -274,14 +274,14 @@ void deadInternalHelper() {}
           ),
         );
 
-        final zombieNames = report.undead.map((z) => z.name).toSet();
+        final undeadNames = report.undead.map((z) => z.name).toSet();
 
         // lib/main.dart main and used.dart usedByMain are live
-        check(zombieNames).not((it) => it.contains('usedByMain'));
+        check(undeadNames).not((it) => it.contains('usedByMain'));
 
-        // internal_tool.dart main and deadInternalHelper are pure zombies
-        check(zombieNames).contains('deadInternalHelper');
-        check(zombieNames).contains('main');
+        // internal_tool.dart main and deadInternalHelper are pure undeads
+        check(undeadNames).contains('deadInternalHelper');
+        check(undeadNames).contains('main');
         final internalMainFinding = report.undead.firstWhere(
           (z) => z.name == 'main' && z.file.contains('internal_tool.dart'),
         );

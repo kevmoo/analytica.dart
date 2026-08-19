@@ -2,7 +2,7 @@
 
 ## 1. Executive Summary & Vision
 
-**Mission**: Provide a fast, token-efficient, deterministic tool to detect and eliminate **"zombie code"** across Dart packages.
+**Mission**: Provide a fast, token-efficient, deterministic tool to detect and eliminate **"undead/dead code"** across Dart packages.
 
 For the exact classification rules, definitions, and code examples, see [taxonomy.md](taxonomy.md).
 For Phase 2/3 internal class members and enum pruning, see [taxonomy_phase2.md](taxonomy_phase2.md).
@@ -141,7 +141,7 @@ Designed for low token overhead and actionable precision, including co-invoked h
 ## 6. CLI Flags & Configuration
 
 ```bash
-zombie [options] [target_path]
+undead [options] [target_path]
 ```
 
 <!-- mdformat off(prevent table wrapping) -->
@@ -154,5 +154,5 @@ zombie [options] [target_path]
 | `--extra-roots` | `<dir1,dir2>` (default: `""`) | Comma-separated list of additional root/test directories or companion packages to include in analysis. |
 | `--pub-get` | `false` (default) \| `true` | Automatically run `dart pub get` (or `flutter pub get`) if `.dart_tool/package_config.json` is missing. |
 | `--include-generated` | `false` (default) \| `true` | When false, ignores `*.g.dart`, `*.freezed.dart`. |
-| `--fail-on-zombies` | `false` (default) \| `true` | Exit with non-zero status code if any zombie is detected (for CI gates). |
+| `--fail-on-undead` | `false` (default) \| `true` | Exit with non-zero status code if any undead declaration is detected (for CI gates). |
 <!-- mdformat on -->

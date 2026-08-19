@@ -23,16 +23,16 @@ d.DirectoryDescriptor packageConfig(String pkgName) {
 
 void main() {
   group('ReachabilityEngine', () {
-    test('detects unexported top-level function as pure zombie', () async {
-      await d.dir('pure_zombie_pkg', [
-        packageConfig('pure_zombie_pkg'),
+    test('detects unexported top-level function as pure undead', () async {
+      await d.dir('pure_undead_pkg', [
+        packageConfig('pure_undead_pkg'),
         d.file('pubspec.yaml', '''
-name: pure_zombie_pkg
+name: pure_undead_pkg
 environment:
   sdk: '^3.5.0'
 '''),
         d.dir('lib', [
-          d.file('pure_zombie_pkg.dart', '''
+          d.file('pure_undead_pkg.dart', '''
 export 'src/live.dart';
 '''),
           d.dir('src', [
@@ -42,28 +42,28 @@ export 'src/live.dart';
         ]),
       ]).create();
 
-      final report = await analyzePackage(d.path('pure_zombie_pkg'));
+      final report = await analyzePackage(d.path('pure_undead_pkg'));
       check(report.pureUndeadFound).equals(1);
       check(report.testedUndeadFound).equals(0);
       check(report.coInvokedHazardsFound).equals(0);
 
-      final zombie = report.undead.single;
-      check(zombie.name).equals('deadFunc');
-      check(zombie.kind).equals(DeclarationKind.function);
-      check(zombie.classification).equals(UndeadClassification.pureUndead);
-      check(zombie.suggestedAction).equals(SuggestedAction.delete);
+      final undead = report.undead.single;
+      check(undead.name).equals('deadFunc');
+      check(undead.kind).equals(DeclarationKind.function);
+      check(undead.classification).equals(UndeadClassification.pureUndead);
+      check(undead.suggestedAction).equals(SuggestedAction.delete);
     });
 
-    test('detects tested zombie and associates orphan test sites', () async {
-      await d.dir('tested_zombie_pkg', [
-        packageConfig('tested_zombie_pkg'),
+    test('detects tested undead and associates orphan test sites', () async {
+      await d.dir('tested_undead_pkg', [
+        packageConfig('tested_undead_pkg'),
         d.file('pubspec.yaml', '''
-name: tested_zombie_pkg
+name: tested_undead_pkg
 environment:
   sdk: '^3.5.0'
 '''),
         d.dir('lib', [
-          d.file('tested_zombie_pkg.dart', '''
+          d.file('tested_undead_pkg.dart', '''
 export 'src/live.dart';
 '''),
           d.dir('src', [
@@ -77,7 +77,7 @@ class OldParser {
         ]),
         d.dir('test', [
           d.file('old_parser_test.dart', '''
-import 'package:tested_zombie_pkg/src/old_parser.dart';
+import 'package:tested_undead_pkg/src/old_parser.dart';
 
 void test(String desc, Function body) {}
 
@@ -91,20 +91,20 @@ void main() {
         ]),
       ]).create();
 
-      final report = await analyzePackage(d.path('tested_zombie_pkg'));
+      final report = await analyzePackage(d.path('tested_undead_pkg'));
       check(report.pureUndeadFound).equals(0);
       check(report.testedUndeadFound).equals(1);
       check(report.coInvokedHazardsFound).equals(0);
 
-      final zombie = report.undead.single;
-      check(zombie.name).equals('OldParser');
-      check(zombie.kind).equals(DeclarationKind.classType);
-      check(zombie.classification).equals(UndeadClassification.testedUndead);
+      final undead = report.undead.single;
+      check(undead.name).equals('OldParser');
+      check(undead.kind).equals(DeclarationKind.classType);
+      check(undead.classification).equals(UndeadClassification.testedUndead);
       check(
-        zombie.suggestedAction,
+        undead.suggestedAction,
       ).equals(SuggestedAction.deleteWithOrphanTests);
 
-      final orphanTests = zombie.orphanTests!;
+      final orphanTests = undead.orphanTests!;
       check(orphanTests.length).equals(1);
       check(orphanTests.first.file).equals('test/old_parser_test.dart');
       check(orphanTests.first.description).equals('OldParser parses correctly');
@@ -341,7 +341,7 @@ export 'src/platform_io.dart'
     });
 
     test(
-      'respects // zombie:ignore and // zombie:ignore_for_file directives',
+      'respects // undead:ignore and // undead:ignore_for_file directives',
       () async {
         await d.dir('suppression_pkg', [
           packageConfig('suppression_pkg'),
@@ -355,12 +355,12 @@ environment:
             d.dir('src', [
               d.file('live.dart', 'void live() {}'),
               d.file('ignored_file.dart', '''
-// zombie:ignore_for_file
+// undead:ignore_for_file
 class IgnoredFileClass {}
 void ignoredFileFunc() {}
 '''),
               d.file('ignored_decl.dart', '''
-// zombie:ignore
+// undead:ignore
 class IgnoredClass {}
 
 class DeadUnignoredClass {}
@@ -519,7 +519,7 @@ set deadSetter(int v) {}
       check(names).not((it) => it.contains('liveTopVar'));
     });
 
-    test('correctly distinguishes tested zombie from co-invoked hazard in '
+    test('correctly distinguishes tested undead from co-invoked hazard in '
         'multi-test file', () async {
       await d.dir('multi_test_pkg', [
         packageConfig('multi_test_pkg'),
@@ -562,14 +562,14 @@ void main() {
       check(report.testedUndeadFound).equals(1);
       check(report.coInvokedHazardsFound).equals(0);
 
-      final zombie = report.undead.single;
-      check(zombie.name).equals('DeadParser');
-      check(zombie.classification).equals(UndeadClassification.testedUndead);
+      final undead = report.undead.single;
+      check(undead.name).equals('DeadParser');
+      check(undead.classification).equals(UndeadClassification.testedUndead);
       check(
-        zombie.suggestedAction,
+        undead.suggestedAction,
       ).equals(SuggestedAction.deleteWithOrphanTests);
 
-      final orphanTests = zombie.orphanTests!;
+      final orphanTests = undead.orphanTests!;
       check(orphanTests.length).equals(1);
       check(orphanTests.first.description).equals('isolated dead parser test');
       check(orphanTests.first.coInvokedHazard).isFalse();
@@ -853,11 +853,11 @@ class DeadService {}
         check(report.testedUndeadFound).equals(0);
         check(report.coInvokedHazardsFound).equals(0);
 
-        final zombieNames = report.undead.map((z) => z.name).toSet();
-        check(zombieNames).contains('DeadService');
-        check(zombieNames).contains('unusedTopLevel');
-        check(zombieNames).not((it) => it.contains('LiveService'));
-        check(zombieNames).not((it) => it.contains('DevService'));
+        final undeadNames = report.undead.map((z) => z.name).toSet();
+        check(undeadNames).contains('DeadService');
+        check(undeadNames).contains('unusedTopLevel');
+        check(undeadNames).not((it) => it.contains('LiveService'));
+        check(undeadNames).not((it) => it.contains('DevService'));
       },
     );
 
@@ -907,14 +907,14 @@ void main() {
       check(report.testedUndeadFound).equals(1);
       check(report.coInvokedHazardsFound).equals(0);
 
-      final zombie = report.undead.single;
-      check(zombie.name).equals('DeadClass');
-      check(zombie.classification).equals(UndeadClassification.testedUndead);
+      final undead = report.undead.single;
+      check(undead.name).equals('DeadClass');
+      check(undead.classification).equals(UndeadClassification.testedUndead);
       check(
-        zombie.suggestedAction,
+        undead.suggestedAction,
       ).equals(SuggestedAction.deleteWithOrphanTests);
 
-      final orphanTests = zombie.orphanTests!;
+      final orphanTests = undead.orphanTests!;
       check(orphanTests.length).equals(1);
       check(orphanTests.first.description).equals('tests dead code only');
       check(orphanTests.first.coInvokedHazard).isFalse();
@@ -964,8 +964,8 @@ extension CounterSub on Counter {
 
         final report = await analyzePackage(d.path('compound_assignment_pkg'));
         check(report.pureUndeadFound).equals(1);
-        final zombie = report.undead.single;
-        check(zombie.name).equals('CounterSub');
+        final undead = report.undead.single;
+        check(undead.name).equals('CounterSub');
       },
     );
 
@@ -1079,18 +1079,18 @@ class DeadAlias = BaseType with UnusedMixin;
       final report = await analyzePackage(d.path('class_type_alias_pkg'));
       check(report.pureUndeadFound).equals(2);
 
-      final zombieNames = report.undead.map((z) => z.name).toSet();
-      check(zombieNames).contains('DeadAlias');
-      check(zombieNames).contains('UnusedMixin');
-      check(zombieNames).not((it) => it.contains('LiveAlias'));
-      check(zombieNames).not((it) => it.contains('BaseType'));
-      check(zombieNames).not((it) => it.contains('UsedMixin'));
-      check(zombieNames).not((it) => it.contains('UsedInterface'));
+      final undeadNames = report.undead.map((z) => z.name).toSet();
+      check(undeadNames).contains('DeadAlias');
+      check(undeadNames).contains('UnusedMixin');
+      check(undeadNames).not((it) => it.contains('LiveAlias'));
+      check(undeadNames).not((it) => it.contains('BaseType'));
+      check(undeadNames).not((it) => it.contains('UsedMixin'));
+      check(undeadNames).not((it) => it.contains('UsedInterface'));
 
-      final deadAliasZombie = report.undead.firstWhere(
+      final deadAliasUndead = report.undead.firstWhere(
         (z) => z.name == 'DeadAlias',
       );
-      check(deadAliasZombie.kind).equals(DeclarationKind.classType);
+      check(deadAliasUndead.kind).equals(DeclarationKind.classType);
     });
 
     test('evaluates testWidgets and solo_test in nested groups', () async {
@@ -1314,7 +1314,7 @@ class DeadFeatureService {}
     });
 
     test('gRPC *Stub naming is not test support and is detected as '
-        'tested zombie (VULN-8)', () async {
+        'tested undead (VULN-8)', () async {
       await d.dir('grpc_stub_pkg', [
         packageConfig('grpc_stub_pkg'),
         d.file('pubspec.yaml', '''
@@ -1366,13 +1366,13 @@ void main() {
 
       final report = await analyzePackage(d.path('grpc_stub_pkg'));
       // MockPaymentClient and TestingHook are preserved test support.
-      // PaymentServiceStub is NOT test support and is flagged as a zombie!
+      // PaymentServiceStub is NOT test support and is flagged as a undead!
       check(report.testedUndeadFound).equals(1);
-      final zombie = report.undead.single;
-      check(zombie.name).equals('PaymentServiceStub');
-      check(zombie.classification).equals(UndeadClassification.testedUndead);
-      check(zombie.orphanTests).isNotNull();
-      check(zombie.orphanTests!.first.file).equals('test/client_test.dart');
+      final undead = report.undead.single;
+      check(undead.name).equals('PaymentServiceStub');
+      check(undead.classification).equals(UndeadClassification.testedUndead);
+      check(undead.orphanTests).isNotNull();
+      check(undead.orphanTests!.first.file).equals('test/client_test.dart');
     });
 
     test('build.yaml with comments and blank lines preserves builder '
@@ -1416,7 +1416,7 @@ void deadBuilderFactory() {}
     });
 
     test('multi-variable variable-level suppression respects '
-        '// zombie:ignore per variable (VULN-11)', () async {
+        '// undead:ignore per variable (VULN-11)', () async {
       await d.dir('multivar_ignore_pkg', [
         packageConfig('multivar_ignore_pkg'),
         d.file('pubspec.yaml', '''
@@ -1430,7 +1430,7 @@ environment:
             d.file('live.dart', 'class LiveClass {}'),
             d.file('vars.dart', '''
 late int varA,
-    // zombie:ignore
+    // undead:ignore
     varB,
     varC;
 '''),
@@ -1502,11 +1502,11 @@ void main() {
 
       final report = await analyzePackage(d.path('fixture_orphan_pkg'));
       check(report.testedUndeadFound).equals(1);
-      final zombie = report.undead.single;
-      check(zombie.name).equals('DeadFixtureHelper');
-      check(zombie.classification).equals(UndeadClassification.testedUndead);
-      check(zombie.orphanTests).isNotNull();
-      final descriptions = zombie.orphanTests!
+      final undead = report.undead.single;
+      check(undead.name).equals('DeadFixtureHelper');
+      check(undead.classification).equals(UndeadClassification.testedUndead);
+      check(undead.orphanTests).isNotNull();
+      final descriptions = undead.orphanTests!
           .map((t) => t.description)
           .toSet();
       check(descriptions).contains('setUpAll');
@@ -1652,20 +1652,20 @@ class DeadDartHelper {
         // 1. Default run: flags both JS interop and DeadDartHelper, but
         // marks isExternalBinding.
         final defaultReport = await analyzePackage(d.path('js_interop_pkg'));
-        final canvasZombie = defaultReport.undead.firstWhere(
+        final canvasUndead = defaultReport.undead.firstWhere(
           (z) => z.name == 'DomCanvas',
         );
-        check(canvasZombie.isExternalBinding).isTrue();
+        check(canvasUndead.isExternalBinding).isTrue();
 
-        final funcZombie = defaultReport.undead.firstWhere(
+        final funcUndead = defaultReport.undead.firstWhere(
           (z) => z.name == 'topLevelJsFunc',
         );
-        check(funcZombie.isExternalBinding).isTrue();
+        check(funcUndead.isExternalBinding).isTrue();
 
-        final dartZombie = defaultReport.undead.firstWhere(
+        final dartUndead = defaultReport.undead.firstWhere(
           (z) => z.name == 'DeadDartHelper',
         );
-        check(dartZombie.isExternalBinding).isFalse();
+        check(dartUndead.isExternalBinding).isFalse();
 
         // 2. Run with ignoreExternalBindings: true.
         final options = UndeadOptions(
@@ -1763,7 +1763,7 @@ void useHelper() {
       check(reportWithWs.pureUndeadFound).equals(1);
       check(reportWithWs.undead.single.name).equals('deadCoreFunc');
 
-      // 2. With workspace discovery disabled -> helper is pure zombie!
+      // 2. With workspace discovery disabled -> helper is pure undead!
       final reportNoWs = await UndeadEngine(
         UndeadOptions(
           packagePath: d.path('ws_monorepo/packages/core_pkg'),
@@ -1771,9 +1771,9 @@ void useHelper() {
         ),
       ).analyze();
       check(reportNoWs.pureUndeadFound).equals(2);
-      final zombieNames = reportNoWs.undead.map((z) => z.name).toSet();
-      check(zombieNames).contains('internalCoreHelper');
-      check(zombieNames).contains('deadCoreFunc');
+      final undeadNames = reportNoWs.undead.map((z) => z.name).toSet();
+      check(undeadNames).contains('internalCoreHelper');
+      check(undeadNames).contains('deadCoreFunc');
     });
 
     test(
@@ -1903,9 +1903,9 @@ void main() {
         ).equals(UndeadClassification.testedUndead);
 
         // fileRootTarget and dirProdTarget are LIVE production roots!
-        final zombieNames = report.undead.map((z) => z.name).toSet();
-        check(zombieNames).not((it) => it.contains('fileRootTarget'));
-        check(zombieNames).not((it) => it.contains('dirProdTarget'));
+        final undeadNames = report.undead.map((z) => z.name).toSet();
+        check(undeadNames).not((it) => it.contains('fileRootTarget'));
+        check(undeadNames).not((it) => it.contains('dirProdTarget'));
       },
     );
 
@@ -1985,8 +1985,8 @@ void runGen() {
 
         check(report.pureUndeadFound).equals(1);
         check(report.undead.single.name).equals('deadFunc');
-        final zombieNames = report.undead.map((z) => z.name).toSet();
-        check(zombieNames).not((it) => it.contains('buildGenHelper'));
+        final undeadNames = report.undead.map((z) => z.name).toSet();
+        check(undeadNames).not((it) => it.contains('buildGenHelper'));
       },
     );
   });

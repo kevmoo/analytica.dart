@@ -27,8 +27,7 @@ identifying unused top-level declarations, classes, functions, and variables.
     exhaustiveness.
 - **Granular Suppressions**:
   - Supports `// undead:ignore` (declaration-level) and
-    `// undead:ignore_for_file` (file-level) directives (with backward
-    compatibility for `// zombie:`).
+    `// undead:ignore_for_file` (file-level) directives.
 
 ## ⚡ Quick Start
 

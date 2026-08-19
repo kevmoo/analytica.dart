@@ -80,8 +80,8 @@ void trulyDeadFunc() {}
           );
 
           check(reportFiltered.pureUndeadFound).equals(1);
-          final zombie = reportFiltered.undead.single;
-          check(zombie.name).equals('trulyDeadFunc');
+          final undead = reportFiltered.undead.single;
+          check(undead.name).equals('trulyDeadFunc');
         },
       );
     });
@@ -137,7 +137,7 @@ void main() {
 
           // 1. Default patterns: DatabaseStub is not recognized as test support
           // (by default Fake*/Mock*), so DatabaseStub and RegularDeadClass are
-          // tested zombies, and UnusedStub is pure zombie.
+          // tested undeads, and UnusedStub is pure undead.
           final reportDefault = await analyzePackage(
             d.path('custom_test_support_pkg'),
           );
@@ -148,8 +148,8 @@ void main() {
 
           // 2. Custom patterns: '*Stub' is configured as test support.
           // DatabaseStub (reached by tests) is preserved as test support.
-          // RegularDeadClass is still a tested zombie.
-          // UnusedStub (unreached by tests) is still a pure zombie.
+          // RegularDeadClass is still a tested undead.
+          // UnusedStub (unreached by tests) is still a pure undead.
           final options = UndeadOptions(
             packagePath: d.path('custom_test_support_pkg'),
             testSupportPatterns: const ['*Stub'],

@@ -35,7 +35,7 @@ Phase 1 operates at the **Top-Level AST Declaration** granularity (`CompilationU
 | **`lib/**`** (non-`src`) | **Public API Root** | ❌ No | **Open-World Invariant**: By default, ALL exported symbols in `exportNamespace` across all non-`src` `lib/**` files are **Public Roots** (Preserved). Never assume `publish_to: none` implies zero external consumers, as internal company repos, path dependencies, and monorepos routinely depend on private packages. |
 | **`lib/src/**`** | **Internal Source Target** | ✅ Yes | Declarations are live **only** if reachable from public exports, executables, tests, tools, or examples. |
 | **`bin/**/*.dart`** | **Executable Root** | ✅ Yes (Internal) | `main()` functions are roots. Unused top-level helper declarations in `bin/` are deletion candidates. |
-| **`test/**`, `integration_test/**`** | **Test Consumer Root** | ❌ No | Test `main()` functions are test roots. Test files are never deletion targets for pure zombies. |
+| **`test/**`, `integration_test/**`** | **Test Consumer Root** | ❌ No | Test `main()` functions are test roots. Test files are never deletion targets for pure undead. |
 | **`example/**`** | **Demonstration Root** | ❌ **No (Immune)** | **Demonstration Invariant**: Code in `example/` is shared on pub.dev for human documentation. It is a consumer root for `lib/src/` and **never a deletion target** by default (`--example-mode=demonstration`). |
 | **`tool/**`, `benchmark/**`, `web/**`** | **Auxiliary Consumer Root** | ✅ Yes (Internal) | `main()` functions are roots. Unused internal utilities in `tool/` are deletion candidates. |
 | **`*.g.dart`, `*.freezed.dart`** | **Generated Code (Exempt)** | ❌ No | Generated files are never modified or flagged directly. |
@@ -48,9 +48,9 @@ Phase 1 operates at the **Top-Level AST Declaration** granularity (`CompilationU
 <!-- mdformat off(prevent table wrapping) -->
 | Code Pattern / Declaration | Location | Target Scope | Reachable Production? | Reachable Tests? | Classification | Recommended Action |
 | :--- | :--- | :--- | :---: | :---: | :--- | :--- |
-| **Unexported Top-Level Declaration** | `lib/src/` | Any | ❌ No | ❌ No | **Pure Zombie** | Delete declaration |
-| **Tested-Only Isolated Feature** | `lib/src/` | Any | ❌ No | ✅ Yes (Sole Target) | **Tested Zombie** | Delete declaration + delete orphan test block |
-| **Co-Invoked Tested Declaration** | `lib/src/` | Any | ❌ No | ✅ Yes (Shared Test) | **Co-Invoked Zombie** | Flag `co_invoked_test_hazard` (manual refactor) |
+| **Unexported Top-Level Declaration** | `lib/src/` | Any | ❌ No | ❌ No | **Pure Undead** | Delete declaration |
+| **Tested-Only Isolated Feature** | `lib/src/` | Any | ❌ No | ✅ Yes (Sole Target) | **Tested Undead** | Delete declaration + delete orphan test block |
+| **Co-Invoked Tested Declaration** | `lib/src/` | Any | ❌ No | ✅ Yes (Shared Test) | **Co-Invoked Hazard** | Flag `co_invoked_test_hazard` (manual refactor) |
 | **Test Support / Fixture / Hook** (`@visibleForTesting`, `Fake*`) | `lib/src/` | Any | ❌ No | ✅ Yes | **Test Support** | Preserve (active test harness) |
 | **Exported Symbol in `exportNamespace`** | `lib/**` (excl. `src`) | Any | N/A | N/A | **Public API** | Preserve (Open-World Invariant) |
 | **Direct Subtype of Live `sealed` Class** | `lib/src/` | Any | (Hierarchy) | N/A | **Sealed Hierarchy** | Preserve (exhaustiveness guarantee) |
@@ -93,8 +93,8 @@ flowchart TD
         Classify{"Classification Engine"}
         P_BFS --> Classify
         T_BFS --> Classify
-        Classify --> Pure["Pure Zombie (Safe to Delete)"]
-        Classify --> Tested["Tested Zombie (Isolated Test Deletion)"]
+        Classify --> Pure["Pure Undead (Safe to Delete)"]
+        Classify --> Tested["Tested Undead (Isolated Test Deletion)"]
         Classify --> CoInvoked["Co-Invoked Hazard (Manual Refactor Required)"]
         Classify --> TestSupport["Test Support Hook / Fixture (Preserved)"]
         Classify --> SealedLive["Sealed Subtype (Preserved)"]
@@ -110,22 +110,22 @@ flowchart TD
 
 ## 5. Concrete Examples & Test Cases
 
-### Example 1: Dead Unexported Top-Level Function (Pure Zombie)
+### Example 1: Dead Unexported Top-Level Function (Pure Undead)
 ```dart
 // lib/src/utils.dart (NOT exported in lib/my_package.dart)
-String calculateLegacyHash(String input) => input.trim(); // 🧟 PURE ZOMBIE
+String calculateLegacyHash(String input) => input.trim(); // 🧟 PURE UNDEAD
 ```
 * **Analysis**: `calculateLegacyHash` is not in `lib/*.dart` export namespace and has 0 inbound reference edges anywhere in the package.
 * **Remediation**: Delete `calculateLegacyHash`.
 
 ---
 
-### Example 2: Tested Zombie vs Co-Invoked Test Hazard
-#### Scenario A: Isolated Tested Zombie (Safe to Delete Test Block)
+### Example 2: Tested Undead vs Co-Invoked Test Hazard
+#### Scenario A: Isolated Tested Undead (Safe to Delete Test Block)
 ```dart
 // lib/src/old_parser.dart (NOT exported in lib/my_package.dart)
 class OldParser {
-  String parse(String raw) => raw.toLowerCase(); // 🧟 TESTED ZOMBIE
+  String parse(String raw) => raw.toLowerCase(); // 🧟 TESTED UNDEAD
 }
 
 // test/old_parser_test.dart
@@ -209,5 +209,5 @@ export 'src/platform_io.dart'
 | Directive | Scope | Example Usage |
 | :--- | :--- | :--- |
 | `// undead:ignore` | Suppresses the immediately following top-level declaration | `// undead:ignore`<br>`class DynamicPluginTarget { ... }` |
-| `// undead:ignore_for_file` | Suppresses all zombie findings within the current `.dart` file | Top of file:<br>`// undead:ignore_for_file` |
+| `// undead:ignore_for_file` | Suppresses all undead findings within the current `.dart` file | Top of file:<br>`// undead:ignore_for_file` |
 <!-- mdformat on -->

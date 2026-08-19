@@ -6,5 +6,5 @@
 - Deterministic analysis modes: open-world (libraries) and closed-app
   (standalone/executables).
 - Custom suppression directives: `// undead:ignore` and
-  `// undead:ignore_for_file` (with backward compatibility for `// zombie:`).
+  `// undead:ignore_for_file`.
 

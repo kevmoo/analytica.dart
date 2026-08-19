@@ -6,9 +6,9 @@ import 'package:undead/src/comment_parser.dart';
 
 void main() {
   group('CommentParser', () {
-    test('detects // zombie:ignore_for_file at top of file', () {
+    test('detects // undead:ignore_for_file at top of file', () {
       const source = '''
-// zombie:ignore_for_file
+// undead:ignore_for_file
 class Foo {}
 ''';
       final result = parseString(
@@ -32,9 +32,9 @@ class Foo {}
       check(CommentParser.hasIgnoreForFile(result.unit, source)).isFalse();
     });
 
-    test('detects // zombie:ignore immediately preceding declaration', () {
+    test('detects // undead:ignore immediately preceding declaration', () {
       const source = '''
-// zombie:ignore
+// undead:ignore
 class DynamicClass {}
 
 class UnignoredClass {}
@@ -51,9 +51,9 @@ class UnignoredClass {}
       check(CommentParser.isDeclarationIgnored(decl2)).isFalse();
     });
 
-    test('detects // zombie:ignore before metadata annotations', () {
+    test('detects // undead:ignore before metadata annotations', () {
       const source = '''
-// zombie:ignore
+// undead:ignore
 @deprecated
 class DynamicAnnotatedClass {}
 ''';
@@ -66,10 +66,10 @@ class DynamicAnnotatedClass {}
       check(CommentParser.isDeclarationIgnored(decl)).isTrue();
     });
 
-    test('detects // zombie:ignore between metadata and declaration token', () {
+    test('detects // undead:ignore between metadata and declaration token', () {
       const source = '''
 @deprecated
-// zombie:ignore
+// undead:ignore
 class DynamicAnnotatedClass {}
 ''';
       final result = parseString(
@@ -96,11 +96,11 @@ class Foo {}
     });
 
     test(
-      'does NOT treat string literals containing // zombie:ignore_for_file as suppression',
+      'does NOT treat string literals containing // undead:ignore_for_file as suppression',
       () {
         const source = '''
 const template = """
-// zombie:ignore_for_file
+// undead:ignore_for_file
 """;
 class Foo {}
 ''';

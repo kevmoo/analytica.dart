@@ -76,8 +76,8 @@ packages/undead/
 
 ### 4.4 Step 4: Classification & Hazard Evaluation
 * Compares declarations in `lib/src/`:
-  * $D \notin \text{PRODUCTION\_LIVE} \land D \notin \text{TEST\_REACHABLE} \implies$ **Pure Zombie** (Delete).
-  * $D \notin \text{PRODUCTION\_LIVE} \land D \in \text{TEST\_REACHABLE} \implies$ **Tested Zombie**:
+  * $D \notin \text{PRODUCTION\_LIVE} \land D \notin \text{TEST\_REACHABLE} \implies$ **Pure Undead** (Delete).
+  * $D \notin \text{PRODUCTION\_LIVE} \land D \in \text{TEST\_REACHABLE} \implies$ **Tested Undead**:
     * If test block contains ONLY dead references $\implies$ Safe to delete test block.
     * If test block co-invokes live and dead code $\implies$ Flag `co_invoked_test_hazard`.
 
@@ -89,7 +89,7 @@ packages/undead/
 All reachability scenarios are verified using ephemeral in-memory packages created via `package:test_descriptor`:
 
 ```dart
-test('detects unexported top-level function as pure zombie', () async {
+test('detects unexported top-level function as pure undead', () async {
   await d.dir('pkg', [
     d.file('pubspec.yaml', '''
 name: sample_pkg

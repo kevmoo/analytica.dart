@@ -131,13 +131,13 @@ void main() {
         UndeadClassification.fromJson('pureUndead'),
       ).equals(UndeadClassification.pureUndead);
       check(
-        UndeadClassification.fromJson('pureZombie'),
+        UndeadClassification.fromJson('pureUndead'),
       ).equals(UndeadClassification.pureUndead);
       check(
         UndeadClassification.fromJson('testedUndead'),
       ).equals(UndeadClassification.testedUndead);
       check(
-        UndeadClassification.fromJson('testedZombie'),
+        UndeadClassification.fromJson('testedUndead'),
       ).equals(UndeadClassification.testedUndead);
       check(
         UndeadClassification.fromJson('coInvokedHazard'),

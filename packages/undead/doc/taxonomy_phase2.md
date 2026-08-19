@@ -50,9 +50,9 @@ Phase 3 addresses individual enum values and fine-grained field parameters.
 <!-- mdformat off(prevent table wrapping) -->
 | Scenario / Code Pattern | Location | Exported? | Production Reachable? | Test Reachable? | Classification | Recommended Action |
 | :--- | :--- | :---: | :---: | :---: | :--- | :--- |
-| **Unused Method on Internal Class** | `lib/src/` | ❌ No | ❌ No | ❌ No | **Pure Zombie Member** | Delete method |
-| **Tested-Only Method on Internal Class** | `lib/src/` | ❌ No | ❌ No | ✅ Yes | **Tested Zombie Member** | Delete method + remove orphan test calls |
-| **Unused Enum Constant** | `lib/src/` | ❌ No | ❌ No | ❌ No | **Zombie Enum Value** | Check switch exhaustiveness before delete |
+| **Unused Method on Internal Class** | `lib/src/` | ❌ No | ❌ No | ❌ No | **Pure Undead Member** | Delete method |
+| **Tested-Only Method on Internal Class** | `lib/src/` | ❌ No | ❌ No | ✅ Yes | **Tested Undead Member** | Delete method + remove orphan test calls |
+| **Unused Enum Constant** | `lib/src/` | ❌ No | ❌ No | ❌ No | **Undead Enum Value** | Check switch exhaustiveness before delete |
 | **Polymorphic Interface Override** | `lib/src/` | ❌ No | (Via Interface) | N/A | **Exempt / Alive** | Preserve |
 | **Suppressed via Custom Comment** | Any | ❌ No | ❌ No | ❌ No | **Ignored** | Skip (`// undead:ignore_for_class`) |
 <!-- mdformat on -->
