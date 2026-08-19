@@ -415,20 +415,31 @@ Run these verification commands before committing refactored code:
 
 When staging refactored code and preparing a commit message or Pull Request:
 
-### 1. User Confirmation Gate (Prompt-Gated Offer)
-Before writing the PR description or commit body, explicitly ask the user (e.g.
-via `ask_question` or interactive confirmation) whether to include a **Tool
-Provenance & Reproduction block**.
+### 1. User Confirmation Gate & Headless Defaults
+* **Interactive Sessions**: Before writing the PR description or commit body,
+  explicitly prompt the user in chat or via the harness confirmation tool (e.g.
+  `ask_question`) whether to include a **Tool Provenance & Complexity Delta
+  block**.
+* **Headless / Autonomous Fallback**: In non-interactive contexts (e.g.
+  subagents, automated eval suites like `evalin`, or headless CI), default to
+  including the block automatically without blocking on user confirmation.
 
 ### 2. Standardized Provenance Block Format
-When confirmed, append the following markdown block to the PR description or
-commit body so reviewers understand where the changes originated and can rerun
-the audit locally:
+When confirmed (or running headlessly), append the following markdown block to
+the PR description or commit body so reviewers understand where the changes
+originated, see the quantified readability improvements, and can rerun the audit
+locally:
 
 ````markdown
-### 🤖 Tool Provenance & Reproduction
+### 🤖 Tool Provenance & Complexity Delta
 
 This refactoring was guided by [`cognitive_complexity`](https://pub.dev/packages/cognitive_complexity) (`v{version}`).
+
+<!-- mdformat off(prevent table wrapping) -->
+| Target Declaration | Pre-Score | Post-Score | Operational Ceiling |
+| :--- | :---: | :---: | :---: |
+| `{declaration_name}` (`{file_path}`) | `{pre_score}` | `{post_score}` | `<={threshold}` |
+<!-- mdformat on -->
 
 To reproduce or re-evaluate cognitive complexity scores:
 ```bash
@@ -447,4 +458,5 @@ Determine the package version dynamically:
   `dart run cognitive_complexity@ --version`.
 * If invoked with a specific version constraint (e.g.
   `cognitive_complexity@0.2.3`), use that exact version.
+
 

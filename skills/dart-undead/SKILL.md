@@ -219,15 +219,18 @@ graph TD
 
 When staging pruned code and preparing a commit message or Pull Request:
 
-### 1. User Confirmation Gate (Prompt-Gated Offer)
-Before writing the PR description or commit body, explicitly prompt the user
-(e.g. via `ask_question` or interactive confirmation) whether to include a
-**Tool Provenance & Reproduction block**.
+### 1. User Confirmation Gate & Headless Defaults
+* **Interactive Sessions**: Before writing the PR description or commit body,
+  explicitly prompt the user in chat or via the harness confirmation tool (e.g.
+  `ask_question`) whether to include a **Tool Provenance & Reproduction block**.
+* **Headless / Autonomous Fallback**: In non-interactive contexts (e.g.
+  subagents, automated eval suites like `evalin`, or headless CI), default to
+  including the block automatically without blocking on user confirmation.
 
 ### 2. Standardized Provenance Block Format
-When confirmed, append the following markdown block to the PR description or
-commit body so reviewers understand where the deletions originated and can
-rerun the reachability analysis locally:
+When confirmed (or running headlessly), append the following markdown block to
+the PR description or commit body so reviewers understand where the deletions
+originated and can rerun the reachability analysis locally:
 
 ````markdown
 ### 🤖 Tool Provenance & Reproduction
@@ -245,4 +248,5 @@ Determine the package version dynamically:
 * Check `pubspec.lock` in the workspace or run `dart run undead@ --version`.
 * If invoked with a specific version constraint (e.g. `undead@0.1.0`), use that
   exact version.
+
 
