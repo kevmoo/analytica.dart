@@ -65,7 +65,8 @@ dart run undead@ [options] [target_path]
 > **Pre-Flight Package Resolution Gate**: `package:analyzer` requires
 > `.dart_tool/package_config.json` to resolve `package:<name>/...` imports. If
 > packages are unresolved, pass `--pub-get` to automatically run `dart pub get`
-> or `flutter pub get`.
+> or `flutter pub get`. If encountering `.dart_tool` atomic rename errors in
+> sandboxed environments, pass `--no-precompile` (e.g. `dart run --no-precompile undead@`).
 
 ### Execution Modes
 
@@ -109,6 +110,7 @@ dart run undead@ --example-mode=demonstration
 | `-f, --format` | Output formatting (`markdown`, `json`, `github`). | `markdown` |
 | `--json-output=<path>` | Write JSON report to file while preserving stdout. | None |
 | `--example-mode` | Policy for `example/` (`demonstration`, `strict`, `skip`). | `demonstration` |
+| `--extra-roots=<dir1,dir2>` | Comma-separated list of additional root/test dirs. | `""` |
 | `--test-support-patterns` | Comma-separated wildcards for test fixtures. | `Fake*,Mock*` |
 | `--ignore-name-patterns` | Comma-separated wildcards for names to ignore. | `""` |
 | `--[no-]workspace-discovery` | Discover consumer roots from sibling packages in workspace. | `true` |
@@ -205,3 +207,6 @@ graph TD
    * Run `dart analyze` to ensure zero compilation or unresolved reference
      errors.
    * Run `dart test` to confirm all remaining tests pass.
+4. **Clean Diff Staging**: Inspect modifications using `git diff --stat` (or
+   isolate in a temporary feature branch/worktree) to ensure only intended
+   declarations were removed.
