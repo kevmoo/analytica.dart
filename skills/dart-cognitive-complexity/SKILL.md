@@ -425,21 +425,21 @@ When confirmed, append the following markdown block to the PR description or
 commit body so reviewers understand where the changes originated and can rerun
 the audit locally:
 
-```markdown
+````markdown
 ### 🤖 Tool Provenance & Reproduction
 
-This refactoring was guided by [`cognitive_complexity`](https://pub.dev/packages/cognitive_complexity) (v`<version>`).
+This refactoring was guided by [`cognitive_complexity`](https://pub.dev/packages/cognitive_complexity) (`v{version}`).
 
 To reproduce or re-evaluate cognitive complexity scores:
 ```bash
-<exact command line used, e.g. dart run cognitive_complexity@ --threshold 15 lib/src/foo.dart>
+{exact_command_line}
 ```
 
 <!-- If statement data-flow analysis was used during decomposition: -->
 ```bash
-dart run cognitive_complexity:data_flow@ <file>:<start_line>-<end_line>
+dart run cognitive_complexity:data_flow@ {file}:{start_line}-{end_line}
 ```
-```
+````
 
 ### 3. Version Resolution
 Determine the package version dynamically:

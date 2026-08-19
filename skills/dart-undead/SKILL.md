@@ -229,16 +229,16 @@ When confirmed, append the following markdown block to the PR description or
 commit body so reviewers understand where the deletions originated and can
 rerun the reachability analysis locally:
 
-```markdown
+````markdown
 ### 🤖 Tool Provenance & Reproduction
 
-Dead code detection and reachability analysis performed with [`pkg:undead`](https://pub.dev/packages/undead) (v`<version>`).
+Dead code detection and reachability analysis performed with [`undead`](https://pub.dev/packages/undead) (`v{version}`).
 
 To reproduce or re-run this reachability audit locally:
 ```bash
-<exact command line used, e.g. dart run undead@ --mode=closed-app or dart run undead@>
+{exact_command_line}
 ```
-```
+````
 
 ### 3. Version Resolution
 Determine the package version dynamically:
