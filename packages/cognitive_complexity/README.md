@@ -55,13 +55,13 @@ void main() {
 Add automated complexity audits to `.github/workflows/complexity.yml`:
 
 ```yaml
-- uses: actions/checkout@v4
+- uses: actions/checkout@v7
   with:
     fetch-depth: 0
 
 - uses: dart-lang/setup-dart@v1
 
-- uses: kevmoo/cognitive_complexity.dart@main
+- uses: kevmoo/analytica.dart@main
   with:
     diff-base: origin/${{ github.base_ref }}
     fail-threshold: 15

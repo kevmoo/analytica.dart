@@ -28,7 +28,7 @@ jobs:
       contents: read # Required for actions/checkout
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           # Fetch full history so merge-base comparison can locate common ancestor
           fetch-depth: 0
@@ -37,7 +37,7 @@ jobs:
         uses: dart-lang/setup-dart@v1
 
       - name: Run Complexity Scanner
-        uses: kevmoo/cognitive_complexity.dart@main
+        uses: kevmoo/analytica.dart@main
         with:
           # Auto-configures pull request merge base comparison
           diff-base: origin/${{ github.base_ref }}
