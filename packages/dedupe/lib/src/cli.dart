@@ -1,6 +1,5 @@
 import 'dart:io';
 
-import 'package:analytica/analyzer.dart';
 import 'package:analytica/cli.dart';
 import 'package:args/args.dart';
 import 'package:path/path.dart' as p;

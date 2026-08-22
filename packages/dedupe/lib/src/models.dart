@@ -1,4 +1,18 @@
-import 'package:analytica/analyzer.dart';
+/// Standard code-generation, binding, and test mock exclusions for duplication
+/// analysis.
+const List<String> defaultDartExclusions = [
+  '**/*.g.dart',
+  '**/*.freezed.dart',
+  '**/*.pb.dart',
+  '**/*.pbjson.dart',
+  '**/*.pbenum.dart',
+  '**/*.pbserver.dart',
+  '**/*_bindings.dart',
+  '**/native_*.dart',
+  '**/jni_*.dart',
+  '**/*.mocks.dart',
+  '**/*.config.dart',
+];
 
 /// Classification category for duplicate code clusters.
 enum CloneCategory {

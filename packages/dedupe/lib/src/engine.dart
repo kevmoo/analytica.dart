@@ -341,11 +341,98 @@ class DedupeEngine {
   }
 
   List<String> _discoverDartFiles(String rootPath) {
-    return discoverDartFiles(
-      rootPath,
-      targets: options.targets,
-      excludePatterns: options.excludePatterns,
-      includePatterns: options.includePatterns,
-    );
+    final targetDir = Directory(p.normalize(p.absolute(rootPath)));
+    if (!targetDir.existsSync()) {
+      return const [];
+    }
+
+    final excludes = options.excludePatterns.map(WildcardPattern.new).toList();
+    final includes = options.includePatterns.map(WildcardPattern.new).toList();
+
+    final discovered = <String>{};
+    for (final target in options.targets) {
+      _collectFromTarget(
+        targetDir: targetDir,
+        target: target,
+        includes: includes,
+        excludes: excludes,
+        discovered: discovered,
+      );
+    }
+
+    final result = discovered.toList()..sort();
+    return result;
+  }
+
+  static void _collectFromTarget({
+    required Directory targetDir,
+    required String target,
+    required List<WildcardPattern> includes,
+    required List<WildcardPattern> excludes,
+    required Set<String> discovered,
+  }) {
+    final fullPath = p.normalize(p.join(targetDir.path, target));
+    final type = FileSystemEntity.typeSync(fullPath);
+
+    if (type == FileSystemEntityType.file) {
+      if (_matchesFilters(fullPath, targetDir.path, includes, excludes)) {
+        discovered.add(fullPath);
+      }
+    } else if (type == FileSystemEntityType.directory) {
+      _collectFromDirectory(
+        dir: Directory(fullPath),
+        rootDirPath: targetDir.path,
+        includes: includes,
+        excludes: excludes,
+        discovered: discovered,
+      );
+    }
+  }
+
+  static void _collectFromDirectory({
+    required Directory dir,
+    required String rootDirPath,
+    required List<WildcardPattern> includes,
+    required List<WildcardPattern> excludes,
+    required Set<String> discovered,
+  }) {
+    for (final entity in dir.listSync(recursive: true, followLinks: false)) {
+      if (entity is File &&
+          _matchesFilters(entity.path, rootDirPath, includes, excludes)) {
+        discovered.add(entity.path);
+      }
+    }
+  }
+
+  static bool _matchesFilters(
+    String filePath,
+    String rootDirPath,
+    List<WildcardPattern> includes,
+    List<WildcardPattern> excludes,
+  ) {
+    if (!filePath.endsWith('.dart')) return false;
+
+    final relPath = p.normalize(p.relative(filePath, from: rootDirPath));
+    final forwardRelPath = relPath.replaceAll(r'\', '/');
+    final rootedPath = '/$forwardRelPath';
+    final basename = p.basename(filePath);
+
+    for (final pattern in excludes) {
+      if (pattern.matches(forwardRelPath) ||
+          pattern.matches(rootedPath) ||
+          pattern.matches(basename)) {
+        return false;
+      }
+    }
+
+    for (final pattern in includes) {
+      if (pattern.matches(forwardRelPath) ||
+          pattern.matches(rootedPath) ||
+          pattern.matches(basename)) {
+        return true;
+      }
+    }
+
+    return false;
   }
 }
