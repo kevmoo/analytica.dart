@@ -167,10 +167,15 @@ class DedupeEngine {
     }
 
     final deltaService = DedupeDeltaService(workingDirectory: targetDirPath);
+    String? repoRoot;
+    try {
+      repoRoot = await deltaService.getRepoRoot();
+    } catch (_) {}
     final diffs = await deltaService.getParsedDiff(options.gitDiffBase!);
     final diffRanges = deltaService.extractDiffRanges(
       diffs,
       baseDir: targetDirPath,
+      repoRoot: repoRoot,
     );
 
     final result = deltaService.applyDiffToClusters(
