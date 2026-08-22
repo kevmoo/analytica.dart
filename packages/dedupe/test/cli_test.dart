@@ -267,6 +267,30 @@ void uniqueB() {
       check(code).equals(66);
     });
 
+    test('run fails when any positional path does not exist', () async {
+      await d.dir('in_proc_pkg_valid', [
+        d.dir('lib', [d.file('a.dart', 'void main() {}')]),
+      ]).create();
+
+      final runner = DedupeCliRunner();
+      final code = await runner.run([
+        d.path('in_proc_pkg_valid'),
+        'does/not/exist/second_dir',
+      ]);
+      check(code).equals(66);
+    });
+
+    test('run reports usage on invalid numeric options', () async {
+      final runner = DedupeCliRunner();
+      check(await runner.run(['--min-tokens=abc', '.'])).equals(64);
+      check(await runner.run(['--min-tokens=-5', '.'])).equals(64);
+      check(await runner.run(['--min-lines=foo', '.'])).equals(64);
+      check(await runner.run(['--top=xyz', '.'])).equals(64);
+      check(await runner.run(['--fail-threshold=-1', '.'])).equals(64);
+      check(await runner.run(['--fail-threshold=NaN', '.'])).equals(64);
+      check(await runner.run(['--fail-threshold=Infinity', '.'])).equals(64);
+    });
+
     test('run executes analysis on temporary directory', () async {
       await d.dir('in_proc_pkg', [
         d.dir('lib', [d.file('a.dart', 'void main() { print("hi"); }')]),
