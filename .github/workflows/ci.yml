@@ -57,6 +57,10 @@ jobs:
         working-directory: packages/cognitive_complexity
         run: dart test
         if: always() && steps.install.outcome == 'success'
+      - name: Run tests (dedupe)
+        working-directory: packages/dedupe
+        run: dart test
+        if: always() && steps.install.outcome == 'success'
       - name: Run tests (undead)
         working-directory: packages/undead
         run: dart test

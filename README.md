@@ -1,6 +1,6 @@
 # Analytica
 
-Monorepo workspace for Dart static analysis, Cognitive Complexity metrics, data-flow refactoring, and dead code detection.
+Monorepo workspace for Dart static analysis, Cognitive Complexity metrics, data-flow refactoring, dead code detection, and structural duplicate code detection.
 
 ---
 
@@ -61,15 +61,18 @@ jobs:
 
 ## 📦 Workspace Packages
 
-* [`cognitive_complexity`](packages/cognitive_complexity): Algorithmic Cognitive Complexity scoring engine, CLI tool, and data-flow analyzer.
-* [`undead`](packages/undead): Whole-program dead declaration and reachability analysis engine and CLI tool.
-* [`analytica`](packages/analytica): Shared CLI utilities, SDK discovery, AST analyzer extensions, and Git diff utilities.
+* [`cognitive_complexity`](packages/cognitive_complexity/): Algorithmic Cognitive Complexity scoring engine, CLI tool, and data-flow analyzer.
+* [`dedupe`](packages/dedupe/): High-performance code duplication and clone detection engine and CLI tool.
+* [`undead`](packages/undead/): Whole-program dead declaration and reachability analysis engine and CLI tool.
+* [`analytica`](packages/analytica/): Shared CLI utilities, SDK discovery, AST analyzer extensions, and Git diff utilities.
 
 ---
 
 ## 🧠 AI Agent Skills
 
-* [`dart-cognitive-complexity`](skills/dart-cognitive-complexity): Agent skill for automated complexity triage, pattern-matching refactoring, and method extraction.
-* [`dart-undead`](skills/dart-undead): Agent skill for deterministic dead code audits, reachability analysis, and safe deletion protocols.
+* [`dart-cognitive-complexity`](skills/dart-cognitive-complexity/): Agent skill for automated complexity triage, pattern-matching refactoring, and method extraction.
+* [`dart-dedupe`](skills/dart-dedupe/): Agent skill for structural code duplication audits, clone triage, and safe deduplication refactoring.
+* [`dart-undead`](skills/dart-undead/): Agent skill for deterministic dead code audits, reachability analysis, and safe deletion protocols.
+
 
 

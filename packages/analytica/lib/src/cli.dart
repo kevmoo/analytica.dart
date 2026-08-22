@@ -96,3 +96,16 @@ int parseNonNegativeInt(String val, String name) {
 
   return (filePath: p.normalize(filePath), linesString: linesString);
 }
+
+/// Parses a comma-separated string into a trimmed, non-empty list of items.
+///
+/// Returns an empty list if [value] is null, empty, or contains only
+/// whitespace.
+List<String> parseCommaSeparated(String? value) {
+  if (value == null || value.trim().isEmpty) return const [];
+  return value
+      .split(',')
+      .map((e) => e.trim())
+      .where((e) => e.isNotEmpty)
+      .toList();
+}

@@ -9,14 +9,27 @@ class WildcardPattern {
 
   static RegExp _compile(String pattern, {required bool caseSensitive}) {
     final buffer = StringBuffer('^');
-    for (var i = 0; i < pattern.length; i++) {
-      final char = pattern[i];
-      if (char == '*') {
-        buffer.write('.*');
-      } else if (char == '?') {
-        buffer.write('.');
+    var i = 0;
+    while (i < pattern.length) {
+      if (i + 1 < pattern.length &&
+          pattern[i] == '*' &&
+          pattern[i + 1] == '*') {
+        if (i + 2 < pattern.length && pattern[i + 2] == '/') {
+          buffer.write(r'(?:.*/)?');
+          i += 3;
+        } else {
+          buffer.write(r'.*');
+          i += 2;
+        }
+      } else if (pattern[i] == '*') {
+        buffer.write(r'[^/]*');
+        i++;
+      } else if (pattern[i] == '?') {
+        buffer.write(r'[^/]');
+        i++;
       } else {
-        buffer.write(RegExp.escape(char));
+        buffer.write(RegExp.escape(pattern[i]));
+        i++;
       }
     }
     buffer.write(r'$');

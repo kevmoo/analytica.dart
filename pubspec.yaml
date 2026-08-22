@@ -7,4 +7,5 @@ environment:
 workspace:
   - packages/analytica
   - packages/cognitive_complexity
+  - packages/dedupe
   - packages/undead

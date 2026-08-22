@@ -1,14 +1,18 @@
-name: analytica
-description: Core utilities, SDK discovery, Git integration, and CI reporting for Dart analysis tools.
-version: 0.1.1-wip
-repository: https://github.com/kevmoo/analytica.dart/tree/main/packages/analytica
+name: dedupe
+description: High-performance code duplication and clone detection engine and CLI tool for Dart and Flutter.
+version: 0.1.0-wip
+repository: https://github.com/kevmoo/analytica.dart/tree/main/packages/dedupe
 
 resolution: workspace
+
+executables:
+  dedupe:
 
 environment:
   sdk: '^3.12.0'
 
 dependencies:
+  analytica: ^0.1.0
   analyzer: '>=12.0.0 <15.0.0'
   args: ^2.7.0
   io: ^1.0.5
