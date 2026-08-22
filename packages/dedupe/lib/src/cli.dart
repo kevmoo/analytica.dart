@@ -70,7 +70,7 @@ ArgParser buildArgParser() {
     ..addOption(
       'bucket',
       defaultsTo: 'all',
-      allowed: ['all', 'identical', 'structural', 'parameterized'],
+      allowed: ['all', 'identical', 'structural', 'parameterized', 'gapped'],
       help: 'Filter displayed clusters by match bucket.',
     )
     ..addOption(

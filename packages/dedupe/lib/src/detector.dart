@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'ast_extractor.dart';
+import 'minhash.dart';
 import 'models.dart';
 import 'tokenizer.dart';
 
@@ -155,6 +156,11 @@ class CloneDetector {
         seenPairs: seenPairs,
         outPairs: rawPairs,
       );
+      _matchMinHashCandidates(
+        candidates: candidates,
+        seenPairs: seenPairs,
+        outPairs: rawPairs,
+      );
     }
 
     final k = math.max(5, minTokens);
@@ -249,6 +255,67 @@ class CloneDetector {
     }
 
     if (!_compareCandidateTokens(c1, c2, fileSequences)) return;
+
+    final span1 = _TokenSpan(
+      fileIndex: c1.fileIndex,
+      startTokenIndex: c1.startTokenIndex,
+      endTokenIndex: c1.endTokenIndex,
+    );
+    final span2 = _TokenSpan(
+      fileIndex: c2.fileIndex,
+      startTokenIndex: c2.startTokenIndex,
+      endTokenIndex: c2.endTokenIndex,
+    );
+
+    final pairKey = _computeSpanPairKey(span1, span2);
+    if (seenPairs.add(pairKey)) {
+      outPairs.add(_MatchPair(span1, span2));
+    }
+  }
+
+  static void _matchMinHashCandidates({
+    required List<AstCandidateUnit> candidates,
+    required Set<int> seenPairs,
+    required List<_MatchPair> outPairs,
+    double minJaccard = 0.80,
+  }) {
+    final lshIndex = LshIndex<AstCandidateUnit>();
+    for (final c in candidates) {
+      if (c.minHashSignature.isNotEmpty) {
+        lshIndex.insert(c, c.minHashSignature);
+      }
+    }
+
+    final candidatePairs = lshIndex.findCandidatePairs();
+    for (final pair in candidatePairs) {
+      _tryAddMinHashCandidatePair(
+        c1: pair.item1,
+        c2: pair.item2,
+        minJaccard: minJaccard,
+        seenPairs: seenPairs,
+        outPairs: outPairs,
+      );
+    }
+  }
+
+  static void _tryAddMinHashCandidatePair({
+    required AstCandidateUnit c1,
+    required AstCandidateUnit c2,
+    required double minJaccard,
+    required Set<int> seenPairs,
+    required List<_MatchPair> outPairs,
+  }) {
+    if (c1.fileIndex == c2.fileIndex &&
+        (c1.startTokenIndex <= c2.endTokenIndex &&
+            c2.startTokenIndex <= c1.endTokenIndex)) {
+      return;
+    }
+
+    final jaccard = MinHasher.exactJaccard(
+      c1.statementHashes,
+      c2.statementHashes,
+    );
+    if (jaccard < minJaccard) return;
 
     final span1 = _TokenSpan(
       fileIndex: c1.fileIndex,
@@ -691,6 +758,7 @@ class CloneDetector {
   ) {
     var isIdentical = true;
     var isStructural = true;
+    var isParameterized = true;
 
     final firstSeq = fileSequences[spans.first.fileIndex];
     final firstTokens = firstSeq.tokens;
@@ -698,11 +766,16 @@ class CloneDetector {
     final tokenCount = spans.first.tokenCount;
 
     for (var sIdx = 1; sIdx < spans.length; sIdx++) {
-      final otherSeq = fileSequences[spans[sIdx].fileIndex];
-      final otherTokens = otherSeq.tokens;
-      final otherStart = spans[sIdx].startTokenIndex;
+      final otherSpan = spans[sIdx];
+      if (otherSpan.tokenCount != tokenCount) {
+        return CloneBucket.gapped;
+      }
 
-      final (identical, structural) = _compareSpanTokens(
+      final otherSeq = fileSequences[otherSpan.fileIndex];
+      final otherTokens = otherSeq.tokens;
+      final otherStart = otherSpan.startTokenIndex;
+
+      final (identical, structural, parameterized) = _compareSpanTokens(
         firstTokens,
         firstStart,
         otherTokens,
@@ -712,14 +785,16 @@ class CloneDetector {
 
       if (!identical) isIdentical = false;
       if (!structural) isStructural = false;
+      if (!parameterized) isParameterized = false;
     }
 
     if (isIdentical) return CloneBucket.identical;
     if (isStructural) return CloneBucket.structural;
-    return CloneBucket.parameterized;
+    if (isParameterized) return CloneBucket.parameterized;
+    return CloneBucket.gapped;
   }
 
-  static (bool, bool) _compareSpanTokens(
+  static (bool, bool, bool) _compareSpanTokens(
     List<NormalizedToken> tokens1,
     int start1,
     List<NormalizedToken> tokens2,
@@ -728,6 +803,7 @@ class CloneDetector {
   ) {
     var isIdentical = true;
     var isStructural = true;
+    var isParameterized = true;
 
     for (var t = 0; t < tokenCount; t++) {
       final tok1 = tokens1[start1 + t];
@@ -741,9 +817,12 @@ class CloneDetector {
           tok1.originalLexeme != tok2.originalLexeme) {
         isStructural = false;
       }
+      if (tok1.normalizedLexeme != tok2.normalizedLexeme) {
+        isParameterized = false;
+      }
     }
 
-    return (isIdentical, isStructural);
+    return (isIdentical, isStructural, isParameterized);
   }
 
   static CloneCategory _classifyCategory(List<NormalizedToken> tokens) {

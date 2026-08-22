@@ -3,6 +3,7 @@ import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/dart/ast/visitor.dart';
 import 'package:analyzer/source/line_info.dart';
 
+import 'minhash.dart';
 import 'tokenizer.dart';
 
 /// Represents a syntactically bounded AST candidate unit for clone detection.
@@ -20,6 +21,8 @@ class AstCandidateUnit {
   final String astNodeType;
   final int signatureHash;
   final bool isDeclaration;
+  final List<int> minHashSignature;
+  final Set<int> statementHashes;
 
   const AstCandidateUnit({
     required this.filePath,
@@ -35,6 +38,8 @@ class AstCandidateUnit {
     required this.astNodeType,
     required this.signatureHash,
     this.isDeclaration = false,
+    this.minHashSignature = const [],
+    this.statementHashes = const {},
   });
 
   bool contains(AstCandidateUnit other) {
@@ -117,6 +122,7 @@ class _DedupeAstVisitor extends RecursiveAstVisitor<void> {
   final Map<int, int> tokenMap;
   final int minTokens;
   final int minLines;
+  final MinHasher minHasher = MinHasher();
 
   final List<AstCandidateUnit> candidates = [];
 
@@ -136,6 +142,7 @@ class _DedupeAstVisitor extends RecursiveAstVisitor<void> {
       node: node,
       nodeType: 'FunctionDeclaration',
       isDeclaration: true,
+      body: node.functionExpression.body,
     );
     super.visitFunctionDeclaration(node);
   }
@@ -146,6 +153,7 @@ class _DedupeAstVisitor extends RecursiveAstVisitor<void> {
       node: node,
       nodeType: 'MethodDeclaration',
       isDeclaration: true,
+      body: node.body,
     );
     super.visitMethodDeclaration(node);
   }
@@ -156,13 +164,18 @@ class _DedupeAstVisitor extends RecursiveAstVisitor<void> {
       node: node,
       nodeType: 'ConstructorDeclaration',
       isDeclaration: true,
+      body: node.body,
     );
     super.visitConstructorDeclaration(node);
   }
 
   @override
   void visitBlock(Block node) {
-    _tryAddCandidate(node: node, nodeType: 'Block');
+    _tryAddCandidate(
+      node: node,
+      nodeType: 'Block',
+      statements: node.statements,
+    );
     super.visitBlock(node);
   }
 
@@ -200,6 +213,8 @@ class _DedupeAstVisitor extends RecursiveAstVisitor<void> {
     required AstNode node,
     required String nodeType,
     bool isDeclaration = false,
+    FunctionBody? body,
+    NodeList<Statement>? statements,
   }) {
     final startTokenIdx = tokenMap[node.beginToken.offset];
     final endTokenIdx = tokenMap[node.endToken.offset];
@@ -216,6 +231,13 @@ class _DedupeAstVisitor extends RecursiveAstVisitor<void> {
     if (lineCount < minLines) return;
 
     final sigHash = _computeSpanHash(startTokenIdx, endTokenIdx);
+    final stmtHashes = _extractStatementHashes(
+      body: body,
+      statements: statements,
+    );
+    final minHashSig = stmtHashes.length >= 2
+        ? minHasher.computeSignature(stmtHashes)
+        : const <int>[];
 
     candidates.add(
       AstCandidateUnit(
@@ -232,8 +254,30 @@ class _DedupeAstVisitor extends RecursiveAstVisitor<void> {
         astNodeType: nodeType,
         signatureHash: sigHash,
         isDeclaration: isDeclaration,
+        minHashSignature: minHashSig,
+        statementHashes: stmtHashes,
       ),
     );
+  }
+
+  Set<int> _extractStatementHashes({
+    FunctionBody? body,
+    NodeList<Statement>? statements,
+  }) {
+    final hashes = <int>{};
+    final stmts =
+        statements ??
+        (body is BlockFunctionBody ? body.block.statements : null);
+    if (stmts == null) return hashes;
+
+    for (final s in stmts) {
+      final start = tokenMap[s.beginToken.offset];
+      final end = tokenMap[s.endToken.offset];
+      if (start != null && end != null && start <= end) {
+        hashes.add(_computeSpanHash(start, end));
+      }
+    }
+    return hashes;
   }
 
   int _computeSpanHash(int startIdx, int endIdx) {

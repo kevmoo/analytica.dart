@@ -26,7 +26,10 @@ enum CloneBucket {
   structural('structural', 'Structural'),
 
   /// Matched after identifier normalization (renamed variables/fields).
-  parameterized('parameterized', 'Parameterized');
+  parameterized('parameterized', 'Parameterized'),
+
+  /// Matched with minor statement insertions, deletions, or gaps via MinHash.
+  gapped('gapped', 'Gapped (Near-Miss)');
 
   final String jsonValue;
   final String displayName;
@@ -37,6 +40,7 @@ enum CloneBucket {
     'identical' => identical,
     'structural' => structural,
     'parameterized' => parameterized,
+    'gapped' => gapped,
     _ => throw ArgumentError.value(value, 'value', 'Unknown CloneBucket'),
   };
 }

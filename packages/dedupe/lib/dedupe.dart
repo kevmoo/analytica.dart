@@ -11,5 +11,6 @@ export 'src/formatters/github_reporter.dart';
 export 'src/formatters/json_formatter.dart';
 export 'src/formatters/markdown_formatter.dart';
 export 'src/formatters/text_formatter.dart';
+export 'src/minhash.dart';
 export 'src/models.dart';
 export 'src/tokenizer.dart';
