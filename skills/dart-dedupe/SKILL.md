@@ -59,7 +59,7 @@ detect:
 Run the official package CLI directly:
 
 ```bash
-dart run dedupe@ [options] [target_path]
+dart run dedupe [options] [target_path]
 ```
 
 ### Execution Modes
@@ -67,13 +67,13 @@ dart run dedupe@ [options] [target_path]
 #### Mode 1: Full Repository / Directory Scan
 ```bash
 # Markdown summary with clickable file links
-dart run dedupe@
+dart run dedupe
 
 # Machine-readable JSON output for agent pipelines
-dart run dedupe@ --format=json
+dart run dedupe --format=json
 
 # Write JSON report to file alongside human stdout
-dart run dedupe@ --json-output=report.json
+dart run dedupe --json-output=report.json
 ```
 
 #### Mode 2: PR / Git Diff Delta Scan (`--git-diff`)
@@ -81,13 +81,13 @@ Focus strictly on code modified in a branch or PR:
 
 ```bash
 # In Git checkouts:
-dart run dedupe@ --git-diff=origin/main
+dart run dedupe --git-diff=origin/main
 
 # Filter report strictly to clusters intersecting modified lines:
-dart run dedupe@ --git-diff=origin/main --only-changed
+dart run dedupe --git-diff=origin/main --only-changed
 
 # Fail CI if diff duplication exceeds 5%:
-dart run dedupe@ --git-diff=origin/main --fail-threshold=5
+dart run dedupe --git-diff=origin/main --fail-threshold=5
 ```
 
 ### Common CLI Options Reference
@@ -149,7 +149,7 @@ Wrap all deduplication refactoring in a strict verification sandwich:
 
 ```mermaid
 graph TD
-    A[Step 1: Baseline Verification<br>dart test] -->|Pass| B[Step 2: Run Dedupe Scan<br>dart run dedupe@]
+    A[Step 1: Baseline Verification<br>dart test] -->|Pass| B[Step 2: Run Dedupe Scan<br>dart run dedupe]
     B --> C[Step 3: Evaluate Candidates<br>Actionable vs Necessary Gate]
     C --> D[Step 4: Surgical Refactoring<br>Extract Shared Helper / Module]
     D --> E[Step 5: Post-Refactor Health<br>dart analyze && dart test]
@@ -160,7 +160,7 @@ graph TD
 1. **Verify Baseline:** Run `dart test` prior to modification. Ensure 100% pass.
 2. **Surgical Modification:** Extract shared functions or helper classes cleanly.
 3. **Verify Post-Refactor Health:** Run `dart analyze --fatal-infos` and `dart test`.
-4. **Zero-Clone Confirmation:** Re-run `dart run dedupe@` to confirm the target
+4. **Zero-Clone Confirmation:** Re-run `dart run dedupe` to confirm the target
    cluster was eliminated.
 5. **Local Staging:** Stage verified diffs locally (`git add .`).
 
@@ -186,4 +186,4 @@ To reproduce or re-run this duplication scan locally:
 
 ### 2. Version Resolution
 Determine the package version dynamically:
-* Check `pubspec.lock` in the workspace or run `dart run dedupe@ --version`.
+* Check `pubspec.lock` in the workspace or run `dart run dedupe --version`.

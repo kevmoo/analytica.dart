@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:math' as math;
 
 import 'package:analytica/analyzer.dart';
 import 'package:path/path.dart' as p;
@@ -179,11 +180,12 @@ class DedupeEngine {
     }
 
     var totalCloneInstances = 0;
-    var totalLinesSaved = 0;
+    var rawLinesSaved = 0;
     for (final c in clusters) {
       totalCloneInstances += c.instances.length;
-      totalLinesSaved += c.estimatedLinesSaved;
+      rawLinesSaved += c.estimatedLinesSaved;
     }
+    final totalLinesSaved = math.min(rawLinesSaved, totalDuplicateLines);
 
     final overallDuplicationPercentage = totalProjectLines > 0
         ? (totalDuplicateLines / totalProjectLines) * 100

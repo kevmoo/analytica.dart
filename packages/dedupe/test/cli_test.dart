@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:checks/checks.dart';
+import 'package:dedupe/src/cli.dart';
 import 'package:path/path.dart' as p;
 import 'package:test/test.dart';
 import 'package:test_descriptor/test_descriptor.dart' as d;
@@ -239,5 +240,41 @@ void uniqueB() {
         await proc.shouldExit(0);
       },
     );
+  });
+
+  group('DedupeCliRunner In-Process', () {
+    test('run parses flags and outputs help', () async {
+      final runner = DedupeCliRunner();
+      final code = await runner.run(['--help']);
+      check(code).equals(0);
+    });
+
+    test('run parses version flag', () async {
+      final runner = DedupeCliRunner();
+      final code = await runner.run(['--version']);
+      check(code).equals(0);
+    });
+
+    test('run reports usage on invalid flag', () async {
+      final runner = DedupeCliRunner();
+      final code = await runner.run(['--invalid-flag-xyz']);
+      check(code).equals(64);
+    });
+
+    test('run fails on nonexistent path', () async {
+      final runner = DedupeCliRunner();
+      final code = await runner.run(['does/not/exist/directory']);
+      check(code).equals(66);
+    });
+
+    test('run executes analysis on temporary directory', () async {
+      await d.dir('in_proc_pkg', [
+        d.dir('lib', [d.file('a.dart', 'void main() { print("hi"); }')]),
+      ]).create();
+
+      final runner = DedupeCliRunner();
+      final code = await runner.run(['--format=json', d.path('in_proc_pkg')]);
+      check(code).equals(0);
+    });
   });
 }

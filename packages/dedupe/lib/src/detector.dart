@@ -81,14 +81,15 @@ class _MatchPair {
 /// Disjoint Set Union (DSU) helper for clustering token spans.
 class _SpanDsu {
   final List<_TokenSpan> spanNodes = [];
+  final Map<_TokenSpan, int> _spanToIndex = {};
   final Map<int, int> parent = {};
 
   int getOrAddSpanNode(_TokenSpan span) {
-    for (var idx = 0; idx < spanNodes.length; idx++) {
-      if (spanNodes[idx] == span) return idx;
-    }
+    final existing = _spanToIndex[span];
+    if (existing != null) return existing;
     final newIdx = spanNodes.length;
     spanNodes.add(span);
+    _spanToIndex[span] = newIdx;
     parent[newIdx] = newIdx;
     return newIdx;
   }
@@ -220,14 +221,21 @@ class CloneDetector {
     required int minLines,
   }) {
     final rawPairs = <_MatchPair>[];
+    final seenPairs = <int>{};
+
     for (final locations in index.values) {
       if (locations.length < 2) continue;
+      // Cap oversized buckets to prevent combinatorial explosion on trivial
+      // boilerplate.
+      if (locations.length > 50) continue;
+
       _collectMatchesForBucket(
         locations: locations,
         fileSequences: fileSequences,
         k: k,
         minTokens: minTokens,
         minLines: minLines,
+        seenPairs: seenPairs,
         outPairs: rawPairs,
       );
     }
@@ -240,22 +248,102 @@ class CloneDetector {
     required int k,
     required int minTokens,
     required int minLines,
+    required Set<int> seenPairs,
     required List<_MatchPair> outPairs,
   }) {
     for (var i = 0; i < locations.length; i++) {
       final loc1 = locations[i];
       for (var j = i + 1; j < locations.length; j++) {
         final loc2 = locations[j];
-        final pair = _tryMatchPair(
+        _processLocationPair(
           loc1: loc1,
           loc2: loc2,
           fileSequences: fileSequences,
           k: k,
           minTokens: minTokens,
           minLines: minLines,
+          seenPairs: seenPairs,
+          outPairs: outPairs,
         );
-        if (pair != null) outPairs.add(pair);
       }
+    }
+  }
+
+  static void _processLocationPair({
+    required _TokenLocation loc1,
+    required _TokenLocation loc2,
+    required List<TokenSequence> fileSequences,
+    required int k,
+    required int minTokens,
+    required int minLines,
+    required Set<int> seenPairs,
+    required List<_MatchPair> outPairs,
+  }) {
+    final pairKey = _computeLocationPairKey(loc1, loc2);
+    if (!seenPairs.add(pairKey)) return;
+
+    final pair = _tryMatchPair(
+      loc1: loc1,
+      loc2: loc2,
+      fileSequences: fileSequences,
+      k: k,
+      minTokens: minTokens,
+      minLines: minLines,
+    );
+    if (pair == null) return;
+
+    final spanKey = _computeSpanPairKey(pair.span1, pair.span2);
+    seenPairs.add(spanKey);
+    outPairs.add(pair);
+    _markSubSeedsAsSeen(pair, k, seenPairs);
+  }
+
+  static int _computeLocationPairKey(_TokenLocation loc1, _TokenLocation loc2) {
+    if (loc1.fileIndex <= loc2.fileIndex) {
+      return Object.hash(
+        loc1.fileIndex,
+        loc1.tokenIndex,
+        loc2.fileIndex,
+        loc2.tokenIndex,
+      );
+    }
+    return Object.hash(
+      loc2.fileIndex,
+      loc2.tokenIndex,
+      loc1.fileIndex,
+      loc1.tokenIndex,
+    );
+  }
+
+  static int _computeSpanPairKey(_TokenSpan span1, _TokenSpan span2) {
+    if (span1.fileIndex <= span2.fileIndex) {
+      return Object.hash(
+        span1.fileIndex,
+        span1.startTokenIndex,
+        span2.fileIndex,
+        span2.startTokenIndex,
+      );
+    }
+    return Object.hash(
+      span2.fileIndex,
+      span2.startTokenIndex,
+      span1.fileIndex,
+      span1.startTokenIndex,
+    );
+  }
+
+  static void _markSubSeedsAsSeen(_MatchPair pair, int k, Set<int> seenPairs) {
+    final maxOffset = pair.span1.tokenCount - k;
+    final file1 = pair.span1.fileIndex;
+    final file2 = pair.span2.fileIndex;
+    final start1 = pair.span1.startTokenIndex;
+    final start2 = pair.span2.startTokenIndex;
+
+    for (var offset = 1; offset <= maxOffset; offset++) {
+      final subKey = file1 <= file2
+          ? Object.hash(file1, start1 + offset, file2, start2 + offset)
+          : Object.hash(file2, start2 + offset, file1, start1 + offset);
+      seenPairs.add(subKey);
     }
   }
 
@@ -371,16 +459,26 @@ class CloneDetector {
   static List<_MatchPair> _filterSubsumedPairs(List<_MatchPair> rawPairs) {
     rawPairs.sort((a, b) => b.span1.tokenCount.compareTo(a.span1.tokenCount));
     final nonSubsumedPairs = <_MatchPair>[];
+    final pairsByFilePair = <int, List<_MatchPair>>{};
+
     for (final pair in rawPairs) {
+      final fileKey = pair.span1.fileIndex <= pair.span2.fileIndex
+          ? Object.hash(pair.span1.fileIndex, pair.span2.fileIndex)
+          : Object.hash(pair.span2.fileIndex, pair.span1.fileIndex);
+      final existingForFile = pairsByFilePair[fileKey];
+
       var isSubsumed = false;
-      for (final existing in nonSubsumedPairs) {
-        if (pair.isSubsumedBy(existing)) {
-          isSubsumed = true;
-          break;
+      if (existingForFile != null) {
+        for (final existing in existingForFile) {
+          if (pair.isSubsumedBy(existing)) {
+            isSubsumed = true;
+            break;
+          }
         }
       }
       if (!isSubsumed) {
         nonSubsumedPairs.add(pair);
+        pairsByFilePair.putIfAbsent(fileKey, () => []).add(pair);
       }
     }
     return nonSubsumedPairs;
@@ -432,7 +530,9 @@ class CloneDetector {
         (instances.map((i) => i.lineCount).reduce((a, b) => a + b) /
                 instances.length)
             .round();
-    final estimatedLinesSaved = (instances.length - 1) * avgLineCount;
+    final estimatedLinesSaved = instances
+        .skip(1)
+        .fold<int>(0, (sum, i) => sum + i.lineCount);
 
     return DuplicateCluster(
       id: 'cluster-$clusterIndex',

@@ -164,5 +164,44 @@ int calculateValue(int first, int second) {
 
       check(clusters).isEmpty();
     });
+
+    test('handles empty input sequences', () {
+      const detector = CloneDetector();
+      check(detector.detect([])).isEmpty();
+
+      final emptySeq = const DartTokenizer().tokenize(
+        filePath: 'empty.dart',
+        content: '',
+      );
+      check(detector.detect([emptySeq])).isEmpty();
+    });
+
+    test('detects intra-file duplicate blocks', () {
+      const code = '''
+void handlerA() {
+  print('Step 1: initializing payload');
+  print('Step 2: verifying signatures');
+  print('Step 3: dispatching event');
+  print('Step 4: completing transaction');
+}
+
+void handlerB() {
+  print('Step 1: initializing payload');
+  print('Step 2: verifying signatures');
+  print('Step 3: dispatching event');
+  print('Step 4: completing transaction');
+}
+''';
+      final seq = const DartTokenizer().tokenize(
+        filePath: 'handlers.dart',
+        content: code,
+      );
+      const detector = CloneDetector(minTokens: 15, minLines: 4);
+      final clusters = detector.detect([seq]);
+
+      check(clusters.length).equals(1);
+      check(clusters.first.instances.length).equals(2);
+      check(clusters.first.instances.first.filePath).equals('handlers.dart');
+    });
   });
 }

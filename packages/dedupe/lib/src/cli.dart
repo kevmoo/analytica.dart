@@ -224,9 +224,29 @@ class DedupeCliRunner {
     final excludeList = _parseCommaSeparated(results.option('exclude'));
     final includeList = _parseCommaSeparated(results.option('include'));
 
+    final String targetPath;
+    final List<String> targets;
+    if (results.rest.isEmpty) {
+      targetPath = '.';
+      targets = const ['lib'];
+    } else if (results.rest.length == 1) {
+      final pth = results.rest.first;
+      final type = FileSystemEntity.typeSync(pth);
+      if (type == FileSystemEntityType.file) {
+        targetPath = p.dirname(pth);
+        targets = [p.basename(pth)];
+      } else {
+        targetPath = pth;
+        targets = const ['.'];
+      }
+    } else {
+      targetPath = '.';
+      targets = results.rest;
+    }
+
     return DedupeOptions(
-      targetPath: normalizedPath,
-      targets: results.rest.isNotEmpty ? results.rest : const ['lib'],
+      targetPath: p.normalize(p.absolute(targetPath)),
+      targets: targets,
       minTokens: minTokens,
       minLines: minLines,
       ignoreComments: ignoreComments,
@@ -241,6 +261,11 @@ class DedupeCliRunner {
           '**/*.pbjson.dart',
           '**/*.pbenum.dart',
           '**/*.pbserver.dart',
+          '**/*_bindings.dart',
+          '**/native_*.dart',
+          '**/jni_*.dart',
+          '**/*.mocks.dart',
+          '**/*.config.dart',
         ],
       ],
       includePatterns: includeList.isNotEmpty
