@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+import 'ast_extractor.dart';
 import 'models.dart';
 import 'tokenizer.dart';
 
@@ -138,18 +139,35 @@ class CloneDetector {
   const CloneDetector({this.minTokens = 40, this.minLines = 4});
 
   /// Detects all duplicate clusters across [fileSequences].
-  List<DuplicateCluster> detect(List<TokenSequence> fileSequences) {
+  List<DuplicateCluster> detect(
+    List<TokenSequence> fileSequences, {
+    List<AstCandidateUnit>? candidates,
+  }) {
     if (fileSequences.isEmpty) return const [];
+
+    final rawPairs = <_MatchPair>[];
+    final seenPairs = <int>{};
+
+    if (candidates != null && candidates.isNotEmpty) {
+      _matchAstCandidates(
+        candidates: candidates,
+        fileSequences: fileSequences,
+        seenPairs: seenPairs,
+        outPairs: rawPairs,
+      );
+    }
 
     final k = math.max(5, minTokens);
     final basePow = _computeBasePow(k);
     final index = _buildKgramIndex(fileSequences, k, basePow);
-    final rawPairs = _findAndExtendMatches(
+    _collectKgramMatches(
       index: index,
       fileSequences: fileSequences,
       k: k,
       minTokens: minTokens,
       minLines: minLines,
+      seenPairs: seenPairs,
+      outPairs: rawPairs,
     );
 
     if (rawPairs.isEmpty) return const [];
@@ -172,6 +190,71 @@ class CloneDetector {
     });
 
     return clusters;
+  }
+
+  static void _matchAstCandidates({
+    required List<AstCandidateUnit> candidates,
+    required List<TokenSequence> fileSequences,
+    required Set<int> seenPairs,
+    required List<_MatchPair> outPairs,
+  }) {
+    final byHash = <int, List<AstCandidateUnit>>{};
+    for (final c in candidates) {
+      byHash.putIfAbsent(c.signatureHash, () => []).add(c);
+    }
+
+    for (final bucket in byHash.values) {
+      if (bucket.length < 2) continue;
+      if (bucket.length > 50) continue;
+
+      for (var i = 0; i < bucket.length; i++) {
+        final c1 = bucket[i];
+        for (var j = i + 1; j < bucket.length; j++) {
+          final c2 = bucket[j];
+          if (c1.fileIndex == c2.fileIndex &&
+              (c1.startTokenIndex <= c2.endTokenIndex &&
+                  c2.startTokenIndex <= c1.endTokenIndex)) {
+            continue;
+          }
+
+          if (!_compareCandidateTokens(c1, c2, fileSequences)) continue;
+
+          final span1 = _TokenSpan(
+            fileIndex: c1.fileIndex,
+            startTokenIndex: c1.startTokenIndex,
+            endTokenIndex: c1.endTokenIndex,
+          );
+          final span2 = _TokenSpan(
+            fileIndex: c2.fileIndex,
+            startTokenIndex: c2.startTokenIndex,
+            endTokenIndex: c2.endTokenIndex,
+          );
+
+          final pairKey = _computeSpanPairKey(span1, span2);
+          if (seenPairs.add(pairKey)) {
+            outPairs.add(_MatchPair(span1, span2));
+          }
+        }
+      }
+    }
+  }
+
+  static bool _compareCandidateTokens(
+    AstCandidateUnit c1,
+    AstCandidateUnit c2,
+    List<TokenSequence> fileSequences,
+  ) {
+    if (c1.tokenCount != c2.tokenCount) return false;
+    final tokens1 = fileSequences[c1.fileIndex].tokens;
+    final tokens2 = fileSequences[c2.fileIndex].tokens;
+
+    for (var i = 0; i < c1.tokenCount; i++) {
+      if (tokens1[c1.startTokenIndex + i].normalizedLexeme !=
+          tokens2[c2.startTokenIndex + i].normalizedLexeme) {
+        return false;
+      }
+    }
+    return true;
   }
 
   static int _computeBasePow(int k) {
@@ -213,16 +296,15 @@ class CloneDetector {
     return index;
   }
 
-  static List<_MatchPair> _findAndExtendMatches({
+  static void _collectKgramMatches({
     required Map<int, List<_TokenLocation>> index,
     required List<TokenSequence> fileSequences,
     required int k,
     required int minTokens,
     required int minLines,
+    required Set<int> seenPairs,
+    required List<_MatchPair> outPairs,
   }) {
-    final rawPairs = <_MatchPair>[];
-    final seenPairs = <int>{};
-
     for (final locations in index.values) {
       if (locations.length < 2) continue;
       // Cap oversized buckets to prevent combinatorial explosion on trivial
@@ -236,10 +318,9 @@ class CloneDetector {
         minTokens: minTokens,
         minLines: minLines,
         seenPairs: seenPairs,
-        outPairs: rawPairs,
+        outPairs: outPairs,
       );
     }
-    return rawPairs;
   }
 
   static void _collectMatchesForBucket({
@@ -292,8 +373,6 @@ class CloneDetector {
     );
     if (pair == null) return;
 
-    final spanKey = _computeSpanPairKey(pair.span1, pair.span2);
-    seenPairs.add(spanKey);
     outPairs.add(pair);
     _markSubSeedsAsSeen(pair, k, seenPairs);
   }

@@ -92,8 +92,13 @@ class DartTokenizer {
     this.ignoreIdentifiers = false,
   });
 
-  /// Tokenizes the Dart source [content] of [filePath].
-  TokenSequence tokenize({required String filePath, required String content}) {
+  /// Tokenizes the Dart source [content] of [filePath]. If [tokenOffsetMap] is
+  /// provided, maps each token offset to its index in the returned token list.
+  TokenSequence tokenize({
+    required String filePath,
+    required String content,
+    Map<int, int>? tokenOffsetMap,
+  }) {
     final parseResult = parseString(
       content: content,
       path: filePath,
@@ -118,6 +123,11 @@ class DartTokenizer {
 
       final startLoc = lineInfo.getLocation(token.offset);
       final endLoc = lineInfo.getLocation(token.end);
+
+      final idx = tokens.length;
+      if (tokenOffsetMap != null) {
+        tokenOffsetMap[token.offset] = idx;
+      }
 
       tokens.add(
         NormalizedToken(

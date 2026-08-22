@@ -2,6 +2,7 @@
 /// Flutter packages and workspaces.
 library;
 
+export 'src/ast_extractor.dart';
 export 'src/cli.dart';
 export 'src/delta_service.dart';
 export 'src/detector.dart';

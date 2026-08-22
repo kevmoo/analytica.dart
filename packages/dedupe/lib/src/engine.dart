@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'package:analytica/analyzer.dart';
 import 'package:path/path.dart' as p;
 
+import 'ast_extractor.dart';
 import 'delta_service.dart';
 import 'detector.dart';
 import 'models.dart';
@@ -33,12 +34,15 @@ class DedupeEngine {
       return _emptyReport();
     }
 
-    final sequences = _tokenizeTargetFiles(targetFiles, targetDir.path);
+    final (sequences, candidates) = _extractFromTargetFiles(
+      targetFiles,
+      targetDir.path,
+    );
     final detector = CloneDetector(
       minTokens: options.minTokens,
       minLines: options.minLines,
     );
-    final rawClusters = detector.detect(sequences);
+    final rawClusters = detector.detect(sequences, candidates: candidates);
 
     final diffResult = await _evaluateGitDiff(
       rawClusters: rawClusters,
@@ -74,25 +78,34 @@ class DedupeEngine {
     );
   }
 
-  List<TokenSequence> _tokenizeTargetFiles(
+  (List<TokenSequence>, List<AstCandidateUnit>) _extractFromTargetFiles(
     List<String> targetFiles,
     String targetDirPath,
   ) {
-    final tokenizer = DartTokenizer(
+    final extractor = AstExtractor(
       ignoreComments: options.ignoreComments,
       ignoreLiterals: options.ignoreLiterals,
       ignoreIdentifiers: options.ignoreIdentifiers,
+      minTokens: options.minTokens,
+      minLines: options.minLines,
     );
 
     final sequences = <TokenSequence>[];
-    for (final file in targetFiles) {
+    final allCandidates = <AstCandidateUnit>[];
+
+    for (var i = 0; i < targetFiles.length; i++) {
+      final file = targetFiles[i];
       final content = File(file).readAsStringSync();
       final relPath = p.relative(file, from: targetDirPath);
-      sequences.add(
-        tokenizer.tokenize(filePath: p.normalize(relPath), content: content),
+      final (seq, candidates) = extractor.extract(
+        filePath: p.normalize(relPath),
+        content: content,
+        fileIndex: i,
       );
+      sequences.add(seq);
+      allCandidates.addAll(candidates);
     }
-    return sequences;
+    return (sequences, allCandidates);
   }
 
   Future<
