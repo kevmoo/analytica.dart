@@ -96,4 +96,22 @@ void main() {
       ).throws<FormatException>();
     });
   });
+
+  group('parseCommaSeparated', () {
+    test('returns empty list on null, empty string, or whitespace', () {
+      check(parseCommaSeparated(null)).isEmpty();
+      check(parseCommaSeparated('')).isEmpty();
+      check(parseCommaSeparated('   ')).isEmpty();
+    });
+
+    test('parses and trims comma-separated tokens', () {
+      final items = parseCommaSeparated('foo, bar,baz , qux');
+      check(items).deepEquals(['foo', 'bar', 'baz', 'qux']);
+    });
+
+    test('skips empty tokens from multiple commas', () {
+      final items = parseCommaSeparated('foo,,bar,  ,baz');
+      check(items).deepEquals(['foo', 'bar', 'baz']);
+    });
+  });
 }

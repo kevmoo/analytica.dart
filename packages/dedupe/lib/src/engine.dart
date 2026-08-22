@@ -341,71 +341,11 @@ class DedupeEngine {
   }
 
   List<String> _discoverDartFiles(String rootPath) {
-    final excludePatterns = options.excludePatterns
-        .map(WildcardPattern.new)
-        .toList();
-    final files = <String>[];
-
-    for (final target in options.targets) {
-      final resolved = p.normalize(p.join(rootPath, target));
-      final type = FileSystemEntity.typeSync(resolved);
-      if (type == FileSystemEntityType.directory) {
-        _collectFilesFromDir(
-          Directory(resolved),
-          rootPath,
-          excludePatterns,
-          files,
-        );
-      } else if (type == FileSystemEntityType.file &&
-          resolved.endsWith('.dart')) {
-        files.add(resolved);
-      }
-    }
-
-    files.sort();
-    return files;
-  }
-
-  static void _collectFilesFromDir(
-    Directory dir,
-    String rootPath,
-    List<WildcardPattern> excludePatterns,
-    List<String> outFiles,
-  ) {
-    final rel = p.relative(dir.path, from: rootPath);
-    final normalized = p.normalize(rel).replaceAll(r'\', '/');
-    if (_isExcluded(normalized, p.basename(dir.path), excludePatterns)) {
-      return;
-    }
-
-    for (final entity in dir.listSync(followLinks: false)) {
-      if (entity is Directory) {
-        _collectFilesFromDir(entity, rootPath, excludePatterns, outFiles);
-      } else if (entity is File && entity.path.endsWith('.dart')) {
-        final fRel = p.relative(entity.path, from: rootPath);
-        final fNorm = p.normalize(fRel).replaceAll(r'\', '/');
-        if (!_isExcluded(fNorm, p.basename(entity.path), excludePatterns)) {
-          outFiles.add(entity.path);
-        }
-      }
-    }
-  }
-
-  static bool _isExcluded(
-    String normalized,
-    String basename,
-    List<WildcardPattern> excludePatterns,
-  ) {
-    if (normalized.startsWith('.dart_tool/') ||
-        normalized.startsWith('.git/') ||
-        normalized.startsWith('build/') ||
-        normalized == '.dart_tool' ||
-        normalized == '.git' ||
-        normalized == 'build') {
-      return true;
-    }
-
-    return WildcardPattern.anyMatch(excludePatterns, normalized) ||
-        WildcardPattern.anyMatch(excludePatterns, basename);
+    return discoverDartFiles(
+      rootPath,
+      targets: options.targets,
+      excludePatterns: options.excludePatterns,
+      includePatterns: options.includePatterns,
+    );
   }
 }

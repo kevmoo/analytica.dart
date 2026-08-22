@@ -1,3 +1,5 @@
+import 'package:analytica/analyzer.dart';
+
 /// Classification category for duplicate code clusters.
 enum CloneCategory {
   logic('logic', 'Logic & Control Flow'),
@@ -366,19 +368,7 @@ final class DedupeOptions {
     this.ignoreComments = true,
     this.ignoreLiterals = true,
     this.ignoreIdentifiers = false,
-    this.excludePatterns = const [
-      '**/*.g.dart',
-      '**/*.freezed.dart',
-      '**/*.pb.dart',
-      '**/*.pbjson.dart',
-      '**/*.pbenum.dart',
-      '**/*.pbserver.dart',
-      '**/*_bindings.dart',
-      '**/native_*.dart',
-      '**/jni_*.dart',
-      '**/*.mocks.dart',
-      '**/*.config.dart',
-    ],
+    this.excludePatterns = defaultDartExclusions,
     this.includePatterns = const ['**/*.dart'],
     this.gitDiffBase,
     this.onlyChanged = false,

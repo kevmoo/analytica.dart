@@ -175,13 +175,13 @@ class UndeadCliRunner {
     final suggestPrivate = results.flag('suggest-private');
     final sdkPath = results.option('sdk-path');
     final jsonOutputPath = results.option('json-output');
-    final testSupportPatterns = _parseCommaSeparated(
+    final testSupportPatterns = parseCommaSeparated(
       results.option('test-support-patterns'),
     );
-    final ignoreNamePatterns = _parseCommaSeparated(
+    final ignoreNamePatterns = parseCommaSeparated(
       results.option('ignore-name-patterns'),
     );
-    final extraRoots = _parseCommaSeparated(results.option('extra-roots'));
+    final extraRoots = parseCommaSeparated(results.option('extra-roots'));
 
     final options = UndeadOptions(
       packagePath: normalizedPath,
@@ -236,13 +236,4 @@ class UndeadCliRunner {
       return ExitCode.software.code;
     }
   }
-}
-
-List<String> _parseCommaSeparated(String? value) {
-  if (value == null || value.trim().isEmpty) return const [];
-  return value
-      .split(',')
-      .map((s) => s.trim())
-      .where((s) => s.isNotEmpty)
-      .toList();
 }

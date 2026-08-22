@@ -1,6 +1,7 @@
 import 'dart:io';
 
-import 'package:analytica/analytica.dart';
+import 'package:analytica/analyzer.dart';
+import 'package:analytica/cli.dart';
 import 'package:args/args.dart';
 import 'package:path/path.dart' as p;
 
@@ -236,8 +237,8 @@ class DedupeCliRunner {
       failThreshold = parsed;
     }
 
-    final excludeList = _parseCommaSeparated(results.option('exclude'));
-    final includeList = _parseCommaSeparated(results.option('include'));
+    final excludeList = parseCommaSeparated(results.option('exclude'));
+    final includeList = parseCommaSeparated(results.option('include'));
 
     final String targetPath;
     final List<String> targets;
@@ -269,19 +270,7 @@ class DedupeCliRunner {
       ignoreIdentifiers: ignoreIdentifiers,
       excludePatterns: [
         if (excludeList.isNotEmpty) ...excludeList,
-        if (excludeList.isEmpty) ...const [
-          '**/*.g.dart',
-          '**/*.freezed.dart',
-          '**/*.pb.dart',
-          '**/*.pbjson.dart',
-          '**/*.pbenum.dart',
-          '**/*.pbserver.dart',
-          '**/*_bindings.dart',
-          '**/native_*.dart',
-          '**/jni_*.dart',
-          '**/*.mocks.dart',
-          '**/*.config.dart',
-        ],
+        if (excludeList.isEmpty) ...defaultDartExclusions,
       ],
       includePatterns: includeList.isNotEmpty
           ? includeList
@@ -374,13 +363,4 @@ class DedupeCliRunner {
     }
     return 0;
   }
-}
-
-List<String> _parseCommaSeparated(String? value) {
-  if (value == null || value.trim().isEmpty) return const [];
-  return value
-      .split(',')
-      .map((s) => s.trim())
-      .where((s) => s.isNotEmpty)
-      .toList();
 }
