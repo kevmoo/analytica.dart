@@ -204,38 +204,66 @@ class CloneDetector {
     }
 
     for (final bucket in byHash.values) {
-      if (bucket.length < 2) continue;
-      if (bucket.length > 50) continue;
+      if (bucket.length < 2 || bucket.length > 50) continue;
+      _matchAstCandidateBucket(
+        bucket: bucket,
+        fileSequences: fileSequences,
+        seenPairs: seenPairs,
+        outPairs: outPairs,
+      );
+    }
+  }
 
-      for (var i = 0; i < bucket.length; i++) {
-        final c1 = bucket[i];
-        for (var j = i + 1; j < bucket.length; j++) {
-          final c2 = bucket[j];
-          if (c1.fileIndex == c2.fileIndex &&
-              (c1.startTokenIndex <= c2.endTokenIndex &&
-                  c2.startTokenIndex <= c1.endTokenIndex)) {
-            continue;
-          }
-
-          if (!_compareCandidateTokens(c1, c2, fileSequences)) continue;
-
-          final span1 = _TokenSpan(
-            fileIndex: c1.fileIndex,
-            startTokenIndex: c1.startTokenIndex,
-            endTokenIndex: c1.endTokenIndex,
-          );
-          final span2 = _TokenSpan(
-            fileIndex: c2.fileIndex,
-            startTokenIndex: c2.startTokenIndex,
-            endTokenIndex: c2.endTokenIndex,
-          );
-
-          final pairKey = _computeSpanPairKey(span1, span2);
-          if (seenPairs.add(pairKey)) {
-            outPairs.add(_MatchPair(span1, span2));
-          }
-        }
+  static void _matchAstCandidateBucket({
+    required List<AstCandidateUnit> bucket,
+    required List<TokenSequence> fileSequences,
+    required Set<int> seenPairs,
+    required List<_MatchPair> outPairs,
+  }) {
+    for (var i = 0; i < bucket.length; i++) {
+      final c1 = bucket[i];
+      for (var j = i + 1; j < bucket.length; j++) {
+        final c2 = bucket[j];
+        _tryAddAstCandidatePair(
+          c1: c1,
+          c2: c2,
+          fileSequences: fileSequences,
+          seenPairs: seenPairs,
+          outPairs: outPairs,
+        );
       }
+    }
+  }
+
+  static void _tryAddAstCandidatePair({
+    required AstCandidateUnit c1,
+    required AstCandidateUnit c2,
+    required List<TokenSequence> fileSequences,
+    required Set<int> seenPairs,
+    required List<_MatchPair> outPairs,
+  }) {
+    if (c1.fileIndex == c2.fileIndex &&
+        (c1.startTokenIndex <= c2.endTokenIndex &&
+            c2.startTokenIndex <= c1.endTokenIndex)) {
+      return;
+    }
+
+    if (!_compareCandidateTokens(c1, c2, fileSequences)) return;
+
+    final span1 = _TokenSpan(
+      fileIndex: c1.fileIndex,
+      startTokenIndex: c1.startTokenIndex,
+      endTokenIndex: c1.endTokenIndex,
+    );
+    final span2 = _TokenSpan(
+      fileIndex: c2.fileIndex,
+      startTokenIndex: c2.startTokenIndex,
+      endTokenIndex: c2.endTokenIndex,
+    );
+
+    final pairKey = _computeSpanPairKey(span1, span2);
+    if (seenPairs.add(pairKey)) {
+      outPairs.add(_MatchPair(span1, span2));
     }
   }
 
