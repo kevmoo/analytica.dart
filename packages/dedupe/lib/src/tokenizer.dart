@@ -30,6 +30,38 @@ class NormalizedToken {
     required this.tokenHash,
   });
 
+  Map<String, dynamic> toJson() => {
+    'type': type.name,
+    'normalizedLexeme': normalizedLexeme,
+    'originalLexeme': originalLexeme,
+    'offset': offset,
+    'length': length,
+    'startLine': startLine,
+    'endLine': endLine,
+    'startColumn': startColumn,
+    'endColumn': endColumn,
+    'tokenHash': tokenHash,
+  };
+
+  /// Deserializes a [NormalizedToken] from [json].
+  ///
+  /// Note: [TokenType] in `pkg:analyzer` is an abstract class with static
+  /// instances rather than an enum; [TokenType.IDENTIFIER] is used as the
+  /// synthetic token type for deserialized cache entries since clone detection
+  /// operates entirely on [normalizedLexeme] and [tokenHash].
+  static NormalizedToken fromJson(Map<String, dynamic> json) => NormalizedToken(
+    type: TokenType.IDENTIFIER,
+    normalizedLexeme: json['normalizedLexeme'] as String,
+    originalLexeme: json['originalLexeme'] as String,
+    offset: json['offset'] as int,
+    length: json['length'] as int,
+    startLine: json['startLine'] as int,
+    endLine: json['endLine'] as int,
+    startColumn: json['startColumn'] as int,
+    endColumn: json['endColumn'] as int,
+    tokenHash: json['tokenHash'] as int,
+  );
+
   @override
   String toString() => '$normalizedLexeme ($startLine:$startColumn)';
 }

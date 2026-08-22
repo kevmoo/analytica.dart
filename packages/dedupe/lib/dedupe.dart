@@ -3,6 +3,7 @@
 library;
 
 export 'src/ast_extractor.dart';
+export 'src/cache.dart';
 export 'src/cli.dart';
 export 'src/delta_service.dart';
 export 'src/detector.dart';

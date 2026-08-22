@@ -124,6 +124,21 @@ ArgParser buildArgParser() {
       negatable: true,
       help: 'Include duplicate clusters list in report.',
     )
+    ..addFlag(
+      'cache',
+      defaultsTo: true,
+      negatable: true,
+      help:
+          'Enable content-hashed on-disk caching of AST candidate units and '
+          'token sequences.',
+    )
+    ..addOption(
+      'cache-dir',
+      valueHelp: 'path',
+      help:
+          'Custom directory path for disk cache (defaults to '
+          '.dart_tool/dedupe_cache).',
+    )
     ..addSdkPathOption()
     ..addHelpFlag()
     ..addVersionFlag(help: 'Print dedupe version.');
@@ -282,6 +297,8 @@ class DedupeCliRunner {
       sdkPath: results.option('sdk-path'),
       includeFileTable: results.flag('files'),
       includeClusters: results.flag('clusters'),
+      useCache: results.flag('cache'),
+      cacheDir: results.option('cache-dir'),
     );
   }
 

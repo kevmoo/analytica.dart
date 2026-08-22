@@ -5,6 +5,7 @@ import 'package:analytica/analyzer.dart';
 import 'package:path/path.dart' as p;
 
 import 'ast_extractor.dart';
+import 'cache.dart';
 import 'delta_service.dart';
 import 'detector.dart';
 import 'models.dart';
@@ -90,22 +91,59 @@ class DedupeEngine {
       minLines: options.minLines,
     );
 
+    final cacheManager = _createCacheManager(targetDirPath);
+    final activeRelPaths = <String>{};
     final sequences = <TokenSequence>[];
     final allCandidates = <AstCandidateUnit>[];
 
     for (var i = 0; i < targetFiles.length; i++) {
       final file = targetFiles[i];
       final content = File(file).readAsStringSync();
-      final relPath = p.relative(file, from: targetDirPath);
-      final (seq, candidates) = extractor.extract(
-        filePath: p.normalize(relPath),
-        content: content,
+      final relPath = p.normalize(p.relative(file, from: targetDirPath));
+      activeRelPaths.add(relPath);
+
+      final contentHash = DedupeCacheManager.computeContentHash(content);
+      final cached = cacheManager.getEntry(
+        relPath: relPath,
+        contentHash: contentHash,
         fileIndex: i,
       );
-      sequences.add(seq);
-      allCandidates.addAll(candidates);
+
+      if (cached != null) {
+        sequences.add(cached.toTokenSequence(content));
+        allCandidates.addAll(cached.candidates);
+      } else {
+        final (seq, candidates) = extractor.extract(
+          filePath: relPath,
+          content: content,
+          fileIndex: i,
+        );
+        sequences.add(seq);
+        allCandidates.addAll(candidates);
+        cacheManager.putEntry(
+          relPath: relPath,
+          contentHash: contentHash,
+          sequence: seq,
+          candidates: candidates,
+        );
+      }
     }
+
+    cacheManager.pruneStale(activeRelPaths);
     return (sequences, allCandidates);
+  }
+
+  DedupeCacheManager _createCacheManager(String targetDirPath) {
+    final cacheDir =
+        options.cacheDir ??
+        (Directory(p.join(targetDirPath, '.dart_tool')).existsSync()
+            ? p.join(targetDirPath, '.dart_tool', 'dedupe_cache')
+            : p.join(targetDirPath, '.dedupe_cache'));
+    return DedupeCacheManager(
+      cacheDirPath: cacheDir,
+      enabled: options.useCache,
+      options: options,
+    );
   }
 
   Future<

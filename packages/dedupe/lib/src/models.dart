@@ -355,6 +355,8 @@ final class DedupeOptions {
   final String? sdkPath;
   final bool includeFileTable;
   final bool includeClusters;
+  final bool useCache;
+  final String? cacheDir;
 
   const DedupeOptions({
     required this.targetPath,
@@ -389,5 +391,7 @@ final class DedupeOptions {
     this.sdkPath,
     this.includeFileTable = true,
     this.includeClusters = true,
+    this.useCache = true,
+    this.cacheDir,
   });
 }

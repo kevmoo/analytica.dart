@@ -42,6 +42,53 @@ class AstCandidateUnit {
     this.statementHashes = const {},
   });
 
+  Map<String, dynamic> toJson() => {
+    'filePath': filePath,
+    'fileIndex': fileIndex,
+    'startLine': startLine,
+    'endLine': endLine,
+    'startOffset': startOffset,
+    'endOffset': endOffset,
+    'startTokenIndex': startTokenIndex,
+    'endTokenIndex': endTokenIndex,
+    'tokenCount': tokenCount,
+    'lineCount': lineCount,
+    'astNodeType': astNodeType,
+    'signatureHash': signatureHash,
+    'isDeclaration': isDeclaration,
+    'minHashSignature': minHashSignature,
+    'statementHashes': statementHashes.toList(),
+  };
+
+  static AstCandidateUnit fromJson(
+    Map<String, dynamic> json, {
+    int? fileIndex,
+  }) => AstCandidateUnit(
+    filePath: json['filePath'] as String,
+    fileIndex: fileIndex ?? (json['fileIndex'] as int),
+    startLine: json['startLine'] as int,
+    endLine: json['endLine'] as int,
+    startOffset: json['startOffset'] as int,
+    endOffset: json['endOffset'] as int,
+    startTokenIndex: json['startTokenIndex'] as int,
+    endTokenIndex: json['endTokenIndex'] as int,
+    tokenCount: json['tokenCount'] as int,
+    lineCount: json['lineCount'] as int,
+    astNodeType: json['astNodeType'] as String,
+    signatureHash: json['signatureHash'] as int,
+    isDeclaration: json['isDeclaration'] as bool? ?? false,
+    minHashSignature:
+        (json['minHashSignature'] as List<dynamic>?)
+            ?.map((e) => e as int)
+            .toList() ??
+        const [],
+    statementHashes:
+        (json['statementHashes'] as List<dynamic>?)
+            ?.map((e) => e as int)
+            .toSet() ??
+        const {},
+  );
+
   bool contains(AstCandidateUnit other) {
     if (fileIndex != other.fileIndex) return false;
     return startTokenIndex <= other.startTokenIndex &&
