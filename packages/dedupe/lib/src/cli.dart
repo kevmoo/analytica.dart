@@ -137,7 +137,7 @@ ArgParser buildArgParser() {
       valueHelp: 'path',
       help:
           'Custom directory path for disk cache (defaults to '
-          '.dart_tool/dedupe_cache).',
+          '.dart_tool/dedupe).',
     )
     ..addSdkPathOption()
     ..addHelpFlag()

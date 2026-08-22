@@ -137,7 +137,7 @@ class DedupeEngine {
     final cacheDir =
         options.cacheDir ??
         (Directory(p.join(targetDirPath, '.dart_tool')).existsSync()
-            ? p.join(targetDirPath, '.dart_tool', 'dedupe_cache')
+            ? p.join(targetDirPath, '.dart_tool', 'dedupe')
             : p.join(targetDirPath, '.dedupe_cache'));
     return DedupeCacheManager(
       cacheDirPath: cacheDir,
