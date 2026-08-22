@@ -153,6 +153,16 @@ class DedupeCacheManager {
     } catch (_) {}
   }
 
+  static final _cacheEntryFileNamePattern = RegExp(r'^[0-9a-fA-F]{16}\.json$');
+  static final _cacheEntryDirPattern = RegExp(r'^[0-9a-fA-F]{2}$');
+
+  bool _isCacheEntryFile(String filePath) {
+    final fileName = p.basename(filePath);
+    if (!_cacheEntryFileNamePattern.hasMatch(fileName)) return false;
+    final parentDir = p.basename(p.dirname(filePath));
+    return _cacheEntryDirPattern.hasMatch(parentDir);
+  }
+
   /// Prunes stale cache entries that no longer correspond to [activeRelPaths].
   void pruneStale(Set<String> activeRelPaths) {
     if (!enabled) return;
@@ -164,15 +174,30 @@ class DedupeCacheManager {
       final files = cacheDir.listSync(recursive: true).whereType<File>();
       for (final file in files) {
         if (!file.path.endsWith('.json')) continue;
+        if (!_isCacheEntryFile(file.path)) continue;
         try {
-          final data =
-              jsonDecode(file.readAsStringSync()) as Map<String, dynamic>;
-          final relPath = data['relPath'] as String?;
-          if (relPath != null && !activeRelPaths.contains(relPath)) {
+          final decoded = jsonDecode(file.readAsStringSync());
+          if (decoded is! Map<String, dynamic>) continue;
+          final relPath = decoded['relPath'] as String?;
+          final version = decoded['version'];
+          final optionsHash = decoded['optionsHash'];
+          final contentHash = decoded['contentHash'];
+          final entry = decoded['entry'];
+
+          // Only prune entries that strictly match the dedupe cache schema.
+          if (relPath == null ||
+              version == null ||
+              optionsHash == null ||
+              contentHash == null ||
+              entry == null) {
+            continue;
+          }
+
+          if (!activeRelPaths.contains(relPath)) {
             file.deleteSync();
           }
         } catch (_) {
-          file.deleteSync();
+          // Never delete unrecognized, malformed, or non-dedupe files.
         }
       }
     } catch (_) {}

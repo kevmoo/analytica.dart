@@ -170,6 +170,45 @@ void main() {
         cache.getEntry(relPath: 'lib/old.dart', contentHash: hash),
       ).isNull();
     });
+
+    test('pruneStale does not delete unrelated or malformed JSON files', () {
+      const options = DedupeOptions(targetPath: '.');
+      final cache = DedupeCacheManager(
+        cacheDirPath: cacheDir,
+        enabled: true,
+        options: options,
+      );
+
+      // Create a mix of unrelated files in cache directory
+      final configJson = File(p.join(cacheDir, 'config.json'));
+      configJson.parent.createSync(recursive: true);
+      configJson.writeAsStringSync(
+        '{"settings": true, "relPath": "other.dart"}',
+      );
+
+      final malformedJson = File(p.join(cacheDir, 'ab', 'malformed.json'));
+      malformedJson.parent.createSync(recursive: true);
+      malformedJson.writeAsStringSync('invalid json content {{{');
+
+      final arrayJson = File(p.join(cacheDir, 'cd', '0123456789abcdef.json'));
+      arrayJson.parent.createSync(recursive: true);
+      arrayJson.writeAsStringSync('[1, 2, 3]');
+
+      final nonCacheJson = File(
+        p.join(cacheDir, 'cd', 'fedcba9876543210.json'),
+      );
+      nonCacheJson.parent.createSync(recursive: true);
+      nonCacheJson.writeAsStringSync('{"someKey": "value"}');
+
+      // Run pruneStale with empty active set
+      cache.pruneStale(<String>{});
+
+      // All unrelated files must survive
+      check(configJson.existsSync()).isTrue();
+      check(malformedJson.existsSync()).isTrue();
+      check(arrayJson.existsSync()).isTrue();
+      check(nonCacheJson.existsSync()).isTrue();
+    });
   });
 
   group('DedupeEngine Incremental Cache Integration', () {
