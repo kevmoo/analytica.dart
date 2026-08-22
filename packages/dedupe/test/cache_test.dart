@@ -209,6 +209,58 @@ void main() {
       check(arrayJson.existsSync()).isTrue();
       check(nonCacheJson.existsSync()).isTrue();
     });
+
+    test(
+      'clear removes only valid cache files and empty shard directories',
+      () {
+        const options = DedupeOptions(targetPath: '.');
+        final cache = DedupeCacheManager(
+          cacheDirPath: cacheDir,
+          enabled: true,
+          options: options,
+        );
+
+        // Add a valid cache entry
+        const code = 'void testMethod() { print(1); }';
+        final hash = DedupeCacheManager.computeContentHash(code);
+        const extractor = AstExtractor(minTokens: 5, minLines: 1);
+        final (seq, candidates) = extractor.extract(
+          filePath: 'lib/sample.dart',
+          content: code,
+          fileIndex: 0,
+        );
+        cache.putEntry(
+          relPath: 'lib/sample.dart',
+          contentHash: hash,
+          sequence: seq,
+          candidates: candidates,
+        );
+
+        // Add unrelated files in the cache directory
+        final configJson = File(p.join(cacheDir, 'config.json'));
+        configJson.writeAsStringSync('{"settings": true}');
+
+        final notesTxt = File(p.join(cacheDir, 'notes.txt'));
+        notesTxt.writeAsStringSync('important notes');
+
+        // Verify entry exists before clear
+        check(
+          cache.getEntry(relPath: 'lib/sample.dart', contentHash: hash),
+        ).isNotNull();
+
+        // Clear cache
+        cache.clear();
+
+        // Cache entry is gone
+        check(
+          cache.getEntry(relPath: 'lib/sample.dart', contentHash: hash),
+        ).isNull();
+
+        // Unrelated files remain untouched
+        check(configJson.existsSync()).isTrue();
+        check(notesTxt.existsSync()).isTrue();
+      },
+    );
   });
 
   group('DedupeEngine Incremental Cache Integration', () {
