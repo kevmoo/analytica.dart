@@ -29,26 +29,54 @@ class DedupeEngine {
 
     final targetFiles = _discoverDartFiles(targetDir.path);
     if (targetFiles.isEmpty) {
-      return DedupeReport(
-        version: dedupeVersion,
-        targetPath: options.targetPath,
-        summary: const DedupeSummary(
-          filesAnalyzed: 0,
-          totalLines: 0,
-          totalTokens: 0,
-          duplicateLines: 0,
-          duplicateTokens: 0,
-          duplicationPercentage: 0.0,
-          clusterCount: 0,
-          cloneInstanceCount: 0,
-          estimatedLinesSaved: 0,
-        ),
-        clusters: const [],
-        fileMetrics: const [],
-      );
+      return _emptyReport();
     }
 
-    // 1. Tokenize all discovered Dart files
+    final sequences = _tokenizeTargetFiles(targetFiles, targetDir.path);
+    final detector = CloneDetector(
+      minTokens: options.minTokens,
+      minLines: options.minLines,
+    );
+    final rawClusters = detector.detect(sequences);
+
+    final diffResult = await _evaluateGitDiff(
+      rawClusters: rawClusters,
+      sequences: sequences,
+      targetDirPath: targetDir.path,
+    );
+
+    return _buildFinalReport(
+      sequences: sequences,
+      clusters: diffResult.clusters,
+      clustersOutsideDiff: diffResult.clustersOutsideDiff,
+      diffDuplicationPercentage: diffResult.diffDuplicationPercentage,
+    );
+  }
+
+  DedupeReport _emptyReport() {
+    return DedupeReport(
+      version: dedupeVersion,
+      targetPath: options.targetPath,
+      summary: const DedupeSummary(
+        filesAnalyzed: 0,
+        totalLines: 0,
+        totalTokens: 0,
+        duplicateLines: 0,
+        duplicateTokens: 0,
+        duplicationPercentage: 0.0,
+        clusterCount: 0,
+        cloneInstanceCount: 0,
+        estimatedLinesSaved: 0,
+      ),
+      clusters: const [],
+      fileMetrics: const [],
+    );
+  }
+
+  List<TokenSequence> _tokenizeTargetFiles(
+    List<String> targetFiles,
+    String targetDirPath,
+  ) {
     final tokenizer = DartTokenizer(
       ignoreComments: options.ignoreComments,
       ignoreLiterals: options.ignoreLiterals,
@@ -58,87 +86,69 @@ class DedupeEngine {
     final sequences = <TokenSequence>[];
     for (final file in targetFiles) {
       final content = File(file).readAsStringSync();
-      final relPath = p.relative(file, from: targetDir.path);
+      final relPath = p.relative(file, from: targetDirPath);
       sequences.add(
         tokenizer.tokenize(filePath: p.normalize(relPath), content: content),
       );
     }
+    return sequences;
+  }
 
-    // 2. Execute Clone Detection
-    final detector = CloneDetector(
-      minTokens: options.minTokens,
-      minLines: options.minLines,
+  Future<
+    ({
+      List<DuplicateCluster> clusters,
+      int clustersOutsideDiff,
+      double? diffDuplicationPercentage,
+    })
+  >
+  _evaluateGitDiff({
+    required List<DuplicateCluster> rawClusters,
+    required List<TokenSequence> sequences,
+    required String targetDirPath,
+  }) async {
+    if (options.gitDiffBase == null || options.gitDiffBase!.isEmpty) {
+      return (
+        clusters: rawClusters,
+        clustersOutsideDiff: 0,
+        diffDuplicationPercentage: null,
+      );
+    }
+
+    final deltaService = DedupeDeltaService(workingDirectory: targetDirPath);
+    final diffs = await deltaService.getParsedDiff(options.gitDiffBase!);
+    final diffRanges = deltaService.extractDiffRanges(
+      diffs,
+      baseDir: targetDirPath,
     );
 
-    var rawClusters = detector.detect(sequences);
+    final result = deltaService.applyDiffToClusters(
+      clusters: rawClusters,
+      sequences: sequences,
+      diffRanges: diffRanges,
+      onlyChanged: options.onlyChanged,
+    );
 
-    // 3. Apply Git Diff Evaluation if requested
-    var clustersOutsideDiff = 0;
-    double? diffDuplicationPercentage;
+    return (
+      clusters: result.clusters,
+      clustersOutsideDiff: result.clustersOutsideDiff,
+      diffDuplicationPercentage: result.diffDuplicationPercent,
+    );
+  }
 
-    if (options.gitDiffBase != null && options.gitDiffBase!.isNotEmpty) {
-      final deltaService = DedupeDeltaService(workingDirectory: targetDir.path);
-      final diffs = await deltaService.getParsedDiff(options.gitDiffBase!);
-      final diffRanges = deltaService.extractDiffRanges(
-        diffs,
-        baseDir: targetDir.path,
-      );
-
-      final result = deltaService.applyDiffToClusters(
-        clusters: rawClusters,
-        sequences: sequences,
-        diffRanges: diffRanges,
-        onlyChanged: options.onlyChanged,
-      );
-
-      rawClusters = result.clusters;
-      clustersOutsideDiff = result.clustersOutsideDiff;
-      diffDuplicationPercentage = result.diffDuplicationPercent;
-    }
-
-    // 4. Compute per-file metrics
-    final fileDuplicateLines = <String, Set<int>>{};
-    final fileDuplicateTokens = <String, Set<int>>{};
-    final fileClusterCount = <String, int>{};
-
-    for (final cluster in rawClusters) {
-      final touchedFilesInCluster = <String>{};
-
-      for (final instance in cluster.instances) {
-        final filePath = instance.filePath;
-        touchedFilesInCluster.add(filePath);
-
-        final lineSet = fileDuplicateLines.putIfAbsent(filePath, () => <int>{});
-        for (var l = instance.startLine; l <= instance.endLine; l++) {
-          lineSet.add(l);
-        }
-
-        final seq = sequences.firstWhere((s) => s.filePath == filePath);
-        final tokenSet = fileDuplicateTokens.putIfAbsent(
-          filePath,
-          () => <int>{},
-        );
-        for (var t = 0; t < seq.tokens.length; t++) {
-          final tok = seq.tokens[t];
-          if (tok.startLine >= instance.startLine &&
-              tok.endLine <= instance.endLine) {
-            tokenSet.add(t);
-          }
-        }
-      }
-
-      for (final filePath in touchedFilesInCluster) {
-        fileClusterCount[filePath] = (fileClusterCount[filePath] ?? 0) + 1;
-      }
-    }
+  DedupeReport _buildFinalReport({
+    required List<TokenSequence> sequences,
+    required List<DuplicateCluster> clusters,
+    required int clustersOutsideDiff,
+    required double? diffDuplicationPercentage,
+  }) {
+    final (fileDuplicateLines, fileDuplicateTokens, fileClusterCount) =
+        _aggregateClusterOccurrences(clusters, sequences);
 
     final fileMetrics = <FileDuplicationMetric>[];
     var totalProjectLines = 0;
     var totalProjectTokens = 0;
     var totalDuplicateLines = 0;
     var totalDuplicateTokens = 0;
-    var totalCloneInstances = 0;
-    var totalLinesSaved = 0;
 
     for (final seq in sequences) {
       totalProjectLines += seq.totalLines;
@@ -168,7 +178,9 @@ class DedupeEngine {
       );
     }
 
-    for (final c in rawClusters) {
+    var totalCloneInstances = 0;
+    var totalLinesSaved = 0;
+    for (final c in clusters) {
       totalCloneInstances += c.instances.length;
       totalLinesSaved += c.estimatedLinesSaved;
     }
@@ -185,7 +197,7 @@ class DedupeEngine {
       duplicateTokens: totalDuplicateTokens,
       duplicationPercentage: overallDuplicationPercentage,
       diffDuplicationPercentage: diffDuplicationPercentage,
-      clusterCount: rawClusters.length,
+      clusterCount: clusters.length,
       cloneInstanceCount: totalCloneInstances,
       estimatedLinesSaved: totalLinesSaved,
       clustersOutsideDiff: clustersOutsideDiff,
@@ -195,9 +207,84 @@ class DedupeEngine {
       version: dedupeVersion,
       targetPath: options.targetPath,
       summary: summary,
-      clusters: rawClusters,
+      clusters: clusters,
       fileMetrics: fileMetrics,
     );
+  }
+
+  static (Map<String, Set<int>>, Map<String, Set<int>>, Map<String, int>)
+  _aggregateClusterOccurrences(
+    List<DuplicateCluster> clusters,
+    List<TokenSequence> sequences,
+  ) {
+    final fileDuplicateLines = <String, Set<int>>{};
+    final fileDuplicateTokens = <String, Set<int>>{};
+    final fileClusterCount = <String, int>{};
+    final seqByPath = {for (final s in sequences) s.filePath: s};
+
+    for (final cluster in clusters) {
+      _processClusterOccurrences(
+        cluster,
+        seqByPath,
+        fileDuplicateLines,
+        fileDuplicateTokens,
+        fileClusterCount,
+      );
+    }
+
+    return (fileDuplicateLines, fileDuplicateTokens, fileClusterCount);
+  }
+
+  static void _processClusterOccurrences(
+    DuplicateCluster cluster,
+    Map<String, TokenSequence> seqByPath,
+    Map<String, Set<int>> fileDuplicateLines,
+    Map<String, Set<int>> fileDuplicateTokens,
+    Map<String, int> fileClusterCount,
+  ) {
+    final touchedFilesInCluster = <String>{};
+
+    for (final instance in cluster.instances) {
+      final filePath = instance.filePath;
+      touchedFilesInCluster.add(filePath);
+
+      _recordInstanceLines(fileDuplicateLines, filePath, instance);
+      final seq = seqByPath[filePath];
+      if (seq != null) {
+        _recordInstanceTokens(fileDuplicateTokens, filePath, instance, seq);
+      }
+    }
+
+    for (final filePath in touchedFilesInCluster) {
+      fileClusterCount[filePath] = (fileClusterCount[filePath] ?? 0) + 1;
+    }
+  }
+
+  static void _recordInstanceLines(
+    Map<String, Set<int>> fileDuplicateLines,
+    String filePath,
+    CloneInstance instance,
+  ) {
+    final lineSet = fileDuplicateLines.putIfAbsent(filePath, () => <int>{});
+    for (var l = instance.startLine; l <= instance.endLine; l++) {
+      lineSet.add(l);
+    }
+  }
+
+  static void _recordInstanceTokens(
+    Map<String, Set<int>> fileDuplicateTokens,
+    String filePath,
+    CloneInstance instance,
+    TokenSequence seq,
+  ) {
+    final tokenSet = fileDuplicateTokens.putIfAbsent(filePath, () => <int>{});
+    for (var t = 0; t < seq.tokens.length; t++) {
+      final tok = seq.tokens[t];
+      if (tok.startLine >= instance.startLine &&
+          tok.endLine <= instance.endLine) {
+        tokenSet.add(t);
+      }
+    }
   }
 
   List<String> _discoverDartFiles(String rootPath) {
@@ -206,46 +293,66 @@ class DedupeEngine {
         .toList();
     final files = <String>[];
 
-    void visit(FileSystemEntity entity) {
-      final rel = p.relative(entity.path, from: rootPath);
-      final normalized = p.normalize(rel).replaceAll(r'\', '/');
-
-      // Check exclusions on directories and files
-      if (normalized.startsWith('.dart_tool/') ||
-          normalized.startsWith('.git/') ||
-          normalized.startsWith('build/') ||
-          normalized == '.dart_tool' ||
-          normalized == '.git' ||
-          normalized == 'build') {
-        return;
-      }
-
-      if (WildcardPattern.anyMatch(excludePatterns, normalized) ||
-          WildcardPattern.anyMatch(excludePatterns, p.basename(entity.path))) {
-        return;
-      }
-
-      if (entity is Directory) {
-        for (final child in entity.listSync(followLinks: false)) {
-          visit(child);
-        }
-      } else if (entity is File && entity.path.endsWith('.dart')) {
-        files.add(entity.path);
-      }
-    }
-
     for (final target in options.targets) {
       final resolved = p.normalize(p.join(rootPath, target));
       final type = FileSystemEntity.typeSync(resolved);
       if (type == FileSystemEntityType.directory) {
-        visit(Directory(resolved));
+        _collectFilesFromDir(
+          Directory(resolved),
+          rootPath,
+          excludePatterns,
+          files,
+        );
       } else if (type == FileSystemEntityType.file &&
           resolved.endsWith('.dart')) {
-        visit(File(resolved));
+        files.add(resolved);
       }
     }
 
     files.sort();
     return files;
+  }
+
+  static void _collectFilesFromDir(
+    Directory dir,
+    String rootPath,
+    List<WildcardPattern> excludePatterns,
+    List<String> outFiles,
+  ) {
+    final rel = p.relative(dir.path, from: rootPath);
+    final normalized = p.normalize(rel).replaceAll(r'\', '/');
+    if (_isExcluded(normalized, p.basename(dir.path), excludePatterns)) {
+      return;
+    }
+
+    for (final entity in dir.listSync(followLinks: false)) {
+      if (entity is Directory) {
+        _collectFilesFromDir(entity, rootPath, excludePatterns, outFiles);
+      } else if (entity is File && entity.path.endsWith('.dart')) {
+        final fRel = p.relative(entity.path, from: rootPath);
+        final fNorm = p.normalize(fRel).replaceAll(r'\', '/');
+        if (!_isExcluded(fNorm, p.basename(entity.path), excludePatterns)) {
+          outFiles.add(entity.path);
+        }
+      }
+    }
+  }
+
+  static bool _isExcluded(
+    String normalized,
+    String basename,
+    List<WildcardPattern> excludePatterns,
+  ) {
+    if (normalized.startsWith('.dart_tool/') ||
+        normalized.startsWith('.git/') ||
+        normalized.startsWith('build/') ||
+        normalized == '.dart_tool' ||
+        normalized == '.git' ||
+        normalized == 'build') {
+      return true;
+    }
+
+    return WildcardPattern.anyMatch(excludePatterns, normalized) ||
+        WildcardPattern.anyMatch(excludePatterns, basename);
   }
 }

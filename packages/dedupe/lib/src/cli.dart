@@ -145,39 +145,53 @@ class DedupeCliRunner {
     try {
       results = parser.parse(args);
     } on FormatException catch (e) {
-      errSink.writeln('Error: ${e.message}');
-      errSink.writeln();
-      errSink.writeln('Usage: dedupe [options] [target_path]');
-      errSink.writeln(parser.usage);
-      return ExitCode.usage.code;
+      return _handleFormatException(e);
     }
 
-    if (results.flag('help')) {
-      outSink.writeln(
-        'dedupe - High-performance code duplication and clone detection '
-        'engine for Dart.',
-      );
-      outSink.writeln();
-      outSink.writeln('Usage: dedupe [options] [target_path]');
-      outSink.writeln();
-      outSink.writeln(parser.usage);
-      return ExitCode.success.code;
-    }
-
-    if (results.flag('version')) {
-      outSink.writeln('dedupe version: $dedupeVersion');
-      return ExitCode.success.code;
-    }
+    if (results.flag('help')) return _handleHelp();
+    if (results.flag('version')) return _handleVersion();
 
     final targetPath = results.rest.isNotEmpty ? results.rest.first : '.';
     final normalizedPath = p.normalize(p.absolute(targetPath));
 
-    final targetDir = Directory(normalizedPath);
-    if (!targetDir.existsSync() && !File(normalizedPath).existsSync()) {
+    if (!Directory(normalizedPath).existsSync() &&
+        !File(normalizedPath).existsSync()) {
       errSink.writeln('Error: Target path does not exist: $targetPath');
       return ExitCode.noInput.code;
     }
 
+    final options = _buildOptions(results, normalizedPath);
+    if (options == null) return ExitCode.usage.code;
+
+    return _executeAnalysis(options);
+  }
+
+  int _handleFormatException(FormatException e) {
+    errSink.writeln('Error: ${e.message}');
+    errSink.writeln();
+    errSink.writeln('Usage: dedupe [options] [target_path]');
+    errSink.writeln(parser.usage);
+    return ExitCode.usage.code;
+  }
+
+  int _handleHelp() {
+    outSink.writeln(
+      'dedupe - High-performance code duplication and clone detection '
+      'engine for Dart.',
+    );
+    outSink.writeln();
+    outSink.writeln('Usage: dedupe [options] [target_path]');
+    outSink.writeln();
+    outSink.writeln(parser.usage);
+    return ExitCode.success.code;
+  }
+
+  int _handleVersion() {
+    outSink.writeln('dedupe version: $dedupeVersion');
+    return ExitCode.success.code;
+  }
+
+  DedupeOptions? _buildOptions(ArgResults results, String normalizedPath) {
     final format = OutputFormat.fromString(results.option('format')!);
     final minTokens = parseNonNegativeInt(
       results.option('min-tokens') ?? '40',
@@ -202,22 +216,15 @@ class DedupeCliRunner {
           'Error: Invalid fail-threshold: ${results.option('fail-threshold')}. '
           'Must be a non-negative number.',
         );
-        return ExitCode.usage.code;
+        return null;
       }
       failThreshold = parsed;
     }
 
-    final gitDiffBase = results.option('git-diff');
-    final onlyChanged = results.flag('only-changed');
-    final jsonOutputPath = results.option('json-output');
-    final sdkPath = results.option('sdk-path');
-    final includeFileTable = results.flag('files');
-    final includeClusters = results.flag('clusters');
-
     final excludeList = _parseCommaSeparated(results.option('exclude'));
     final includeList = _parseCommaSeparated(results.option('include'));
 
-    final options = DedupeOptions(
+    return DedupeOptions(
       targetPath: normalizedPath,
       targets: results.rest.isNotEmpty ? results.rest : const ['lib'],
       minTokens: minTokens,
@@ -239,68 +246,37 @@ class DedupeCliRunner {
       includePatterns: includeList.isNotEmpty
           ? includeList
           : const ['**/*.dart'],
-      gitDiffBase: gitDiffBase,
-      onlyChanged: onlyChanged,
+      gitDiffBase: results.option('git-diff'),
+      onlyChanged: results.flag('only-changed'),
       failThreshold: failThreshold,
       top: top,
       categoryFilter: categoryFilter,
       bucketFilter: bucketFilter,
       format: format,
-      jsonOutputPath: jsonOutputPath,
-      sdkPath: sdkPath,
-      includeFileTable: includeFileTable,
-      includeClusters: includeClusters,
+      jsonOutputPath: results.option('json-output'),
+      sdkPath: results.option('sdk-path'),
+      includeFileTable: results.flag('files'),
+      includeClusters: results.flag('clusters'),
     );
+  }
 
+  Future<int> _executeAnalysis(DedupeOptions options) async {
     try {
       final engine = DedupeEngine(options);
       final report = await engine.analyze();
 
-      if (jsonOutputPath != null) {
+      if (options.jsonOutputPath != null) {
         final jsonOutput = const JsonFormatter().format(report);
-        final file = File(jsonOutputPath);
+        final file = File(options.jsonOutputPath!);
         file.parent.createSync(recursive: true);
         file.writeAsStringSync('$jsonOutput\n');
       }
 
-      switch (format) {
-        case OutputFormat.json:
-          outSink.writeln(const JsonFormatter().format(report));
-        case OutputFormat.markdown:
-          final mdFormatter = MarkdownFormatter(
-            topCount: top,
-            categoryFilter: categoryFilter,
-            bucketFilter: bucketFilter,
-            includeFileTable: includeFileTable,
-            includeClusters: includeClusters,
-          );
-          outSink.writeln(mdFormatter.format(report));
-        case OutputFormat.github:
-          final reporter = DedupeGitHubReporter(stdoutSink: outSink);
-          reporter.report(report);
-        case OutputFormat.text:
-          final txtFormatter = TextFormatter(
-            topCount: top,
-            categoryFilter: categoryFilter,
-            bucketFilter: bucketFilter,
-          );
-          outSink.writeln(txtFormatter.format(report));
-      }
+      _renderReport(report, options);
 
-      if (failThreshold != null) {
-        final effectivePercentage =
-            report.summary.diffDuplicationPercentage ??
-            report.summary.duplicationPercentage;
-
-        if (effectivePercentage > failThreshold) {
-          final effectiveStr = effectivePercentage.toStringAsFixed(1);
-          final thresholdStr = failThreshold.toStringAsFixed(1);
-          errSink.writeln(
-            '\nError: Duplication threshold exceeded: '
-            '$effectiveStr% > $thresholdStr%',
-          );
-          return 1;
-        }
+      if (options.failThreshold != null) {
+        final code = _checkThreshold(report, options.failThreshold!);
+        if (code != 0) return code;
       }
 
       return ExitCode.success.code;
@@ -312,6 +288,49 @@ class DedupeCliRunner {
       errSink.writeln(stack);
       return ExitCode.software.code;
     }
+  }
+
+  void _renderReport(DedupeReport report, DedupeOptions options) {
+    switch (options.format) {
+      case OutputFormat.json:
+        outSink.writeln(const JsonFormatter().format(report));
+      case OutputFormat.markdown:
+        final mdFormatter = MarkdownFormatter(
+          topCount: options.top,
+          categoryFilter: options.categoryFilter,
+          bucketFilter: options.bucketFilter,
+          includeFileTable: options.includeFileTable,
+          includeClusters: options.includeClusters,
+        );
+        outSink.writeln(mdFormatter.format(report));
+      case OutputFormat.github:
+        final reporter = DedupeGitHubReporter(stdoutSink: outSink);
+        reporter.report(report);
+      case OutputFormat.text:
+        final txtFormatter = TextFormatter(
+          topCount: options.top,
+          categoryFilter: options.categoryFilter,
+          bucketFilter: options.bucketFilter,
+        );
+        outSink.writeln(txtFormatter.format(report));
+    }
+  }
+
+  int _checkThreshold(DedupeReport report, double failThreshold) {
+    final effectivePercentage =
+        report.summary.diffDuplicationPercentage ??
+        report.summary.duplicationPercentage;
+
+    if (effectivePercentage > failThreshold) {
+      final effectiveStr = effectivePercentage.toStringAsFixed(1);
+      final thresholdStr = failThreshold.toStringAsFixed(1);
+      errSink.writeln(
+        '\nError: Duplication threshold exceeded: '
+        '$effectiveStr% > $thresholdStr%',
+      );
+      return 1;
+    }
+    return 0;
   }
 }
 

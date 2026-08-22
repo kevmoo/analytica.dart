@@ -62,102 +62,142 @@ class DedupeDeltaService {
       );
     }
 
-    final updatedClusters = <DuplicateCluster>[];
-    var totalChangedLinesInDiff = 0;
+    final totalChangedLinesInDiff = _computeTotalDiffLines(diffRanges);
     final duplicatedDiffLinesByFile = <String, Set<int>>{};
-
-    for (final entry in diffRanges.entries) {
-      final lineRanges = entry.value;
-      for (final range in lineRanges) {
-        totalChangedLinesInDiff += range.lineCount;
-      }
-    }
-
+    final updatedClusters = <DuplicateCluster>[];
     var clustersOutside = 0;
 
     for (final cluster in clusters) {
-      final updatedInstances = <CloneInstance>[];
-      var clusterIntersectsDiff = false;
-      var allInstancesInDiff = true;
+      final updated = _annotateCluster(
+        cluster: cluster,
+        diffRanges: diffRanges,
+        duplicatedDiffLinesByFile: duplicatedDiffLinesByFile,
+      );
 
-      for (final instance in cluster.instances) {
-        final normPath = p.normalize(instance.filePath);
-        final fileRanges = diffRanges[normPath] ?? const [];
-
-        final inDiff = fileRanges.any(
-          (r) => r.intersects(instance.startLine, instance.endLine),
-        );
-
-        if (inDiff) {
-          clusterIntersectsDiff = true;
-          final set = duplicatedDiffLinesByFile.putIfAbsent(
-            normPath,
-            () => <int>{},
-          );
-          for (
-            var line = instance.startLine;
-            line <= instance.endLine;
-            line++
-          ) {
-            if (fileRanges.any((r) => r.contains(line))) {
-              set.add(line);
-            }
-          }
-        } else {
-          allInstancesInDiff = false;
-        }
-
-        updatedInstances.add(
-          CloneInstance(
-            filePath: instance.filePath,
-            startLine: instance.startLine,
-            endLine: instance.endLine,
-            startColumn: instance.startColumn,
-            endColumn: instance.endColumn,
-            tokenCount: instance.tokenCount,
-            lineCount: instance.lineCount,
-            snippet: instance.snippet,
-            inDiff: inDiff,
-          ),
-        );
-      }
-
-      if (!clusterIntersectsDiff) {
+      if (!updated.intersectsDiff) {
         clustersOutside++;
       }
 
-      if (onlyChanged && !clusterIntersectsDiff) {
+      if (onlyChanged && !updated.intersectsDiff) {
         continue;
       }
 
-      updatedClusters.add(
-        DuplicateCluster(
-          id: cluster.id,
-          instances: updatedInstances,
-          tokenCount: cluster.tokenCount,
-          lineCount: cluster.lineCount,
-          category: cluster.category,
-          bucket: cluster.bucket,
-          estimatedLinesSaved: cluster.estimatedLinesSaved,
-          intersectsDiff: clusterIntersectsDiff,
-          isNewlyIntroduced: clusterIntersectsDiff && allInstancesInDiff,
-        ),
-      );
+      updatedClusters.add(updated);
     }
 
-    var totalDuplicateLinesInDiff = 0;
-    for (final set in duplicatedDiffLinesByFile.values) {
-      totalDuplicateLinesInDiff += set.length;
-    }
-
-    final diffDuplicationPercent = totalChangedLinesInDiff > 0
-        ? (totalDuplicateLinesInDiff / totalChangedLinesInDiff) * 100
-        : (totalDuplicateLinesInDiff > 0 ? 100.0 : 0.0);
+    final diffDuplicationPercent = _computeDiffDuplicationPercent(
+      totalChangedLinesInDiff,
+      duplicatedDiffLinesByFile,
+    );
 
     return (
       clusters: updatedClusters,
       clustersOutsideDiff: clustersOutside,
       diffDuplicationPercent: diffDuplicationPercent,
     );
+  }
+
+  static int _computeTotalDiffLines(Map<String, List<LineRange>> diffRanges) {
+    var total = 0;
+    for (final lineRanges in diffRanges.values) {
+      for (final range in lineRanges) {
+        total += range.lineCount;
+      }
+    }
+    return total;
+  }
+
+  static DuplicateCluster _annotateCluster({
+    required DuplicateCluster cluster,
+    required Map<String, List<LineRange>> diffRanges,
+    required Map<String, Set<int>> duplicatedDiffLinesByFile,
+  }) {
+    final updatedInstances = <CloneInstance>[];
+    var clusterIntersectsDiff = false;
+    var allInstancesInDiff = true;
+
+    for (final instance in cluster.instances) {
+      final normPath = p.normalize(instance.filePath);
+      final fileRanges = diffRanges[normPath] ?? const [];
+
+      final inDiff = _annotateInstance(
+        instance: instance,
+        fileRanges: fileRanges,
+        normPath: normPath,
+        duplicatedDiffLinesByFile: duplicatedDiffLinesByFile,
+      );
+
+      if (inDiff) {
+        clusterIntersectsDiff = true;
+      } else {
+        allInstancesInDiff = false;
+      }
+
+      updatedInstances.add(
+        CloneInstance(
+          filePath: instance.filePath,
+          startLine: instance.startLine,
+          endLine: instance.endLine,
+          startColumn: instance.startColumn,
+          endColumn: instance.endColumn,
+          tokenCount: instance.tokenCount,
+          lineCount: instance.lineCount,
+          snippet: instance.snippet,
+          inDiff: inDiff,
+        ),
+      );
+    }
+
+    return DuplicateCluster(
+      id: cluster.id,
+      instances: updatedInstances,
+      tokenCount: cluster.tokenCount,
+      lineCount: cluster.lineCount,
+      category: cluster.category,
+      bucket: cluster.bucket,
+      estimatedLinesSaved: cluster.estimatedLinesSaved,
+      intersectsDiff: clusterIntersectsDiff,
+      isNewlyIntroduced: clusterIntersectsDiff && allInstancesInDiff,
+    );
+  }
+
+  static bool _annotateInstance({
+    required CloneInstance instance,
+    required List<LineRange> fileRanges,
+    required String normPath,
+    required Map<String, Set<int>> duplicatedDiffLinesByFile,
+  }) {
+    final inDiff = fileRanges.any(
+      (r) => r.intersects(instance.startLine, instance.endLine),
+    );
+
+    if (inDiff) {
+      final set = duplicatedDiffLinesByFile.putIfAbsent(
+        normPath,
+        () => <int>{},
+      );
+      for (var line = instance.startLine; line <= instance.endLine; line++) {
+        if (fileRanges.any((r) => r.contains(line))) {
+          set.add(line);
+        }
+      }
+    }
+
+    return inDiff;
+  }
+
+  static double _computeDiffDuplicationPercent(
+    int totalChangedLinesInDiff,
+    Map<String, Set<int>> duplicatedDiffLinesByFile,
+  ) {
+    var totalDuplicateLinesInDiff = 0;
+    for (final set in duplicatedDiffLinesByFile.values) {
+      totalDuplicateLinesInDiff += set.length;
+    }
+
+    if (totalChangedLinesInDiff > 0) {
+      return (totalDuplicateLinesInDiff / totalChangedLinesInDiff) * 100;
+    }
+    return totalDuplicateLinesInDiff > 0 ? 100.0 : 0.0;
   }
 }

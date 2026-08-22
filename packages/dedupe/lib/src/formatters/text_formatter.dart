@@ -14,8 +14,18 @@ class TextFormatter {
 
   String format(DedupeReport report) {
     final buffer = StringBuffer();
-    final summary = report.summary;
+    _writeSummary(buffer, report);
 
+    final clusters = _filterClusters(report.clusters);
+    if (clusters.isNotEmpty) {
+      _writeClusters(buffer, clusters);
+    }
+
+    return buffer.toString().trimRight();
+  }
+
+  static void _writeSummary(StringBuffer buffer, DedupeReport report) {
+    final summary = report.summary;
     buffer.writeln('Dedupe Duplication Summary: ${report.targetPath}');
     buffer.writeln('-' * 60);
     buffer.writeln('  Files Analyzed:          ${summary.filesAnalyzed}');
@@ -40,43 +50,45 @@ class TextFormatter {
       }
     }
     buffer.writeln('-' * 60);
+  }
 
-    var clusters = report.clusters;
+  List<DuplicateCluster> _filterClusters(List<DuplicateCluster> clusters) {
+    var result = clusters;
     if (categoryFilter != 'all') {
-      clusters = clusters
+      result = result
           .where((c) => c.category.jsonValue == categoryFilter)
           .toList();
     }
     if (bucketFilter != 'all') {
-      clusters = clusters
-          .where((c) => c.bucket.jsonValue == bucketFilter)
-          .toList();
+      result = result.where((c) => c.bucket.jsonValue == bucketFilter).toList();
     }
-    if (topCount > 0 && clusters.length > topCount) {
-      clusters = clusters.sublist(0, topCount);
+    if (topCount > 0 && result.length > topCount) {
+      result = result.sublist(0, topCount);
     }
+    return result;
+  }
 
-    if (clusters.isNotEmpty) {
-      buffer.writeln('\nTop Duplicate Clusters:');
-      for (final cluster in clusters) {
-        final diffBadge = cluster.intersectsDiff ? ' [IN DIFF]' : '';
-        buffer.writeln(
-          '  [${cluster.id}] ${cluster.category.displayName} '
-          '(${cluster.bucket.displayName}) - '
-          '~${cluster.estimatedLinesSaved} lines saved across '
-          '${cluster.instances.length} occurrences$diffBadge',
-        );
-        for (final instance in cluster.instances) {
-          final inDiffTag = instance.inDiff ? ' [in diff]' : '';
-          final loc =
-              '${instance.filePath}:${instance.startLine}-${instance.endLine}';
-          final stats =
-              '(${instance.lineCount} lines, ${instance.tokenCount} tokens)';
-          buffer.writeln('    - $loc $stats$inDiffTag');
-        }
+  static void _writeClusters(
+    StringBuffer buffer,
+    List<DuplicateCluster> clusters,
+  ) {
+    buffer.writeln('\nTop Duplicate Clusters:');
+    for (final cluster in clusters) {
+      final diffBadge = cluster.intersectsDiff ? ' [IN DIFF]' : '';
+      buffer.writeln(
+        '  [${cluster.id}] ${cluster.category.displayName} '
+        '(${cluster.bucket.displayName}) - '
+        '~${cluster.estimatedLinesSaved} lines saved across '
+        '${cluster.instances.length} occurrences$diffBadge',
+      );
+      for (final instance in cluster.instances) {
+        final inDiffTag = instance.inDiff ? ' [in diff]' : '';
+        final loc =
+            '${instance.filePath}:${instance.startLine}-${instance.endLine}';
+        final stats =
+            '(${instance.lineCount} lines, ${instance.tokenCount} tokens)';
+        buffer.writeln('    - $loc $stats$inDiffTag');
       }
     }
-
-    return buffer.toString().trimRight();
   }
 }
