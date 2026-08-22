@@ -6,6 +6,8 @@
   while the step summary keeps the full table.
 - Add `max-comment-rows` input to the GitHub Action (default `0` = unlimited)
   to keep sticky comments under GitHub's 65536-character body limit.
+- Anchor GitHub annotations to the declaration line only, so they render
+  under the function signature instead of after the closing brace.
 - Move package into pub workspace monorepo layout under `packages/cognitive_complexity`.
 - Restore root `action.yml` and `skills/` structure for monorepo workspace.
 
