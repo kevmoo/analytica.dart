@@ -36,6 +36,8 @@ void main() {
       check(stdout).contains('--fail-threshold');
       check(stdout).contains('--git-diff');
       check(stdout).contains('only-changed');
+      check(stdout).contains('clear-cache');
+      check(stdout).contains('cache-dir');
     });
 
     test('--version displays version and exits 0', () async {
@@ -317,5 +319,67 @@ void uniqueB() {
       final code = await runner.run(['--format=json', d.path('in_proc_pkg')]);
       check(code).equals(0);
     });
+
+    test(
+      'run handles --ignore-comments and --no-ignore-comments flags',
+      () async {
+        await d.dir('in_proc_comments_pkg', [
+          d.dir('lib', [
+            d.file('a.dart', '// comment 1\nvoid main() { print("a"); }'),
+            d.file('b.dart', '// comment 2\nvoid main() { print("a"); }'),
+          ]),
+        ]).create();
+
+        final runner = DedupeCliRunner();
+        final code1 = await runner.run([
+          '--format=json',
+          '--ignore-comments',
+          d.path('in_proc_comments_pkg'),
+        ]);
+        check(code1).equals(0);
+
+        final code2 = await runner.run([
+          '--format=json',
+          '--no-ignore-comments',
+          d.path('in_proc_comments_pkg'),
+        ]);
+        check(code2).equals(0);
+      },
+    );
+
+    test(
+      'run handles --clear-cache, --no-cache, and --cache-dir flags',
+      () async {
+        await d.dir('in_proc_cache_flags_pkg', [
+          d.dir('lib', [d.file('a.dart', 'void main() { print("a"); }')]),
+        ]).create();
+
+        final customCache = p.join(d.sandbox, 'custom_cache_dir');
+        final runner = DedupeCliRunner();
+
+        final code1 = await runner.run([
+          '--format=json',
+          '--cache-dir=$customCache',
+          d.path('in_proc_cache_flags_pkg'),
+        ]);
+        check(code1).equals(0);
+        check(Directory(customCache).existsSync()).isTrue();
+
+        final code2 = await runner.run([
+          '--format=json',
+          '--cache-dir=$customCache',
+          '--clear-cache',
+          d.path('in_proc_cache_flags_pkg'),
+        ]);
+        check(code2).equals(0);
+
+        final code3 = await runner.run([
+          '--format=json',
+          '--no-cache',
+          d.path('in_proc_cache_flags_pkg'),
+        ]);
+        check(code3).equals(0);
+      },
+    );
   });
 }

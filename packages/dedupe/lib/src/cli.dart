@@ -139,6 +139,12 @@ ArgParser buildArgParser() {
           'Custom directory path for disk cache (defaults to '
           '.dart_tool/dedupe).',
     )
+    ..addFlag(
+      'clear-cache',
+      defaultsTo: false,
+      negatable: false,
+      help: 'Clear existing disk cache before running analysis.',
+    )
     ..addSdkPathOption()
     ..addHelpFlag()
     ..addVersionFlag(help: 'Print dedupe version.');
@@ -294,6 +300,7 @@ class DedupeCliRunner {
       includeClusters: results.flag('clusters'),
       useCache: results.flag('cache'),
       cacheDir: results.option('cache-dir'),
+      clearCache: results.flag('clear-cache'),
     );
   }
 

@@ -7,6 +7,7 @@ import 'package:path/path.dart' as p;
 import 'ast_extractor.dart';
 import 'models.dart';
 import 'tokenizer.dart';
+import 'version.dart';
 
 /// Represents a cached file extraction entry storing token sequence metadata
 /// and parsed AST candidate units.
@@ -70,9 +71,13 @@ class CachedFileEntry {
 
 /// Manages content-hashed disk caching for token sequences and AST candidates.
 class DedupeCacheManager {
+  static const _cacheFormatVersion = '1';
+
   final String cacheDirPath;
   final bool enabled;
   final DedupeOptions options;
+  final String sdkVersion;
+  final String packageVersion;
 
   late final String _optionsHash = _computeOptionsHash();
 
@@ -80,7 +85,10 @@ class DedupeCacheManager {
     required this.cacheDirPath,
     required this.enabled,
     required this.options,
-  });
+    String? sdkVersion,
+    String? packageVersion,
+  }) : sdkVersion = sdkVersion ?? Platform.version,
+       packageVersion = packageVersion ?? dedupeVersion;
 
   /// Computes a deterministic 64-bit FNV-1a content hash for source [content].
   static String computeContentHash(String content) {
@@ -107,14 +115,17 @@ class DedupeCacheManager {
 
     try {
       final jsonStr = cacheFile.readAsStringSync();
-      final data = jsonDecode(jsonStr) as Map<String, dynamic>;
+      final data = jsonDecode(jsonStr);
+      if (data is! Map<String, dynamic>) return null;
+      if (data['version'] != _cacheFormatVersion) return null;
+      if (data['relPath'] != relPath) return null;
       if (data['contentHash'] != contentHash) return null;
       if (data['optionsHash'] != _optionsHash) return null;
 
-      return CachedFileEntry.fromJson(
-        data['entry'] as Map<String, dynamic>,
-        fileIndex: fileIndex,
-      );
+      final entryData = data['entry'];
+      if (entryData is! Map<String, dynamic>) return null;
+
+      return CachedFileEntry.fromJson(entryData, fileIndex: fileIndex);
     } catch (_) {
       return null;
     }
@@ -142,15 +153,28 @@ class DedupeCacheManager {
       );
 
       final payload = {
-        'version': '1',
+        'version': _cacheFormatVersion,
         'relPath': relPath,
         'contentHash': contentHash,
         'optionsHash': _optionsHash,
         'entry': entry.toJson(),
       };
 
-      cacheFile.writeAsStringSync(jsonEncode(payload));
-    } catch (_) {}
+      final tempFile = File('${cacheFile.path}.$pid.tmp');
+      tempFile.writeAsStringSync(jsonEncode(payload), flush: true);
+      try {
+        tempFile.renameSync(cacheFile.path);
+      } on FileSystemException {
+        if (cacheFile.existsSync()) {
+          try {
+            cacheFile.deleteSync();
+          } catch (_) {}
+        }
+        tempFile.renameSync(cacheFile.path);
+      }
+    } catch (_) {
+      // Graceful error handling
+    }
   }
 
   static final _cacheEntryFileNamePattern = RegExp(r'^[0-9a-fA-F]{16}\.json$');
@@ -169,12 +193,8 @@ class DedupeCacheManager {
     try {
       final decoded = jsonDecode(file.readAsStringSync());
       if (decoded is! Map<String, dynamic>) return null;
-      for (final key in const [
-        'version',
-        'optionsHash',
-        'contentHash',
-        'entry',
-      ]) {
+      if (decoded['version'] != _cacheFormatVersion) return null;
+      for (final key in const ['optionsHash', 'contentHash', 'entry']) {
         if (decoded[key] == null) return null;
       }
       return decoded['relPath'] as String?;
@@ -246,6 +266,7 @@ class DedupeCacheManager {
 
   String _computeOptionsHash() {
     final raw =
+        '$packageVersion|$sdkVersion|'
         '${options.minTokens}|${options.minLines}|'
         '${options.ignoreComments}|${options.ignoreLiterals}|'
         '${options.ignoreIdentifiers}';

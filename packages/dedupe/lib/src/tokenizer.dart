@@ -139,9 +139,45 @@ class DartTokenizer {
     final lineInfo = parseResult.lineInfo;
     final tokens = <NormalizedToken>[];
 
+    void processToken(Token t) {
+      final (normalized, hash) = _normalizeToken(t);
+
+      final startLoc = lineInfo.getLocation(t.offset);
+      final endLoc = lineInfo.getLocation(t.end);
+
+      final idx = tokens.length;
+      if (tokenOffsetMap != null) {
+        tokenOffsetMap[t.offset] = idx;
+      }
+
+      tokens.add(
+        NormalizedToken(
+          type: t.type,
+          normalizedLexeme: normalized,
+          originalLexeme: t.lexeme,
+          offset: t.offset,
+          length: t.length,
+          startLine: startLoc.lineNumber,
+          endLine: endLoc.lineNumber,
+          startColumn: startLoc.columnNumber,
+          endColumn: endLoc.columnNumber,
+          tokenHash: hash,
+        ),
+      );
+    }
+
     var token = parseResult.unit.beginToken;
 
     while (!token.isEof) {
+      if (!ignoreComments) {
+        var comment = token.precedingComments;
+        while (comment != null) {
+          processToken(comment);
+          final next = comment.next;
+          comment = next is CommentToken ? next : null;
+        }
+      }
+
       final isComment =
           token.type == TokenType.SINGLE_LINE_COMMENT ||
           token.type == TokenType.MULTI_LINE_COMMENT;
@@ -151,32 +187,17 @@ class DartTokenizer {
         continue;
       }
 
-      final (normalized, hash) = _normalizeToken(token);
-
-      final startLoc = lineInfo.getLocation(token.offset);
-      final endLoc = lineInfo.getLocation(token.end);
-
-      final idx = tokens.length;
-      if (tokenOffsetMap != null) {
-        tokenOffsetMap[token.offset] = idx;
-      }
-
-      tokens.add(
-        NormalizedToken(
-          type: token.type,
-          normalizedLexeme: normalized,
-          originalLexeme: token.lexeme,
-          offset: token.offset,
-          length: token.length,
-          startLine: startLoc.lineNumber,
-          endLine: endLoc.lineNumber,
-          startColumn: startLoc.columnNumber,
-          endColumn: endLoc.columnNumber,
-          tokenHash: hash,
-        ),
-      );
-
+      processToken(token);
       token = token.next!;
+    }
+
+    if (!ignoreComments) {
+      var comment = token.precedingComments;
+      while (comment != null) {
+        processToken(comment);
+        final next = comment.next;
+        comment = next is CommentToken ? next : null;
+      }
     }
 
     return TokenSequence(

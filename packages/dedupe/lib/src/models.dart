@@ -373,6 +373,7 @@ final class DedupeOptions {
   final bool includeClusters;
   final bool useCache;
   final String? cacheDir;
+  final bool clearCache;
 
   const DedupeOptions({
     required this.targetPath,
@@ -397,5 +398,6 @@ final class DedupeOptions {
     this.includeClusters = true,
     this.useCache = true,
     this.cacheDir,
+    this.clearCache = false,
   });
 }

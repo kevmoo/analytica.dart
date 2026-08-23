@@ -15,3 +15,4 @@ export 'src/formatters/text_formatter.dart';
 export 'src/minhash.dart';
 export 'src/models.dart';
 export 'src/tokenizer.dart';
+export 'src/version.dart';
