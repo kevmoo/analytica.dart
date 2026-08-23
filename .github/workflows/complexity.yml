@@ -20,8 +20,7 @@ jobs:
         uses: dart-lang/setup-dart@v1
 
       - name: Self-Dogfood Complexity Check
-        # Uses the composite action definition at the repository root
-        uses: ./
+        uses: ./packages/cognitive_complexity
         with:
           diff-base: origin/${{ github.base_ref }}
           fail-threshold: 15
