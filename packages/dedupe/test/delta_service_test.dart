@@ -31,6 +31,51 @@ void main() {
       ).equals(const LineRange(12, 16));
     });
 
+    test('extractDiffRanges resolves repo-relative diffs against absolute '
+        'baseDir and repoRoot', () {
+      final service = DedupeDeltaService();
+      final diffs = [
+        const GitFileDiff(
+          newPath: 'packages/core/lib/src/util.dart',
+          hunks: [
+            DiffHunk(
+              oldStart: 10,
+              oldCount: 5,
+              newStart: 10,
+              newCount: 8,
+              lines: [],
+              addedOrModifiedRanges: [LineRange(12, 16)],
+            ),
+          ],
+        ),
+        const GitFileDiff(
+          newPath: 'packages/other/lib/other.dart',
+          hunks: [
+            DiffHunk(
+              oldStart: 1,
+              oldCount: 1,
+              newStart: 1,
+              newCount: 5,
+              lines: [],
+              addedOrModifiedRanges: [LineRange(1, 5)],
+            ),
+          ],
+        ),
+      ];
+
+      final ranges = service.extractDiffRanges(
+        diffs,
+        baseDir: '/repo/root/packages/core',
+        repoRoot: '/repo/root',
+      );
+
+      check(ranges['lib/src/util.dart']).isNotNull();
+      check(
+        ranges['lib/src/util.dart']!.single,
+      ).equals(const LineRange(12, 16));
+      check(ranges.containsKey('packages/other/lib/other.dart')).isFalse();
+    });
+
     test(
       'applyDiffToClusters annotates instances and computes diff duplication',
       () {

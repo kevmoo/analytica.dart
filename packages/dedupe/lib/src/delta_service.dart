@@ -19,17 +19,37 @@ class DedupeDeltaService {
     return _gitDiffService.getParsedDiff(baseRef, targetPaths: targetPaths);
   }
 
+  /// Returns the absolute path to the root of the Git repository.
+  Future<String> getRepoRoot() => _gitDiffService.getRepoRoot();
+
   /// Maps a list of [GitFileDiff]s to a map of normalized relative file paths
   /// to their added or modified [LineRange]s.
   Map<String, List<LineRange>> extractDiffRanges(
     List<GitFileDiff> fileDiffs, {
     String? baseDir,
+    String? repoRoot,
   }) {
     final map = <String, List<LineRange>>{};
+    final absBaseDir = baseDir != null
+        ? p.normalize(p.absolute(baseDir))
+        : null;
+
     for (final diff in fileDiffs) {
-      var path = diff.path;
-      if (baseDir != null && p.isWithin(baseDir, path)) {
-        path = p.relative(path, from: baseDir);
+      final diffPath = diff.path;
+      String path;
+      if (absBaseDir != null) {
+        final absDiffPath = repoRoot != null
+            ? p.normalize(p.join(repoRoot, diffPath))
+            : p.normalize(p.absolute(diffPath));
+
+        if (p.isWithin(absBaseDir, absDiffPath) ||
+            p.equals(absBaseDir, absDiffPath)) {
+          path = p.relative(absDiffPath, from: absBaseDir);
+        } else {
+          continue;
+        }
+      } else {
+        path = diffPath;
       }
       path = p.normalize(path);
       map[path] = diff.addedOrModifiedLineRanges;
