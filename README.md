@@ -41,9 +41,9 @@ Modular composite GitHub Actions are maintained and documented in their respecti
 
 Specialized agent skills are maintained in the [`skills/`](skills/) directory and documented alongside their companion packages:
 
-* [**`dart-cognitive-complexity`**](skills/dart-cognitive-complexity/SKILL.md) (documented in [`cognitive_complexity`](packages/cognitive_complexity/README.md#ai-agent-integration)): Complexity scoring, triage, and AST pattern matching refactoring.
-* [**`dart-dedupe`**](skills/dart-dedupe/SKILL.md) (documented in [`dedupe`](packages/dedupe/README.md#ai-agent-integration)): Structural code duplication audits, clone triage, and safe deduplication.
-* [**`dart-undead`**](skills/dart-undead/SKILL.md) (documented in [`undead`](packages/undead/README.md#ai-agent-integration)): Deterministic dead code reachability audits and safe declaration pruning.
+* [**`dart-cognitive-complexity`**](skills/dart-cognitive-complexity/SKILL.md) (documented in [`cognitive_complexity`](packages/cognitive_complexity/README.md#-ai-agent-integration)): Complexity scoring, triage, and AST pattern matching refactoring.
+* [**`dart-dedupe`**](skills/dart-dedupe/SKILL.md) (documented in [`dedupe`](packages/dedupe/README.md#-ai-agent-integration)): Structural code duplication audits, clone triage, and safe deduplication.
+* [**`dart-undead`**](skills/dart-undead/SKILL.md) (documented in [`undead`](packages/undead/README.md#-ai-agent-integration)): Deterministic dead code reachability audits and safe declaration pruning.
 
 ---
 
