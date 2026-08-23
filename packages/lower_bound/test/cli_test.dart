@@ -21,10 +21,7 @@ void main() {
 
   group('CLI Options & Resolution', () {
     test('displays help with --help and exits 0', () async {
-      final proc = await TestProcess.start(SdkDiscovery.dartExecutable, [
-        binPath,
-        '--help',
-      ]);
+      final proc = await TestProcess.start(dartExecutable, [binPath, '--help']);
       expect(
         proc.stdout,
         emitsThrough(
@@ -35,7 +32,7 @@ void main() {
     });
 
     test('exits 64 on invalid argument', () async {
-      final proc = await TestProcess.start(SdkDiscovery.dartExecutable, [
+      final proc = await TestProcess.start(dartExecutable, [
         binPath,
         '--non-existent-flag',
       ]);
@@ -44,7 +41,7 @@ void main() {
     });
 
     test('exits 66 when target directory does not exist', () async {
-      final proc = await TestProcess.start(SdkDiscovery.dartExecutable, [
+      final proc = await TestProcess.start(dartExecutable, [
         binPath,
         '/non/existent/directory/path',
       ]);
@@ -55,7 +52,7 @@ void main() {
     test('exits 66 when directory has no pubspec.yaml', () async {
       await d.dir('empty_dir', []).create();
 
-      final proc = await TestProcess.start(SdkDiscovery.dartExecutable, [
+      final proc = await TestProcess.start(dartExecutable, [
         binPath,
         p.join(d.sandbox, 'empty_dir'),
       ]);
@@ -77,7 +74,7 @@ environment:
 
         final commentFile = p.join(d.sandbox, 'comment.md');
 
-        final proc = await TestProcess.start(SdkDiscovery.dartExecutable, [
+        final proc = await TestProcess.start(dartExecutable, [
           binPath,
           '--comment-output=$commentFile',
           '--max-comment-rows=1',
@@ -104,7 +101,7 @@ environment:
         d.dir('lib', [d.file('json_pkg.dart', 'const a = 1;')]),
       ]).create();
 
-      final proc = await TestProcess.start(SdkDiscovery.dartExecutable, [
+      final proc = await TestProcess.start(dartExecutable, [
         binPath,
         '--format=json',
         p.join(d.sandbox, 'json_pkg'),

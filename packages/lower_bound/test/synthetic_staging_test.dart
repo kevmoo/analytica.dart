@@ -33,7 +33,7 @@ analyzer:
 '''),
         ]).create();
 
-        final parsed = PubspecHelper.parse(p.join(d.sandbox, 'staging_test'));
+        final parsed = parsePubspec(p.join(d.sandbox, 'staging_test'));
         final staging = SyntheticStaging.create(
           sourcePackagePath: p.join(d.sandbox, 'staging_test'),
           pubspec: parsed,
@@ -108,7 +108,7 @@ dependencies:
       ]).create();
 
       final pkgBPath = p.join(d.sandbox, 'sibling_repo', 'pkg_b');
-      final parsed = PubspecHelper.parse(pkgBPath);
+      final parsed = parsePubspec(pkgBPath);
 
       final localSiblings = {
         'pkg_a': LocalSibling(
@@ -158,7 +158,7 @@ dependencies:
         d.dir('lib', [d.file('pkg_config_test.dart', '')]),
       ]).create();
 
-      final parsed = PubspecHelper.parse(p.join(d.sandbox, 'pkg_config_test'));
+      final parsed = parsePubspec(p.join(d.sandbox, 'pkg_config_test'));
       final staging = SyntheticStaging.create(
         sourcePackagePath: p.join(d.sandbox, 'pkg_config_test'),
         pubspec: parsed,

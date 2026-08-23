@@ -17,7 +17,7 @@ environment:
         d.dir('lib', [d.file('no_deps.dart', 'const answer = 42;')]),
       ]).create();
 
-      final res = await LowerBoundRunner.validate(
+      final res = await validatePackageLowerBounds(
         packagePath: p.join(d.sandbox, 'no_deps'),
       );
 
@@ -45,7 +45,7 @@ String joinPaths(String a, String b) => p.join(a, b);
         ]),
       ]).create();
 
-      final res = await LowerBoundRunner.validate(
+      final res = await validatePackageLowerBounds(
         packagePath: p.join(d.sandbox, 'clean_pkg'),
       );
 
@@ -79,7 +79,7 @@ void broken() {
           ]),
         ]).create();
 
-        final res = await LowerBoundRunner.validate(
+        final res = await validatePackageLowerBounds(
           packagePath: p.join(d.sandbox, 'broken_pkg'),
         );
 

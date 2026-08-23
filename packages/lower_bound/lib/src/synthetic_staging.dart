@@ -33,8 +33,7 @@ class SyntheticStaging {
   }) {
     final parent = baseTempDir ?? Directory.systemTemp;
     final tempDir = parent.createTempSync('lower_bound_staged_');
-    final siblings =
-        localSiblings ?? PubspecHelper.findLocalSiblings(sourcePackagePath);
+    final siblings = localSiblings ?? findLocalSiblings(sourcePackagePath);
 
     final staging = SyntheticStaging._(
       sourcePackagePath: sourcePackagePath,
@@ -48,19 +47,16 @@ class SyntheticStaging {
   }
 
   void _setupDirectory() {
-    // 1. Copy lib directory using absolute path
     final sourceLib = Directory(p.join(sourcePackagePath, 'lib')).absolute;
     if (sourceLib.existsSync()) {
       _copyDirectory(sourceLib, Directory(p.join(stagingDir.path, 'lib')));
     }
 
-    // 2. Copy bin directory if present
     final sourceBin = Directory(p.join(sourcePackagePath, 'bin')).absolute;
     if (sourceBin.existsSync()) {
       _copyDirectory(sourceBin, Directory(p.join(stagingDir.path, 'bin')));
     }
 
-    // 3. Copy analysis_options.yaml if present (or look up parent hierarchy)
     _copyAnalysisOptions();
   }
 
@@ -239,23 +235,27 @@ class SyntheticStaging {
       final packages = json['packages'];
       if (packages is! YamlList) return {};
 
-      final result = <String, String>{};
-      for (final pkg in packages) {
-        if (pkg is YamlMap) {
-          final name = pkg['name'] as String?;
-          final rootUri = pkg['rootUri'] as String?;
-          if (name != null && rootUri != null) {
-            final version = _extractPackageVersion(name, rootUri);
-            if (version != null) {
-              result[name] = version;
-            }
-          }
-        }
-      }
-      return result;
+      return _parsePackagesList(packages);
     } catch (_) {
       return {};
     }
+  }
+
+  Map<String, String> _parsePackagesList(YamlList packages) {
+    final result = <String, String>{};
+    for (final pkg in packages) {
+      if (pkg is YamlMap) {
+        final name = pkg['name'] as String?;
+        final rootUri = pkg['rootUri'] as String?;
+        if (name != null && rootUri != null) {
+          final version = _extractPackageVersion(name, rootUri);
+          if (version != null) {
+            result[name] = version;
+          }
+        }
+      }
+    }
+    return result;
   }
 
   String? _extractPackageVersion(String name, String rootUri) {
@@ -264,10 +264,7 @@ class SyntheticStaging {
       return match.group(1);
     }
     final sibling = localSiblings[name];
-    if (sibling?.rawVersion != null) {
-      return sibling!.rawVersion;
-    }
-    return null;
+    return sibling?.rawVersion;
   }
 
   void dispose() {

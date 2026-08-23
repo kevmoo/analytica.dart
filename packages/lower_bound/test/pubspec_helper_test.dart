@@ -23,7 +23,7 @@ dev_dependencies:
 '''),
       ]).create();
 
-      final parsed = PubspecHelper.parse(p.join(d.sandbox, 'sample_pkg'));
+      final parsed = parsePubspec(p.join(d.sandbox, 'sample_pkg'));
 
       check(parsed.name).equals('sample_pkg');
       check(parsed.version).equals(Version(1, 0, 0));
@@ -55,7 +55,7 @@ dependencies:
 '''),
       ]).create();
 
-      final parsed = PubspecHelper.parse(p.join(d.sandbox, 'wip_pkg'));
+      final parsed = parsePubspec(p.join(d.sandbox, 'wip_pkg'));
       check(parsed.name).equals('wip_pkg');
       check(parsed.isPublishable).isFalse();
       check(parsed.isWip).isTrue();
@@ -64,7 +64,7 @@ dependencies:
 
     test('throws MissingInputException when pubspec.yaml is missing', () {
       check(
-        () => PubspecHelper.parse(p.join(d.sandbox, 'non_existent_dir')),
+        () => parsePubspec(p.join(d.sandbox, 'non_existent_dir')),
       ).throws<MissingInputException>();
     });
 
@@ -80,7 +80,7 @@ dependencies:
         ]).create();
 
         check(
-          () => PubspecHelper.parse(p.join(d.sandbox, 'no_sdk_pkg')),
+          () => parsePubspec(p.join(d.sandbox, 'no_sdk_pkg')),
         ).throws<PackageResolutionException>();
       },
     );
@@ -128,7 +128,7 @@ environment:
           ]),
         ]).create();
 
-        final siblings = PubspecHelper.findLocalSiblings(
+        final siblings = findLocalSiblings(
           p.join(d.sandbox, 'monorepo', 'packages', 'pkg_b'),
         );
 
