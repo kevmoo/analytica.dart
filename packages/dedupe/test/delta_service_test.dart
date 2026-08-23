@@ -103,7 +103,7 @@ void main() {
           snippet: 'code',
         );
 
-        const cluster = DuplicateCluster(
+        final cluster = DuplicateCluster(
           id: 'cluster-1',
           instances: [instance1, instance2],
           tokenCount: 40,
@@ -160,7 +160,7 @@ void main() {
         snippet: 'code',
       );
 
-      const cluster = DuplicateCluster(
+      final cluster = DuplicateCluster(
         id: 'cluster-legacy',
         instances: [instance1, instance2],
         tokenCount: 40,

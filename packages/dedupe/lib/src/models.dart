@@ -16,8 +16,13 @@ const List<String> defaultDartExclusions = [
 
 /// Classification category for duplicate code clusters.
 enum CloneCategory {
+  /// Logic and control flow duplication (if statements, loops, algorithms).
   logic('logic', 'Logic & Control Flow'),
+
+  /// Data definitions, literals, maps, and declarative boilerplate.
   data('data', 'Data & Declarative Boilerplate'),
+
+  /// Structural boilerplate and scaffolding (class structures, setups).
   boilerplate('boilerplate', 'Scaffolding & Structural Boilerplate');
 
   final String jsonValue;
@@ -25,12 +30,16 @@ enum CloneCategory {
 
   const CloneCategory(this.jsonValue, this.displayName);
 
+  /// Parses a [CloneCategory] from its JSON string representation.
   static CloneCategory fromJson(String value) => switch (value) {
     'logic' => logic,
     'data' => data,
     'boilerplate' => boilerplate,
     _ => throw ArgumentError.value(value, 'value', 'Unknown CloneCategory'),
   };
+
+  /// Parses a [CloneCategory] from a string representation.
+  static CloneCategory fromString(String value) => fromJson(value);
 }
 
 /// Structural match type / bucket for clone detection.
@@ -52,6 +61,7 @@ enum CloneBucket {
 
   const CloneBucket(this.jsonValue, this.displayName);
 
+  /// Parses a [CloneBucket] from its JSON string representation.
   static CloneBucket fromJson(String value) => switch (value) {
     'identical' => identical,
     'structural' => structural,
@@ -59,19 +69,33 @@ enum CloneBucket {
     'gapped' => gapped,
     _ => throw ArgumentError.value(value, 'value', 'Unknown CloneBucket'),
   };
+
+  /// Parses a [CloneBucket] from a string representation.
+  static CloneBucket fromString(String value) => fromJson(value);
 }
 
 /// Output formatting mode for CLI and reports.
 enum OutputFormat {
+  /// Formats the report as human-readable GitHub Flavored Markdown.
   markdown('markdown'),
+
+  /// Formats the report as machine-readable JSON.
   json('json'),
+
+  /// Emits GitHub Actions workflow commands and PR review annotations.
   github('github'),
+
+  /// Formats the report as concise, plain ASCII text.
   text('text');
 
   final String jsonValue;
 
   const OutputFormat(this.jsonValue);
 
+  /// Parses an [OutputFormat] from its JSON string representation.
+  static OutputFormat fromJson(String value) => fromString(value);
+
+  /// Parses an [OutputFormat] from a string representation.
   static OutputFormat fromString(String value) => switch (value) {
     'markdown' => markdown,
     'json' => json,
@@ -82,7 +106,7 @@ enum OutputFormat {
 }
 
 /// Represents a single occurrence of duplicate code in a file.
-class CloneInstance {
+final class CloneInstance {
   final String filePath;
   final int startLine;
   final int endLine;
@@ -130,12 +154,39 @@ class CloneInstance {
   };
 
   @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is CloneInstance &&
+          filePath == other.filePath &&
+          startLine == other.startLine &&
+          endLine == other.endLine &&
+          startColumn == other.startColumn &&
+          endColumn == other.endColumn &&
+          tokenCount == other.tokenCount &&
+          lineCount == other.lineCount &&
+          snippet == other.snippet &&
+          inDiff == other.inDiff;
+
+  @override
+  int get hashCode => Object.hash(
+    filePath,
+    startLine,
+    endLine,
+    startColumn,
+    endColumn,
+    tokenCount,
+    lineCount,
+    snippet,
+    inDiff,
+  );
+
+  @override
   String toString() =>
       '$filePath:$startLine-$endLine ($lineCount lines, $tokenCount tokens)';
 }
 
 /// A cluster of two or more [CloneInstance]s sharing duplicated code.
-class DuplicateCluster {
+final class DuplicateCluster {
   final String id;
   final List<CloneInstance> instances;
   final int tokenCount;
@@ -146,9 +197,9 @@ class DuplicateCluster {
   final bool intersectsDiff;
   final bool isNewlyIntroduced;
 
-  const DuplicateCluster({
+  DuplicateCluster({
     required this.id,
-    required this.instances,
+    required List<CloneInstance> instances,
     required this.tokenCount,
     required this.lineCount,
     required this.category,
@@ -156,7 +207,7 @@ class DuplicateCluster {
     required this.estimatedLinesSaved,
     this.intersectsDiff = false,
     this.isNewlyIntroduced = false,
-  });
+  }) : instances = List.unmodifiable(instances);
 
   int get instanceCount => instances.length;
 
@@ -191,13 +242,40 @@ class DuplicateCluster {
   };
 
   @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is DuplicateCluster &&
+          id == other.id &&
+          _listEquals(instances, other.instances) &&
+          tokenCount == other.tokenCount &&
+          lineCount == other.lineCount &&
+          category == other.category &&
+          bucket == other.bucket &&
+          estimatedLinesSaved == other.estimatedLinesSaved &&
+          intersectsDiff == other.intersectsDiff &&
+          isNewlyIntroduced == other.isNewlyIntroduced;
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    Object.hashAll(instances),
+    tokenCount,
+    lineCount,
+    category,
+    bucket,
+    estimatedLinesSaved,
+    intersectsDiff,
+    isNewlyIntroduced,
+  );
+
+  @override
   String toString() =>
       'Cluster $id ($category, $bucket, $instanceCount instances, '
       '$estimatedLinesSaved lines saved)';
 }
 
 /// Duplication metrics for a single analyzed file.
-class FileDuplicationMetric {
+final class FileDuplicationMetric {
   final String filePath;
   final int totalLines;
   final int duplicateLines;
@@ -237,10 +315,38 @@ class FileDuplicationMetric {
     'duplicationPercentage': duplicationPercentage,
     'clusterCount': clusterCount,
   };
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is FileDuplicationMetric &&
+          filePath == other.filePath &&
+          totalLines == other.totalLines &&
+          duplicateLines == other.duplicateLines &&
+          totalTokens == other.totalTokens &&
+          duplicateTokens == other.duplicateTokens &&
+          duplicationPercentage == other.duplicationPercentage &&
+          clusterCount == other.clusterCount;
+
+  @override
+  int get hashCode => Object.hash(
+    filePath,
+    totalLines,
+    duplicateLines,
+    totalTokens,
+    duplicateTokens,
+    duplicationPercentage,
+    clusterCount,
+  );
+
+  @override
+  String toString() =>
+      '$filePath: $duplicateLines/$totalLines duplicate lines '
+      '(${duplicationPercentage.toStringAsFixed(1)}%)';
 }
 
 /// Aggregate summary metrics for a deduplication analysis run.
-class DedupeSummary {
+final class DedupeSummary {
   final int filesAnalyzed;
   final int totalLines;
   final int totalTokens;
@@ -296,23 +402,60 @@ class DedupeSummary {
     'estimatedLinesSaved': estimatedLinesSaved,
     if (clustersOutsideDiff > 0) 'clustersOutsideDiff': clustersOutsideDiff,
   };
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is DedupeSummary &&
+          filesAnalyzed == other.filesAnalyzed &&
+          totalLines == other.totalLines &&
+          totalTokens == other.totalTokens &&
+          duplicateLines == other.duplicateLines &&
+          duplicateTokens == other.duplicateTokens &&
+          duplicationPercentage == other.duplicationPercentage &&
+          diffDuplicationPercentage == other.diffDuplicationPercentage &&
+          clusterCount == other.clusterCount &&
+          cloneInstanceCount == other.cloneInstanceCount &&
+          estimatedLinesSaved == other.estimatedLinesSaved &&
+          clustersOutsideDiff == other.clustersOutsideDiff;
+
+  @override
+  int get hashCode => Object.hash(
+    filesAnalyzed,
+    totalLines,
+    totalTokens,
+    duplicateLines,
+    duplicateTokens,
+    duplicationPercentage,
+    diffDuplicationPercentage,
+    clusterCount,
+    cloneInstanceCount,
+    estimatedLinesSaved,
+    clustersOutsideDiff,
+  );
+
+  @override
+  String toString() =>
+      'DedupeSummary($filesAnalyzed files, $clusterCount clusters, '
+      '${duplicationPercentage.toStringAsFixed(1)}% duplication)';
 }
 
 /// Full analysis report produced by `pkg:dedupe`.
-class DedupeReport {
+final class DedupeReport {
   final String version;
   final String targetPath;
   final DedupeSummary summary;
   final List<DuplicateCluster> clusters;
   final List<FileDuplicationMetric> fileMetrics;
 
-  const DedupeReport({
+  DedupeReport({
     required this.version,
     required this.targetPath,
     required this.summary,
-    required this.clusters,
-    required this.fileMetrics,
-  });
+    required List<DuplicateCluster> clusters,
+    required List<FileDuplicationMetric> fileMetrics,
+  }) : clusters = List.unmodifiable(clusters),
+       fileMetrics = List.unmodifiable(fileMetrics);
 
   factory DedupeReport.fromJson(Map<String, dynamic> json) {
     final summary = DedupeSummary.fromJson(
@@ -347,6 +490,30 @@ class DedupeReport {
     'clusters': clusters.map((c) => c.toJson()).toList(),
     'fileMetrics': fileMetrics.map((f) => f.toJson()).toList(),
   };
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is DedupeReport &&
+          version == other.version &&
+          targetPath == other.targetPath &&
+          summary == other.summary &&
+          _listEquals(clusters, other.clusters) &&
+          _listEquals(fileMetrics, other.fileMetrics);
+
+  @override
+  int get hashCode => Object.hash(
+    version,
+    targetPath,
+    summary,
+    Object.hashAll(clusters),
+    Object.hashAll(fileMetrics),
+  );
+
+  @override
+  String toString() =>
+      'DedupeReport(version: $version, target: $targetPath, '
+      'clusters: ${clusters.length}, files: ${fileMetrics.length})';
 }
 
 /// Configuration options for duplicate code scanning.
@@ -375,16 +542,16 @@ final class DedupeOptions {
   final String? cacheDir;
   final bool clearCache;
 
-  const DedupeOptions({
+  DedupeOptions({
     required this.targetPath,
-    this.targets = const ['lib'],
+    List<String> targets = const ['lib'],
     this.minTokens = 40,
     this.minLines = 4,
     this.ignoreComments = true,
     this.ignoreLiterals = true,
     this.ignoreIdentifiers = false,
-    this.excludePatterns = defaultDartExclusions,
-    this.includePatterns = const ['**/*.dart'],
+    List<String> excludePatterns = defaultDartExclusions,
+    List<String> includePatterns = const ['**/*.dart'],
     this.gitDiffBase,
     this.onlyChanged = false,
     this.failThreshold,
@@ -399,5 +566,79 @@ final class DedupeOptions {
     this.useCache = true,
     this.cacheDir,
     this.clearCache = false,
-  });
+  }) : targets = List.unmodifiable(targets),
+       excludePatterns = List.unmodifiable(excludePatterns),
+       includePatterns = List.unmodifiable(includePatterns);
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is DedupeOptions &&
+          targetPath == other.targetPath &&
+          _listEquals(targets, other.targets) &&
+          minTokens == other.minTokens &&
+          minLines == other.minLines &&
+          ignoreComments == other.ignoreComments &&
+          ignoreLiterals == other.ignoreLiterals &&
+          ignoreIdentifiers == other.ignoreIdentifiers &&
+          _listEquals(excludePatterns, other.excludePatterns) &&
+          _listEquals(includePatterns, other.includePatterns) &&
+          gitDiffBase == other.gitDiffBase &&
+          onlyChanged == other.onlyChanged &&
+          failThreshold == other.failThreshold &&
+          top == other.top &&
+          categoryFilter == other.categoryFilter &&
+          bucketFilter == other.bucketFilter &&
+          format == other.format &&
+          jsonOutputPath == other.jsonOutputPath &&
+          sdkPath == other.sdkPath &&
+          includeFileTable == other.includeFileTable &&
+          includeClusters == other.includeClusters &&
+          useCache == other.useCache &&
+          cacheDir == other.cacheDir &&
+          clearCache == other.clearCache;
+
+  @override
+  int get hashCode => Object.hash(
+    targetPath,
+    Object.hashAll(targets),
+    minTokens,
+    minLines,
+    ignoreComments,
+    ignoreLiterals,
+    ignoreIdentifiers,
+    Object.hashAll(excludePatterns),
+    Object.hashAll(includePatterns),
+    gitDiffBase,
+    onlyChanged,
+    failThreshold,
+    top,
+    categoryFilter,
+    bucketFilter,
+    format,
+    jsonOutputPath,
+    sdkPath,
+    Object.hash(
+      includeFileTable,
+      includeClusters,
+      useCache,
+      cacheDir,
+      clearCache,
+    ),
+  );
+
+  @override
+  String toString() =>
+      'DedupeOptions(targetPath: $targetPath, format: $format, '
+      'minTokens: $minTokens, minLines: $minLines)';
+}
+
+bool _listEquals<T>(List<T>? a, List<T>? b) {
+  if (identical(a, b)) return true;
+  if (a == null || b == null) return false;
+  if (a.length != b.length) return false;
+  for (var i = 0; i < a.length; i++) {
+    if (a[i] != b[i]) return false;
+  }
+  return true;
 }
