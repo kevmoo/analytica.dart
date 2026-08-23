@@ -74,30 +74,6 @@ void emitGitHubWarning(
   );
 }
 
-/// Emits a GitHub Actions workflow notice annotation.
-void emitGitHubNotice(
-  String message, {
-  String? file,
-  int? line,
-  int? endLine,
-  int? col,
-  int? endColumn,
-  String? title,
-  StringSink? sink,
-}) {
-  _emitWorkflowCommand(
-    'notice',
-    message,
-    file: file,
-    line: line,
-    endLine: endLine,
-    col: col,
-    endColumn: endColumn,
-    title: title,
-    sink: sink,
-  );
-}
-
 void _emitWorkflowCommand(
   String command,
   String message, {
@@ -110,13 +86,30 @@ void _emitWorkflowCommand(
   StringSink? sink,
 }) {
   final params = <String>[];
-  if (file != null) params.add('file=$file');
+  if (file != null) params.add('file=${_escapeProperty(file)}');
   if (line != null) params.add('line=$line');
   if (endLine != null) params.add('endLine=$endLine');
   if (col != null) params.add('col=$col');
   if (endColumn != null) params.add('endColumn=$endColumn');
-  if (title != null) params.add('title=$title');
+  if (title != null) params.add('title=${_escapeProperty(title)}');
 
   final paramStr = params.isNotEmpty ? ' ${params.join(',')}' : '';
-  (sink ?? stdout).writeln('::$command$paramStr::$message');
+  final escapedMessage = _escapeData(message);
+  (sink ?? stdout).writeln('::$command$paramStr::$escapedMessage');
+}
+
+String _escapeProperty(String value) {
+  return value
+      .replaceAll('%', '%25')
+      .replaceAll('\r', '%0D')
+      .replaceAll('\n', '%0A')
+      .replaceAll(':', '%3A')
+      .replaceAll(',', '%2C');
+}
+
+String _escapeData(String value) {
+  return value
+      .replaceAll('%', '%25')
+      .replaceAll('\r', '%0D')
+      .replaceAll('\n', '%0A');
 }

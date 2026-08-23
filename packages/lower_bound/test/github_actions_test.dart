@@ -1,29 +1,30 @@
 import 'package:checks/checks.dart';
-import 'package:lower_bound/lower_bound.dart';
+import 'package:lower_bound/src/github_actions.dart';
 import 'package:test/test.dart';
 
 void main() {
   group('GitHub Actions Helpers', () {
-    test('emitGitHubError formats correctly', () {
+    test('emitGitHubError formats and escapes correctly', () {
       final sink = StringBuffer();
       emitGitHubError(
-        'Compile error at floor',
+        'Compile error line 1\nCompile error line 2: with colons',
         file: 'lib/src/foo.dart',
         line: 10,
-        title: 'Error Title',
+        title: 'Error: Title, with commas',
         sink: sink,
       );
 
       final output = sink.toString().trim();
       check(output).equals(
-        '::error file=lib/src/foo.dart,line=10,title=Error Title::Compile error at floor',
+        '::error file=lib/src/foo.dart,line=10,title=Error%3A Title%2C with commas::'
+        'Compile error line 1%0ACompile error line 2: with colons',
       );
     });
 
-    test('emitGitHubWarning formats correctly', () {
+    test('emitGitHubWarning formats and escapes correctly', () {
       final sink = StringBuffer();
       emitGitHubWarning(
-        'Unreleased local sibling',
+        'Unreleased local sibling\nSecond line',
         file: 'pubspec.yaml',
         title: 'Warning Title',
         sink: sink,
@@ -32,16 +33,8 @@ void main() {
       final output = sink.toString().trim();
       check(output).equals(
         '::warning file=pubspec.yaml,title=Warning Title::'
-        'Unreleased local sibling',
+        'Unreleased local sibling%0ASecond line',
       );
-    });
-
-    test('emitGitHubNotice formats correctly', () {
-      final sink = StringBuffer();
-      emitGitHubNotice('Notice message', sink: sink);
-
-      final output = sink.toString().trim();
-      check(output).equals('::notice::Notice message');
     });
   });
 }

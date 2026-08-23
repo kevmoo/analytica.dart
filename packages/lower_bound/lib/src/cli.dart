@@ -20,9 +20,9 @@ ArgParser buildLowerBoundArgParser() {
       help: 'Directory or file targets to analyze in staging.',
     )
     ..addFlag(
-      'pin',
-      defaultsTo: true,
-      help: 'Pin direct runtime dependencies to their exact declared floor.',
+      'allow-local-siblings',
+      defaultsTo: false,
+      help: 'Allow unreleased local sibling packages via path overrides.',
     )
     ..addOption(
       'sdk',
@@ -94,7 +94,7 @@ Future<int> runLowerBoundCli(
     return ExitCode.noInput.code;
   }
 
-  return _runValidationSuite(results, packagePaths, out);
+  return _runValidationSuite(results, packagePaths, out, err, cwd);
 }
 
 void _printUsage(ArgParser parser, StringSink out) {
@@ -121,17 +121,44 @@ List<String>? _resolvePackagePaths(
 List<String>? _resolveExplicitPaths(List<String> rawPaths, StringSink err) {
   final paths = <String>[];
   for (final rawPath in rawPaths) {
-    final dir = Directory(rawPath);
-    if (!dir.existsSync()) {
-      err.writeln('Directory does not exist: $rawPath');
-      return null;
+    final expanded = _expandExplicitPath(rawPath, err);
+    if (expanded == null) return null;
+    paths.addAll(expanded);
+  }
+  return paths;
+}
+
+List<String>? _expandExplicitPath(String rawPath, StringSink err) {
+  final dir = Directory(rawPath);
+  if (!dir.existsSync()) {
+    err.writeln('Directory does not exist: $rawPath');
+    return null;
+  }
+  final pubspecFile = File(p.join(dir.path, 'pubspec.yaml'));
+  if (!pubspecFile.existsSync()) {
+    err.writeln('No pubspec.yaml found in $rawPath');
+    return null;
+  }
+
+  try {
+    final parsed = parsePubspec(dir.path);
+    if (parsed.isWorkspaceRoot) {
+      return _expandWorkspaceMembers(dir.path, parsed.workspace!);
     }
-    final pubspecFile = File(p.join(dir.path, 'pubspec.yaml'));
-    if (!pubspecFile.existsSync()) {
-      err.writeln('No pubspec.yaml found in $rawPath');
-      return null;
+    return [dir.path];
+  } catch (e) {
+    err.writeln('Failed to parse pubspec in $rawPath: $e');
+    return null;
+  }
+}
+
+List<String> _expandWorkspaceMembers(String rootPath, List<String> members) {
+  final paths = <String>[];
+  for (final member in members) {
+    final memberDir = Directory(p.join(rootPath, member));
+    if (memberDir.existsSync()) {
+      paths.add(memberDir.path);
     }
-    paths.add(dir.path);
   }
   return paths;
 }
@@ -148,13 +175,7 @@ List<String>? _resolveCwdWorkspace(String cwd, StringSink err) {
     return [cwd];
   }
 
-  final paths = <String>[];
-  for (final member in parsed.workspace!) {
-    final memberDir = Directory(p.join(cwd, member));
-    if (memberDir.existsSync()) {
-      paths.add(memberDir.path);
-    }
-  }
+  final paths = _expandWorkspaceMembers(cwd, parsed.workspace!);
   return paths.isEmpty ? null : paths;
 }
 
@@ -162,9 +183,11 @@ Future<int> _runValidationSuite(
   ArgResults results,
   List<String> packagePaths,
   StringSink out,
+  StringSink err,
+  String cwd,
 ) async {
-  final targets = results.multiOption('targets');
-  final pin = results.flag('pin');
+  final targets = _parseTargets(results.multiOption('targets'));
+  final allowLocalSiblings = results.flag('allow-local-siblings');
   final keepTemp = results.flag('keep-temp');
   final failOnError = results.flag('fail-on-error');
   final format = results.option('format') ?? 'text';
@@ -172,7 +195,18 @@ Future<int> _runValidationSuite(
   final maxCommentRows =
       int.tryParse(results.option('max-comment-rows') ?? '0') ?? 0;
   final sdkRaw = results.option('sdk');
-  final sdkOverride = sdkRaw != null ? Version.parse(sdkRaw) : null;
+
+  final Version? sdkOverride;
+  if (sdkRaw != null && sdkRaw.isNotEmpty) {
+    try {
+      sdkOverride = Version.parse(sdkRaw);
+    } on FormatException {
+      err.writeln('Error: Invalid --sdk version string \'$sdkRaw\'.');
+      return ExitCode.usage.code;
+    }
+  } else {
+    sdkOverride = null;
+  }
 
   final validationResults = <LowerBoundValidationResult>[];
   var allClean = true;
@@ -182,11 +216,12 @@ Future<int> _runValidationSuite(
     final isClean = await _runSinglePackage(
       packagePath: packagePath,
       targets: targets,
-      pin: pin,
+      allowLocalSiblings: allowLocalSiblings,
       keepTemp: keepTemp,
       sdkOverride: sdkOverride,
       isJson: isJson,
       out: out,
+      err: err,
       results: validationResults,
     );
     if (!isClean) {
@@ -202,8 +237,10 @@ Future<int> _runValidationSuite(
     format: format,
     results: validationResults,
     sink: out,
+    errSink: err,
     commentOutput: commentOutput,
     maxCommentRows: maxCommentRows,
+    workspaceRoot: cwd,
   );
 
   if (failOnError && !allClean) {
@@ -212,14 +249,28 @@ Future<int> _runValidationSuite(
   return ExitCode.success.code;
 }
 
+List<String> _parseTargets(List<String> rawTargets) {
+  final result = <String>[];
+  for (final t in rawTargets) {
+    for (final part in t.split(RegExp(r'[,\s]+'))) {
+      final trimmed = part.trim();
+      if (trimmed.isNotEmpty) {
+        result.add(trimmed);
+      }
+    }
+  }
+  return result.isEmpty ? const ['lib', 'bin'] : result;
+}
+
 Future<bool> _runSinglePackage({
   required String packagePath,
   required List<String> targets,
-  required bool pin,
+  required bool allowLocalSiblings,
   required bool keepTemp,
   required Version? sdkOverride,
   required bool isJson,
   required StringSink out,
+  required StringSink err,
   required List<LowerBoundValidationResult> results,
 }) async {
   final packageName = p.basename(packagePath);
@@ -232,8 +283,9 @@ Future<bool> _runSinglePackage({
       packagePath: packagePath,
       targets: targets,
       keepTemp: keepTemp,
-      pinExactFloors: pin,
+      allowLocalSiblings: allowLocalSiblings,
       sdkOverride: sdkOverride,
+      errSink: err,
     );
 
     results.add(res);
@@ -245,6 +297,20 @@ Future<bool> _runSinglePackage({
     if (!isJson) {
       out.writeln('✗ ERROR: $e');
     }
+    err.writeln('Validation error for $packageName: $e');
+    results.add(
+      LowerBoundValidationResult(
+        packageName: packageName,
+        packagePath: packagePath,
+        minSdk: sdkOverride ?? Version(0, 0, 0),
+        dependencies: const [],
+        resolvedVersions: const {},
+        pubGetSuccess: false,
+        pubGetError: e.toString(),
+        analyzeSuccess: false,
+        warnings: [e.toString()],
+      ),
+    );
     return false;
   }
 }
@@ -253,17 +319,17 @@ void _renderResults({
   required String format,
   required List<LowerBoundValidationResult> results,
   required StringSink sink,
+  required StringSink errSink,
   required String? commentOutput,
   required int maxCommentRows,
+  required String workspaceRoot,
 }) {
   if (commentOutput != null && commentOutput.isNotEmpty) {
     final commentReport = buildMarkdownReport(
       results,
       maxCommentRows: maxCommentRows,
     );
-    try {
-      File(commentOutput).writeAsStringSync(commentReport);
-    } catch (_) {}
+    _writeCommentFile(commentOutput, commentReport, errSink);
   }
 
   switch (format) {
@@ -271,16 +337,21 @@ void _renderResults({
       renderJson(results, sink);
       break;
     case 'github':
-      renderGitHub(
-        results,
-        sink,
-        commentOutputFile: commentOutput,
-        maxCommentRows: maxCommentRows,
-      );
+      renderGitHub(results, sink, workspaceRoot: workspaceRoot);
       break;
     case 'text':
     default:
       renderText(results, sink);
       break;
+  }
+}
+
+void _writeCommentFile(String filePath, String content, StringSink errSink) {
+  try {
+    final file = File(filePath);
+    file.parent.createSync(recursive: true);
+    file.writeAsStringSync(content);
+  } catch (e) {
+    errSink.writeln('Warning: Failed to write comment file \'$filePath\': $e');
   }
 }

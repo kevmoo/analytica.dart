@@ -1,5 +1,6 @@
 import 'package:checks/checks.dart';
-import 'package:lower_bound/lower_bound.dart';
+import 'package:lower_bound/src/exceptions.dart';
+import 'package:lower_bound/src/pubspec_helper.dart';
 import 'package:path/path.dart' as p;
 import 'package:pub_semver/pub_semver.dart';
 import 'package:test/test.dart';

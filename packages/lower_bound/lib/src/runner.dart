@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:path/path.dart' as p;
@@ -9,14 +10,22 @@ import 'sdk_discovery.dart';
 import 'synthetic_staging.dart';
 
 /// Validates the lower bounds of the package at [packagePath].
+///
+/// Simulates minimum dependency resolution by executing `pub downgrade` in an
+/// isolated synthetic directory (with `dev_dependencies` and workspace
+/// boundaries removed), followed by static analysis.
+///
+/// Note: When [sdkOverride] is passed, `_PUB_TEST_SDK_VERSION` is set for pub
+/// resolution only. Static analysis runs using the local ambient Dart SDK.
 Future<LowerBoundValidationResult> validatePackageLowerBounds({
   required String packagePath,
   List<String> targets = const ['lib', 'bin'],
   bool keepTemp = false,
-  bool pinExactFloors = true,
+  bool allowLocalSiblings = false,
   Version? sdkOverride,
   Map<String, LocalSibling>? localSiblings,
   Directory? baseTempDir,
+  StringSink? errSink,
 }) async {
   final parsed = parsePubspec(packagePath);
   final targetSdk = sdkOverride ?? parsed.minSdk;
@@ -33,10 +42,10 @@ Future<LowerBoundValidationResult> validatePackageLowerBounds({
   );
 
   try {
-    final resolutionError = await _runStagedPubResolution(
+    final resolutionError = await _runStagedPubDowngrade(
       staging: staging,
       targetSdk: targetSdk,
-      pinExactFloors: pinExactFloors,
+      allowLocalSiblings: allowLocalSiblings,
     );
 
     if (resolutionError != null) {
@@ -57,7 +66,11 @@ Future<LowerBoundValidationResult> validatePackageLowerBounds({
       targets: validTargets,
     );
 
-    final analyzerErrors = _parseAnalyzerErrors(analyzeResult);
+    final diagnostics = _parseDiagnostics(
+      analyzeResult,
+      staging.stagingDir.path,
+    );
+    final analyzeSuccess = diagnostics.every((d) => !d.isError);
 
     return LowerBoundValidationResult(
       packageName: parsed.name,
@@ -66,12 +79,12 @@ Future<LowerBoundValidationResult> validatePackageLowerBounds({
       dependencies: _effectiveDependencies(parsed, staging),
       resolvedVersions: resolvedVersions,
       pubGetSuccess: true,
-      analyzeSuccess: analyzeResult.exitCode == 0,
-      analyzerErrors: analyzerErrors,
+      analyzeSuccess: analyzeSuccess,
+      diagnostics: diagnostics,
       warnings: staging.warnings,
     );
   } finally {
-    _cleanupStaging(staging, keepTemp: keepTemp);
+    _cleanupStaging(staging, keepTemp: keepTemp, errSink: errSink);
   }
 }
 
@@ -120,28 +133,20 @@ List<DependencyFloor> _effectiveDependencies(
       : parsed.dependencies;
 }
 
-Future<String?> _runStagedPubResolution({
+Future<String?> _runStagedPubDowngrade({
   required SyntheticStaging staging,
   required Version targetSdk,
-  required bool pinExactFloors,
+  required bool allowLocalSiblings,
 }) async {
-  staging.writePubspec(pinLowerBounds: pinExactFloors);
-  var pubGetResult = await _runPubGet(
+  staging.writePubspec(allowLocalSiblings: allowLocalSiblings);
+  final downgradeResult = await _runPubDowngrade(
     workingDirectory: staging.stagingDir.path,
     simulatedSdk: targetSdk,
   );
 
-  if (pubGetResult.exitCode != 0 && pinExactFloors) {
-    staging.writePubspec(pinLowerBounds: false);
-    pubGetResult = await _runPubDowngrade(
-      workingDirectory: staging.stagingDir.path,
-      simulatedSdk: targetSdk,
-    );
-  }
-
-  if (pubGetResult.exitCode != 0) {
-    final stderrStr = pubGetResult.stderr.toString().trim();
-    final stdoutStr = pubGetResult.stdout.toString().trim();
+  if (downgradeResult.exitCode != 0) {
+    final stderrStr = downgradeResult.stderr.toString().trim();
+    final stdoutStr = downgradeResult.stdout.toString().trim();
     return stderrStr.isNotEmpty ? stderrStr : stdoutStr;
   }
 
@@ -171,53 +176,98 @@ List<String> _resolveTargets(String stagingPath, List<String> targets) {
   return validTargets.isEmpty ? const ['.'] : validTargets;
 }
 
-List<String> _parseAnalyzerErrors(ProcessResult result) {
-  if (result.exitCode == 0) return const [];
+List<LowerBoundDiagnostic> _parseDiagnostics(
+  ProcessResult result,
+  String stagingPath,
+) {
+  final raw = result.stdout.toString().trim();
+  if (raw.isEmpty) return const [];
 
-  final errors = <String>[];
-  final lines = result.stdout.toString().split('\n');
+  try {
+    final json = jsonDecode(raw);
+    if (json is Map<String, Object?> && json['diagnostics'] is List) {
+      final list = json['diagnostics'] as List;
+      final parsed = <LowerBoundDiagnostic>[];
+      for (final item in list) {
+        if (item is Map<String, Object?>) {
+          final diag = _parseJsonDiagnostic(item, stagingPath);
+          if (diag != null) parsed.add(diag);
+        }
+      }
+      return parsed;
+    }
+  } catch (_) {}
 
+  return _fallbackDiagnostics(raw);
+}
+
+LowerBoundDiagnostic? _parseJsonDiagnostic(
+  Map<String, Object?> item,
+  String stagingPath,
+) {
+  final message = item['problemMessage'] as String? ?? '';
+  final severity = item['severity'] as String? ?? 'ERROR';
+  final location = item['location'] as Map<String, Object?>?;
+
+  String? relativeFile;
+  int? line;
+  int? column;
+
+  if (location != null) {
+    final filePath = location['file'] as String?;
+    if (filePath != null) {
+      relativeFile = p.isWithin(stagingPath, filePath)
+          ? p.relative(filePath, from: stagingPath)
+          : filePath;
+    }
+    final range = location['range'] as Map<String, Object?>?;
+    final start = range?['start'] as Map<String, Object?>?;
+    line = start?['line'] as int?;
+    column = start?['column'] as int?;
+  }
+
+  return LowerBoundDiagnostic(
+    message: message,
+    file: relativeFile,
+    line: line,
+    column: column,
+    severity: severity,
+  );
+}
+
+List<LowerBoundDiagnostic> _fallbackDiagnostics(String output) {
+  final lines = output.split('\n');
+  final result = <LowerBoundDiagnostic>[];
   for (final line in lines) {
     final trimmed = line.trim();
-    if (_isDiagnosticLine(trimmed)) {
-      errors.add(trimmed);
+    if (trimmed.isNotEmpty) {
+      final isErr =
+          trimmed.startsWith('error -') ||
+          trimmed.contains('error •') ||
+          trimmed.contains('error:');
+      result.add(
+        LowerBoundDiagnostic(
+          message: trimmed,
+          severity: isErr ? 'ERROR' : 'WARNING',
+        ),
+      );
     }
   }
-
-  if (errors.isEmpty && lines.isNotEmpty) {
-    errors.addAll(lines.where((l) => l.trim().isNotEmpty).take(20));
-  }
-
-  return errors;
+  return result;
 }
 
-bool _isDiagnosticLine(String line) {
-  return line.isNotEmpty &&
-      (line.startsWith('error -') ||
-          line.startsWith('warning -') ||
-          line.contains('error •') ||
-          line.contains('warning •') ||
-          line.contains('error:'));
-}
-
-void _cleanupStaging(SyntheticStaging staging, {required bool keepTemp}) {
+void _cleanupStaging(
+  SyntheticStaging staging, {
+  required bool keepTemp,
+  StringSink? errSink,
+}) {
   if (!keepTemp) {
     staging.dispose();
   } else {
-    stdout.writeln('Preserved staging directory: ${staging.stagingDir.path}');
+    (errSink ?? stderr).writeln(
+      'Preserved staging directory: ${staging.stagingDir.path}',
+    );
   }
-}
-
-Future<ProcessResult> _runPubGet({
-  required String workingDirectory,
-  required Version simulatedSdk,
-}) async {
-  return Process.run(
-    dartExecutable,
-    ['pub', 'get'],
-    workingDirectory: workingDirectory,
-    environment: {'_PUB_TEST_SDK_VERSION': simulatedSdk.toString()},
-  );
 }
 
 Future<ProcessResult> _runPubDowngrade({
@@ -238,6 +288,7 @@ Future<ProcessResult> _runDartAnalyze({
 }) async {
   return Process.run(dartExecutable, [
     'analyze',
+    '--format=json',
     ...targets,
   ], workingDirectory: workingDirectory);
 }

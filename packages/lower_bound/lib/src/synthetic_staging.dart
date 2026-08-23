@@ -1,9 +1,8 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:path/path.dart' as p;
-import 'package:yaml/yaml.dart';
 
-import 'github_actions.dart';
 import 'models.dart';
 import 'pubspec_helper.dart';
 
@@ -67,7 +66,7 @@ class SyntheticStaging {
     final raw = optionsFile.readAsStringSync();
     final sanitizedLines = <String>[];
     for (final line in raw.split('\n')) {
-      if (line.trim().startsWith('include: package:')) {
+      if (line.trim().startsWith('include:')) {
         sanitizedLines.add('# [lower_bound stripped include: ${line.trim()}]');
       } else {
         sanitizedLines.add(line);
@@ -91,10 +90,7 @@ class SyntheticStaging {
   }
 
   /// Writes a synthetic pubspec.yaml into the staging directory.
-  void writePubspec({
-    bool pinLowerBounds = true,
-    Set<String> excludeOverrides = const {},
-  }) {
+  void writePubspec({bool allowLocalSiblings = false}) {
     warnings.clear();
     resolvedFloorMetadata.clear();
 
@@ -102,12 +98,11 @@ class SyntheticStaging {
     _writeHeader(buffer);
     _writeDependencies(buffer);
 
-    final (:exactVersionOverrides, :pathOverrides) = _collectOverrides(
-      pinLowerBounds: pinLowerBounds,
-      excludeOverrides: excludeOverrides,
-    );
-
-    _writeOverrides(buffer, exactVersionOverrides, pathOverrides);
+    if (allowLocalSiblings) {
+      _writeSiblingOverrides(buffer);
+    } else {
+      resolvedFloorMetadata.addAll(pubspec.dependencies);
+    }
 
     File(
       p.join(stagingDir.path, 'pubspec.yaml'),
@@ -124,40 +119,40 @@ class SyntheticStaging {
   }
 
   void _writeDependencies(StringBuffer buffer) {
-    if (pubspec.rawDependencies.isEmpty) return;
+    if (pubspec.rawDependencies.isEmpty &&
+        pubspec.rawNonHostedDependencies.isEmpty) {
+      return;
+    }
     buffer.writeln('dependencies:');
     for (final entry in pubspec.rawDependencies.entries) {
       buffer.writeln('  ${entry.key}: \'${entry.value}\'');
     }
+    for (final entry in pubspec.rawNonHostedDependencies.entries) {
+      buffer.writeln('  ${entry.key}: ${entry.value}');
+    }
     buffer.writeln();
   }
 
-  ({
-    Map<String, String> exactVersionOverrides,
-    Map<String, String> pathOverrides,
-  })
-  _collectOverrides({
-    required bool pinLowerBounds,
-    required Set<String> excludeOverrides,
-  }) {
-    final exactVersionOverrides = <String, String>{};
+  void _writeSiblingOverrides(StringBuffer buffer) {
     final pathOverrides = <String, String>{};
 
     for (final dep in pubspec.dependencies) {
       final sibling = localSiblings[dep.name];
       if (_isUnreleasedWipSibling(sibling)) {
         _handleWipSibling(dep, sibling!, pathOverrides);
-      } else if (pinLowerBounds && !excludeOverrides.contains(dep.name)) {
-        _handleExactFloorOverride(dep, exactVersionOverrides);
       } else {
         resolvedFloorMetadata.add(dep);
       }
     }
 
-    return (
-      exactVersionOverrides: exactVersionOverrides,
-      pathOverrides: pathOverrides,
-    );
+    if (pathOverrides.isNotEmpty) {
+      buffer.writeln('dependency_overrides:');
+      for (final entry in pathOverrides.entries) {
+        buffer.writeln('  ${entry.key}:');
+        buffer.writeln('    path: \'${entry.value}\'');
+      }
+      buffer.writeln();
+    }
   }
 
   bool _isUnreleasedWipSibling(LocalSibling? sibling) {
@@ -176,11 +171,6 @@ class SyntheticStaging {
         '\'${dep.name}\' ($rawVer). Linked via local path override for '
         'lower-bound validation.';
     warnings.add(warningMsg);
-    emitGitHubWarning(
-      warningMsg,
-      file: p.join(sourcePackagePath, 'pubspec.yaml'),
-      title: 'Unreleased Local Sibling Dependency',
-    );
 
     resolvedFloorMetadata.add(
       DependencyFloor(
@@ -194,34 +184,6 @@ class SyntheticStaging {
     );
   }
 
-  void _handleExactFloorOverride(
-    DependencyFloor dep,
-    Map<String, String> exactVersionOverrides,
-  ) {
-    if (dep.lowerBound != null) {
-      exactVersionOverrides[dep.name] = dep.lowerBound.toString();
-    }
-    resolvedFloorMetadata.add(dep);
-  }
-
-  void _writeOverrides(
-    StringBuffer buffer,
-    Map<String, String> exactVersionOverrides,
-    Map<String, String> pathOverrides,
-  ) {
-    if (exactVersionOverrides.isEmpty && pathOverrides.isEmpty) return;
-
-    buffer.writeln('dependency_overrides:');
-    for (final entry in exactVersionOverrides.entries) {
-      buffer.writeln('  ${entry.key}: \'${entry.value}\'');
-    }
-    for (final entry in pathOverrides.entries) {
-      buffer.writeln('  ${entry.key}:');
-      buffer.writeln('    path: \'${entry.value}\'');
-    }
-    buffer.writeln();
-  }
-
   /// Reads resolved dependency versions from the generated package_config.json.
   Map<String, String> readResolvedVersions() {
     final configFile = File(
@@ -230,10 +192,10 @@ class SyntheticStaging {
     if (!configFile.existsSync()) return {};
 
     try {
-      final json = loadYaml(configFile.readAsStringSync());
-      if (json is! YamlMap) return {};
+      final json = jsonDecode(configFile.readAsStringSync());
+      if (json is! Map<String, Object?>) return {};
       final packages = json['packages'];
-      if (packages is! YamlList) return {};
+      if (packages is! List) return {};
 
       return _parsePackagesList(packages);
     } catch (_) {
@@ -241,10 +203,10 @@ class SyntheticStaging {
     }
   }
 
-  Map<String, String> _parsePackagesList(YamlList packages) {
+  Map<String, String> _parsePackagesList(List packages) {
     final result = <String, String>{};
     for (final pkg in packages) {
-      if (pkg is YamlMap) {
+      if (pkg is Map) {
         final name = pkg['name'] as String?;
         final rootUri = pkg['rootUri'] as String?;
         if (name != null && rootUri != null) {
@@ -263,8 +225,33 @@ class SyntheticStaging {
     if (match != null) {
       return match.group(1);
     }
+
+    // Try resolving from local sibling or target package's pubspec.yaml
     final sibling = localSiblings[name];
-    return sibling?.rawVersion;
+    if (sibling?.rawVersion != null) {
+      return sibling!.rawVersion;
+    }
+
+    return _readVersionFromUri(rootUri);
+  }
+
+  String? _readVersionFromUri(String rootUri) {
+    try {
+      final uri = Uri.parse(rootUri);
+      final pkgDir = uri.isAbsolute && uri.scheme == 'file'
+          ? Directory.fromUri(uri)
+          : Directory(p.join(stagingDir.path, '.dart_tool', rootUri));
+      final pubspecFile = File(p.join(pkgDir.path, 'pubspec.yaml'));
+      if (pubspecFile.existsSync()) {
+        final content = pubspecFile.readAsStringSync();
+        final match = RegExp(
+          r'^version:\s*([^\s#]+)',
+          multiLine: true,
+        ).firstMatch(content);
+        return match?.group(1);
+      }
+    } catch (_) {}
+    return null;
   }
 
   void dispose() {

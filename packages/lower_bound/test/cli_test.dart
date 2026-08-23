@@ -2,62 +2,81 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:checks/checks.dart';
-import 'package:lower_bound/lower_bound.dart';
+import 'package:lower_bound/src/cli.dart';
+import 'package:lower_bound/src/sdk_discovery.dart';
 import 'package:path/path.dart' as p;
 import 'package:test/test.dart';
 import 'package:test_descriptor/test_descriptor.dart' as d;
 import 'package:test_process/test_process.dart';
 
+String _resolveBinPath() {
+  var dir = Directory.current;
+  while (true) {
+    final candidate = File(
+      p.join(dir.path, 'packages', 'lower_bound', 'bin', 'lower_bound.dart'),
+    );
+    if (candidate.existsSync()) return candidate.path;
+
+    final direct = File(p.join(dir.path, 'bin', 'lower_bound.dart'));
+    if (direct.existsSync()) return direct.path;
+
+    final parent = dir.parent;
+    if (parent.path == dir.path) break;
+    dir = parent;
+  }
+  return p.join(Directory.current.path, 'bin', 'lower_bound.dart');
+}
+
 void main() {
-  final binPath = p.normalize(
-    p.join(
-      Directory.current.path,
-      'packages',
-      'lower_bound',
-      'bin',
-      'lower_bound.dart',
-    ),
-  );
+  final binPath = _resolveBinPath();
 
   group('CLI Options & Resolution', () {
     test('displays help with --help and exits 0', () async {
-      final proc = await TestProcess.start(dartExecutable, [binPath, '--help']);
-      expect(
-        proc.stdout,
-        emitsThrough(
-          'Validate Dart package compilation against dependency lower bounds.',
-        ),
+      final out = StringBuffer();
+      final exitCode = await runLowerBoundCli(['--help'], stdoutSink: out);
+      check(exitCode).equals(0);
+      check(out.toString()).contains(
+        'Validate Dart package compilation against dependency lower bounds.',
       );
-      await proc.shouldExit(0);
     });
 
     test('exits 64 on invalid argument', () async {
-      final proc = await TestProcess.start(dartExecutable, [
-        binPath,
+      final err = StringBuffer();
+      final exitCode = await runLowerBoundCli([
         '--non-existent-flag',
-      ]);
-      expect(proc.stderr, emitsThrough(contains('Could not find an option')));
-      await proc.shouldExit(64);
+      ], stderrSink: err);
+      check(exitCode).equals(64);
+      check(err.toString()).contains('Could not find an option');
+    });
+
+    test('exits 64 on invalid --sdk argument', () async {
+      final err = StringBuffer();
+      final exitCode = await runLowerBoundCli([
+        '--sdk=invalid-sdk-version',
+        '.',
+      ], stderrSink: err);
+      check(exitCode).equals(64);
+      check(err.toString()).contains('Invalid --sdk');
     });
 
     test('exits 66 when target directory does not exist', () async {
-      final proc = await TestProcess.start(dartExecutable, [
-        binPath,
+      final err = StringBuffer();
+      final exitCode = await runLowerBoundCli([
         '/non/existent/directory/path',
-      ]);
-      expect(proc.stderr, emitsThrough(contains('Directory does not exist')));
-      await proc.shouldExit(66);
+      ], stderrSink: err);
+      check(exitCode).equals(66);
+      check(err.toString()).contains('Directory does not exist');
     });
 
     test('exits 66 when directory has no pubspec.yaml', () async {
       await d.dir('empty_dir', []).create();
 
-      final proc = await TestProcess.start(dartExecutable, [
-        binPath,
+      final err = StringBuffer();
+      final exitCode = await runLowerBoundCli([
         p.join(d.sandbox, 'empty_dir'),
-      ]);
-      expect(proc.stderr, emitsThrough(contains('No pubspec.yaml found')));
-      await proc.shouldExit(66);
+      ], stderrSink: err);
+      check(exitCode).equals(66);
+      check(err.toString()).contains('No pubspec.yaml found');
     });
 
     test(
@@ -72,7 +91,7 @@ environment:
           d.dir('lib', [d.file('valid_pkg.dart', 'const a = 1;')]),
         ]).create();
 
-        final commentFile = p.join(d.sandbox, 'comment.md');
+        final commentFile = p.join(d.sandbox, 'nested_dir', 'comment.md');
 
         final proc = await TestProcess.start(dartExecutable, [
           binPath,
@@ -117,5 +136,45 @@ environment:
       check(entry['package']).equals('json_pkg');
       check(entry['clean']).equals(true);
     });
+
+    test(
+      'expands workspace members when explicit path is workspace root',
+      () async {
+        await d.dir('explicit_workspace', [
+          d.file('pubspec.yaml', '''
+name: workspace_root
+workspace:
+  - member_a
+  - member_b
+environment:
+  sdk: '^3.12.0'
+'''),
+          d.dir('member_a', [
+            d.file('pubspec.yaml', '''
+name: member_a
+environment:
+  sdk: '^3.12.0'
+'''),
+            d.dir('lib', [d.file('member_a.dart', 'const a = 1;')]),
+          ]),
+          d.dir('member_b', [
+            d.file('pubspec.yaml', '''
+name: member_b
+environment:
+  sdk: '^3.12.0'
+'''),
+            d.dir('lib', [d.file('member_b.dart', 'const b = 2;')]),
+          ]),
+        ]).create();
+
+        final out = StringBuffer();
+        final exitCode = await runLowerBoundCli([
+          p.join(d.sandbox, 'explicit_workspace'),
+        ], stdoutSink: out);
+        check(exitCode).equals(0);
+        check(out.toString()).contains('member_a');
+        check(out.toString()).contains('member_b');
+      },
+    );
   });
 }

@@ -36,6 +36,7 @@ class ParsedPubspec {
   final VersionConstraint sdkConstraint;
   final List<DependencyFloor> dependencies;
   final Map<String, String> rawDependencies;
+  final Map<String, String> rawNonHostedDependencies;
   final List<String>? workspace;
 
   const ParsedPubspec({
@@ -47,6 +48,7 @@ class ParsedPubspec {
     required this.sdkConstraint,
     required this.dependencies,
     required this.rawDependencies,
+    this.rawNonHostedDependencies = const {},
     this.workspace,
   });
 
@@ -86,25 +88,56 @@ ParsedPubspec parsePubspec(String packagePath) {
   final minSdk = _extractMinSdk(sdkConstraint, file.path);
   final dependencies = <DependencyFloor>[];
   final rawDependencies = <String, String>{};
+  final rawNonHostedDependencies = <String, String>{};
 
   for (final entry in pubspec.dependencies.entries) {
     final depName = entry.key;
     final dep = entry.value;
 
-    final constraint = dep is HostedDependency
-        ? dep.version
-        : VersionConstraint.any;
+    if (dep is HostedDependency) {
+      final constraint = dep.version;
+      rawDependencies[depName] = constraint.toString();
+      final floor = _extractFloor(constraint);
 
-    rawDependencies[depName] = constraint.toString();
-    final floor = _extractFloor(constraint);
-
-    dependencies.add(
-      DependencyFloor(
-        name: depName,
-        declaredConstraint: constraint,
-        lowerBound: floor,
-      ),
-    );
+      dependencies.add(
+        DependencyFloor(
+          name: depName,
+          declaredConstraint: constraint,
+          lowerBound: floor,
+        ),
+      );
+    } else if (dep is SdkDependency) {
+      rawNonHostedDependencies[depName] = "sdk: '${dep.sdk}'";
+      dependencies.add(
+        DependencyFloor(
+          name: depName,
+          declaredConstraint: VersionConstraint.any,
+          lowerBound: null,
+          isNonHosted: true,
+        ),
+      );
+    } else if (dep is PathDependency) {
+      rawNonHostedDependencies[depName] = "path: '${dep.path}'";
+      dependencies.add(
+        DependencyFloor(
+          name: depName,
+          declaredConstraint: VersionConstraint.any,
+          lowerBound: null,
+          isNonHosted: true,
+        ),
+      );
+    } else if (dep is GitDependency) {
+      final gitPath = dep.path != null ? ", path: '${dep.path}'" : '';
+      rawNonHostedDependencies[depName] = "git: {url: '${dep.url}'$gitPath}";
+      dependencies.add(
+        DependencyFloor(
+          name: depName,
+          declaredConstraint: VersionConstraint.any,
+          lowerBound: null,
+          isNonHosted: true,
+        ),
+      );
+    }
   }
 
   return ParsedPubspec(
@@ -116,6 +149,7 @@ ParsedPubspec parsePubspec(String packagePath) {
     sdkConstraint: sdkConstraint,
     dependencies: dependencies,
     rawDependencies: rawDependencies,
+    rawNonHostedDependencies: rawNonHostedDependencies,
     workspace: pubspec.workspace,
   );
 }
@@ -234,7 +268,7 @@ Version _extractMinSdk(VersionConstraint constraint, String filePath) {
 Version? _extractFloor(VersionConstraint constraint) {
   return switch (constraint) {
     final Version v => v,
-    VersionRange(:final min?) => min,
+    VersionRange(:final min?, includeMin: true) => min,
     _ => null,
   };
 }

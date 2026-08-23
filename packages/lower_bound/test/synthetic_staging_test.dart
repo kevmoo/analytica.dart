@@ -1,7 +1,8 @@
 import 'dart:io';
 
 import 'package:checks/checks.dart';
-import 'package:lower_bound/lower_bound.dart';
+import 'package:lower_bound/src/pubspec_helper.dart';
+import 'package:lower_bound/src/synthetic_staging.dart';
 import 'package:path/path.dart' as p;
 import 'package:pub_semver/pub_semver.dart';
 import 'package:test/test.dart';
@@ -51,7 +52,7 @@ analyzer:
             ).existsSync(),
           ).isTrue();
 
-          staging.writePubspec(pinLowerBounds: true);
+          staging.writePubspec();
 
           final stagedPubspecContent = File(
             p.join(staging.stagingDir.path, 'pubspec.yaml'),
@@ -60,8 +61,6 @@ analyzer:
           check(stagedPubspecContent).contains('name: staging_test');
           check(stagedPubspecContent).contains('publish_to: none');
           check(stagedPubspecContent).contains('path: \'^1.9.0\'');
-          check(stagedPubspecContent).contains('dependency_overrides:');
-          check(stagedPubspecContent).contains('path: \'1.9.0\'');
           check(
             stagedPubspecContent,
           ).not((c) => c.contains('resolution: workspace'));
@@ -80,7 +79,7 @@ analyzer:
       },
     );
 
-    test('links unreleased wip local siblings via path overrides', () async {
+    test('links unreleased wip local siblings when allowed', () async {
       await d.dir('sibling_repo', [
         d.dir('pkg_a', [
           d.file('pubspec.yaml', '''
@@ -128,14 +127,13 @@ dependencies:
       );
 
       try {
-        staging.writePubspec(pinLowerBounds: true);
+        staging.writePubspec(allowLocalSiblings: true);
 
         final stagedPubspecContent = File(
           p.join(staging.stagingDir.path, 'pubspec.yaml'),
         ).readAsStringSync();
 
         check(stagedPubspecContent).contains('dependency_overrides:');
-        check(stagedPubspecContent).contains('path: \'1.9.0\'');
         check(stagedPubspecContent).contains('pkg_a:');
         check(stagedPubspecContent).contains('path: \'');
 

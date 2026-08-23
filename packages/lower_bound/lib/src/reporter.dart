@@ -31,6 +31,13 @@ void _renderPackageText(LowerBoundValidationResult result, StringSink sink) {
     sink.writeln('Status: PASSED');
   }
 
+  if (result.warnings.isNotEmpty) {
+    sink.writeln('Warnings:');
+    for (final warning in result.warnings) {
+      sink.writeln('  • $warning');
+    }
+  }
+
   _renderDependenciesText(result, sink);
   sink.writeln();
 }
@@ -43,6 +50,23 @@ void _renderDependenciesText(
 
   sink.writeln('Dependency Resolution Floor:');
   for (final dep in result.dependencies) {
+    if (dep.isLocalPathOverride) {
+      final namePad = dep.name.padRight(20);
+      final declPad = dep.declaredConstraint.toString().padRight(16);
+      sink.writeln(
+        '  ~ $namePad declared: $declPad '
+        '(local path override: ${dep.localPath}, '
+        'version: ${dep.localVersion})',
+      );
+      continue;
+    }
+
+    if (dep.isNonHosted) {
+      final namePad = dep.name.padRight(20);
+      sink.writeln('  - $namePad (non-hosted dependency)');
+      continue;
+    }
+
     final resolved = result.resolvedVersions[dep.name] ?? 'unresolved';
     final isExactFloor =
         dep.lowerBound != null &&
@@ -86,12 +110,26 @@ void _appendPackageMarkdown(
   buffer.writeln('* **Status**: ${result.isClean ? "Clean" : "**Failed**"}');
   buffer.writeln();
 
+  _appendWarningsMarkdown(buffer, result);
   _appendDiagnosticsMarkdown(buffer, result);
   _appendDependencyTableMarkdown(
     buffer,
     result,
     maxCommentRows: maxCommentRows,
   );
+}
+
+void _appendWarningsMarkdown(
+  StringBuffer buffer,
+  LowerBoundValidationResult result,
+) {
+  if (result.warnings.isEmpty) return;
+  buffer.writeln('> [!NOTE]');
+  buffer.writeln('> **Validation Warnings**:');
+  for (final warning in result.warnings) {
+    buffer.writeln('> * $warning');
+  }
+  buffer.writeln();
 }
 
 void _appendDiagnosticsMarkdown(
@@ -102,7 +140,10 @@ void _appendDiagnosticsMarkdown(
     buffer.writeln('> [!CAUTION]');
     buffer.writeln('> **Pub Resolution Error**:');
     buffer.writeln('> ```');
-    buffer.writeln('> ${result.pubGetError}');
+    final errLines = (result.pubGetError ?? 'Unknown error').split('\n');
+    for (final line in errLines) {
+      buffer.writeln('> $line');
+    }
     buffer.writeln('> ```');
     buffer.writeln();
   } else if (!result.analyzeSuccess) {
@@ -135,11 +176,8 @@ void _appendDependencyTableMarkdown(
       : result.dependencies;
 
   for (final dep in displayDeps) {
+    final status = _computeDependencyStatus(dep, result);
     final resolved = result.resolvedVersions[dep.name] ?? 'unresolved';
-    final isFloor =
-        dep.lowerBound != null &&
-        resolved.toString() == dep.lowerBound.toString();
-    final status = isFloor ? 'Exact Floor' : 'Satisfied';
     final floorStr = dep.lowerBound?.toString() ?? 'any';
     buffer.writeln(
       '| `${dep.name}` | `${dep.declaredConstraint}` | '
@@ -155,43 +193,63 @@ void _appendDependencyTableMarkdown(
   buffer.writeln();
 }
 
+String _computeDependencyStatus(
+  DependencyFloor dep,
+  LowerBoundValidationResult result,
+) {
+  if (dep.isLocalPathOverride) return 'Local Sibling Override';
+  if (dep.isNonHosted) return 'Non-Hosted';
+  final resolved = result.resolvedVersions[dep.name] ?? 'unresolved';
+  final isFloor =
+      dep.lowerBound != null &&
+      resolved.toString() == dep.lowerBound.toString();
+  return isFloor ? 'Exact Floor' : 'Satisfied';
+}
+
 /// Emits GitHub Step Summary and workflow annotations.
 void renderGitHub(
   List<LowerBoundValidationResult> results,
   StringSink sink, {
-  String? commentOutputFile,
-  int maxCommentRows = 0,
+  String? workspaceRoot,
 }) {
-  _emitGitHubAnnotations(results);
+  _emitGitHubAnnotations(results, workspaceRoot: workspaceRoot);
 
   final summaryReport = buildMarkdownReport(results, maxCommentRows: 0);
   appendGitHubStepSummary(summaryReport);
 
-  if (commentOutputFile != null && commentOutputFile.isNotEmpty) {
-    final commentReport = buildMarkdownReport(
-      results,
-      maxCommentRows: maxCommentRows,
-    );
-    _writeCommentFile(commentOutputFile, commentReport);
-  }
-
   renderText(results, sink);
 }
 
-void _emitGitHubAnnotations(List<LowerBoundValidationResult> results) {
+void _emitGitHubAnnotations(
+  List<LowerBoundValidationResult> results, {
+  String? workspaceRoot,
+}) {
+  final root = workspaceRoot ?? Directory.current.path;
+
   for (final result in results) {
-    final pubspecPath = p.join(result.packagePath, 'pubspec.yaml');
+    final pubspecPath = _toRelativePath(
+      p.join(result.packagePath, 'pubspec.yaml'),
+      root,
+    );
 
     if (!result.pubGetSuccess) {
       emitGitHubError(
         'Dependency resolution failed at floor: ${result.pubGetError}',
         file: pubspecPath,
       );
-    } else if (!result.analyzeSuccess) {
-      for (final err in result.analyzerErrors) {
+      continue;
+    }
+
+    for (final diag in result.diagnostics) {
+      if (diag.isError) {
+        final filePath = diag.file != null
+            ? _toRelativePath(p.join(result.packagePath, diag.file!), root)
+            : pubspecPath;
         emitGitHubError(
-          err,
-          file: pubspecPath,
+          diag.message,
+          file: filePath,
+          line: diag.line,
+          col: diag.column,
           title: 'Lower Bound Compile Error',
         );
       }
@@ -199,10 +257,10 @@ void _emitGitHubAnnotations(List<LowerBoundValidationResult> results) {
   }
 }
 
-void _writeCommentFile(String filePath, String content) {
-  try {
-    File(filePath).writeAsStringSync(content);
-  } catch (_) {}
+String _toRelativePath(String fullPath, String root) {
+  return p.isWithin(root, fullPath)
+      ? p.relative(fullPath, from: root)
+      : fullPath;
 }
 
 /// Renders structured JSON output to [sink].

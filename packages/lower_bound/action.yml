@@ -8,13 +8,13 @@ branding:
 
 inputs:
   targets:
-    description: 'Space-separated list of target directories or files to analyze in staging.'
+    description: 'Comma-separated list of target directories or files to analyze in staging.'
     required: false
-    default: 'lib bin'
-  pin:
-    description: 'Pin direct runtime dependencies to their exact declared floor.'
+    default: 'lib,bin'
+  allow-local-siblings:
+    description: 'Allow unreleased local sibling packages via path overrides.'
     required: false
-    default: 'true'
+    default: 'false'
   sdk:
     description: 'Simulate specific Dart SDK version during pub resolution.'
     required: false
@@ -47,7 +47,7 @@ runs:
       shell: bash
       env:
         INPUT_TARGETS: ${{ inputs.targets }}
-        INPUT_PIN: ${{ inputs.pin }}
+        INPUT_ALLOW_LOCAL_SIBLINGS: ${{ inputs.allow-local-siblings }}
         INPUT_SDK: ${{ inputs.sdk }}
         INPUT_FAIL_ON_ERROR: ${{ inputs.fail-on-error }}
         INPUT_FORMAT: ${{ inputs.format }}
@@ -57,21 +57,6 @@ runs:
         GH_TOKEN: ${{ github.token }}
         PR_NUMBER: ${{ github.event.pull_request.number }}
       run: |
-        pin_arg=""
-        if [ "$INPUT_PIN" = "false" ]; then
-          pin_arg="--no-pin"
-        fi
-
-        sdk_arg=""
-        if [ -n "$INPUT_SDK" ]; then
-          sdk_arg="--sdk=$INPUT_SDK"
-        fi
-
-        fail_arg=""
-        if [ "$INPUT_FAIL_ON_ERROR" = "false" ]; then
-          fail_arg="--no-fail-on-error"
-        fi
-
         case "${INPUT_MAX_COMMENT_ROWS:-0}" in
           ''|*[!0-9]*)
             echo "::error::max-comment-rows must be a non-negative integer, got '${INPUT_MAX_COMMENT_ROWS}'."
@@ -79,13 +64,27 @@ runs:
             ;;
         esac
 
-        # When a row cap is requested, the validator renders a second, trimmed
-        # report for the PR comment while the step summary keeps every row.
-        comment_args=()
-        comment_file=""
-        if [ "$INPUT_FORMAT" = "github" ] && [ "${INPUT_MAX_COMMENT_ROWS:-0}" -gt 0 ]; then
-          comment_file="${RUNNER_TEMP}/lower-bound-comment.md"
-          comment_args=(--comment-output="$comment_file" --max-comment-rows="$INPUT_MAX_COMMENT_ROWS")
+        run_args=(
+          "--targets=$INPUT_TARGETS"
+          "--format=$INPUT_FORMAT"
+        )
+
+        if [ "$INPUT_ALLOW_LOCAL_SIBLINGS" = "true" ]; then
+          run_args+=("--allow-local-siblings")
+        fi
+
+        if [ -n "$INPUT_SDK" ]; then
+          run_args+=("--sdk=$INPUT_SDK")
+        fi
+
+        if [ "$INPUT_FAIL_ON_ERROR" = "false" ]; then
+          run_args+=("--no-fail-on-error")
+        fi
+
+        comment_file="${RUNNER_TEMP}/lower-bound-comment.md"
+        run_args+=("--comment-output=$comment_file")
+        if [ "${INPUT_MAX_COMMENT_ROWS:-0}" -gt 0 ]; then
+          run_args+=("--max-comment-rows=$INPUT_MAX_COMMENT_ROWS")
         fi
 
         workspace="${GITHUB_WORKSPACE:-$PWD}"
@@ -96,32 +95,22 @@ runs:
           pkg_path="$workspace/$pkg_path"
         fi
 
+        run_args+=("$pkg_path")
+
         # Resolve the tool dependencies inside the action checkout, but
         # execute against the caller workspace.
-        (cd "$ACTION_PATH/packages/lower_bound" && dart pub get >/dev/null)
+        (cd "$ACTION_PATH" && dart pub get >/dev/null)
         cd "$workspace"
 
         # Execute lower_bound CLI and capture exit code
         set +e
-        dart run "$ACTION_PATH/packages/lower_bound/bin/lower_bound.dart" \
-          --targets="$INPUT_TARGETS" \
-          $pin_arg \
-          $sdk_arg \
-          --format="$INPUT_FORMAT" \
-          $fail_arg \
-          "${comment_args[@]}" \
-          "$pkg_path"
+        dart run "$ACTION_PATH/bin/lower_bound.dart" "${run_args[@]}"
         exit_code=$?
         set -e
 
         # If running inside a PR context and GH_TOKEN is present, post or update sticky comment
         if [ -n "$PR_NUMBER" ] && [ -n "$GH_TOKEN" ]; then
-          body_file="$GITHUB_STEP_SUMMARY"
-          if [ -n "$comment_file" ] && [ -s "$comment_file" ]; then
-            body_file="$comment_file"
-          fi
-
-          if [ -f "$body_file" ] && [ -s "$body_file" ]; then
+          if [ -f "$comment_file" ] && [ -s "$comment_file" ]; then
             echo "Searching for existing lower-bound validation comment on PR #$PR_NUMBER..."
 
             comment_ids=$(gh api --paginate "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/comments" \
@@ -130,10 +119,10 @@ runs:
 
             if [ -n "$comment_id" ]; then
               echo "Updating existing comment (ID: $comment_id)..."
-              gh api -X PATCH "repos/$GITHUB_REPOSITORY/issues/comments/$comment_id" -F body=@"$body_file" > /dev/null || true
+              gh api -X PATCH "repos/$GITHUB_REPOSITORY/issues/comments/$comment_id" -F body=@"$comment_file" > /dev/null || true
             else
               echo "Creating new PR comment..."
-              gh pr comment "$PR_NUMBER" --body-file "$body_file" --repo "$GITHUB_REPOSITORY" > /dev/null || true
+              gh pr comment "$PR_NUMBER" --body-file "$comment_file" --repo "$GITHUB_REPOSITORY" > /dev/null || true
             fi
           fi
         fi

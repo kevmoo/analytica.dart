@@ -1,7 +1,7 @@
 import 'dart:io';
 
 import 'package:checks/checks.dart';
-import 'package:lower_bound/lower_bound.dart';
+import 'package:lower_bound/src/sdk_discovery.dart';
 import 'package:test/test.dart';
 
 void main() {
