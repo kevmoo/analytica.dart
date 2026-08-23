@@ -152,19 +152,20 @@ class CloneDetector {
     if (fileSequences.isEmpty) return const [];
 
     final rawPairs = <_MatchPair>[];
-    final seenPairs = <int>{};
+    final seenAstPairs = <(int, int, int, int)>{};
+    final seenKgramPairs = <(int, int, int, int)>{};
 
     if (candidates != null && candidates.isNotEmpty) {
       _matchAstCandidates(
         candidates: candidates,
         fileSequences: fileSequences,
-        seenPairs: seenPairs,
+        seenPairs: seenAstPairs,
         outPairs: rawPairs,
       );
       _matchMinHashCandidates(
         candidates: candidates,
         fileSequences: fileSequences,
-        seenPairs: seenPairs,
+        seenPairs: seenAstPairs,
         outPairs: rawPairs,
       );
     }
@@ -178,7 +179,7 @@ class CloneDetector {
       k: k,
       minTokens: minTokens,
       minLines: minLines,
-      seenPairs: seenPairs,
+      seenPairs: seenKgramPairs,
       outPairs: rawPairs,
     );
 
@@ -207,7 +208,7 @@ class CloneDetector {
   static void _matchAstCandidates({
     required List<AstCandidateUnit> candidates,
     required List<TokenSequence> fileSequences,
-    required Set<int> seenPairs,
+    required Set<(int, int, int, int)> seenPairs,
     required List<_MatchPair> outPairs,
   }) {
     final byHash = <int, List<AstCandidateUnit>>{};
@@ -229,7 +230,7 @@ class CloneDetector {
   static void _matchAstCandidateBucket({
     required List<AstCandidateUnit> bucket,
     required List<TokenSequence> fileSequences,
-    required Set<int> seenPairs,
+    required Set<(int, int, int, int)> seenPairs,
     required List<_MatchPair> outPairs,
   }) {
     if (bucket.length <= kAllPairsBucketLimit) {
@@ -265,7 +266,7 @@ class CloneDetector {
     required AstCandidateUnit c1,
     required AstCandidateUnit c2,
     required List<TokenSequence> fileSequences,
-    required Set<int> seenPairs,
+    required Set<(int, int, int, int)> seenPairs,
     required List<_MatchPair> outPairs,
   }) {
     if (c1.fileIndex == c2.fileIndex &&
@@ -296,7 +297,7 @@ class CloneDetector {
   static void _matchMinHashCandidates({
     required List<AstCandidateUnit> candidates,
     required List<TokenSequence> fileSequences,
-    required Set<int> seenPairs,
+    required Set<(int, int, int, int)> seenPairs,
     required List<_MatchPair> outPairs,
     double minJaccard = 0.80,
   }) {
@@ -325,7 +326,7 @@ class CloneDetector {
     required AstCandidateUnit c2,
     required List<TokenSequence> fileSequences,
     required double minJaccard,
-    required Set<int> seenPairs,
+    required Set<(int, int, int, int)> seenPairs,
     required List<_MatchPair> outPairs,
   }) {
     if (c1.fileIndex == c2.fileIndex &&
@@ -456,7 +457,7 @@ class CloneDetector {
     required int k,
     required int minTokens,
     required int minLines,
-    required Set<int> seenPairs,
+    required Set<(int, int, int, int)> seenPairs,
     required List<_MatchPair> outPairs,
   }) {
     for (final locations in index.values) {
@@ -480,7 +481,7 @@ class CloneDetector {
     required int k,
     required int minTokens,
     required int minLines,
-    required Set<int> seenPairs,
+    required Set<(int, int, int, int)> seenPairs,
     required List<_MatchPair> outPairs,
   }) {
     if (locations.length <= kAllPairsBucketLimit) {
@@ -525,7 +526,7 @@ class CloneDetector {
     required int k,
     required int minTokens,
     required int minLines,
-    required Set<int> seenPairs,
+    required Set<(int, int, int, int)> seenPairs,
     required List<_MatchPair> outPairs,
   }) {
     final pairKey = _computeLocationPairKey(loc1, loc2);
@@ -545,33 +546,33 @@ class CloneDetector {
     _markSubSeedsAsSeen(pair, k, seenPairs);
   }
 
-  static int _computeLocationPairKey(_TokenLocation loc1, _TokenLocation loc2) {
-    if (loc1.fileIndex <= loc2.fileIndex) {
-      return Object.hash(
-        loc1.fileIndex,
-        loc1.tokenIndex,
-        loc2.fileIndex,
-        loc2.tokenIndex,
-      );
+  static (int, int, int, int) _computeLocationPairKey(
+    _TokenLocation loc1,
+    _TokenLocation loc2,
+  ) {
+    if (loc1.fileIndex < loc2.fileIndex ||
+        (loc1.fileIndex == loc2.fileIndex &&
+            loc1.tokenIndex <= loc2.tokenIndex)) {
+      return (loc1.fileIndex, loc1.tokenIndex, loc2.fileIndex, loc2.tokenIndex);
     }
-    return Object.hash(
-      loc2.fileIndex,
-      loc2.tokenIndex,
-      loc1.fileIndex,
-      loc1.tokenIndex,
-    );
+    return (loc2.fileIndex, loc2.tokenIndex, loc1.fileIndex, loc1.tokenIndex);
   }
 
-  static int _computeSpanPairKey(_TokenSpan span1, _TokenSpan span2) {
-    if (span1.fileIndex <= span2.fileIndex) {
-      return Object.hash(
+  static (int, int, int, int) _computeSpanPairKey(
+    _TokenSpan span1,
+    _TokenSpan span2,
+  ) {
+    if (span1.fileIndex < span2.fileIndex ||
+        (span1.fileIndex == span2.fileIndex &&
+            span1.startTokenIndex <= span2.startTokenIndex)) {
+      return (
         span1.fileIndex,
         span1.startTokenIndex,
         span2.fileIndex,
         span2.startTokenIndex,
       );
     }
-    return Object.hash(
+    return (
       span2.fileIndex,
       span2.startTokenIndex,
       span1.fileIndex,
@@ -579,7 +580,11 @@ class CloneDetector {
     );
   }
 
-  static void _markSubSeedsAsSeen(_MatchPair pair, int k, Set<int> seenPairs) {
+  static void _markSubSeedsAsSeen(
+    _MatchPair pair,
+    int k,
+    Set<(int, int, int, int)> seenPairs,
+  ) {
     final maxOffset = pair.span1.tokenCount - k;
     final file1 = pair.span1.fileIndex;
     final file2 = pair.span2.fileIndex;
@@ -587,9 +592,9 @@ class CloneDetector {
     final start2 = pair.span2.startTokenIndex;
 
     for (var offset = 1; offset <= maxOffset; offset++) {
-      final subKey = file1 <= file2
-          ? Object.hash(file1, start1 + offset, file2, start2 + offset)
-          : Object.hash(file2, start2 + offset, file1, start1 + offset);
+      final subKey = file1 < file2 || (file1 == file2 && start1 <= start2)
+          ? (file1, start1 + offset, file2, start2 + offset)
+          : (file2, start2 + offset, file1, start1 + offset);
       seenPairs.add(subKey);
     }
   }
@@ -706,12 +711,12 @@ class CloneDetector {
   static List<_MatchPair> _filterSubsumedPairs(List<_MatchPair> rawPairs) {
     rawPairs.sort((a, b) => b.span1.tokenCount.compareTo(a.span1.tokenCount));
     final nonSubsumedPairs = <_MatchPair>[];
-    final pairsByFilePair = <int, List<_MatchPair>>{};
+    final pairsByFilePair = <(int, int), List<_MatchPair>>{};
 
     for (final pair in rawPairs) {
       final fileKey = pair.span1.fileIndex <= pair.span2.fileIndex
-          ? Object.hash(pair.span1.fileIndex, pair.span2.fileIndex)
-          : Object.hash(pair.span2.fileIndex, pair.span1.fileIndex);
+          ? (pair.span1.fileIndex, pair.span2.fileIndex)
+          : (pair.span2.fileIndex, pair.span1.fileIndex);
       final existingForFile = pairsByFilePair[fileKey];
 
       var isSubsumed = false;
