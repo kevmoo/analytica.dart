@@ -56,14 +56,24 @@ void main() {
 
     /// Basenames of the files the scanner reported deltas for.
     Future<Set<String>> scannedFiles(List<String> extraArgs) async {
-      final res = await Process.run(Platform.resolvedExecutable, [
-        binPath,
-        '--git-diff=HEAD~1',
-        '--fail-threshold=15',
-        '--format=json',
-        ...extraArgs,
-        'lib',
-      ], workingDirectory: repoPath);
+      final res = await Process.run(
+        Platform.resolvedExecutable,
+        [
+          binPath,
+          '--git-diff=HEAD~1',
+          '--fail-threshold=15',
+          '--format=json',
+          ...extraArgs,
+          'lib',
+        ],
+        workingDirectory: repoPath,
+        environment: {
+          // runCli re-aligns Directory.current to GITHUB_WORKSPACE when set.
+          // On GitHub Actions that points at the (shallow) checkout, yanking
+          // the scanner out of the fixture repo -- pin it to the fixture.
+          'GITHUB_WORKSPACE': repoPath,
+        },
+      );
       final out = (res.stdout as String).trim();
       if (out.isEmpty) return {};
       return RegExp(
@@ -141,11 +151,12 @@ void main() {
     });
 
     test('warns when used without --git-diff', () async {
-      final res = await Process.run(Platform.resolvedExecutable, [
-        binPath,
-        '--exclude=**.g.dart',
-        'lib',
-      ], workingDirectory: repoPath);
+      final res = await Process.run(
+        Platform.resolvedExecutable,
+        [binPath, '--exclude=**.g.dart', 'lib'],
+        workingDirectory: repoPath,
+        environment: {'GITHUB_WORKSPACE': repoPath},
+      );
       check(
         res.stderr as String,
       ).contains('--exclude has no effect unless --git-diff');
