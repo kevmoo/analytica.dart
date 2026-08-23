@@ -169,36 +169,11 @@ class DartTokenizer {
     var token = parseResult.unit.beginToken;
 
     while (!token.isEof) {
-      if (!ignoreComments) {
-        var comment = token.precedingComments;
-        while (comment != null) {
-          processToken(comment);
-          final next = comment.next;
-          comment = next is CommentToken ? next : null;
-        }
-      }
-
-      final isComment =
-          token.type == TokenType.SINGLE_LINE_COMMENT ||
-          token.type == TokenType.MULTI_LINE_COMMENT;
-
-      if (ignoreComments && isComment) {
-        token = token.next!;
-        continue;
-      }
-
+      _processPrecedingComments(token, processToken);
       processToken(token);
       token = token.next!;
     }
-
-    if (!ignoreComments) {
-      var comment = token.precedingComments;
-      while (comment != null) {
-        processToken(comment);
-        final next = comment.next;
-        comment = next is CommentToken ? next : null;
-      }
-    }
+    _processPrecedingComments(token, processToken);
 
     return TokenSequence(
       filePath: filePath,
@@ -207,6 +182,19 @@ class DartTokenizer {
       tokens: tokens,
       totalLines: lineInfo.lineCount,
     );
+  }
+
+  void _processPrecedingComments(
+    Token token,
+    void Function(Token) processToken,
+  ) {
+    if (ignoreComments) return;
+    var comment = token.precedingComments;
+    while (comment != null) {
+      processToken(comment);
+      final next = comment.next;
+      comment = next is CommentToken ? next : null;
+    }
   }
 
   (String, int) _normalizeToken(Token token) {
