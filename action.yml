@@ -93,7 +93,7 @@ runs:
 
         # When a row cap is requested, the scanner renders a second, trimmed
         # report for the PR comment while the step summary keeps every row.
-        # Absolute path: the scanner runs with the action directory as cwd.
+        # Absolute path so it is independent of the scanner's cwd.
         # An array keeps the path intact even if RUNNER_TEMP contains spaces.
         comment_args=()
         comment_file=""
@@ -109,13 +109,19 @@ runs:
           targets="packages"
         fi
 
-        # Navigate to action repo directory, run pub get to resolve dependencies deterministically
-        cd "$ACTION_PATH"
-        dart pub get >/dev/null
-        
+        # Resolve the scanner's dependencies inside the action checkout, but
+        # run it from the caller's workspace: relative targets and the
+        # --git-diff working tree must both resolve against the repository
+        # under audit, not the action download directory (which is not even
+        # a git clone). `dart run <absolute script>` picks up the action's
+        # package config from the script location, so no activation is
+        # needed.
+        (cd "$ACTION_PATH" && dart pub get >/dev/null)
+        cd "$workspace"
+
         # Execute the scanner CLI tool and capture exit code
         set +e
-        dart run cognitive_complexity \
+        dart run "$ACTION_PATH/packages/cognitive_complexity/bin/cognitive_complexity.dart" \
           --threshold="$INPUT_THRESHOLD" \
           --fail-threshold="$INPUT_FAIL_THRESHOLD" \
           --format="$INPUT_FORMAT" \
