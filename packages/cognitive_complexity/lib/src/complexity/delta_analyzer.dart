@@ -1,3 +1,4 @@
+import 'package:glob/glob.dart';
 import 'package:pool/pool.dart';
 import 'complexity_analyzer.dart';
 import 'git_diff_service.dart';
@@ -145,6 +146,26 @@ class DeltaSummary {
   }
 }
 
+/// Compiles [patterns] into globs, ignoring blank entries.
+///
+/// Blank entries are dropped rather than rejected: they are what a trailing
+/// comma or an empty CI variable produces, and `Glob('')` throws. A genuinely
+/// malformed pattern still throws, but as a [FormatException] naming the
+/// pattern rather than a scanner error pointing at an offset.
+List<Glob> compileExcludeGlobs(Iterable<String> patterns) {
+  final globs = <Glob>[];
+  for (final raw in patterns) {
+    final pattern = raw.trim();
+    if (pattern.isEmpty) continue;
+    try {
+      globs.add(Glob(pattern));
+    } on FormatException catch (e) {
+      throw FormatException('Invalid exclude pattern "$pattern": ${e.message}');
+    }
+  }
+  return globs;
+}
+
 /// Evaluates git diffs to calculate cognitive complexity score deltas.
 class DeltaAnalyzer {
   final ComplexityAnalyzer _analyzer = ComplexityAnalyzer();
@@ -155,15 +176,27 @@ class DeltaAnalyzer {
           gitService ?? GitDiffService(workingDirectory: workingDirectory);
 
   /// Computes complexity deltas between [baseRef] and current working tree.
+  ///
+  /// Paths matching any glob in [excludeGlobs] are skipped. Generated sources
+  /// are the motivating case: they routinely exceed any sensible threshold and
+  /// cannot be simplified by hand, so reporting them is noise.
   Future<DeltaSummary> computeDeltas(
     String baseRef, {
     List<String> targetPaths = const [],
+    List<String> excludeGlobs = const [],
   }) async {
     final mergeBase = await _gitService.getMergeBase(baseRef);
-    final modFiles = await _gitService.getModifiedDartFiles(
+    var modFiles = await _gitService.getModifiedDartFiles(
       mergeBase,
       targetPaths: targetPaths,
     );
+
+    final globs = compileExcludeGlobs(excludeGlobs);
+    if (globs.isNotEmpty) {
+      modFiles = modFiles
+          .where((f) => !globs.any((g) => g.matches(f)))
+          .toList();
+    }
     final allDeltas = <ComplexityDelta>[];
 
     final pool = Pool(8);

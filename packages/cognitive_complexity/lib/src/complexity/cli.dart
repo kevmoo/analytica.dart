@@ -80,6 +80,13 @@ Future<int> runCli(
       help:
           'Maximum table rows in --comment-output (0 = unlimited). GitHub '
           'rejects comment bodies over 65536 characters.',
+    )
+    ..addMultiOption(
+      'exclude',
+      valueHelp: 'glob',
+      help:
+          'Glob patterns to skip, comma-separated or repeated. Useful for '
+          'generated sources, e.g. --exclude="**.g.dart,**.freezed.dart".',
     );
 
   try {
@@ -106,6 +113,7 @@ Future<int> runCli(
     final format = argResults['format'] as String;
     final gitDiffBase = argResults['git-diff'] as String?;
     final failOnIncrease = argResults['fail-on-increase'] as bool;
+    final excludeGlobs = argResults['exclude'] as List<String>;
     final commentOutput = argResults['comment-output'] as String?;
     final maxCommentRows = parseNonNegativeInt(
       argResults['max-comment-rows'] as String,
@@ -117,6 +125,7 @@ Future<int> runCli(
       commentOutput: commentOutput,
       format: format,
       gitDiffBase: gitDiffBase,
+      excludeGlobs: excludeGlobs,
       err: stderrSink,
     );
 
@@ -132,6 +141,7 @@ Future<int> runCli(
         failOnIncrease: failOnIncrease,
         commentOutput: commentOutput,
         maxCommentRows: maxCommentRows,
+        excludeGlobs: excludeGlobs,
         out: stdoutSink,
         err: stderrSink,
       );
@@ -164,12 +174,19 @@ void _warnIgnoredFlags({
   required String? commentOutput,
   required String format,
   required String? gitDiffBase,
+  required List<String> excludeGlobs,
   required StringSink err,
 }) {
   if (failOnIncrease && gitDiffBase == null) {
     err.writeln(
       'Warning: --fail-on-increase has no effect unless --git-diff is '
       'specified.',
+    );
+  }
+
+  if (excludeGlobs.isNotEmpty && gitDiffBase == null) {
+    err.writeln(
+      'Warning: --exclude has no effect unless --git-diff is specified.',
     );
   }
 
@@ -191,11 +208,13 @@ Future<int> _handleDiffMode({
   required StringSink err,
   String? commentOutput,
   int maxCommentRows = 0,
+  List<String> excludeGlobs = const [],
 }) async {
   final deltaAnalyzer = DeltaAnalyzer();
   final summary = await deltaAnalyzer.computeDeltas(
     gitDiffBase,
     targetPaths: targets,
+    excludeGlobs: excludeGlobs,
   );
 
   if (format == 'json') {
