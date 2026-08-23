@@ -97,54 +97,29 @@ ParsedPubspec parsePubspec(String packagePath) {
     if (dep is HostedDependency) {
       final constraint = dep.version;
       rawDependencies[depName] = constraint.toString();
-      final floor = _extractFloor(constraint);
 
       dependencies.add(
         DependencyFloor(
           name: depName,
           declaredConstraint: constraint,
-          lowerBound: floor,
+          lowerBound: _extractFloor(constraint),
         ),
       );
-    } else if (dep is SdkDependency) {
-      rawNonHostedDependencies[depName] = "sdk: '${dep.sdk}'";
-      dependencies.add(
-        DependencyFloor(
-          name: depName,
-          declaredConstraint: VersionConstraint.any,
-          lowerBound: null,
-          isNonHosted: true,
-        ),
-      );
-    } else if (dep is PathDependency) {
-      // Staging lives in a temp directory, so a relative path would resolve
-      // against it instead of the source package.
-      final depPath = p.isAbsolute(dep.path)
-          ? dep.path
-          : p.normalize(p.join(p.absolute(packagePath), dep.path));
-      rawNonHostedDependencies[depName] = "path: '$depPath'";
-      dependencies.add(
-        DependencyFloor(
-          name: depName,
-          declaredConstraint: VersionConstraint.any,
-          lowerBound: null,
-          isNonHosted: true,
-        ),
-      );
-    } else if (dep is GitDependency) {
-      final gitPath = dep.path != null ? ", path: '${dep.path}'" : '';
-      final gitRef = dep.ref != null ? ", ref: '${dep.ref}'" : '';
-      rawNonHostedDependencies[depName] =
-          "git: {url: '${dep.url}'$gitPath$gitRef}";
-      dependencies.add(
-        DependencyFloor(
-          name: depName,
-          declaredConstraint: VersionConstraint.any,
-          lowerBound: null,
-          isNonHosted: true,
-        ),
-      );
+      continue;
     }
+
+    final descriptor = _nonHostedDescriptor(dep, packagePath);
+    if (descriptor == null) continue;
+
+    rawNonHostedDependencies[depName] = descriptor;
+    dependencies.add(
+      DependencyFloor(
+        name: depName,
+        declaredConstraint: VersionConstraint.any,
+        lowerBound: null,
+        isNonHosted: true,
+      ),
+    );
   }
 
   return ParsedPubspec(
@@ -159,6 +134,31 @@ ParsedPubspec parsePubspec(String packagePath) {
     rawNonHostedDependencies: rawNonHostedDependencies,
     workspace: pubspec.workspace,
   );
+}
+
+/// Renders the inline YAML descriptor for a non-hosted [dep], or `null` if the
+/// dependency kind is not supported.
+///
+/// Descriptors are nested mappings, so callers must wrap the result in a flow
+/// map when writing it under a dependency key.
+String? _nonHostedDescriptor(Dependency dep, String packagePath) {
+  if (dep is SdkDependency) {
+    return "sdk: '${dep.sdk}'";
+  }
+  if (dep is PathDependency) {
+    // Staging lives in a temp directory, so a relative path would resolve
+    // against it instead of the source package.
+    final depPath = p.isAbsolute(dep.path)
+        ? dep.path
+        : p.normalize(p.join(p.absolute(packagePath), dep.path));
+    return "path: '$depPath'";
+  }
+  if (dep is GitDependency) {
+    final gitPath = dep.path != null ? ", path: '${dep.path}'" : '';
+    final gitRef = dep.ref != null ? ", ref: '${dep.ref}'" : '';
+    return "git: {url: '${dep.url}'$gitPath$gitRef}";
+  }
+  return null;
 }
 
 /// Discovers local sibling packages in the repository containing [startPath].
