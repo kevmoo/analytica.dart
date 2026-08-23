@@ -19,7 +19,7 @@ environment:
   sdk: '^3.12.0'
 
 dependencies:
-  analytica: ^0.1.0
+  analytica: ^0.1.1
   analyzer: '>=12.0.0 <15.0.0'
   args: ^2.7.0
   io: ^1.0.5
