@@ -663,7 +663,7 @@ class CloneDetector {
     var start2 = loc2.tokenIndex;
     while (start1 > 0 && start2 > 0) {
       if (loc1.fileIndex == loc2.fileIndex &&
-          start1 - 1 == loc2.tokenIndex + k - 1) {
+          start2 - 1 <= loc1.tokenIndex + k - 1) {
         break;
       }
       if (tokens1[start1 - 1].normalizedLexeme !=

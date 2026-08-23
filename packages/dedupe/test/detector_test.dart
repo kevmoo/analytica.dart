@@ -233,5 +233,40 @@ void auditLogTraceEvent(String eventName, int eventId) {
       check(cluster.instances.length).equals(60);
       check(cluster.bucket).equals(CloneBucket.identical);
     });
+
+    test('detects repeated duplicate blocks within the same function', () {
+      const code = '''
+void executePipelineTasks() {
+  final alpha = 100;
+  final beta = alpha * 2;
+  if (beta > 50) {
+    print('Processing batch task alpha');
+  }
+
+  for (var i = 0; i < 5; i++) {
+    print('Intervening loop: \$i');
+  }
+
+  final alpha = 100;
+  final beta = alpha * 2;
+  if (beta > 50) {
+    print('Processing batch task alpha');
+  }
+}
+''';
+      final seq = const DartTokenizer().tokenize(
+        filePath: 'pipeline.dart',
+        content: code,
+      );
+      const detector = CloneDetector(minTokens: 15, minLines: 4);
+      final clusters = detector.detect([seq]);
+
+      check(clusters.length).equals(1);
+      final cluster = clusters.first;
+      check(cluster.instances.length).equals(2);
+      check(cluster.instances[0].filePath).equals('pipeline.dart');
+      check(cluster.instances[1].filePath).equals('pipeline.dart');
+      check(cluster.bucket).equals(CloneBucket.identical);
+    });
   });
 }
