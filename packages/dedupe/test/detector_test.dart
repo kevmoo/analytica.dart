@@ -264,7 +264,6 @@ void auditLogTraceEvent(String eventName, int eventId) {
       check(cluster.instances.length).equals(60);
       check(cluster.bucket).equals(CloneBucket.identical);
     });
-
     test('expands to maximal k-gram extent when AST candidate is present', () {
       const function1 = '''
 void processOrderBatchA(List<String> items) {
