@@ -26,18 +26,18 @@ const _declarationHeaderKeywords = {
 /// and [ConstructorDeclaration], falling back to recursive identifier token
 /// scanning.
 String? extractNodeName(AstNode node) => switch (node) {
-  ClassDeclaration(:final declaredFragment, :final namePart) =>
-    declaredFragment?.element.name ?? namePart.typeName.lexeme,
+  ClassDeclaration(:final declaredFragment) =>
+    declaredFragment?.element.name ?? _findFirstIdentifier(node),
   ClassTypeAlias(:final declaredFragment, :final name) =>
     declaredFragment?.element.name ?? name.lexeme,
-  EnumDeclaration(:final declaredFragment, :final namePart) =>
-    declaredFragment?.element.name ?? namePart.typeName.lexeme,
+  EnumDeclaration(:final declaredFragment) =>
+    declaredFragment?.element.name ?? _findFirstIdentifier(node),
   MixinDeclaration(:final declaredFragment, :final name) =>
     declaredFragment?.element.name ?? name.lexeme,
   ExtensionDeclaration(:final declaredFragment, :final name) =>
     declaredFragment?.element.name ?? name?.lexeme,
-  ExtensionTypeDeclaration(:final declaredFragment, :final namePart) =>
-    declaredFragment?.element.name ?? namePart.typeName.lexeme,
+  ExtensionTypeDeclaration(:final declaredFragment) =>
+    declaredFragment?.element.name ?? _findFirstIdentifier(node),
   TypeAlias(:final declaredFragment, :final name) =>
     declaredFragment?.element.name ?? name.lexeme,
   FunctionDeclaration(:final declaredFragment, :final name) =>
@@ -59,6 +59,10 @@ String? extractNodeName(AstNode node) => switch (node) {
 
 String? _findFirstIdentifier(AstNode node) {
   for (final entity in node.childEntities) {
+    // Annotations and doc comments are lexically inside the declaration but
+    // are not part of its name, and both can contain identifiers that would
+    // otherwise win this depth-first scan: `@Foo()` or `/// See [bar].` on
+    // `class Baz` would resolve the name as `Foo` or `bar`.
     if (entity is NodeList<Annotation> ||
         entity is Annotation ||
         entity is Comment ||
