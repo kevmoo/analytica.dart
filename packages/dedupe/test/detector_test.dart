@@ -237,20 +237,24 @@ void auditLogTraceEvent(String eventName, int eventId) {
     test('detects repeated duplicate blocks within the same function', () {
       const code = '''
 void executePipelineTasks() {
-  final alpha = 100;
-  final beta = alpha * 2;
-  if (beta > 50) {
-    print('Processing batch task alpha');
+  {
+    final alpha = 100;
+    final beta = alpha * 2;
+    if (beta > 50) {
+      print('Processing batch task alpha');
+    }
   }
 
   for (var i = 0; i < 5; i++) {
     print('Intervening loop: \$i');
   }
 
-  final alpha = 100;
-  final beta = alpha * 2;
-  if (beta > 50) {
-    print('Processing batch task alpha');
+  {
+    final alpha = 100;
+    final beta = alpha * 2;
+    if (beta > 50) {
+      print('Processing batch task alpha');
+    }
   }
 }
 ''';

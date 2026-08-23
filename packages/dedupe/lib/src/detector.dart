@@ -687,7 +687,7 @@ class CloneDetector {
     var end1 = loc1.tokenIndex + k - 1;
     var end2 = loc2.tokenIndex + k - 1;
     while (end1 + 1 < tokens1.length && end2 + 1 < tokens2.length) {
-      if (loc1.fileIndex == loc2.fileIndex && end1 + 1 == start2) {
+      if (loc1.fileIndex == loc2.fileIndex && end1 + 1 >= start2) {
         break;
       }
       if (tokens1[end1 + 1].normalizedLexeme !=
@@ -733,6 +733,7 @@ class CloneDetector {
     List<TokenSequence> fileSequences,
   ) {
     final clusters = <DuplicateCluster>[];
+    final seenClusterSignatures = <String>{};
     var clusterIndex = 1;
 
     for (final spans in clusterMap.values) {
@@ -742,6 +743,15 @@ class CloneDetector {
         fileSequences: fileSequences,
       );
       if (cluster != null) {
+        final sig = cluster.instances
+            .map(
+              (i) =>
+                  '${i.filePath}:${i.startLine}-${i.endLine}:'
+                  '${i.startColumn}-${i.endColumn}',
+            )
+            .join(';');
+        if (!seenClusterSignatures.add(sig)) continue;
+
         clusters.add(cluster);
         clusterIndex++;
       }
