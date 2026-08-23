@@ -204,6 +204,37 @@ void handlerB() {
       check(clusters.first.instances.first.filePath).equals('handlers.dart');
     });
 
+    test('detects and clusters clone groups appearing in 52 locations without '
+        'off-by-one drops', () {
+      const helperFunction = '''
+void auditLogTraceEvent(String eventName, int eventId) {
+  print('Audit log event: \$eventName [\$eventId]');
+  print('Recording timestamp and thread metadata');
+  print('Flushing audit buffer to disk cache');
+  print('Verification trace sequence completed');
+}
+''';
+
+      const tokenizer = DartTokenizer();
+      final sequences = <TokenSequence>[];
+      for (var i = 0; i < 52; i++) {
+        sequences.add(
+          tokenizer.tokenize(
+            filePath: 'module_\$i.dart',
+            content: helperFunction,
+          ),
+        );
+      }
+
+      const detector = CloneDetector(minTokens: 15, minLines: 4);
+      final clusters = detector.detect(sequences);
+
+      check(clusters.length).equals(1);
+      final cluster = clusters.first;
+      check(cluster.instances.length).equals(52);
+      check(cluster.bucket).equals(CloneBucket.identical);
+    });
+
     test('detects and clusters clone groups appearing in >50 locations', () {
       const helperFunction = '''
 void auditLogTraceEvent(String eventName, int eventId) {
@@ -219,7 +250,7 @@ void auditLogTraceEvent(String eventName, int eventId) {
       for (var i = 0; i < 60; i++) {
         sequences.add(
           tokenizer.tokenize(
-            filePath: 'module_$i.dart',
+            filePath: 'module_\$i.dart',
             content: helperFunction,
           ),
         );
@@ -314,5 +345,77 @@ void multiBlockSequence() {
         }
       },
     );
+
+    test('expands to maximal k-gram extent when AST candidate is present', () {
+      const function1 = '''
+void processOrderBatchA(List<String> items) {
+  print('Beginning order batch processing sequence');
+  for (final item in items) {
+    print('Processing item: \$item');
+    print('Updating database transaction logs');
+    print('Sending notification to fulfillment queue');
+  }
+  print('Order batch processing completed successfully');
+}
+''';
+
+      const function2 = '''
+void processOrderBatchB(List<String> items) {
+  print('Beginning order batch processing sequence');
+  for (final item in items) {
+    print('Processing item: \$item');
+    print('Updating database transaction logs');
+    print('Sending notification to fulfillment queue');
+  }
+  print('Order batch processing completed successfully');
+}
+''';
+
+      const tokenizer = DartTokenizer();
+      final seq1 = tokenizer.tokenize(filePath: 'a.dart', content: function1);
+      final seq2 = tokenizer.tokenize(filePath: 'b.dart', content: function2);
+
+      // Create an AST candidate unit corresponding to the inner for-loop only
+      // (a sub-block of the entire identical function).
+      const astCandidate1 = AstCandidateUnit(
+        filePath: 'a.dart',
+        fileIndex: 0,
+        startLine: 3,
+        endLine: 7,
+        startOffset: 45,
+        endOffset: 150,
+        startTokenIndex: 8,
+        endTokenIndex: 25,
+        tokenCount: 18,
+        lineCount: 5,
+        astNodeType: 'ForStatement',
+        signatureHash: 12345,
+      );
+      const astCandidate2 = AstCandidateUnit(
+        filePath: 'b.dart',
+        fileIndex: 1,
+        startLine: 3,
+        endLine: 7,
+        startOffset: 45,
+        endOffset: 150,
+        startTokenIndex: 8,
+        endTokenIndex: 25,
+        tokenCount: 18,
+        lineCount: 5,
+        astNodeType: 'ForStatement',
+        signatureHash: 12345,
+      );
+
+      const detector = CloneDetector(minTokens: 15, minLines: 4);
+      final clusters = detector.detect(
+        [seq1, seq2],
+        candidates: [astCandidate1, astCandidate2],
+      );
+
+      check(clusters.length).equals(1);
+      final cluster = clusters.first;
+      check(cluster.tokenCount).isGreaterThan(astCandidate1.tokenCount);
+      check(cluster.instances.length).equals(2);
+    });
   });
 }
