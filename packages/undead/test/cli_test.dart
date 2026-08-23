@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:checks/checks.dart';
 import 'package:path/path.dart' as p;
 import 'package:test/test.dart';
+import 'package:undead/src/cli.dart';
 import 'package:test_descriptor/test_descriptor.dart' as d;
 import 'package:test_process/test_process.dart';
 
@@ -57,7 +58,7 @@ void main() {
       final stdout = await proc.stdoutStream().join('\n');
       await proc.shouldExit(0);
 
-      check(stdout).contains('undead version: 0.1.1-wip');
+      check(stdout).contains('undead version: $undeadVersion');
     });
 
     test('--mode accepts closed-app', () async {

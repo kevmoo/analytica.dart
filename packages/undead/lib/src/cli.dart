@@ -9,7 +9,7 @@ import 'formatters/markdown_formatter.dart';
 import 'models.dart';
 import 'reachability_engine.dart';
 
-const String undeadVersion = '0.1.1-wip';
+const String undeadVersion = '0.1.1';
 
 /// Configures and parses CLI arguments for `pkg:undead`.
 ArgParser buildArgParser() {
