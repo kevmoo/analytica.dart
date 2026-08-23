@@ -169,14 +169,21 @@ class DedupeCliRunner {
     final targetPath = results.rest.isNotEmpty ? results.rest.first : '.';
     final normalizedPath = p.normalize(p.absolute(targetPath));
 
-    if (!Directory(normalizedPath).existsSync() &&
-        !File(normalizedPath).existsSync()) {
-      errSink.writeln('Error: Target path does not exist: $targetPath');
-      return ExitCode.noInput.code;
+    final DedupeOptions options;
+    try {
+      options = _buildOptions(results, normalizedPath);
+    } on FormatException catch (e) {
+      return _handleFormatException(e);
     }
 
-    final options = _buildOptions(results, normalizedPath);
-    if (options == null) return ExitCode.usage.code;
+    for (final target in results.rest) {
+      final normalizedPath = p.normalize(p.absolute(target));
+      if (!Directory(normalizedPath).existsSync() &&
+          !File(normalizedPath).existsSync()) {
+        errSink.writeln('Error: Target path does not exist: $target');
+        return ExitCode.noInput.code;
+      }
+    }
 
     return _executeAnalysis(options);
   }
@@ -206,7 +213,7 @@ class DedupeCliRunner {
     return ExitCode.success.code;
   }
 
-  DedupeOptions? _buildOptions(ArgResults results, String normalizedPath) {
+  DedupeOptions _buildOptions(ArgResults results, String normalizedPath) {
     final format = OutputFormat.fromString(results.option('format')!);
     final minTokens = parseNonNegativeInt(
       results.option('min-tokens') ?? '40',
@@ -225,13 +232,13 @@ class DedupeCliRunner {
 
     double? failThreshold;
     if (results.option('fail-threshold') != null) {
-      final parsed = double.tryParse(results.option('fail-threshold')!);
-      if (parsed == null || parsed < 0) {
-        errSink.writeln(
-          'Error: Invalid fail-threshold: ${results.option('fail-threshold')}. '
-          'Must be a non-negative number.',
+      final raw = results.option('fail-threshold')!;
+      final parsed = double.tryParse(raw);
+      if (parsed == null || parsed < 0 || parsed.isNaN || parsed.isInfinite) {
+        throw FormatException(
+          'Invalid fail-threshold: "$raw". '
+          'Must be a non-negative finite number.',
         );
-        return null;
       }
       failThreshold = parsed;
     }
