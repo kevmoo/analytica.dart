@@ -61,7 +61,7 @@ Add automated complexity audits to `.github/workflows/complexity.yml`:
 
 - uses: dart-lang/setup-dart@v1
 
-- uses: kevmoo/analytica.dart@main
+- uses: kevmoo/analytica.dart/packages/cognitive_complexity@main
   with:
     diff-base: origin/${{ github.base_ref }}
     fail-threshold: 15

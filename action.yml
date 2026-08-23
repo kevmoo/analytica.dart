@@ -1,55 +1,32 @@
-name: 'Dart Cognitive Complexity Audit'
-description: 'Deterministic Cognitive Complexity calculator and Git diff regression scanner for Dart and Flutter repositories.'
+name: 'Analytica (Deprecated Root Action)'
+description: 'The root action entrypoint is deprecated. Use packages/<tool> instead.'
 author: 'kevmoo'
 
 branding:
-  icon: 'trending-up'
-  color: 'blue'
-
-inputs:
-  targets:
-    description: 'Space-separated list of target files or directories to analyze.'
-    required: false
-    default: 'lib'
-  threshold:
-    description: 'Minimum complexity score to display in reports.'
-    required: false
-    default: '0'
-  fail-threshold:
-    description: 'Exit with non-zero status if any function score exceeds this ceiling.'
-    required: false
-    default: '15'
-  diff-base:
-    description: 'Git ref (e.g. origin/main) to compare against. Auto-detects PR base by default.'
-    required: false
-    default: ''
-  fail-on-increase:
-    description: 'Exit with non-zero status if any function increased in complexity over diff-base.'
-    required: false
-    default: 'false'
-  format:
-    description: 'Output format: github (summary table + annotations), text, or json.'
-    required: false
-    default: 'github'
-  max-comment-rows:
-    description: >-
-      Maximum table rows in the sticky PR comment, most significant first
-      (0 = unlimited). The step summary always keeps the full table. GitHub
-      rejects comment bodies over 65536 characters, so an uncapped table on a
-      large diff fails to post.
-    required: false
-    default: '0'
+  icon: 'alert-triangle'
+  color: 'red'
 
 runs:
   using: 'composite'
   steps:
-    - name: Delegate to Cognitive Complexity Action
-      uses: ./packages/cognitive_complexity
-      with:
-        targets: ${{ inputs.targets }}
-        threshold: ${{ inputs.threshold }}
-        fail-threshold: ${{ inputs.fail-threshold }}
-        diff-base: ${{ inputs.diff-base }}
-        fail-on-increase: ${{ inputs.fail-on-increase }}
-        format: ${{ inputs.format }}
-        max-comment-rows: ${{ inputs.max-comment-rows }}
+    - name: Deprecation Notice
+      shell: bash
+      run: |
+        echo "::error title=Deprecated Action Entrypoint::The root action 'kevmoo/analytica.dart' has been deprecated in favor of modular subdirectory actions."
+        echo ""
+        echo "=================================================================================="
+        echo "🚨 ACTION CONFIGURATION UPDATE REQUIRED"
+        echo "=================================================================================="
+        echo "The root action 'uses: kevmoo/analytica.dart@...' is no longer supported."
+        echo ""
+        echo "Please update your workflow configuration to use the specific tool:"
+        echo ""
+        echo "  • Cognitive Complexity:"
+        echo "      uses: kevmoo/analytica.dart/packages/cognitive_complexity@main"
+        echo ""
+        echo "  • Dependency Lower-Bound Validator:"
+        echo "      uses: kevmoo/analytica.dart/packages/lower_bound@main"
+        echo ""
+        echo "For documentation, visit: https://github.com/kevmoo/analytica.dart"
+        echo "=================================================================================="
+        exit 1
