@@ -272,5 +272,47 @@ void executePipelineTasks() {
       check(cluster.instances[1].filePath).equals('pipeline.dart');
       check(cluster.bucket).equals(CloneBucket.identical);
     });
+
+    test(
+      'deduplicates identical line-range clusters across repeated blocks',
+      () {
+        const code = '''
+void multiBlockSequence() {
+  {
+    print('Block step 1');
+    print('Block step 2');
+    print('Block step 3');
+    print('Block step 4');
+  }
+  {
+    print('Block step 1');
+    print('Block step 2');
+    print('Block step 3');
+    print('Block step 4');
+  }
+  {
+    print('Block step 1');
+    print('Block step 2');
+    print('Block step 3');
+    print('Block step 4');
+  }
+}
+''';
+        final seq = const DartTokenizer().tokenize(
+          filePath: 'blocks.dart',
+          content: code,
+        );
+        const detector = CloneDetector(minTokens: 10, minLines: 4);
+        final clusters = detector.detect([seq]);
+
+        final signatures = <String>{};
+        for (final c in clusters) {
+          final sig = c.instances
+              .map((i) => '${i.filePath}:${i.startLine}-${i.endLine}')
+              .join(';');
+          check(signatures.add(sig)).isTrue();
+        }
+      },
+    );
   });
 }

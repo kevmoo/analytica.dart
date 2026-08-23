@@ -744,11 +744,7 @@ class CloneDetector {
       );
       if (cluster != null) {
         final sig = cluster.instances
-            .map(
-              (i) =>
-                  '${i.filePath}:${i.startLine}-${i.endLine}:'
-                  '${i.startColumn}-${i.endColumn}',
-            )
+            .map((i) => '${i.filePath}:${i.startLine}-${i.endLine}')
             .join(';');
         if (!seenClusterSignatures.add(sig)) continue;
 
