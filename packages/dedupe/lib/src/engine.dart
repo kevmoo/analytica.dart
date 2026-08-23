@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'dart:math' as math;
 
 import 'package:analytica/analyzer.dart';
 import 'package:path/path.dart' as p;
@@ -256,12 +255,10 @@ class DedupeEngine {
     }
 
     var totalCloneInstances = 0;
-    var rawLinesSaved = 0;
     for (final c in clusters) {
       totalCloneInstances += c.instances.length;
-      rawLinesSaved += c.estimatedLinesSaved;
     }
-    final totalLinesSaved = math.min(rawLinesSaved, totalDuplicateLines);
+    final totalLinesSaved = _computeTotalLinesSaved(clusters);
 
     final overallDuplicationPercentage = totalProjectLines > 0
         ? (totalDuplicateLines / totalProjectLines) * 100
@@ -288,6 +285,47 @@ class DedupeEngine {
       clusters: clusters,
       fileMetrics: fileMetrics,
     );
+  }
+
+  static int _computeTotalLinesSaved(List<DuplicateCluster> clusters) {
+    if (clusters.isEmpty) return 0;
+
+    final lineMaxInstances = <String, Map<int, int>>{};
+    for (final cluster in clusters) {
+      _recordClusterLineInstances(cluster, lineMaxInstances);
+    }
+
+    var savedAccumulator = 0.0;
+    for (final fileMap in lineMaxInstances.values) {
+      for (final maxN in fileMap.values) {
+        if (maxN >= 2) {
+          savedAccumulator += (maxN - 1) / maxN;
+        }
+      }
+    }
+
+    return savedAccumulator.round();
+  }
+
+  static void _recordClusterLineInstances(
+    DuplicateCluster cluster,
+    Map<String, Map<int, int>> lineMaxInstances,
+  ) {
+    final instanceCount = cluster.instances.length;
+    if (instanceCount < 2) return;
+
+    for (final instance in cluster.instances) {
+      final fileMap = lineMaxInstances.putIfAbsent(
+        instance.filePath,
+        () => <int, int>{},
+      );
+      for (var l = instance.startLine; l <= instance.endLine; l++) {
+        final currentMax = fileMap[l] ?? 0;
+        if (instanceCount > currentMax) {
+          fileMap[l] = instanceCount;
+        }
+      }
+    }
   }
 
   static (Map<String, Set<int>>, Map<String, Set<int>>, Map<String, int>)

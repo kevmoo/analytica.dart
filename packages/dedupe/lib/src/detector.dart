@@ -78,6 +78,55 @@ class _MatchPair {
     return (other.span1.contains(span1) && other.span2.contains(span2)) ||
         (other.span1.contains(span2) && other.span2.contains(span1));
   }
+
+  bool isSubsumedByOrOverlaps(
+    _MatchPair other, {
+    double minOverlapFraction = 0.70,
+  }) {
+    if (isSubsumedBy(other)) return true;
+
+    if (span1.fileIndex == other.span1.fileIndex &&
+        span2.fileIndex == other.span2.fileIndex) {
+      return _spansOverlapSufficiently(
+        span1,
+        other.span1,
+        span2,
+        other.span2,
+        minOverlapFraction,
+      );
+    }
+    if (span1.fileIndex == other.span2.fileIndex &&
+        span2.fileIndex == other.span1.fileIndex) {
+      return _spansOverlapSufficiently(
+        span1,
+        other.span2,
+        span2,
+        other.span1,
+        minOverlapFraction,
+      );
+    }
+    return false;
+  }
+
+  static bool _spansOverlapSufficiently(
+    _TokenSpan s1,
+    _TokenSpan o1,
+    _TokenSpan s2,
+    _TokenSpan o2,
+    double minOverlapFraction,
+  ) {
+    if (!s1.overlaps(o1) || !s2.overlaps(o2)) return false;
+    final count1 = _overlapTokenCount(s1, o1);
+    final count2 = _overlapTokenCount(s2, o2);
+    return count1 / s1.tokenCount >= minOverlapFraction &&
+        count2 / s2.tokenCount >= minOverlapFraction;
+  }
+
+  static int _overlapTokenCount(_TokenSpan s1, _TokenSpan s2) {
+    final start = math.max(s1.startTokenIndex, s2.startTokenIndex);
+    final end = math.min(s1.endTokenIndex, s2.endTokenIndex);
+    return math.max(0, end - start + 1);
+  }
 }
 
 /// Disjoint Set Union (DSU) helper for clustering token spans.
@@ -722,7 +771,7 @@ class CloneDetector {
       var isSubsumed = false;
       if (existingForFile != null) {
         for (final existing in existingForFile) {
-          if (pair.isSubsumedBy(existing)) {
+          if (pair.isSubsumedByOrOverlaps(existing)) {
             isSubsumed = true;
             break;
           }
@@ -740,8 +789,7 @@ class CloneDetector {
     Map<int, List<_TokenSpan>> clusterMap,
     List<TokenSequence> fileSequences,
   ) {
-    final clusters = <DuplicateCluster>[];
-    final seenClusterSignatures = <String>{};
+    final rawClusters = <DuplicateCluster>[];
     var clusterIndex = 1;
 
     for (final spans in clusterMap.values) {
@@ -751,16 +799,123 @@ class CloneDetector {
         fileSequences: fileSequences,
       );
       if (cluster != null) {
-        final sig = cluster.instances
-            .map((i) => '${i.filePath}:${i.startLine}-${i.endLine}')
-            .join(';');
-        if (!seenClusterSignatures.add(sig)) continue;
-
-        clusters.add(cluster);
+        rawClusters.add(cluster);
         clusterIndex++;
       }
     }
-    return clusters;
+
+    final deduplicated = _mergeAndDeduplicateClusters(rawClusters);
+
+    deduplicated.sort((a, b) {
+      final comp = b.estimatedLinesSaved.compareTo(a.estimatedLinesSaved);
+      if (comp != 0) return comp;
+      return b.tokenCount.compareTo(a.tokenCount);
+    });
+
+    final finalClusters = <DuplicateCluster>[];
+    for (var i = 0; i < deduplicated.length; i++) {
+      final c = deduplicated[i];
+      finalClusters.add(
+        DuplicateCluster(
+          id: 'cluster-${i + 1}',
+          instances: c.instances,
+          tokenCount: c.tokenCount,
+          lineCount: c.lineCount,
+          category: c.category,
+          bucket: c.bucket,
+          estimatedLinesSaved: c.estimatedLinesSaved,
+          intersectsDiff: c.intersectsDiff,
+          isNewlyIntroduced: c.isNewlyIntroduced,
+        ),
+      );
+    }
+
+    return finalClusters;
+  }
+
+  static List<DuplicateCluster> _mergeAndDeduplicateClusters(
+    List<DuplicateCluster> clusters,
+  ) {
+    if (clusters.length <= 1) return clusters;
+
+    final sorted = List<DuplicateCluster>.from(clusters)
+      ..sort((a, b) {
+        final c1 = b.instances.length.compareTo(a.instances.length);
+        if (c1 != 0) return c1;
+        final c2 = b.lineCount.compareTo(a.lineCount);
+        if (c2 != 0) return c2;
+        return b.tokenCount.compareTo(a.tokenCount);
+      });
+
+    final kept = <DuplicateCluster>[];
+
+    for (final candidate in sorted) {
+      var isRedundant = false;
+
+      for (final existing in kept) {
+        if (_isClusterSubsumedOrDuplicate(candidate, existing)) {
+          isRedundant = true;
+          break;
+        }
+      }
+
+      if (!isRedundant) {
+        kept.add(candidate);
+      }
+    }
+
+    return kept;
+  }
+
+  static bool _isClusterSubsumedOrDuplicate(
+    DuplicateCluster candidate,
+    DuplicateCluster existing,
+  ) {
+    if (candidate.instances.length > existing.instances.length) {
+      return false;
+    }
+
+    final usedExistingIndices = <int>{};
+    for (final cInst in candidate.instances) {
+      final matchIndex = _findMatchingExistingInstance(
+        cInst,
+        existing.instances,
+        usedExistingIndices,
+      );
+      if (matchIndex == null) return false;
+      usedExistingIndices.add(matchIndex);
+    }
+
+    return true;
+  }
+
+  static int? _findMatchingExistingInstance(
+    CloneInstance cInst,
+    List<CloneInstance> existingInstances,
+    Set<int> usedIndices,
+  ) {
+    for (var i = 0; i < existingInstances.length; i++) {
+      if (usedIndices.contains(i)) continue;
+      if (_instancesOverlapSufficiently(cInst, existingInstances[i])) {
+        return i;
+      }
+    }
+    return null;
+  }
+
+  static bool _instancesOverlapSufficiently(
+    CloneInstance cInst,
+    CloneInstance eInst,
+  ) {
+    if (cInst.filePath != eInst.filePath) return false;
+    final overlapStart = math.max(cInst.startLine, eInst.startLine);
+    final overlapEnd = math.min(cInst.endLine, eInst.endLine);
+    if (overlapStart > overlapEnd) return false;
+
+    final overlapLines = overlapEnd - overlapStart + 1;
+    final frac = overlapLines / cInst.lineCount;
+    return frac >= 0.70 ||
+        (eInst.startLine <= cInst.startLine && eInst.endLine >= cInst.endLine);
   }
 
   static DuplicateCluster? _buildSingleCluster({
@@ -804,11 +959,35 @@ class CloneDetector {
   }
 
   static List<_TokenSpan> _deduplicateOverlappingSpans(List<_TokenSpan> spans) {
-    final deduped = <_TokenSpan>[];
+    if (spans.isEmpty) return const [];
+
+    final byFile = <int, List<_TokenSpan>>{};
     for (final s in spans) {
-      if (!deduped.any((existing) => existing.overlaps(s))) {
-        deduped.add(s);
+      byFile.putIfAbsent(s.fileIndex, () => []).add(s);
+    }
+
+    final deduped = <_TokenSpan>[];
+    for (final fileSpans in byFile.values) {
+      fileSpans.sort((a, b) => a.startTokenIndex.compareTo(b.startTokenIndex));
+
+      var current = fileSpans.first;
+      for (var i = 1; i < fileSpans.length; i++) {
+        final next = fileSpans[i];
+        if (current.overlaps(next)) {
+          current = _TokenSpan(
+            fileIndex: current.fileIndex,
+            startTokenIndex: math.min(
+              current.startTokenIndex,
+              next.startTokenIndex,
+            ),
+            endTokenIndex: math.max(current.endTokenIndex, next.endTokenIndex),
+          );
+        } else {
+          deduped.add(current);
+          current = next;
+        }
       }
+      deduped.add(current);
     }
     return deduped;
   }

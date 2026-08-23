@@ -137,5 +137,108 @@ void singleFunction() {
       check(report.summary.duplicateLines).equals(0);
       check(report.summary.clusterCount).equals(0);
     });
+
+    test('computes estimatedLinesSaved correctly across 2, 3, and 4 duplicate '
+        'files', () async {
+      const fourteenLineBlock = '''
+void handleRecord(String id, int count, double weight) {
+  if (id.isEmpty) {
+    throw ArgumentError('id is empty');
+  }
+  if (count <= 0) {
+    throw ArgumentError('count is non-positive');
+  }
+  if (weight < 0.0) {
+    throw ArgumentError('weight is negative');
+  }
+  final density = count / weight;
+  print('Processing record: \$id, density: \$density');
+  print('Recording transaction to audit trail');
+}
+''';
+
+      final libDir = Directory(p.join(tempDir.path, 'lib'))..createSync();
+      File(
+        p.join(libDir.path, 'file1.dart'),
+      ).writeAsStringSync(fourteenLineBlock);
+      File(
+        p.join(libDir.path, 'file2.dart'),
+      ).writeAsStringSync(fourteenLineBlock);
+
+      // 2 files: 28 duplicate lines, 14 lines saved
+      final engine2 = DedupeEngine(
+        DedupeOptions(targetPath: tempDir.path, minTokens: 20, minLines: 4),
+      );
+      final report2 = await engine2.analyze();
+      check(report2.summary.filesAnalyzed).equals(2);
+      check(report2.summary.clusterCount).equals(1);
+      check(report2.summary.duplicateLines).equals(28);
+      check(report2.summary.estimatedLinesSaved).equals(14);
+
+      // 3 files: 42 duplicate lines, 28 lines saved
+      File(
+        p.join(libDir.path, 'file3.dart'),
+      ).writeAsStringSync(fourteenLineBlock);
+      final engine3 = DedupeEngine(
+        DedupeOptions(targetPath: tempDir.path, minTokens: 20, minLines: 4),
+      );
+      final report3 = await engine3.analyze();
+      check(report3.summary.filesAnalyzed).equals(3);
+      check(report3.summary.clusterCount).equals(1);
+      check(report3.summary.duplicateLines).equals(42);
+      check(report3.summary.estimatedLinesSaved).equals(28);
+
+      // 4 files: 56 duplicate lines, 42 lines saved
+      File(
+        p.join(libDir.path, 'file4.dart'),
+      ).writeAsStringSync(fourteenLineBlock);
+      final engine4 = DedupeEngine(
+        DedupeOptions(targetPath: tempDir.path, minTokens: 20, minLines: 4),
+      );
+      final report4 = await engine4.analyze();
+      check(report4.summary.filesAnalyzed).equals(4);
+      check(report4.summary.clusterCount).equals(1);
+      check(report4.summary.duplicateLines).equals(56);
+      check(report4.summary.estimatedLinesSaved).equals(42);
+    });
+
+    test(
+      'handles overlapping clusters without over-counting estimatedLinesSaved',
+      () async {
+        const code1 = '''
+void pipeline1() {
+  print('L1');
+  print('L2');
+  print('L3');
+  print('L4');
+  print('L5');
+  print('L6');
+}
+''';
+        const code2 = '''
+void pipeline2() {
+  print('L1');
+  print('L2');
+  print('L3');
+  print('L4');
+  print('L5');
+  print('L6');
+}
+''';
+        final libDir = Directory(p.join(tempDir.path, 'lib'))..createSync();
+        File(p.join(libDir.path, 'p1.dart')).writeAsStringSync(code1);
+        File(p.join(libDir.path, 'p2.dart')).writeAsStringSync(code2);
+
+        final engine = DedupeEngine(
+          DedupeOptions(targetPath: tempDir.path, minTokens: 10, minLines: 4),
+        );
+        final report = await engine.analyze();
+
+        check(
+          report.summary.estimatedLinesSaved,
+        ).isLessThan(report.summary.duplicateLines);
+        check(report.summary.estimatedLinesSaved).isGreaterThan(0);
+      },
+    );
   });
 }
