@@ -1,3 +1,7 @@
+## 0.1.1-wip
+
+- Add `dart-dedupe` agent skill integration guide in `README.md`.
+
 ## 0.1.0
 
 - Initial release of `pkg:dedupe`:

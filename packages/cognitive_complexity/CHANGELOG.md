@@ -1,3 +1,9 @@
+## 0.2.5-wip
+
+- Update GitHub Action documentation in `README.md` to reference modular
+  subdirectory path (`packages/cognitive_complexity`) and add rendered Action
+  Inputs Reference table.
+
 ## 0.2.4
 
 - Fix `action.yml` monorepo auto-detection to evaluate default `lib` vs
