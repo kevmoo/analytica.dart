@@ -26,18 +26,18 @@ const _declarationHeaderKeywords = {
 /// and [ConstructorDeclaration], falling back to recursive identifier token
 /// scanning.
 String? extractNodeName(AstNode node) => switch (node) {
-  ClassDeclaration(:final declaredFragment) =>
-    declaredFragment?.element.name ?? _findFirstIdentifier(node),
+  ClassDeclaration(:final declaredFragment, :final namePart) =>
+    declaredFragment?.element.name ?? namePart.typeName.lexeme,
   ClassTypeAlias(:final declaredFragment, :final name) =>
     declaredFragment?.element.name ?? name.lexeme,
-  EnumDeclaration(:final declaredFragment) =>
-    declaredFragment?.element.name ?? _findFirstIdentifier(node),
+  EnumDeclaration(:final declaredFragment, :final namePart) =>
+    declaredFragment?.element.name ?? namePart.typeName.lexeme,
   MixinDeclaration(:final declaredFragment, :final name) =>
     declaredFragment?.element.name ?? name.lexeme,
   ExtensionDeclaration(:final declaredFragment, :final name) =>
     declaredFragment?.element.name ?? name?.lexeme,
-  ExtensionTypeDeclaration(:final declaredFragment) =>
-    declaredFragment?.element.name ?? _findFirstIdentifier(node),
+  ExtensionTypeDeclaration(:final declaredFragment, :final namePart) =>
+    declaredFragment?.element.name ?? namePart.typeName.lexeme,
   TypeAlias(:final declaredFragment, :final name) =>
     declaredFragment?.element.name ?? name.lexeme,
   FunctionDeclaration(:final declaredFragment, :final name) =>
@@ -48,6 +48,7 @@ String? extractNodeName(AstNode node) => switch (node) {
     declaredFragment?.element.name ?? name.lexeme,
   ConstructorDeclaration(:final declaredFragment, :final name) =>
     declaredFragment?.element.name ?? name?.lexeme,
+  EnumConstantDeclaration(:final name) => name.lexeme,
   TopLevelVariableDeclaration(:final variables)
       when variables.variables.isNotEmpty =>
     extractNodeName(variables.variables.first),
@@ -58,7 +59,10 @@ String? extractNodeName(AstNode node) => switch (node) {
 
 String? _findFirstIdentifier(AstNode node) {
   for (final entity in node.childEntities) {
-    if (entity is NodeList<Annotation> || entity is Annotation) {
+    if (entity is NodeList<Annotation> ||
+        entity is Annotation ||
+        entity is Comment ||
+        entity is CommentReference) {
       continue;
     }
     if (entity is Token &&

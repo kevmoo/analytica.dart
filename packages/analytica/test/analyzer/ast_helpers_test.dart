@@ -102,6 +102,57 @@ void annotatedFunc() {}
       check(extractNodeName(decls[3])).equals('AnnotatedExtType');
       check(extractNodeName(decls[4])).equals('annotatedFunc');
     });
+
+    test('extracts names correctly when declarations have doc comments '
+        'referencing other symbols', () {
+      const source = '''
+/// A thing. See [bar] and [otherMethod] for details.
+class Foo {
+  int bar(int x) => x;
+}
+
+/// Enum docs. See [constantRef] for details.
+enum Status {
+  /// Constant doc. See [otherRef] here.
+  ready,
+  paused,
+}
+
+/// Mixin docs referencing [somethingElse].
+mixin Loggable {}
+
+/// Extension docs referencing [anotherThing].
+extension StringExt on String {}
+
+/// Extension type docs referencing [typeRef].
+extension type Id(int value) {}
+
+/// Function docs referencing [paramRef].
+void topLevelFn() {}
+
+/// Top-level variable doc referencing [someOtherVar].
+int topLevelVar = 1;
+''';
+      final parsed = parseString(
+        content: source,
+        featureSet: FeatureSet.latestLanguageVersion(),
+      );
+
+      final decls = parsed.unit.declarations;
+      check(extractNodeName(decls[0])).equals('Foo');
+      check(extractNodeName(decls[1])).equals('Status');
+      check(extractNodeName(decls[2])).equals('Loggable');
+      check(extractNodeName(decls[3])).equals('StringExt');
+      check(extractNodeName(decls[4])).equals('Id');
+      check(extractNodeName(decls[5])).equals('topLevelFn');
+
+      final topVar = decls[6] as TopLevelVariableDeclaration;
+      check(extractNodeName(topVar)).equals('topLevelVar');
+
+      final enumDecl = decls[1] as EnumDeclaration;
+      check(extractNodeName(enumDecl.body.constants[0])).equals('ready');
+      check(extractNodeName(enumDecl.body.constants[1])).equals('paused');
+    });
   });
 
   group('getTopLevelElement', () {

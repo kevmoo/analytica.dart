@@ -604,5 +604,21 @@ void main() {
         results.map((r) => r.name),
       ).unorderedEquals(['C.mC', 'E.mE', 'M.mM', 'Ext.mExt', 'Et.mEt']);
     });
+
+    test('Enclosing names ignore doc comment references', () {
+      final results = analyzer.analyzeCode('''
+        /// A thing. See [bar] and [other] for details.
+        class Foo {
+          int bar(int x) => x > 1 ? 1 : 0;
+        }
+
+        /// Enum docs with [foo] reference.
+        enum Bar {
+          a;
+          void baz() {}
+        }
+      ''');
+      check(results.map((r) => r.name)).unorderedEquals(['Foo.bar', 'Bar.baz']);
+    });
   });
 }
