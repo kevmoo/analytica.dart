@@ -48,6 +48,7 @@ String? extractNodeName(AstNode node) => switch (node) {
     declaredFragment?.element.name ?? name.lexeme,
   ConstructorDeclaration(:final declaredFragment, :final name) =>
     declaredFragment?.element.name ?? name?.lexeme,
+  EnumConstantDeclaration(:final name) => name.lexeme,
   TopLevelVariableDeclaration(:final variables)
       when variables.variables.isNotEmpty =>
     extractNodeName(variables.variables.first),
@@ -58,7 +59,14 @@ String? extractNodeName(AstNode node) => switch (node) {
 
 String? _findFirstIdentifier(AstNode node) {
   for (final entity in node.childEntities) {
-    if (entity is NodeList<Annotation> || entity is Annotation) {
+    // Annotations and doc comments are lexically inside the declaration but
+    // are not part of its name, and both can contain identifiers that would
+    // otherwise win this depth-first scan: `@Foo()` or `/// See [bar].` on
+    // `class Baz` would resolve the name as `Foo` or `bar`.
+    if (entity is NodeList<Annotation> ||
+        entity is Annotation ||
+        entity is Comment ||
+        entity is CommentReference) {
       continue;
     }
     if (entity is Token &&
