@@ -87,26 +87,39 @@ class _MatchPair {
 
     if (span1.fileIndex == other.span1.fileIndex &&
         span2.fileIndex == other.span2.fileIndex) {
-      if (span1.overlaps(other.span1) && span2.overlaps(other.span2)) {
-        final o1 = _overlapTokenCount(span1, other.span1);
-        final o2 = _overlapTokenCount(span2, other.span2);
-        if (o1 / span1.tokenCount >= minOverlapFraction &&
-            o2 / span2.tokenCount >= minOverlapFraction) {
-          return true;
-        }
-      }
-    } else if (span1.fileIndex == other.span2.fileIndex &&
+      return _spansOverlapSufficiently(
+        span1,
+        other.span1,
+        span2,
+        other.span2,
+        minOverlapFraction,
+      );
+    }
+    if (span1.fileIndex == other.span2.fileIndex &&
         span2.fileIndex == other.span1.fileIndex) {
-      if (span1.overlaps(other.span2) && span2.overlaps(other.span1)) {
-        final o1 = _overlapTokenCount(span1, other.span2);
-        final o2 = _overlapTokenCount(span2, other.span1);
-        if (o1 / span1.tokenCount >= minOverlapFraction &&
-            o2 / span2.tokenCount >= minOverlapFraction) {
-          return true;
-        }
-      }
+      return _spansOverlapSufficiently(
+        span1,
+        other.span2,
+        span2,
+        other.span1,
+        minOverlapFraction,
+      );
     }
     return false;
+  }
+
+  static bool _spansOverlapSufficiently(
+    _TokenSpan s1,
+    _TokenSpan o1,
+    _TokenSpan s2,
+    _TokenSpan o2,
+    double minOverlapFraction,
+  ) {
+    if (!s1.overlaps(o1) || !s2.overlaps(o2)) return false;
+    final count1 = _overlapTokenCount(s1, o1);
+    final count2 = _overlapTokenCount(s2, o2);
+    return count1 / s1.tokenCount >= minOverlapFraction &&
+        count2 / s2.tokenCount >= minOverlapFraction;
   }
 
   static int _overlapTokenCount(_TokenSpan s1, _TokenSpan s2) {
@@ -864,32 +877,45 @@ class CloneDetector {
 
     final usedExistingIndices = <int>{};
     for (final cInst in candidate.instances) {
-      var instanceMatched = false;
-      for (var i = 0; i < existing.instances.length; i++) {
-        if (usedExistingIndices.contains(i)) continue;
-        final eInst = existing.instances[i];
-        if (eInst.filePath == cInst.filePath) {
-          final overlapStart = math.max(cInst.startLine, eInst.startLine);
-          final overlapEnd = math.min(cInst.endLine, eInst.endLine);
-          if (overlapStart <= overlapEnd) {
-            final overlapLines = overlapEnd - overlapStart + 1;
-            final frac = overlapLines / cInst.lineCount;
-            if (frac >= 0.70 ||
-                (eInst.startLine <= cInst.startLine &&
-                    eInst.endLine >= cInst.endLine)) {
-              usedExistingIndices.add(i);
-              instanceMatched = true;
-              break;
-            }
-          }
-        }
-      }
-      if (!instanceMatched) {
-        return false;
-      }
+      final matchIndex = _findMatchingExistingInstance(
+        cInst,
+        existing.instances,
+        usedExistingIndices,
+      );
+      if (matchIndex == null) return false;
+      usedExistingIndices.add(matchIndex);
     }
 
     return true;
+  }
+
+  static int? _findMatchingExistingInstance(
+    CloneInstance cInst,
+    List<CloneInstance> existingInstances,
+    Set<int> usedIndices,
+  ) {
+    for (var i = 0; i < existingInstances.length; i++) {
+      if (usedIndices.contains(i)) continue;
+      if (_instancesOverlapSufficiently(cInst, existingInstances[i])) {
+        return i;
+      }
+    }
+    return null;
+  }
+
+  static bool _instancesOverlapSufficiently(
+    CloneInstance cInst,
+    CloneInstance eInst,
+  ) {
+    if (cInst.filePath != eInst.filePath) return false;
+    final overlapStart = math.max(cInst.startLine, eInst.startLine);
+    final overlapEnd = math.min(cInst.endLine, eInst.endLine);
+    if (overlapStart > overlapEnd) return false;
+
+    final overlapLines = overlapEnd - overlapStart + 1;
+    final frac = overlapLines / cInst.lineCount;
+    return frac >= 0.70 ||
+        (eInst.startLine <= cInst.startLine && eInst.endLine >= cInst.endLine);
   }
 
   static DuplicateCluster? _buildSingleCluster({

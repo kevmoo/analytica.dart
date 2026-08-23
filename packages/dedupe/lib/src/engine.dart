@@ -291,23 +291,8 @@ class DedupeEngine {
     if (clusters.isEmpty) return 0;
 
     final lineMaxInstances = <String, Map<int, int>>{};
-
     for (final cluster in clusters) {
-      final instanceCount = cluster.instances.length;
-      if (instanceCount < 2) continue;
-
-      for (final instance in cluster.instances) {
-        final fileMap = lineMaxInstances.putIfAbsent(
-          instance.filePath,
-          () => <int, int>{},
-        );
-        for (var l = instance.startLine; l <= instance.endLine; l++) {
-          final currentMax = fileMap[l] ?? 0;
-          if (instanceCount > currentMax) {
-            fileMap[l] = instanceCount;
-          }
-        }
-      }
+      _recordClusterLineInstances(cluster, lineMaxInstances);
     }
 
     var savedAccumulator = 0.0;
@@ -320,6 +305,27 @@ class DedupeEngine {
     }
 
     return savedAccumulator.round();
+  }
+
+  static void _recordClusterLineInstances(
+    DuplicateCluster cluster,
+    Map<String, Map<int, int>> lineMaxInstances,
+  ) {
+    final instanceCount = cluster.instances.length;
+    if (instanceCount < 2) return;
+
+    for (final instance in cluster.instances) {
+      final fileMap = lineMaxInstances.putIfAbsent(
+        instance.filePath,
+        () => <int, int>{},
+      );
+      for (var l = instance.startLine; l <= instance.endLine; l++) {
+        final currentMax = fileMap[l] ?? 0;
+        if (instanceCount > currentMax) {
+          fileMap[l] = instanceCount;
+        }
+      }
+    }
   }
 
   static (Map<String, Set<int>>, Map<String, Set<int>>, Map<String, int>)
