@@ -137,7 +137,7 @@ class LshIndex<T> {
   /// Finds all unique candidate pairs that share at least one LSH bucket.
   List<({T item1, T item2})> findCandidatePairs() {
     final candidatePairs = <({T item1, T item2})>[];
-    final seen = <int>{};
+    final seen = <(T, T)>{};
 
     for (final bucket in _buckets.values) {
       if (bucket.length < 2) continue;
@@ -154,14 +154,14 @@ class LshIndex<T> {
 
   void _addSmallBucketPairs(
     List<T> bucket,
-    Set<int> seen,
+    Set<(T, T)> seen,
     List<({T item1, T item2})> candidatePairs,
   ) {
     for (var i = 0; i < bucket.length; i++) {
       final a = bucket[i];
       for (var j = i + 1; j < bucket.length; j++) {
         final b = bucket[j];
-        final pairKey = _pairHashCode(a, b);
+        final pairKey = _canonicalPair(a, b);
         if (seen.add(pairKey)) {
           candidatePairs.add((item1: a, item2: b));
         }
@@ -171,24 +171,20 @@ class LshIndex<T> {
 
   void _addLargeBucketPairs(
     List<T> bucket,
-    Set<int> seen,
+    Set<(T, T)> seen,
     List<({T item1, T item2})> candidatePairs,
   ) {
     for (var i = 0; i < bucket.length - 1; i++) {
       final a = bucket[i];
       final b = bucket[i + 1];
-      final pairKey = _pairHashCode(a, b);
+      final pairKey = _canonicalPair(a, b);
       if (seen.add(pairKey)) {
         candidatePairs.add((item1: a, item2: b));
       }
     }
   }
 
-  int _pairHashCode(T a, T b) {
-    final hashA = a.hashCode;
-    final hashB = b.hashCode;
-    return hashA <= hashB
-        ? Object.hash(hashA, hashB)
-        : Object.hash(hashB, hashA);
+  (T, T) _canonicalPair(T a, T b) {
+    return identityHashCode(a) <= identityHashCode(b) ? (a, b) : (b, a);
   }
 }
