@@ -1,6 +1,11 @@
-## 0.1.1-wip
+## 0.1.1
 
-- Added `parseCommaSeparated` utility function in `package:analytica/cli.dart`.
+- Add `parseCommaSeparated` utility function in `package:analytica/cli.dart`.
+- Fix `extractNodeName` and `_findFirstIdentifier` in
+  `package:analytica/analyzer.dart` to ignore doc comment symbol references
+  when ASTs lack element resolution (#80).
+- Fix `WildcardPattern` in `package:analytica/analyzer.dart` to correctly
+  support `**/` recursive directory glob matching.
 
 ## 0.1.0
 
