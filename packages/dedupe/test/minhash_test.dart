@@ -140,5 +140,54 @@ void handleUserOrder(String userId, double amount) {
       check(cluster.instances[0].filePath).equals('lib/order_a.dart');
       check(cluster.instances[1].filePath).equals('lib/order_b.dart');
     });
+
+    test('does not pair functions with identical statement sketches but '
+        'divergent token contents', () {
+      const codeA = r'''
+void logMetricsAlpha(int alpha, int beta) {
+  final result = alpha + beta;
+  print('Metric alpha computed: $result');
+  print('Dispatching alpha to telemetry');
+  print('Updating alpha cache state');
+  print('Finalizing alpha transaction');
+}
+''';
+
+      const codeB = r'''
+void sendEmailNotification(String recipient, String message) {
+  final status = recipient.isNotEmpty;
+  print('Sending notification to $recipient: $status');
+  print('Writing message payload to SMTP socket');
+  print('Awaiting server confirmation packet');
+  print('Closing SMTP connection socket');
+}
+''';
+
+      const extractor = AstExtractor(
+        minTokens: 15,
+        minLines: 4,
+        ignoreComments: true,
+        ignoreLiterals: false,
+      );
+
+      final (seqA, candA) = extractor.extract(
+        filePath: 'lib/metrics.dart',
+        content: codeA,
+        fileIndex: 0,
+      );
+      final (seqB, candB) = extractor.extract(
+        filePath: 'lib/email.dart',
+        content: codeB,
+        fileIndex: 1,
+      );
+
+      const detector = CloneDetector(minTokens: 15, minLines: 4);
+      final clusters = detector.detect(
+        [seqA, seqB],
+        candidates: [...candA, ...candB],
+      );
+
+      check(clusters.isEmpty).equals(true);
+    });
   });
 }

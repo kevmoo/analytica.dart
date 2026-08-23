@@ -158,6 +158,7 @@ class CloneDetector {
       );
       _matchMinHashCandidates(
         candidates: candidates,
+        fileSequences: fileSequences,
         seenPairs: seenPairs,
         outPairs: rawPairs,
       );
@@ -275,6 +276,7 @@ class CloneDetector {
 
   static void _matchMinHashCandidates({
     required List<AstCandidateUnit> candidates,
+    required List<TokenSequence> fileSequences,
     required Set<int> seenPairs,
     required List<_MatchPair> outPairs,
     double minJaccard = 0.80,
@@ -291,6 +293,7 @@ class CloneDetector {
       _tryAddMinHashCandidatePair(
         c1: pair.item1,
         c2: pair.item2,
+        fileSequences: fileSequences,
         minJaccard: minJaccard,
         seenPairs: seenPairs,
         outPairs: outPairs,
@@ -301,6 +304,7 @@ class CloneDetector {
   static void _tryAddMinHashCandidatePair({
     required AstCandidateUnit c1,
     required AstCandidateUnit c2,
+    required List<TokenSequence> fileSequences,
     required double minJaccard,
     required Set<int> seenPairs,
     required List<_MatchPair> outPairs,
@@ -317,6 +321,10 @@ class CloneDetector {
     );
     if (jaccard < minJaccard) return;
 
+    if (!_verifyMinHashCandidateTokens(c1, c2, fileSequences, minJaccard)) {
+      return;
+    }
+
     final span1 = _TokenSpan(
       fileIndex: c1.fileIndex,
       startTokenIndex: c1.startTokenIndex,
@@ -332,6 +340,38 @@ class CloneDetector {
     if (seenPairs.add(pairKey)) {
       outPairs.add(_MatchPair(span1, span2));
     }
+  }
+
+  static bool _verifyMinHashCandidateTokens(
+    AstCandidateUnit c1,
+    AstCandidateUnit c2,
+    List<TokenSequence> fileSequences,
+    double minSimilarity,
+  ) {
+    final tokens1 = fileSequences[c1.fileIndex].tokens;
+    final tokens2 = fileSequences[c2.fileIndex].tokens;
+
+    const shingleSize = 2;
+    if (c1.tokenCount < shingleSize || c2.tokenCount < shingleSize) {
+      return _compareCandidateTokens(c1, c2, fileSequences);
+    }
+
+    final shingles1 = <int>{};
+    for (var i = 0; i <= c1.tokenCount - shingleSize; i++) {
+      final h1 = tokens1[c1.startTokenIndex + i].tokenHash;
+      final h2 = tokens1[c1.startTokenIndex + i + 1].tokenHash;
+      shingles1.add(Object.hash(h1, h2));
+    }
+
+    final shingles2 = <int>{};
+    for (var i = 0; i <= c2.tokenCount - shingleSize; i++) {
+      final h1 = tokens2[c2.startTokenIndex + i].tokenHash;
+      final h2 = tokens2[c2.startTokenIndex + i + 1].tokenHash;
+      shingles2.add(Object.hash(h1, h2));
+    }
+
+    final tokenJaccard = MinHasher.exactJaccard(shingles1, shingles2);
+    return tokenJaccard >= minSimilarity;
   }
 
   static bool _compareCandidateTokens(
