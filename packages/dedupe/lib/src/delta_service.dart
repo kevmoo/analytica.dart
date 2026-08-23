@@ -38,17 +38,9 @@ class DedupeDeltaService {
       final diffPath = diff.path;
       String path;
       if (absBaseDir != null) {
-        String absDiffPath;
-        if (repoRoot != null) {
-          absDiffPath = p.normalize(p.join(repoRoot, diffPath));
-        } else if (p.isAbsolute(diffPath)) {
-          absDiffPath = p.normalize(diffPath);
-        } else if (baseDir != null &&
-            (p.isWithin(baseDir, diffPath) || p.equals(baseDir, diffPath))) {
-          absDiffPath = p.normalize(p.absolute(diffPath));
-        } else {
-          absDiffPath = p.normalize(p.join(absBaseDir, diffPath));
-        }
+        final absDiffPath = repoRoot != null
+            ? p.normalize(p.join(repoRoot, diffPath))
+            : p.normalize(p.absolute(diffPath));
 
         if (p.isWithin(absBaseDir, absDiffPath) ||
             p.equals(absBaseDir, absDiffPath)) {

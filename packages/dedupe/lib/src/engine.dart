@@ -167,10 +167,7 @@ class DedupeEngine {
     }
 
     final deltaService = DedupeDeltaService(workingDirectory: targetDirPath);
-    String? repoRoot;
-    try {
-      repoRoot = await deltaService.getRepoRoot();
-    } catch (_) {}
+    final repoRoot = await deltaService.getRepoRoot();
     final diffs = await deltaService.getParsedDiff(options.gitDiffBase!);
     final diffRanges = deltaService.extractDiffRanges(
       diffs,
