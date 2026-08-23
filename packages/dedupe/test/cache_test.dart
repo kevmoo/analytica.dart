@@ -3,6 +3,8 @@ import 'dart:io';
 
 import 'package:checks/checks.dart';
 import 'package:dedupe/dedupe.dart';
+import 'package:dedupe/src/ast_extractor.dart';
+import 'package:dedupe/src/cache.dart';
 import 'package:path/path.dart' as p;
 import 'package:test/test.dart';
 
@@ -23,7 +25,7 @@ void main() {
     });
 
     test('putEntry and getEntry store and load valid cache data', () {
-      const options = DedupeOptions(targetPath: '.');
+      final options = DedupeOptions(targetPath: '.');
       final cache = DedupeCacheManager(
         cacheDirPath: cacheDir,
         enabled: true,
@@ -61,7 +63,7 @@ void main() {
     });
 
     test('getEntry returns null on content hash mismatch', () {
-      const options = DedupeOptions(targetPath: '.');
+      final options = DedupeOptions(targetPath: '.');
       final cache = DedupeCacheManager(
         cacheDirPath: cacheDir,
         enabled: true,
@@ -96,8 +98,8 @@ void main() {
     });
 
     test('getEntry returns null on options mismatch', () {
-      const options1 = DedupeOptions(targetPath: '.', minTokens: 40);
-      const options2 = DedupeOptions(targetPath: '.', minTokens: 50);
+      final options1 = DedupeOptions(targetPath: '.', minTokens: 40);
+      final options2 = DedupeOptions(targetPath: '.', minTokens: 50);
 
       final cache1 = DedupeCacheManager(
         cacheDirPath: cacheDir,
@@ -137,7 +139,7 @@ void main() {
     });
 
     test('pruneStale removes deleted files from cache', () {
-      const options = DedupeOptions(targetPath: '.');
+      final options = DedupeOptions(targetPath: '.');
       final cache = DedupeCacheManager(
         cacheDirPath: cacheDir,
         enabled: true,
@@ -173,7 +175,7 @@ void main() {
     });
 
     test('pruneStale does not delete unrelated or malformed JSON files', () {
-      const options = DedupeOptions(targetPath: '.');
+      final options = DedupeOptions(targetPath: '.');
       final cache = DedupeCacheManager(
         cacheDirPath: cacheDir,
         enabled: true,
@@ -214,7 +216,7 @@ void main() {
     test(
       'clear removes only valid cache files and empty shard directories',
       () {
-        const options = DedupeOptions(targetPath: '.');
+        final options = DedupeOptions(targetPath: '.');
         final cache = DedupeCacheManager(
           cacheDirPath: cacheDir,
           enabled: true,
@@ -263,7 +265,7 @@ void main() {
       },
     );
     test('getEntry returns null on cache format version mismatch', () {
-      const options = DedupeOptions(targetPath: '.');
+      final options = DedupeOptions(targetPath: '.');
       final cache = DedupeCacheManager(
         cacheDirPath: cacheDir,
         enabled: true,
@@ -317,7 +319,7 @@ void main() {
     test(
       'getEntry returns null on SDK version or package version mismatch',
       () {
-        const options = DedupeOptions(targetPath: '.');
+        final options = DedupeOptions(targetPath: '.');
         final cache = DedupeCacheManager(
           cacheDirPath: cacheDir,
           enabled: true,
@@ -393,7 +395,7 @@ void main() {
     test(
       'getEntry gracefully handles corrupt or truncated JSON cache files',
       () {
-        const options = DedupeOptions(targetPath: '.');
+        final options = DedupeOptions(targetPath: '.');
         final cache = DedupeCacheManager(
           cacheDirPath: cacheDir,
           enabled: true,
@@ -459,7 +461,7 @@ void main() {
     );
 
     test('getEntry returns null when relPath mismatches', () {
-      const options = DedupeOptions(targetPath: '.');
+      final options = DedupeOptions(targetPath: '.');
       final cache = DedupeCacheManager(
         cacheDirPath: cacheDir,
         enabled: true,

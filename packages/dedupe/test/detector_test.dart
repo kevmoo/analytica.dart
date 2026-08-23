@@ -1,5 +1,8 @@
 import 'package:checks/checks.dart';
 import 'package:dedupe/dedupe.dart';
+import 'package:dedupe/src/ast_extractor.dart';
+import 'package:dedupe/src/detector.dart';
+import 'package:dedupe/src/tokenizer.dart';
 import 'package:test/test.dart';
 
 void main() {

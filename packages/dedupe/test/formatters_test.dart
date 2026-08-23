@@ -32,7 +32,7 @@ void main() {
       inDiff: false,
     );
 
-    const cluster = DuplicateCluster(
+    final cluster = DuplicateCluster(
       id: 'cluster-1',
       instances: [instance1, instance2],
       tokenCount: 45,
@@ -67,7 +67,7 @@ void main() {
       clusterCount: 1,
     );
 
-    const report = DedupeReport(
+    final report = DedupeReport(
       version: '0.1.0-wip',
       targetPath: 'packages/test',
       summary: summary,
@@ -120,7 +120,7 @@ void main() {
         estimatedLinesSaved: 0,
       );
 
-      const cleanReport = DedupeReport(
+      final cleanReport = DedupeReport(
         version: '0.1.0-wip',
         targetPath: 'clean_pkg',
         summary: cleanSummary,

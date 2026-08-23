@@ -27,7 +27,7 @@ void main() {
       lineCount: 11,
       snippet: 'void doLogic() { print("a"); }',
     );
-    const clusterLogic = DuplicateCluster(
+    final clusterLogic = DuplicateCluster(
       id: 'cluster-logic',
       instances: [inst1A, inst1B],
       tokenCount: 40,
@@ -57,7 +57,7 @@ void main() {
       lineCount: 16,
       snippet: 'final data = [10, 20, 30];',
     );
-    const clusterData = DuplicateCluster(
+    final clusterData = DuplicateCluster(
       id: 'cluster-data',
       instances: [inst2A, inst2B],
       tokenCount: 50,
@@ -87,7 +87,7 @@ void main() {
       lineCount: 8,
       snippet: 'class BoilerB {}',
     );
-    const clusterBoiler = DuplicateCluster(
+    final clusterBoiler = DuplicateCluster(
       id: 'cluster-boiler',
       instances: [inst3A, inst3B],
       tokenCount: 30,
@@ -130,7 +130,7 @@ void main() {
       ),
     ];
 
-    const report = DedupeReport(
+    final report = DedupeReport(
       version: '0.1.0-wip',
       targetPath: 'pkg/sample',
       summary: summary,
@@ -286,7 +286,7 @@ void main() {
 
     test('propagates DedupeOptions configuration', () {
       final buffer = StringBuffer();
-      const options = DedupeOptions(
+      final options = DedupeOptions(
         targetPath: 'pkg/sample',
         top: 1,
         categoryFilter: 'logic',
