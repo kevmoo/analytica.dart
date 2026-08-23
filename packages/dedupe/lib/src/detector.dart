@@ -128,6 +128,11 @@ class _SpanDsu {
   }
 }
 
+/// Above this bucket size, matching degrades from all-pairs (O(N^2)) to
+/// linear star-topology linking to bound the comparison count on ubiquitous
+/// boilerplate without risking cascade cluster disconnects.
+const int kAllPairsBucketLimit = 50;
+
 /// Core clone detection engine using $k$-gram polynomial rolling hashes and
 /// maximal bidirectional extension.
 class CloneDetector {
@@ -228,7 +233,7 @@ class CloneDetector {
     required Set<(int, int, int, int)> seenPairs,
     required List<_MatchPair> outPairs,
   }) {
-    if (bucket.length <= 50) {
+    if (bucket.length <= kAllPairsBucketLimit) {
       for (var i = 0; i < bucket.length; i++) {
         final c1 = bucket[i];
         for (var j = i + 1; j < bucket.length; j++) {
@@ -243,11 +248,12 @@ class CloneDetector {
         }
       }
     } else {
-      // Chain adjacent items for large buckets to maintain O(N) scaling.
-      for (var i = 0; i < bucket.length - 1; i++) {
+      // Link anchor (bucket[0]) against all other candidates in O(N).
+      final anchor = bucket.first;
+      for (var i = 1; i < bucket.length; i++) {
         _tryAddAstCandidatePair(
-          c1: bucket[i],
-          c2: bucket[i + 1],
+          c1: anchor,
+          c2: bucket[i],
           fileSequences: fileSequences,
           seenPairs: seenPairs,
           outPairs: outPairs,
@@ -374,14 +380,14 @@ class CloneDetector {
     for (var i = 0; i <= c1.tokenCount - shingleSize; i++) {
       final h1 = tokens1[c1.startTokenIndex + i].tokenHash;
       final h2 = tokens1[c1.startTokenIndex + i + 1].tokenHash;
-      shingles1.add(Object.hash(h1, h2));
+      shingles1.add((h1 << 32) ^ (h2 & 0xFFFFFFFF));
     }
 
     final shingles2 = <int>{};
     for (var i = 0; i <= c2.tokenCount - shingleSize; i++) {
       final h1 = tokens2[c2.startTokenIndex + i].tokenHash;
       final h2 = tokens2[c2.startTokenIndex + i + 1].tokenHash;
-      shingles2.add(Object.hash(h1, h2));
+      shingles2.add((h1 << 32) ^ (h2 & 0xFFFFFFFF));
     }
 
     final tokenJaccard = MinHasher.exactJaccard(shingles1, shingles2);
@@ -478,7 +484,7 @@ class CloneDetector {
     required Set<(int, int, int, int)> seenPairs,
     required List<_MatchPair> outPairs,
   }) {
-    if (locations.length <= 50) {
+    if (locations.length <= kAllPairsBucketLimit) {
       for (var i = 0; i < locations.length; i++) {
         final loc1 = locations[i];
         for (var j = i + 1; j < locations.length; j++) {
@@ -496,11 +502,12 @@ class CloneDetector {
         }
       }
     } else {
-      // Chain adjacent locations for large buckets to maintain O(N) scaling.
-      for (var i = 0; i < locations.length - 1; i++) {
+      // Link anchor (locations[0]) against all other locations in O(N).
+      final anchor = locations.first;
+      for (var i = 1; i < locations.length; i++) {
         _processLocationPair(
-          loc1: locations[i],
-          loc2: locations[i + 1],
+          loc1: anchor,
+          loc2: locations[i],
           fileSequences: fileSequences,
           k: k,
           minTokens: minTokens,

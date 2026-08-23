@@ -1,5 +1,7 @@
 import 'dart:math' as math;
 
+import 'detector.dart';
+
 /// Computes MinHash signatures and Locality-Sensitive Hashing (LSH) band keys
 /// for fast set similarity estimation and near-miss clone candidate retrieval.
 class MinHasher {
@@ -142,7 +144,7 @@ class LshIndex<T> {
     for (final bucket in _buckets.values) {
       if (bucket.length < 2) continue;
 
-      if (bucket.length <= 50) {
+      if (bucket.length <= kAllPairsBucketLimit) {
         _addSmallBucketPairs(bucket, seen, candidatePairs);
       } else {
         _addLargeBucketPairs(bucket, seen, candidatePairs);
@@ -174,12 +176,12 @@ class LshIndex<T> {
     Set<(T, T)> seen,
     List<({T item1, T item2})> candidatePairs,
   ) {
-    for (var i = 0; i < bucket.length - 1; i++) {
-      final a = bucket[i];
-      final b = bucket[i + 1];
-      final pairKey = _canonicalPair(a, b);
+    final anchor = bucket.first;
+    for (var i = 1; i < bucket.length; i++) {
+      final b = bucket[i];
+      final pairKey = _canonicalPair(anchor, b);
       if (seen.add(pairKey)) {
-        candidatePairs.add((item1: a, item2: b));
+        candidatePairs.add((item1: anchor, item2: b));
       }
     }
   }
