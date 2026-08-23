@@ -360,14 +360,14 @@ class CloneDetector {
     for (var i = 0; i <= c1.tokenCount - shingleSize; i++) {
       final h1 = tokens1[c1.startTokenIndex + i].tokenHash;
       final h2 = tokens1[c1.startTokenIndex + i + 1].tokenHash;
-      shingles1.add(Object.hash(h1, h2));
+      shingles1.add((h1 << 32) ^ (h2 & 0xFFFFFFFF));
     }
 
     final shingles2 = <int>{};
     for (var i = 0; i <= c2.tokenCount - shingleSize; i++) {
       final h1 = tokens2[c2.startTokenIndex + i].tokenHash;
       final h2 = tokens2[c2.startTokenIndex + i + 1].tokenHash;
-      shingles2.add(Object.hash(h1, h2));
+      shingles2.add((h1 << 32) ^ (h2 & 0xFFFFFFFF));
     }
 
     final tokenJaccard = MinHasher.exactJaccard(shingles1, shingles2);
