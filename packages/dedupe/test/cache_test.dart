@@ -170,6 +170,97 @@ void main() {
         cache.getEntry(relPath: 'lib/old.dart', contentHash: hash),
       ).isNull();
     });
+
+    test('pruneStale does not delete unrelated or malformed JSON files', () {
+      const options = DedupeOptions(targetPath: '.');
+      final cache = DedupeCacheManager(
+        cacheDirPath: cacheDir,
+        enabled: true,
+        options: options,
+      );
+
+      // Create a mix of unrelated files in cache directory
+      final configJson = File(p.join(cacheDir, 'config.json'));
+      configJson.parent.createSync(recursive: true);
+      configJson.writeAsStringSync(
+        '{"settings": true, "relPath": "other.dart"}',
+      );
+
+      final malformedJson = File(p.join(cacheDir, 'ab', 'malformed.json'));
+      malformedJson.parent.createSync(recursive: true);
+      malformedJson.writeAsStringSync('invalid json content {{{');
+
+      final arrayJson = File(p.join(cacheDir, 'cd', '0123456789abcdef.json'));
+      arrayJson.parent.createSync(recursive: true);
+      arrayJson.writeAsStringSync('[1, 2, 3]');
+
+      final nonCacheJson = File(
+        p.join(cacheDir, 'cd', 'fedcba9876543210.json'),
+      );
+      nonCacheJson.parent.createSync(recursive: true);
+      nonCacheJson.writeAsStringSync('{"someKey": "value"}');
+
+      // Run pruneStale with empty active set
+      cache.pruneStale(<String>{});
+
+      // All unrelated files must survive
+      check(configJson.existsSync()).isTrue();
+      check(malformedJson.existsSync()).isTrue();
+      check(arrayJson.existsSync()).isTrue();
+      check(nonCacheJson.existsSync()).isTrue();
+    });
+
+    test(
+      'clear removes only valid cache files and empty shard directories',
+      () {
+        const options = DedupeOptions(targetPath: '.');
+        final cache = DedupeCacheManager(
+          cacheDirPath: cacheDir,
+          enabled: true,
+          options: options,
+        );
+
+        // Add a valid cache entry
+        const code = 'void testMethod() { print(1); }';
+        final hash = DedupeCacheManager.computeContentHash(code);
+        const extractor = AstExtractor(minTokens: 5, minLines: 1);
+        final (seq, candidates) = extractor.extract(
+          filePath: 'lib/sample.dart',
+          content: code,
+          fileIndex: 0,
+        );
+        cache.putEntry(
+          relPath: 'lib/sample.dart',
+          contentHash: hash,
+          sequence: seq,
+          candidates: candidates,
+        );
+
+        // Add unrelated files in the cache directory
+        final configJson = File(p.join(cacheDir, 'config.json'));
+        configJson.writeAsStringSync('{"settings": true}');
+
+        final notesTxt = File(p.join(cacheDir, 'notes.txt'));
+        notesTxt.writeAsStringSync('important notes');
+
+        // Verify entry exists before clear
+        check(
+          cache.getEntry(relPath: 'lib/sample.dart', contentHash: hash),
+        ).isNotNull();
+
+        // Clear cache
+        cache.clear();
+
+        // Cache entry is gone
+        check(
+          cache.getEntry(relPath: 'lib/sample.dart', contentHash: hash),
+        ).isNull();
+
+        // Unrelated files remain untouched
+        check(configJson.existsSync()).isTrue();
+        check(notesTxt.existsSync()).isTrue();
+      },
+    );
   });
 
   group('DedupeEngine Incremental Cache Integration', () {

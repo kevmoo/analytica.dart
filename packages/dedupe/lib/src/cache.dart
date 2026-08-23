@@ -153,6 +153,36 @@ class DedupeCacheManager {
     } catch (_) {}
   }
 
+  static final _cacheEntryFileNamePattern = RegExp(r'^[0-9a-fA-F]{16}\.json$');
+  static final _cacheEntryDirPattern = RegExp(r'^[0-9a-fA-F]{2}$');
+
+  bool _isCacheEntryFile(String filePath) {
+    final fileName = p.basename(filePath);
+    if (!_cacheEntryFileNamePattern.hasMatch(fileName)) return false;
+    final parentDir = p.basename(p.dirname(filePath));
+    return _cacheEntryDirPattern.hasMatch(parentDir);
+  }
+
+  /// Returns the `relPath` of a dedupe cache entry file, or `null` if [file]
+  /// is not one: unreadable, not JSON, or missing any schema field.
+  String? _cacheEntryRelPath(File file) {
+    try {
+      final decoded = jsonDecode(file.readAsStringSync());
+      if (decoded is! Map<String, dynamic>) return null;
+      for (final key in const [
+        'version',
+        'optionsHash',
+        'contentHash',
+        'entry',
+      ]) {
+        if (decoded[key] == null) return null;
+      }
+      return decoded['relPath'] as String?;
+    } catch (_) {
+      return null;
+    }
+  }
+
   /// Prunes stale cache entries that no longer correspond to [activeRelPaths].
   void pruneStale(Set<String> activeRelPaths) {
     if (!enabled) return;
@@ -163,27 +193,47 @@ class DedupeCacheManager {
     try {
       final files = cacheDir.listSync(recursive: true).whereType<File>();
       for (final file in files) {
-        if (!file.path.endsWith('.json')) continue;
+        if (!_isCacheEntryFile(file.path)) continue;
+        final relPath = _cacheEntryRelPath(file);
+        if (relPath == null || activeRelPaths.contains(relPath)) continue;
         try {
-          final data =
-              jsonDecode(file.readAsStringSync()) as Map<String, dynamic>;
-          final relPath = data['relPath'] as String?;
-          if (relPath != null && !activeRelPaths.contains(relPath)) {
-            file.deleteSync();
-          }
-        } catch (_) {
           file.deleteSync();
-        }
+        } catch (_) {}
       }
     } catch (_) {}
   }
 
-  /// Clears the entire cache directory.
+  /// Clears dedupe cache entries from the cache directory without removing
+  /// unrelated user files.
   void clear() {
     final cacheDir = Directory(cacheDirPath);
-    if (cacheDir.existsSync()) {
+    if (!cacheDir.existsSync()) return;
+
+    try {
+      final files = cacheDir.listSync(recursive: true).whereType<File>();
+      for (final file in files) {
+        _deleteCacheEntryFile(file);
+      }
+      _deleteEmptyShardDirs(cacheDir);
+    } catch (_) {}
+  }
+
+  void _deleteCacheEntryFile(File file) {
+    if (!_isCacheEntryFile(file.path)) return;
+    if (_cacheEntryRelPath(file) == null) return;
+    try {
+      file.deleteSync();
+    } catch (_) {}
+  }
+
+  void _deleteEmptyShardDirs(Directory cacheDir) {
+    for (final entity in cacheDir.listSync()) {
+      if (entity is! Directory) continue;
+      if (!_cacheEntryDirPattern.hasMatch(p.basename(entity.path))) continue;
       try {
-        cacheDir.deleteSync(recursive: true);
+        if (entity.listSync().isEmpty) {
+          entity.deleteSync();
+        }
       } catch (_) {}
     }
   }
