@@ -1,4 +1,4 @@
-## 0.2.4-wip
+## 0.2.4
 
 - Fix `action.yml` monorepo auto-detection to evaluate default `lib` vs
   `packages` existence against the caller's `$GITHUB_WORKSPACE` instead of
@@ -7,15 +7,15 @@
   rather than `$ACTION_PATH`, so relative `targets` and `--git-diff` resolve
   against the repository under audit when the action is used from another
   repository (#76).
-
 - Add `--comment-output` and `--max-comment-rows` CLI options: with
   `--format=github`, write a second report capped to the most significant rows
   (violations, then increases, then additions) for posting as a PR comment,
-  while the step summary keeps the full table.
+  while the step summary keeps the full table (#49).
+- Add `commentFile` and `maxCommentRows` parameters to `GitHubReporter`.
 - Add `max-comment-rows` input to the GitHub Action (default `0` = unlimited)
   to keep sticky comments under GitHub's 65536-character body limit.
 - Anchor GitHub annotations to the declaration line only, so they render
-  under the function signature instead of after the closing brace.
+  under the function signature instead of after the closing brace (#55).
 - Move package into pub workspace monorepo layout under `packages/cognitive_complexity`.
 - Restore root `action.yml` and `skills/` structure for monorepo workspace.
 
