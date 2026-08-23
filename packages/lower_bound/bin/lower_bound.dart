@@ -69,7 +69,7 @@ Future<void> main(List<String> args) async {
     exit(ExitCode.usage.code);
   }
 
-  if (results['help'] as bool) {
+  if (results.flag('help')) {
     stdout.writeln(
       'Validate Dart package compilation against dependency lower bounds.',
     );
@@ -80,15 +80,15 @@ Future<void> main(List<String> args) async {
     exit(ExitCode.success.code);
   }
 
-  final targets = results['targets'] as List<String>;
-  final pin = results['pin'] as bool;
-  final keepTemp = results['keep-temp'] as bool;
-  final failOnError = results['fail-on-error'] as bool;
-  final format = results['format'] as String;
-  final commentOutput = results['comment-output'] as String?;
-  final maxRowsRaw = results['max-comment-rows'] as String?;
+  final targets = results.multiOption('targets');
+  final pin = results.flag('pin');
+  final keepTemp = results.flag('keep-temp');
+  final failOnError = results.flag('fail-on-error');
+  final format = results.option('format') ?? 'text';
+  final commentOutput = results.option('comment-output');
+  final maxRowsRaw = results.option('max-comment-rows');
   final maxCommentRows = int.tryParse(maxRowsRaw ?? '0') ?? 0;
-  final sdkRaw = results['sdk'] as String?;
+  final sdkRaw = results.option('sdk');
   final sdkOverride = sdkRaw != null ? Version.parse(sdkRaw) : null;
 
   final packagePaths = <String>[];
