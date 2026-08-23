@@ -128,6 +128,11 @@ class _SpanDsu {
   }
 }
 
+/// Above this bucket size, matching degrades from all-pairs (O(N^2)) to
+/// linear star-topology linking to bound the comparison count on ubiquitous
+/// boilerplate without risking cascade cluster disconnects.
+const int kAllPairsBucketLimit = 50;
+
 /// Core clone detection engine using $k$-gram polynomial rolling hashes and
 /// maximal bidirectional extension.
 class CloneDetector {
@@ -211,7 +216,7 @@ class CloneDetector {
     }
 
     for (final bucket in byHash.values) {
-      if (bucket.length < 2 || bucket.length > 50) continue;
+      if (bucket.length < 2) continue;
       _matchAstCandidateBucket(
         bucket: bucket,
         fileSequences: fileSequences,
@@ -227,13 +232,27 @@ class CloneDetector {
     required Set<int> seenPairs,
     required List<_MatchPair> outPairs,
   }) {
-    for (var i = 0; i < bucket.length; i++) {
-      final c1 = bucket[i];
-      for (var j = i + 1; j < bucket.length; j++) {
-        final c2 = bucket[j];
+    if (bucket.length <= kAllPairsBucketLimit) {
+      for (var i = 0; i < bucket.length; i++) {
+        final c1 = bucket[i];
+        for (var j = i + 1; j < bucket.length; j++) {
+          final c2 = bucket[j];
+          _tryAddAstCandidatePair(
+            c1: c1,
+            c2: c2,
+            fileSequences: fileSequences,
+            seenPairs: seenPairs,
+            outPairs: outPairs,
+          );
+        }
+      }
+    } else {
+      // Link anchor (bucket[0]) against all other candidates in O(N).
+      final anchor = bucket.first;
+      for (var i = 1; i < bucket.length; i++) {
         _tryAddAstCandidatePair(
-          c1: c1,
-          c2: c2,
+          c1: anchor,
+          c2: bucket[i],
           fileSequences: fileSequences,
           seenPairs: seenPairs,
           outPairs: outPairs,
@@ -442,9 +461,6 @@ class CloneDetector {
   }) {
     for (final locations in index.values) {
       if (locations.length < 2) continue;
-      // Cap oversized buckets to prevent combinatorial explosion on trivial
-      // boilerplate.
-      if (locations.length > 50) continue;
 
       _collectMatchesForBucket(
         locations: locations,
@@ -467,13 +483,30 @@ class CloneDetector {
     required Set<int> seenPairs,
     required List<_MatchPair> outPairs,
   }) {
-    for (var i = 0; i < locations.length; i++) {
-      final loc1 = locations[i];
-      for (var j = i + 1; j < locations.length; j++) {
-        final loc2 = locations[j];
+    if (locations.length <= kAllPairsBucketLimit) {
+      for (var i = 0; i < locations.length; i++) {
+        final loc1 = locations[i];
+        for (var j = i + 1; j < locations.length; j++) {
+          final loc2 = locations[j];
+          _processLocationPair(
+            loc1: loc1,
+            loc2: loc2,
+            fileSequences: fileSequences,
+            k: k,
+            minTokens: minTokens,
+            minLines: minLines,
+            seenPairs: seenPairs,
+            outPairs: outPairs,
+          );
+        }
+      }
+    } else {
+      // Link anchor (locations[0]) against all other locations in O(N).
+      final anchor = locations.first;
+      for (var i = 1; i < locations.length; i++) {
         _processLocationPair(
-          loc1: loc1,
-          loc2: loc2,
+          loc1: anchor,
+          loc2: locations[i],
           fileSequences: fileSequences,
           k: k,
           minTokens: minTokens,

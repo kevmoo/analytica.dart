@@ -1,5 +1,7 @@
 import 'dart:math' as math;
 
+import 'detector.dart';
+
 /// Computes MinHash signatures and Locality-Sensitive Hashing (LSH) band keys
 /// for fast set similarity estimation and near-miss clone candidate retrieval.
 class MinHasher {
@@ -140,21 +142,48 @@ class LshIndex<T> {
     final seen = <int>{};
 
     for (final bucket in _buckets.values) {
-      if (bucket.length < 2 || bucket.length > 50) continue;
+      if (bucket.length < 2) continue;
 
-      for (var i = 0; i < bucket.length; i++) {
-        final a = bucket[i];
-        for (var j = i + 1; j < bucket.length; j++) {
-          final b = bucket[j];
-          final pairKey = _pairHashCode(a, b);
-          if (seen.add(pairKey)) {
-            candidatePairs.add((item1: a, item2: b));
-          }
-        }
+      if (bucket.length <= kAllPairsBucketLimit) {
+        _addSmallBucketPairs(bucket, seen, candidatePairs);
+      } else {
+        _addLargeBucketPairs(bucket, seen, candidatePairs);
       }
     }
 
     return candidatePairs;
+  }
+
+  void _addSmallBucketPairs(
+    List<T> bucket,
+    Set<int> seen,
+    List<({T item1, T item2})> candidatePairs,
+  ) {
+    for (var i = 0; i < bucket.length; i++) {
+      final a = bucket[i];
+      for (var j = i + 1; j < bucket.length; j++) {
+        final b = bucket[j];
+        final pairKey = _pairHashCode(a, b);
+        if (seen.add(pairKey)) {
+          candidatePairs.add((item1: a, item2: b));
+        }
+      }
+    }
+  }
+
+  void _addLargeBucketPairs(
+    List<T> bucket,
+    Set<int> seen,
+    List<({T item1, T item2})> candidatePairs,
+  ) {
+    final anchor = bucket.first;
+    for (var i = 1; i < bucket.length; i++) {
+      final b = bucket[i];
+      final pairKey = _pairHashCode(anchor, b);
+      if (seen.add(pairKey)) {
+        candidatePairs.add((item1: anchor, item2: b));
+      }
+    }
   }
 
   int _pairHashCode(T a, T b) {

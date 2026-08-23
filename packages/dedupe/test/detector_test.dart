@@ -203,5 +203,66 @@ void handlerB() {
       check(clusters.first.instances.length).equals(2);
       check(clusters.first.instances.first.filePath).equals('handlers.dart');
     });
+
+    test('detects and clusters clone groups appearing in 52 locations without '
+        'off-by-one drops', () {
+      const helperFunction = '''
+void auditLogTraceEvent(String eventName, int eventId) {
+  print('Audit log event: \$eventName [\$eventId]');
+  print('Recording timestamp and thread metadata');
+  print('Flushing audit buffer to disk cache');
+  print('Verification trace sequence completed');
+}
+''';
+
+      const tokenizer = DartTokenizer();
+      final sequences = <TokenSequence>[];
+      for (var i = 0; i < 52; i++) {
+        sequences.add(
+          tokenizer.tokenize(
+            filePath: 'module_\$i.dart',
+            content: helperFunction,
+          ),
+        );
+      }
+
+      const detector = CloneDetector(minTokens: 15, minLines: 4);
+      final clusters = detector.detect(sequences);
+
+      check(clusters.length).equals(1);
+      final cluster = clusters.first;
+      check(cluster.instances.length).equals(52);
+      check(cluster.bucket).equals(CloneBucket.identical);
+    });
+
+    test('detects and clusters clone groups appearing in >50 locations', () {
+      const helperFunction = '''
+void auditLogTraceEvent(String eventName, int eventId) {
+  print('Audit log event: \$eventName [\$eventId]');
+  print('Recording timestamp and thread metadata');
+  print('Flushing audit buffer to disk cache');
+  print('Verification trace sequence completed');
+}
+''';
+
+      const tokenizer = DartTokenizer();
+      final sequences = <TokenSequence>[];
+      for (var i = 0; i < 60; i++) {
+        sequences.add(
+          tokenizer.tokenize(
+            filePath: 'module_\$i.dart',
+            content: helperFunction,
+          ),
+        );
+      }
+
+      const detector = CloneDetector(minTokens: 15, minLines: 4);
+      final clusters = detector.detect(sequences);
+
+      check(clusters.length).equals(1);
+      final cluster = clusters.first;
+      check(cluster.instances.length).equals(60);
+      check(cluster.bucket).equals(CloneBucket.identical);
+    });
   });
 }
