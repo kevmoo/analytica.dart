@@ -147,19 +147,20 @@ class CloneDetector {
     if (fileSequences.isEmpty) return const [];
 
     final rawPairs = <_MatchPair>[];
-    final seenPairs = <(int, int, int, int)>{};
+    final seenAstPairs = <(int, int, int, int)>{};
+    final seenKgramPairs = <(int, int, int, int)>{};
 
     if (candidates != null && candidates.isNotEmpty) {
       _matchAstCandidates(
         candidates: candidates,
         fileSequences: fileSequences,
-        seenPairs: seenPairs,
+        seenPairs: seenAstPairs,
         outPairs: rawPairs,
       );
       _matchMinHashCandidates(
         candidates: candidates,
         fileSequences: fileSequences,
-        seenPairs: seenPairs,
+        seenPairs: seenAstPairs,
         outPairs: rawPairs,
       );
     }
@@ -173,7 +174,7 @@ class CloneDetector {
       k: k,
       minTokens: minTokens,
       minLines: minLines,
-      seenPairs: seenPairs,
+      seenPairs: seenKgramPairs,
       outPairs: rawPairs,
     );
 
