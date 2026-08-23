@@ -142,6 +142,128 @@ int computeScore(int base, int multiplier) {
       check(stdout).contains('## 🔍 Duplicate Clusters');
     });
 
+    test(
+      'runs analysis and outputs GitHub format with --format=github',
+      () async {
+        await d.dir('cli_gh_pkg', [
+          d.dir('lib', [
+            d.file('calc_a.dart', '''
+int computeScore(int base, int multiplier) {
+  if (base < 0) return 0;
+  final bonus = multiplier * 10;
+  final result = base + bonus;
+  return result;
+}
+'''),
+            d.file('calc_b.dart', '''
+int computeScore(int base, int multiplier) {
+  if (base < 0) return 0;
+  final bonus = multiplier * 10;
+  final result = base + bonus;
+  return result;
+}
+'''),
+          ]),
+        ]).create();
+
+        final proc = await runDedupe([
+          '--format=github',
+          '--min-tokens=15',
+          '--min-lines=3',
+          d.path('cli_gh_pkg'),
+        ]);
+
+        final stdout = await proc.stdoutStream().join('\n');
+        await proc.shouldExit(0);
+
+        check(stdout).contains('::warning file=lib/calc_a.dart');
+        check(stdout).contains('# 🔍 Dedupe Duplication Analysis:');
+        check(stdout).contains('## 📊 Summary');
+        check(stdout).contains('## 📁 File Breakdown');
+        check(stdout).contains('## 🔍 Duplicate Clusters');
+      },
+    );
+
+    test('--format=github respects --no-files, --no-clusters, --category, and '
+        '--bucket', () async {
+      await d.dir('cli_gh_filters_pkg', [
+        d.dir('lib', [
+          d.file('a.dart', '''
+int calc(int x) {
+  if (x < 0) return 0;
+  final a = x * 10;
+  final b = a + 5;
+  return b;
+}
+'''),
+          d.file('b.dart', '''
+int calc(int x) {
+  if (x < 0) return 0;
+  final a = x * 10;
+  final b = a + 5;
+  return b;
+}
+'''),
+        ]),
+      ]).create();
+
+      // Test --no-files
+      final procNoFiles = await runDedupe([
+        '--format=github',
+        '--no-files',
+        '--min-tokens=10',
+        '--min-lines=3',
+        d.path('cli_gh_filters_pkg'),
+      ]);
+      final outNoFiles = await procNoFiles.stdoutStream().join('\n');
+      await procNoFiles.shouldExit(0);
+      check(outNoFiles).not((it) => it.contains('## 📁 File Breakdown'));
+      check(outNoFiles).contains('## 📊 Summary');
+      check(outNoFiles).contains('::warning');
+
+      // Test --no-clusters
+      final procNoClusters = await runDedupe([
+        '--format=github',
+        '--no-clusters',
+        '--min-tokens=10',
+        '--min-lines=3',
+        d.path('cli_gh_filters_pkg'),
+      ]);
+      final outNoClusters = await procNoClusters.stdoutStream().join('\n');
+      await procNoClusters.shouldExit(0);
+      check(outNoClusters).not((it) => it.contains('::warning'));
+      check(outNoClusters).not((it) => it.contains('## 🔍 Duplicate Clusters'));
+      check(outNoClusters).contains('## 📊 Summary');
+
+      // Test --category=data (when existing cluster is logic)
+      final procCategory = await runDedupe([
+        '--format=github',
+        '--category=data',
+        '--min-tokens=10',
+        '--min-lines=3',
+        d.path('cli_gh_filters_pkg'),
+      ]);
+      final outCategory = await procCategory.stdoutStream().join('\n');
+      await procCategory.shouldExit(0);
+      check(outCategory).not((it) => it.contains('::warning'));
+      check(
+        outCategory,
+      ).contains('No duplicate clusters matched the current filter criteria.');
+
+      // Test --bucket=identical
+      final procBucket = await runDedupe([
+        '--format=github',
+        '--bucket=identical',
+        '--min-tokens=10',
+        '--min-lines=3',
+        d.path('cli_gh_filters_pkg'),
+      ]);
+      final outBucket = await procBucket.stdoutStream().join('\n');
+      await procBucket.shouldExit(0);
+      check(outBucket).contains('::warning');
+      check(outBucket).contains('Identical');
+    });
+
     test('writes JSON report to file with --json-output', () async {
       await d.dir('cli_out_file_pkg', [
         d.dir('lib', [

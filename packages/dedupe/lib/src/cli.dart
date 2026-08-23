@@ -348,7 +348,10 @@ class DedupeCliRunner {
         );
         outSink.writeln(mdFormatter.format(report));
       case OutputFormat.github:
-        final reporter = DedupeGitHubReporter(stdoutSink: outSink);
+        final reporter = DedupeGitHubReporter(
+          stdoutSink: outSink,
+          options: options,
+        );
         reporter.report(report);
       case OutputFormat.text:
         final txtFormatter = TextFormatter(
