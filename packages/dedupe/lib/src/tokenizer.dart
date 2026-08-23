@@ -139,35 +139,24 @@ class DartTokenizer {
     final lineInfo = parseResult.lineInfo;
     final tokens = <NormalizedToken>[];
 
-    var token = parseResult.unit.beginToken;
+    void processToken(Token t) {
+      final (normalized, hash) = _normalizeToken(t);
 
-    while (!token.isEof) {
-      final isComment =
-          token.type == TokenType.SINGLE_LINE_COMMENT ||
-          token.type == TokenType.MULTI_LINE_COMMENT;
-
-      if (ignoreComments && isComment) {
-        token = token.next!;
-        continue;
-      }
-
-      final (normalized, hash) = _normalizeToken(token);
-
-      final startLoc = lineInfo.getLocation(token.offset);
-      final endLoc = lineInfo.getLocation(token.end);
+      final startLoc = lineInfo.getLocation(t.offset);
+      final endLoc = lineInfo.getLocation(t.end);
 
       final idx = tokens.length;
       if (tokenOffsetMap != null) {
-        tokenOffsetMap[token.offset] = idx;
+        tokenOffsetMap[t.offset] = idx;
       }
 
       tokens.add(
         NormalizedToken(
-          type: token.type,
+          type: t.type,
           normalizedLexeme: normalized,
-          originalLexeme: token.lexeme,
-          offset: token.offset,
-          length: token.length,
+          originalLexeme: t.lexeme,
+          offset: t.offset,
+          length: t.length,
           startLine: startLoc.lineNumber,
           endLine: endLoc.lineNumber,
           startColumn: startLoc.columnNumber,
@@ -175,9 +164,16 @@ class DartTokenizer {
           tokenHash: hash,
         ),
       );
+    }
 
+    var token = parseResult.unit.beginToken;
+
+    while (!token.isEof) {
+      _processPrecedingComments(token, processToken);
+      processToken(token);
       token = token.next!;
     }
+    _processPrecedingComments(token, processToken);
 
     return TokenSequence(
       filePath: filePath,
@@ -186,6 +182,19 @@ class DartTokenizer {
       tokens: tokens,
       totalLines: lineInfo.lineCount,
     );
+  }
+
+  void _processPrecedingComments(
+    Token token,
+    void Function(Token) processToken,
+  ) {
+    if (ignoreComments) return;
+    var comment = token.precedingComments;
+    while (comment != null) {
+      processToken(comment);
+      final next = comment.next;
+      comment = next is CommentToken ? next : null;
+    }
   }
 
   (String, int) _normalizeToken(Token token) {

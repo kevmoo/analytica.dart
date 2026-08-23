@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:checks/checks.dart';
@@ -261,6 +262,244 @@ void main() {
         check(notesTxt.existsSync()).isTrue();
       },
     );
+    test('getEntry returns null on cache format version mismatch', () {
+      const options = DedupeOptions(targetPath: '.');
+      final cache = DedupeCacheManager(
+        cacheDirPath: cacheDir,
+        enabled: true,
+        options: options,
+      );
+
+      const code = 'void testMethod() { print(1); }';
+      final hash = DedupeCacheManager.computeContentHash(code);
+
+      const extractor = AstExtractor(minTokens: 5, minLines: 1);
+      final (seq, candidates) = extractor.extract(
+        filePath: 'lib/sample.dart',
+        content: code,
+        fileIndex: 0,
+      );
+
+      cache.putEntry(
+        relPath: 'lib/sample.dart',
+        contentHash: hash,
+        sequence: seq,
+        candidates: candidates,
+      );
+
+      // Verify it is readable initially
+      check(
+        cache.getEntry(
+          relPath: 'lib/sample.dart',
+          contentHash: hash,
+          fileIndex: 0,
+        ),
+      ).isNotNull();
+
+      // Corrupt format version in cached file
+      final pathHash = DedupeCacheManager.computeContentHash('lib/sample.dart');
+      final cacheFile = File(
+        p.join(cacheDir, pathHash.substring(0, 2), '$pathHash.json'),
+      );
+      final data =
+          jsonDecode(cacheFile.readAsStringSync()) as Map<String, dynamic>;
+      data['version'] = '999';
+      cacheFile.writeAsStringSync(jsonEncode(data));
+
+      final cached = cache.getEntry(
+        relPath: 'lib/sample.dart',
+        contentHash: hash,
+        fileIndex: 0,
+      );
+      check(cached).isNull();
+    });
+
+    test(
+      'getEntry returns null on SDK version or package version mismatch',
+      () {
+        const options = DedupeOptions(targetPath: '.');
+        final cache = DedupeCacheManager(
+          cacheDirPath: cacheDir,
+          enabled: true,
+          options: options,
+          sdkVersion: '3.12.0',
+          packageVersion: '0.1.0',
+        );
+
+        const code = 'void testMethod() { print(1); }';
+        final hash = DedupeCacheManager.computeContentHash(code);
+
+        const extractor = AstExtractor(minTokens: 5, minLines: 1);
+        final (seq, candidates) = extractor.extract(
+          filePath: 'lib/sample.dart',
+          content: code,
+          fileIndex: 0,
+        );
+
+        cache.putEntry(
+          relPath: 'lib/sample.dart',
+          contentHash: hash,
+          sequence: seq,
+          candidates: candidates,
+        );
+
+        final diffSdkCache = DedupeCacheManager(
+          cacheDirPath: cacheDir,
+          enabled: true,
+          options: options,
+          sdkVersion: '3.13.0',
+          packageVersion: '0.1.0',
+        );
+        check(
+          diffSdkCache.getEntry(
+            relPath: 'lib/sample.dart',
+            contentHash: hash,
+            fileIndex: 0,
+          ),
+        ).isNull();
+
+        final diffPkgCache = DedupeCacheManager(
+          cacheDirPath: cacheDir,
+          enabled: true,
+          options: options,
+          sdkVersion: '3.12.0',
+          packageVersion: '0.2.0',
+        );
+        check(
+          diffPkgCache.getEntry(
+            relPath: 'lib/sample.dart',
+            contentHash: hash,
+            fileIndex: 0,
+          ),
+        ).isNull();
+
+        final sameCache = DedupeCacheManager(
+          cacheDirPath: cacheDir,
+          enabled: true,
+          options: options,
+          sdkVersion: '3.12.0',
+          packageVersion: '0.1.0',
+        );
+        check(
+          sameCache.getEntry(
+            relPath: 'lib/sample.dart',
+            contentHash: hash,
+            fileIndex: 0,
+          ),
+        ).isNotNull();
+      },
+    );
+
+    test(
+      'getEntry gracefully handles corrupt or truncated JSON cache files',
+      () {
+        const options = DedupeOptions(targetPath: '.');
+        final cache = DedupeCacheManager(
+          cacheDirPath: cacheDir,
+          enabled: true,
+          options: options,
+        );
+
+        const code = 'void testMethod() { print(1); }';
+        final hash = DedupeCacheManager.computeContentHash(code);
+
+        const extractor = AstExtractor(minTokens: 5, minLines: 1);
+        final (seq, candidates) = extractor.extract(
+          filePath: 'lib/sample.dart',
+          content: code,
+          fileIndex: 0,
+        );
+
+        cache.putEntry(
+          relPath: 'lib/sample.dart',
+          contentHash: hash,
+          sequence: seq,
+          candidates: candidates,
+        );
+
+        final pathHash = DedupeCacheManager.computeContentHash(
+          'lib/sample.dart',
+        );
+        final cacheFile = File(
+          p.join(cacheDir, pathHash.substring(0, 2), '$pathHash.json'),
+        );
+
+        // Truncated JSON
+        cacheFile.writeAsStringSync(
+          '{"version": "1", "relPath": "lib/sample.da',
+        );
+        check(
+          cache.getEntry(
+            relPath: 'lib/sample.dart',
+            contentHash: hash,
+            fileIndex: 0,
+          ),
+        ).isNull();
+
+        // Completely non-JSON data
+        cacheFile.writeAsStringSync('not json content at all');
+        check(
+          cache.getEntry(
+            relPath: 'lib/sample.dart',
+            contentHash: hash,
+            fileIndex: 0,
+          ),
+        ).isNull();
+
+        // JSON array instead of map
+        cacheFile.writeAsStringSync('[1, 2, 3]');
+        check(
+          cache.getEntry(
+            relPath: 'lib/sample.dart',
+            contentHash: hash,
+            fileIndex: 0,
+          ),
+        ).isNull();
+      },
+    );
+
+    test('getEntry returns null when relPath mismatches', () {
+      const options = DedupeOptions(targetPath: '.');
+      final cache = DedupeCacheManager(
+        cacheDirPath: cacheDir,
+        enabled: true,
+        options: options,
+      );
+
+      const code = 'void testMethod() { print(1); }';
+      final hash = DedupeCacheManager.computeContentHash(code);
+
+      const extractor = AstExtractor(minTokens: 5, minLines: 1);
+      final (seq, candidates) = extractor.extract(
+        filePath: 'lib/sample.dart',
+        content: code,
+        fileIndex: 0,
+      );
+
+      cache.putEntry(
+        relPath: 'lib/sample.dart',
+        contentHash: hash,
+        sequence: seq,
+        candidates: candidates,
+      );
+
+      // Mismatch relPath payload
+      final pathHash = DedupeCacheManager.computeContentHash('lib/sample.dart');
+      final cacheFile = File(
+        p.join(cacheDir, pathHash.substring(0, 2), '$pathHash.json'),
+      );
+      final data =
+          jsonDecode(cacheFile.readAsStringSync()) as Map<String, dynamic>;
+      data['relPath'] = 'lib/colliding_other.dart';
+      cacheFile.writeAsStringSync(jsonEncode(data));
+
+      final cached = cache.getEntry(
+        relPath: 'lib/sample.dart',
+        contentHash: hash,
+        fileIndex: 0,
+      );
+      check(cached).isNull();
+    });
   });
 
   group('DedupeEngine Incremental Cache Integration', () {
@@ -323,5 +562,99 @@ void duplicateFunctionB() {
         ).equals(report1.summary.duplicateLines);
       },
     );
+
+    test('clearCache option clears existing cache directory', () async {
+      final cacheDir = p.join(tempDir.path, '.cache');
+      final options1 = DedupeOptions(
+        targetPath: tempDir.path,
+        minTokens: 10,
+        minLines: 3,
+        useCache: true,
+        cacheDir: cacheDir,
+      );
+
+      final engine1 = DedupeEngine(options1);
+      await engine1.analyze();
+      final cacheFiles1 = Directory(
+        cacheDir,
+      ).listSync(recursive: true).whereType<File>().toList();
+      check(cacheFiles1).isNotEmpty();
+
+      final options2 = DedupeOptions(
+        targetPath: tempDir.path,
+        minTokens: 10,
+        minLines: 3,
+        useCache: false,
+        clearCache: true,
+        cacheDir: cacheDir,
+      );
+
+      final engine2 = DedupeEngine(options2);
+      await engine2.analyze();
+      final cacheFiles2 = Directory(
+        cacheDir,
+      ).listSync(recursive: true).whereType<File>().toList();
+      check(cacheFiles2).isEmpty();
+    });
+
+    test('verifies real cache hit by poisoning a cached entry', () async {
+      final cacheDir = p.join(tempDir.path, '.cache');
+      final options = DedupeOptions(
+        targetPath: tempDir.path,
+        minTokens: 10,
+        minLines: 3,
+        useCache: true,
+        cacheDir: cacheDir,
+      );
+
+      final engine1 = DedupeEngine(options);
+      final report1 = await engine1.analyze();
+      check(report1.summary.clusterCount).equals(1);
+
+      // Poison the cache entry for lib/b.dart to have 0 tokens and 0 candidates
+      final pathHash = DedupeCacheManager.computeContentHash('lib/b.dart');
+      final cacheFile = File(
+        p.join(cacheDir, pathHash.substring(0, 2), '$pathHash.json'),
+      );
+      check(cacheFile.existsSync()).isTrue();
+
+      final data =
+          jsonDecode(cacheFile.readAsStringSync()) as Map<String, dynamic>;
+      final entry = data['entry'] as Map<String, dynamic>;
+      entry['tokens'] = <dynamic>[];
+      entry['candidates'] = <dynamic>[];
+      cacheFile.writeAsStringSync(jsonEncode(data));
+
+      // Re-run analysis; because lib/b.dart was poisoned in the cache, no clusters are found
+      final engine2 = DedupeEngine(options);
+      final report2 = await engine2.analyze();
+      check(report2.summary.clusterCount).equals(0);
+    });
+
+    test('cached run vs --no-cache run produce identical reports', () async {
+      final cacheDir = p.join(tempDir.path, '.cache');
+      final cachedOptions = DedupeOptions(
+        targetPath: tempDir.path,
+        minTokens: 10,
+        minLines: 3,
+        useCache: true,
+        cacheDir: cacheDir,
+      );
+      final noCacheOptions = DedupeOptions(
+        targetPath: tempDir.path,
+        minTokens: 10,
+        minLines: 3,
+        useCache: false,
+      );
+
+      // First run populates cache
+      await DedupeEngine(cachedOptions).analyze();
+
+      // Second run hits cache
+      final cachedReport = await DedupeEngine(cachedOptions).analyze();
+      final noCacheReport = await DedupeEngine(noCacheOptions).analyze();
+
+      check(cachedReport.toJson()).deepEquals(noCacheReport.toJson());
+    });
   });
 }

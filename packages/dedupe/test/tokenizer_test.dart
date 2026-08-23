@@ -43,6 +43,46 @@ void test() {}
       }
     });
 
+    test('extracts comment tokens when ignoreComments is false', () {
+      const code = '''
+// Leading comment
+/// Leading doc comment
+void testMethod() {
+  // Inner comment
+  /* Inner multi-line
+     comment */
+  print('Hello');
+}
+// Trailing comment
+''';
+      const tokenizer = DartTokenizer(ignoreComments: false);
+      final seq = tokenizer.tokenize(filePath: 'test.dart', content: code);
+
+      final commentLexemes = seq.tokens
+          .where(
+            (t) =>
+                t.originalLexeme.startsWith('//') ||
+                t.originalLexeme.startsWith('/*'),
+          )
+          .map((t) => t.originalLexeme)
+          .toList();
+
+      check(commentLexemes).contains('// Leading comment');
+      check(commentLexemes).contains('/// Leading doc comment');
+      check(commentLexemes).contains('// Inner comment');
+      check(commentLexemes).any((it) => it.startsWith('/* Inner multi-line'));
+      check(commentLexemes).contains('// Trailing comment');
+
+      // Verify token ordering and locations
+      final firstTok = seq.tokens.first;
+      check(firstTok.originalLexeme).equals('// Leading comment');
+      check(firstTok.startLine).equals(1);
+
+      final lastTok = seq.tokens.last;
+      check(lastTok.originalLexeme).equals('// Trailing comment');
+      check(lastTok.startLine).equals(9);
+    });
+
     test(
       'normalizes string and numeric literals when ignoreLiterals is true',
       () {

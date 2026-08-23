@@ -2,7 +2,6 @@ name: Cognitive Complexity Audit
 
 on:
   pull_request:
-    branches: [ main ]
 
 jobs:
   audit:

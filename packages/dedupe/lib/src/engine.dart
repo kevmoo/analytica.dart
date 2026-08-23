@@ -10,8 +10,9 @@ import 'delta_service.dart';
 import 'detector.dart';
 import 'models.dart';
 import 'tokenizer.dart';
+import 'version.dart';
 
-const String dedupeVersion = '0.1.0-wip';
+export 'version.dart';
 
 /// Orchestrates file discovery, tokenization, clone detection, Git diff
 /// evaluation, and metric aggregation.
@@ -92,6 +93,10 @@ class DedupeEngine {
     );
 
     final cacheManager = _createCacheManager(targetDirPath);
+    if (options.clearCache) {
+      cacheManager.clear();
+    }
+
     final activeRelPaths = <String>{};
     final sequences = <TokenSequence>[];
     final allCandidates = <AstCandidateUnit>[];
@@ -134,16 +139,34 @@ class DedupeEngine {
   }
 
   DedupeCacheManager _createCacheManager(String targetDirPath) {
-    final cacheDir =
-        options.cacheDir ??
-        (Directory(p.join(targetDirPath, '.dart_tool')).existsSync()
-            ? p.join(targetDirPath, '.dart_tool', 'dedupe')
-            : p.join(targetDirPath, '.dedupe_cache'));
+    final cacheDir = options.cacheDir ?? _resolveDefaultCacheDir(targetDirPath);
     return DedupeCacheManager(
       cacheDirPath: cacheDir,
       enabled: options.useCache,
       options: options,
     );
+  }
+
+  static String _resolveDefaultCacheDir(String targetDirPath) {
+    var current = p.normalize(p.absolute(targetDirPath));
+    while (true) {
+      final dartTool = Directory(p.join(current, '.dart_tool'));
+      if (dartTool.existsSync()) {
+        return p.join(dartTool.path, 'dedupe');
+      }
+      final pubspec = File(p.join(current, 'pubspec.yaml'));
+      if (pubspec.existsSync()) {
+        return p.join(current, '.dart_tool', 'dedupe');
+      }
+      final parent = p.dirname(current);
+      if (parent == current) break;
+      current = parent;
+    }
+    final targetDartTool = Directory(p.join(targetDirPath, '.dart_tool'));
+    if (targetDartTool.existsSync()) {
+      return p.join(targetDirPath, '.dart_tool', 'dedupe');
+    }
+    return p.join(targetDirPath, '.dedupe_cache');
   }
 
   Future<
