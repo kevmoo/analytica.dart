@@ -102,15 +102,16 @@ runs:
           comment_args=(--comment-output="$comment_file" --max-comment-rows="$INPUT_MAX_COMMENT_ROWS")
         fi
 
+        # Auto-detect monorepos when default 'lib' target does not exist in caller workspace
+        workspace="${GITHUB_WORKSPACE:-$PWD}"
+        targets="$INPUT_TARGETS"
+        if [ "$targets" = "lib" ] && [ ! -d "$workspace/lib" ] && [ -d "$workspace/packages" ]; then
+          targets="packages"
+        fi
+
         # Navigate to action repo directory, run pub get to resolve dependencies deterministically
         cd "$ACTION_PATH"
         dart pub get >/dev/null
-        
-        # Auto-detect monorepos when default 'lib' target does not exist
-        targets="$INPUT_TARGETS"
-        if [ "$targets" = "lib" ] && [ ! -d "lib" ] && [ -d "packages" ]; then
-          targets="packages"
-        fi
         
         # Execute the scanner CLI tool and capture exit code
         set +e

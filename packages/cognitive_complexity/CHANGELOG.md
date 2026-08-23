@@ -1,5 +1,9 @@
 ## 0.2.4-wip
 
+- Fix `action.yml` monorepo auto-detection to evaluate default `lib` vs
+  `packages` existence against the caller's `$GITHUB_WORKSPACE` instead of
+  `$ACTION_PATH` (#76).
+
 - Add `--comment-output` and `--max-comment-rows` CLI options: with
   `--format=github`, write a second report capped to the most significant rows
   (violations, then increases, then additions) for posting as a PR comment,
