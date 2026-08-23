@@ -30,100 +30,20 @@ A unified suite of high-performance static analysis engines, CLI tools, GitHub A
 
 ## 🚀 GitHub Actions
 
-Modular composite actions to automate code quality, complexity ceilings, and dependency validation in CI workflows:
+Modular composite GitHub Actions are maintained and documented in their respective package directories:
 
-### 1. Cognitive Complexity Audit
-
-Calculates Cognitive Complexity scores on pull requests and prevents complexity regressions.
-
-Add `.github/workflows/complexity.yml` to your repository:
-
-```yaml
-name: Cognitive Complexity Audit
-
-on:
-  pull_request:
-    branches: [main]
-
-jobs:
-  audit:
-    runs-on: ubuntu-latest
-    permissions:
-      pull-requests: write # Required for sticky PR comment summaries
-      contents: read
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v7
-        with:
-          fetch-depth: 0 # Full history required for diff-base merge-base comparison
-
-      - name: Setup Dart SDK
-        uses: dart-lang/setup-dart@v1
-
-      - name: Run Complexity Scanner
-        uses: kevmoo/analytica.dart/packages/cognitive_complexity@main
-        with:
-          diff-base: origin/${{ github.base_ref }}
-          fail-threshold: 15
-          fail-on-increase: true
-```
-
-👉 [Cognitive Complexity Action Inputs Reference & Documentation](packages/cognitive_complexity/README.md#action-inputs-reference)
-
-### 2. Dependency Lower-Bound Validator
-
-Validates that declared dependency lower bounds resolve and build against synthetic minimums.
-
-Add `.github/workflows/lower_bound.yml` to your repository:
-
-```yaml
-name: Dependency Lower-Bound Validation
-
-on:
-  pull_request:
-
-jobs:
-  validate:
-    runs-on: ubuntu-latest
-    permissions:
-      pull-requests: write # Required for sticky PR comment summaries
-      contents: read
-    steps:
-      - name: Checkout Codebase
-        uses: actions/checkout@v7
-
-      - name: Setup Dart SDK
-        uses: dart-lang/setup-dart@v1
-
-      - name: Validate Dependency Lower Bounds
-        uses: kevmoo/analytica.dart/packages/lower_bound@main
-        with:
-          format: 'github'
-          fail-on-error: 'true'
-```
-
-👉 [Lower-Bound Action Inputs Reference & Documentation](packages/lower_bound/README.md#action-inputs-reference)
+* [**Cognitive Complexity Audit**](packages/cognitive_complexity/README.md#github-actions) (`packages/cognitive_complexity`): Calculates Cognitive Complexity scores on pull requests and flags regressions.
+* [**Dependency Lower-Bound Validator**](packages/lower_bound/README.md#github-action) (`packages/lower_bound`): Validates that declared dependency lower bounds resolve and build against synthetic minimums.
 
 ---
 
 ## 🧠 AI Agent Skills
 
-Specialized agent skills and protocols for AI coding assistants (Cursor, Claude Code, Gemini CLI, Jetski):
+Specialized agent skills are maintained in the [`skills/`](skills/) directory and documented alongside their companion packages:
 
-Install via `npx skills`:
-
-```bash
-# Cognitive Complexity triage, pattern-matching refactoring, and method extraction
-npx skills add kevmoo/analytica.dart --skill dart-cognitive-complexity
-
-# Structural code duplication audits, clone triage, and safe deduplication
-npx skills add kevmoo/analytica.dart --skill dart-dedupe
-
-# Deterministic dead code reachability audits and safe declaration pruning
-npx skills add kevmoo/analytica.dart --skill dart-undead
-```
-
-Or run `npx skills add kevmoo/analytica.dart` for an interactive selection menu.
+* [**`dart-cognitive-complexity`**](skills/dart-cognitive-complexity/SKILL.md) (documented in [`cognitive_complexity`](packages/cognitive_complexity/README.md#ai-agent-integration)): Complexity scoring, triage, and AST pattern matching refactoring.
+* [**`dart-dedupe`**](skills/dart-dedupe/SKILL.md) (documented in [`dedupe`](packages/dedupe/README.md#ai-agent-integration)): Structural code duplication audits, clone triage, and safe deduplication.
+* [**`dart-undead`**](skills/dart-undead/SKILL.md) (documented in [`undead`](packages/undead/README.md#ai-agent-integration)): Deterministic dead code reachability audits and safe declaration pruning.
 
 ---
 
