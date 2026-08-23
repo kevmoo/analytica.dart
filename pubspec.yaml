@@ -8,4 +8,5 @@ workspace:
   - packages/analytica
   - packages/cognitive_complexity
   - packages/dedupe
+  - packages/lower_bound
   - packages/undead
