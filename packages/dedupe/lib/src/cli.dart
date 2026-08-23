@@ -166,24 +166,6 @@ class DedupeCliRunner {
     if (results.flag('help')) return _handleHelp();
     if (results.flag('version')) return _handleVersion();
 
-    if (results.rest.isEmpty) {
-      final normalizedPath = p.normalize(p.absolute('.'));
-      if (!Directory(normalizedPath).existsSync() &&
-          !File(normalizedPath).existsSync()) {
-        errSink.writeln('Error: Target path does not exist: .');
-        return ExitCode.noInput.code;
-      }
-    } else {
-      for (final target in results.rest) {
-        final normalizedPath = p.normalize(p.absolute(target));
-        if (!Directory(normalizedPath).existsSync() &&
-            !File(normalizedPath).existsSync()) {
-          errSink.writeln('Error: Target path does not exist: $target');
-          return ExitCode.noInput.code;
-        }
-      }
-    }
-
     final targetPath = results.rest.isNotEmpty ? results.rest.first : '.';
     final normalizedPath = p.normalize(p.absolute(targetPath));
 
@@ -192,6 +174,15 @@ class DedupeCliRunner {
       options = _buildOptions(results, normalizedPath);
     } on FormatException catch (e) {
       return _handleFormatException(e);
+    }
+
+    for (final target in results.rest) {
+      final normalizedPath = p.normalize(p.absolute(target));
+      if (!Directory(normalizedPath).existsSync() &&
+          !File(normalizedPath).existsSync()) {
+        errSink.writeln('Error: Target path does not exist: $target');
+        return ExitCode.noInput.code;
+      }
     }
 
     return _executeAnalysis(options);
@@ -245,7 +236,8 @@ class DedupeCliRunner {
       final parsed = double.tryParse(raw);
       if (parsed == null || parsed < 0 || parsed.isNaN || parsed.isInfinite) {
         throw FormatException(
-          'Invalid fail-threshold: "$raw". Must be a non-negative finite number.',
+          'Invalid fail-threshold: "$raw". '
+          'Must be a non-negative finite number.',
         );
       }
       failThreshold = parsed;
