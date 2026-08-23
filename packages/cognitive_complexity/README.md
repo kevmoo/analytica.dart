@@ -55,18 +55,48 @@ void main() {
 Add automated complexity audits to `.github/workflows/complexity.yml`:
 
 ```yaml
-- uses: actions/checkout@v7
-  with:
-    fetch-depth: 0
+name: Cognitive Complexity Audit
 
-- uses: dart-lang/setup-dart@v1
+on:
+  pull_request:
+    branches: [main]
 
-- uses: kevmoo/analytica.dart/packages/cognitive_complexity@main
-  with:
-    diff-base: origin/${{ github.base_ref }}
-    fail-threshold: 15
-    fail-on-increase: true
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write # Required for sticky PR comment summaries
+      contents: read
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # Full history required for diff-base merge-base comparison
+
+      - name: Setup Dart SDK
+        uses: dart-lang/setup-dart@v1
+
+      - name: Run Complexity Scanner
+        uses: kevmoo/analytica.dart/packages/cognitive_complexity@main
+        with:
+          diff-base: origin/${{ github.base_ref }}
+          fail-threshold: 15
+          fail-on-increase: true
 ```
+
+#### Action Inputs Reference
+
+<!-- mdformat off(prevent table wrapping) -->
+| Input | Default | Description |
+| :--- | :---: | :--- |
+| `targets` | `lib` | Space-separated list of directories or files to scan. |
+| `threshold` | `0` | Minimum score required to include a declaration in summary tables. |
+| `fail-threshold` | `15` | Maximum complexity ceiling allowed before failing the build. |
+| `diff-base` | _Auto_ | Git ref to compare against (e.g. `origin/main`). Auto-detects PR base. |
+| `fail-on-increase` | `false` | When `true`, blocks PR merge on complexity increases exceeding `fail-threshold`. |
+| `format` | `github` | Output format: `github` (annotations + step summary), `text`, or `json`. |
+| `max-comment-rows` | `0` | Maximum table rows in the sticky PR comment (0 = unlimited). |
+<!-- mdformat on -->
 
 ## 🧠 AI Agent Integration
 

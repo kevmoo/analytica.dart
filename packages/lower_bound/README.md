@@ -59,9 +59,41 @@ dart run lower_bound --comment-output=comment.md --max-comment-rows=10
 Add `lower_bound` to your GitHub Actions workflow:
 
 ```yaml
-- name: Validate Dependency Lower Bounds
-  uses: kevmoo/analytica.dart/packages/lower_bound@main
-  with:
-    format: 'github'
-    fail-on-error: 'true'
+name: Dependency Lower-Bound Validation
+
+on:
+  pull_request:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write # Required for sticky PR comment summaries
+      contents: read
+    steps:
+      - name: Checkout Codebase
+        uses: actions/checkout@v7
+
+      - name: Setup Dart SDK
+        uses: dart-lang/setup-dart@v1
+
+      - name: Validate Dependency Lower Bounds
+        uses: kevmoo/analytica.dart/packages/lower_bound@main
+        with:
+          format: 'github'
+          fail-on-error: 'true'
 ```
+
+#### Action Inputs Reference
+
+<!-- mdformat off(prevent table wrapping) -->
+| Input | Default | Description |
+| :--- | :---: | :--- |
+| `package-path` | `.` | Path to target package or workspace root to validate. |
+| `targets` | `lib,bin` | Comma-separated list of target directories or files to analyze. |
+| `allow-local-siblings` | `false` | Allow unreleased local sibling packages via path overrides. |
+| `sdk` | _None_ | Simulate specific Dart SDK version during pub resolution. |
+| `fail-on-error` | `true` | Exit with non-zero status if lower bound validation fails. |
+| `format` | `github` | Output format: `github` (summary table + annotations), `text`, or `json`. |
+| `max-comment-rows` | `0` | Maximum table rows in the sticky PR comment (0 = unlimited). |
+<!-- mdformat on -->
