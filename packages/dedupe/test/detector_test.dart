@@ -417,5 +417,142 @@ void processOrderBatchB(List<String> items) {
       check(cluster.tokenCount).isGreaterThan(astCandidate1.tokenCount);
       check(cluster.instances.length).equals(2);
     });
+
+    test('computes estimatedLinesSaved correctly for 2, 3, and 4 instances '
+        'of a 14-line block', () {
+      const fourteenLineBlock = '''
+void handleRecord(String id, int count, double weight) {
+  if (id.isEmpty) {
+    throw ArgumentError('id is empty');
+  }
+  if (count <= 0) {
+    throw ArgumentError('count is non-positive');
+  }
+  if (weight < 0.0) {
+    throw ArgumentError('weight is negative');
+  }
+  final density = count / weight;
+  print('Processing record: \$id, density: \$density');
+  print('Recording transaction to audit trail');
+}
+''';
+
+      const tokenizer = DartTokenizer();
+      final seq1 = tokenizer.tokenize(
+        filePath: 'file1.dart',
+        content: fourteenLineBlock,
+      );
+      final seq2 = tokenizer.tokenize(
+        filePath: 'file2.dart',
+        content: fourteenLineBlock,
+      );
+      final seq3 = tokenizer.tokenize(
+        filePath: 'file3.dart',
+        content: fourteenLineBlock,
+      );
+      final seq4 = tokenizer.tokenize(
+        filePath: 'file4.dart',
+        content: fourteenLineBlock,
+      );
+
+      const detector = CloneDetector(minTokens: 20, minLines: 4);
+
+      // 2 instances -> 14 lines saved (1 copy kept, 1 saved)
+      final clusters2 = detector.detect([seq1, seq2]);
+      check(clusters2.length).equals(1);
+      check(clusters2.first.instances.length).equals(2);
+      check(clusters2.first.lineCount).equals(14);
+      check(clusters2.first.estimatedLinesSaved).equals(14);
+
+      // 3 instances -> 28 lines saved (1 copy kept, 2 saved)
+      final clusters3 = detector.detect([seq1, seq2, seq3]);
+      check(clusters3.length).equals(1);
+      check(clusters3.first.instances.length).equals(3);
+      check(clusters3.first.lineCount).equals(14);
+      check(clusters3.first.estimatedLinesSaved).equals(28);
+
+      // 4 instances -> 42 lines saved (1 copy kept, 3 saved)
+      final clusters4 = detector.detect([seq1, seq2, seq3, seq4]);
+      check(clusters4.length).equals(1);
+      check(clusters4.first.instances.length).equals(4);
+      check(clusters4.first.lineCount).equals(14);
+      check(clusters4.first.estimatedLinesSaved).equals(42);
+    });
+
+    test(
+      'merges partially overlapping match windows across same instances',
+      () {
+        const codeA = '''
+void outerPipelineA() {
+  print('Step 1: start pipeline');
+  print('Step 2: process queue');
+  print('Step 3: validate entries');
+  print('Step 4: write database');
+  print('Step 5: notify handlers');
+  print('Step 6: finish pipeline');
+}
+''';
+
+        const codeB = '''
+void outerPipelineB() {
+  print('Step 1: start pipeline');
+  print('Step 2: process queue');
+  print('Step 3: validate entries');
+  print('Step 4: write database');
+  print('Step 5: notify handlers');
+  print('Step 6: finish pipeline');
+}
+''';
+
+        const tokenizer = DartTokenizer();
+        final seq1 = tokenizer.tokenize(
+          filePath: 'pipe_a.dart',
+          content: codeA,
+        );
+        final seq2 = tokenizer.tokenize(
+          filePath: 'pipe_b.dart',
+          content: codeB,
+        );
+
+        const innerAst1 = AstCandidateUnit(
+          filePath: 'pipe_a.dart',
+          fileIndex: 0,
+          startLine: 3,
+          endLine: 7,
+          startOffset: 25,
+          endOffset: 120,
+          startTokenIndex: 6,
+          endTokenIndex: 20,
+          tokenCount: 15,
+          lineCount: 5,
+          astNodeType: 'Block',
+          signatureHash: 9999,
+        );
+        const innerAst2 = AstCandidateUnit(
+          filePath: 'pipe_b.dart',
+          fileIndex: 1,
+          startLine: 3,
+          endLine: 7,
+          startOffset: 25,
+          endOffset: 120,
+          startTokenIndex: 6,
+          endTokenIndex: 20,
+          tokenCount: 15,
+          lineCount: 5,
+          astNodeType: 'Block',
+          signatureHash: 9999,
+        );
+
+        const detector = CloneDetector(minTokens: 15, minLines: 4);
+        final clusters = detector.detect(
+          [seq1, seq2],
+          candidates: [innerAst1, innerAst2],
+        );
+
+        check(clusters.length).equals(1);
+        check(clusters.first.instances.length).equals(2);
+        check(clusters.first.estimatedLinesSaved).isLessThan(20);
+      },
+    );
   });
 }
