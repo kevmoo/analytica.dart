@@ -33,6 +33,64 @@ dart run cognitive_complexity@
 
 _(Requires Dart SDK **3.12.0 or greater**)_.
 
+### `cognitive_complexity` CLI Options
+
+<!-- CLI_README_START cognitive_complexity -->
+```console
+$ cognitive_complexity --help
+Dart & Flutter Cognitive Complexity Calculator
+
+Usage: dart run cognitive_complexity [options] <file_or_directory>
+
+Options:
+-h, --help                        Print this usage information.
+-t, --threshold                   Minimum complexity score to include in output.
+                                  (defaults to "0")
+-f, --fail-threshold              Exit with non-zero code if any function score exceeds this value.
+-d, --git-diff=<git-ref>          Git reference to compare against. Only evaluates modified files and function complexity deltas.
+    --fail-on-increase            When using --git-diff, exit with non-zero code if any function increased in complexity. When --fail-threshold is also set, only increases that exceed the threshold fail.
+    --format                      Output format.
+                                  [text (default), json, github]
+    --comment-output=<path>       With --format=github, also write a standalone report to this path, ordered by significance and capped by --max-comment-rows. Intended for posting as a PR comment while the step summary keeps the full table.
+    --max-comment-rows=<count>    Maximum table rows in --comment-output (0 = unlimited). GitHub rejects comment bodies over 65536 characters.
+                                  (defaults to "0")
+```
+<!-- CLI_README_END cognitive_complexity -->
+
+### `data_flow` CLI Options
+
+<!-- CLI_README_START data_flow -->
+```console
+$ data_flow --help
+Dart Data-Flow & Method Extraction Analyzer
+
+Analyzes a target slice of code inside a Dart function and deterministically
+calculates required parameters (inputs), modified variables (mutations),
+and live return values (outputs) for safe method extraction.
+
+Usage: dart run cognitive_complexity:data_flow [options] <file.dart[:start-end]>
+
+Examples:
+  # Analyze lines 45 through 80 of auth.dart (Agent-first JSON default)
+  dart run cognitive_complexity:data_flow lib/src/auth.dart:45-80
+
+  # Analyze with explicit flags and custom helper name
+  dart run cognitive_complexity:data_flow --lines=45-80 --name=_validateToken lib/src/auth.dart
+
+  # Human-readable terminal output
+  dart run cognitive_complexity:data_flow --format=text lib/src/auth.dart:45-80
+
+Options:
+-h, --help        Print this usage information.
+-l, --lines       Target 1-based line range of the code block to extract (e.g. 45-80).
+-n, --name        Name for the proposed extracted helper function.
+                  (defaults to "_extracted")
+-f, --format      Output format.
+                  [json (default), text]
+    --sdk-path    Path to the Dart SDK root used for analysis. Defaults to auto-discovery (running VM, DART_SDK environment variable, PATH, FLUTTER_ROOT).
+```
+<!-- CLI_README_END data_flow -->
+
 ### Library API
 
 Add `cognitive_complexity` to your `pubspec.yaml`:
