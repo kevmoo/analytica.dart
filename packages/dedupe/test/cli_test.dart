@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:checks/checks.dart';
+import 'package:dedupe/dedupe.dart';
 import 'package:dedupe/src/cli.dart';
 import 'package:path/path.dart' as p;
 import 'package:test/test.dart';
@@ -45,7 +46,7 @@ void main() {
       final stdout = await proc.stdoutStream().join('\n');
       await proc.shouldExit(0);
 
-      check(stdout).contains('dedupe version: 0.1.0-wip');
+      check(stdout).contains('dedupe version: $dedupeVersion');
     });
 
     test('invalid flag exits with code 64 (usage)', () async {

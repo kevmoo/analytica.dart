@@ -1,37 +1,40 @@
-# Dedupe
+High-performance structural code duplication and clone detection engine and CLI
+tool for Dart and Flutter.
 
-High-performance structural code duplication and clone detection engine and CLI tool for Dart and Flutter.
+## Features
 
----
+- **Token-Level & Structural Clone Detection**: Detects exact duplicates,
+  structural clones (normalized string & numeric literals), and parameterized
+  clones (renamed identifiers).
+- **Polynomial Rolling Hash Engine**: Fast k-gram indexing with maximal
+  bidirectional expansion for sub-second analysis across large monorepos.
+- **Git Diff & PR Delta Scanning**: Analyzes pull request changes against a Git
+  base ref (`--git-diff=origin/main`) and isolates newly introduced duplication
+  (`--only-changed`).
+- **Rich Multi-Format Reporting**: Outputs human-readable Markdown with
+  clickable file line links, machine-readable JSON, terminal text summaries, and
+  GitHub Actions step annotations.
+- **Deduplication Metrics**: Computes per-file and package-level duplication
+  percentages, duplicate cluster inventories, and estimated lines saved.
 
-## 🚀 Features
-
-- **Token-Level & Structural Clone Detection**: Detects exact duplicates, structural clones (normalized string & numeric literals), and parameterized clones (renamed identifiers).
-- **Polynomial Rolling Hash Engine**: Fast $k$-gram indexing with maximal bidirectional expansion for sub-second analysis across large monorepos.
-- **Git Diff & PR Delta Scanning**: Analyzes pull request changes against a Git base ref (`--git-diff=origin/main`) and isolates newly introduced duplication (`--only-changed`).
-- **Rich Multi-Format Reporting**: Outputs human-readable Markdown with clickable file line links, machine-readable JSON, terminal text summaries, and GitHub Actions step annotations.
-- **Deduplication Metrics**: Computes per-file and package-level duplication percentages, duplicate cluster inventories, and estimated lines saved.
-
----
-
-## 📦 Installation & Usage
+## Usage
 
 ### CLI Execution
 
-Run directly via `dart run`:
+Run directly using `dart run dedupe@`:
 
 ```bash
 # Full package/repository scan
-dart run dedupe
+dart run dedupe@
 
 # Scan specific directories or files
-dart run dedupe lib/src packages/core
+dart run dedupe@ lib/src packages/core
 
 # JSON output for automated pipelines / AI agents
-dart run dedupe --format=json
+dart run dedupe@ --format=json
 
 # Write machine-readable JSON report to file
-dart run dedupe --json-output=report.json
+dart run dedupe@ --json-output=report.json
 ```
 
 ### Git Diff / PR Regression Gate
@@ -40,18 +43,16 @@ Scan only modified files and evaluate delta duplication:
 
 ```bash
 # Audit PR delta against base ref
-dart run dedupe --git-diff=origin/main
+dart run dedupe@ --git-diff=origin/main
 
 # Only report clusters intersecting changed lines
-dart run dedupe --git-diff=origin/main --only-changed
+dart run dedupe@ --git-diff=origin/main --only-changed
 
 # Fail CI if duplication exceeds 5%
-dart run dedupe --git-diff=origin/main --fail-threshold=5
+dart run dedupe@ --git-diff=origin/main --fail-threshold=5
 ```
 
----
-
-## ⚙️ CLI Options Reference
+## CLI options
 
 <!-- mdformat off(prevent table wrapping) -->
 
@@ -82,9 +83,7 @@ dart run dedupe --git-diff=origin/main --fail-threshold=5
 
 <!-- mdformat on -->
 
----
-
-## 🧩 Programmatic API
+## Programmatic API
 
 ```dart
 import 'package:dedupe/dedupe.dart';
