@@ -3,3 +3,5 @@
 build/
 pubspec.lock
 .deslop/
+.dedupe_cache/
+
