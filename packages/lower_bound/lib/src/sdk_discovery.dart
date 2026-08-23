@@ -22,7 +22,6 @@ class SdkDiscovery {
     final dir = Directory(candidatePath);
     if (!dir.existsSync()) return false;
 
-    // A valid Dart SDK root contains either lib/_internal or bin/dart/version
     final internalDir = Directory(p.join(candidatePath, 'lib', '_internal'));
     final versionFile = File(p.join(candidatePath, 'version'));
     final binDart = File(
@@ -34,27 +33,34 @@ class SdkDiscovery {
   }
 
   static String _resolveDartExecutable() {
-    // 1. Check DART_SDK environment variable
+    return _fromDartSdkEnv() ??
+        _fromResolvedExecutable() ??
+        _fromPathEnv() ??
+        _fromFlutterRoot() ??
+        (Platform.isWindows ? 'dart.exe' : 'dart');
+  }
+
+  static String? _fromDartSdkEnv() {
     final envSdk = Platform.environment['DART_SDK'];
     if (envSdk != null && envSdk.isNotEmpty && isValidSdkPath(envSdk)) {
       return p.join(envSdk, 'bin', Platform.isWindows ? 'dart.exe' : 'dart');
     }
+    return null;
+  }
 
-    // 2. Check Platform.resolvedExecutable (Fast path for JIT VM)
+  static String? _fromResolvedExecutable() {
     final resolvedExe = Platform.resolvedExecutable;
-    if (resolvedExe.isNotEmpty) {
-      final candidateSdk = p.dirname(p.dirname(resolvedExe));
-      if (isValidSdkPath(candidateSdk)) {
-        return resolvedExe;
-      }
-    }
+    if (resolvedExe.isEmpty) return null;
+    final candidateSdk = p.dirname(p.dirname(resolvedExe));
+    return isValidSdkPath(candidateSdk) ? resolvedExe : null;
+  }
 
-    // 3. Scan system PATH
+  static String? _fromPathEnv() {
     final pathEnv = Platform.environment['PATH'] ?? '';
     final separator = Platform.isWindows ? ';' : ':';
     final searchNames = Platform.isWindows
-        ? ['dart.exe', 'dart.bat', 'dart']
-        : ['dart'];
+        ? const ['dart.exe', 'dart.bat', 'dart']
+        : const ['dart'];
 
     for (final segment in pathEnv.split(separator)) {
       final trimmed = segment.trim();
@@ -62,52 +68,51 @@ class SdkDiscovery {
 
       for (final name in searchNames) {
         final candidate = File(p.join(trimmed, name));
-        if (candidate.existsSync()) {
-          try {
-            final realPath = candidate.resolveSymbolicLinksSync();
-            final candidateSdk = p.dirname(p.dirname(realPath));
-            if (isValidSdkPath(candidateSdk)) {
-              return p.join(
-                candidateSdk,
-                'bin',
-                Platform.isWindows ? 'dart.exe' : 'dart',
-              );
-            }
-
-            // Check for Flutter cache layout (e.g. flutter/bin/cache/dart-sdk)
-            final flutterCacheSdk = p.join(
-              p.dirname(realPath),
-              'cache',
-              'dart-sdk',
-            );
-            if (isValidSdkPath(flutterCacheSdk)) {
-              return p.join(
-                flutterCacheSdk,
-                'bin',
-                Platform.isWindows ? 'dart.exe' : 'dart',
-              );
-            }
-          } catch (_) {
-            // Permission or link resolution error; continue scanning
-          }
-        }
+        final resolved = _probeSdkFromCandidate(candidate);
+        if (resolved != null) return resolved;
       }
     }
+    return null;
+  }
 
-    // 4. Check FLUTTER_ROOT environment variable
-    final flutterRoot = Platform.environment['FLUTTER_ROOT'];
-    if (flutterRoot != null && flutterRoot.isNotEmpty) {
-      final flutterSdk = p.join(flutterRoot, 'bin', 'cache', 'dart-sdk');
-      if (isValidSdkPath(flutterSdk)) {
+  static String? _probeSdkFromCandidate(File candidate) {
+    if (!candidate.existsSync()) return null;
+    try {
+      final realPath = candidate.resolveSymbolicLinksSync();
+      final candidateSdk = p.dirname(p.dirname(realPath));
+      if (isValidSdkPath(candidateSdk)) {
         return p.join(
-          flutterSdk,
+          candidateSdk,
           'bin',
           Platform.isWindows ? 'dart.exe' : 'dart',
         );
       }
-    }
 
-    // Fallback to literal 'dart' or 'dart.exe'
-    return Platform.isWindows ? 'dart.exe' : 'dart';
+      final flutterCacheSdk = p.join(p.dirname(realPath), 'cache', 'dart-sdk');
+      if (isValidSdkPath(flutterCacheSdk)) {
+        return p.join(
+          flutterCacheSdk,
+          'bin',
+          Platform.isWindows ? 'dart.exe' : 'dart',
+        );
+      }
+    } catch (_) {
+      // Permission or link resolution error
+    }
+    return null;
+  }
+
+  static String? _fromFlutterRoot() {
+    final flutterRoot = Platform.environment['FLUTTER_ROOT'];
+    if (flutterRoot == null || flutterRoot.isEmpty) return null;
+    final flutterSdk = p.join(flutterRoot, 'bin', 'cache', 'dart-sdk');
+    if (isValidSdkPath(flutterSdk)) {
+      return p.join(
+        flutterSdk,
+        'bin',
+        Platform.isWindows ? 'dart.exe' : 'dart',
+      );
+    }
+    return null;
   }
 }

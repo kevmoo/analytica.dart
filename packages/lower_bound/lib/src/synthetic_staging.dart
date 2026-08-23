@@ -1,7 +1,7 @@
-import 'dart:convert';
 import 'dart:io';
 
 import 'package:path/path.dart' as p;
+import 'package:yaml/yaml.dart';
 
 import 'github_actions.dart';
 import 'models.dart';
@@ -14,8 +14,8 @@ class SyntheticStaging {
   final ParsedPubspec pubspec;
   final Directory stagingDir;
   final Map<String, LocalSibling> localSiblings;
-  final List<String> warnings = <String>[];
-  final List<DependencyFloor> resolvedFloorMetadata = <DependencyFloor>[];
+  final List<String> warnings = [];
+  final List<DependencyFloor> resolvedFloorMetadata = [];
 
   SyntheticStaging._({
     required this.sourcePackagePath,
@@ -33,15 +33,14 @@ class SyntheticStaging {
   }) {
     final parent = baseTempDir ?? Directory.systemTemp;
     final tempDir = parent.createTempSync('lower_bound_staged_');
-
-    final resolvedSiblings =
+    final siblings =
         localSiblings ?? PubspecHelper.findLocalSiblings(sourcePackagePath);
 
     final staging = SyntheticStaging._(
       sourcePackagePath: sourcePackagePath,
       pubspec: pubspec,
       stagingDir: tempDir,
-      localSiblings: resolvedSiblings,
+      localSiblings: siblings,
     );
 
     staging._setupDirectory();
@@ -66,49 +65,36 @@ class SyntheticStaging {
   }
 
   void _copyAnalysisOptions() {
-    var searchDir = Directory(sourcePackagePath);
-    File? optionsFile;
+    final optionsFile = _findAnalysisOptionsFile();
+    if (optionsFile == null) return;
 
-    // Look in package root first, then ascend up to repo root
+    final raw = optionsFile.readAsStringSync();
+    final sanitizedLines = <String>[];
+    for (final line in raw.split('\n')) {
+      if (line.trim().startsWith('include: package:')) {
+        sanitizedLines.add('# [lower_bound stripped include: ${line.trim()}]');
+      } else {
+        sanitizedLines.add(line);
+      }
+    }
+    File(
+      p.join(stagingDir.path, 'analysis_options.yaml'),
+    ).writeAsStringSync(sanitizedLines.join('\n'));
+  }
+
+  File? _findAnalysisOptionsFile() {
+    var searchDir = Directory(sourcePackagePath);
     while (true) {
       final candidate = File(p.join(searchDir.path, 'analysis_options.yaml'));
-      if (candidate.existsSync()) {
-        optionsFile = candidate;
-        break;
-      }
+      if (candidate.existsSync()) return candidate;
       final parent = searchDir.parent;
       if (parent.path == searchDir.path) break;
       searchDir = parent;
     }
-
-    if (optionsFile != null) {
-      final raw = optionsFile.readAsStringSync();
-      // Remove package: includes that reference dev_dependencies (e.g. lints)
-      final sanitizedLines = <String>[];
-      for (final line in raw.split('\n')) {
-        if (line.trim().startsWith('include: package:')) {
-          sanitizedLines.add(
-            '# [lower_bound stripped include: ${line.trim()}]',
-          );
-        } else {
-          sanitizedLines.add(line);
-        }
-      }
-      File(
-        p.join(stagingDir.path, 'analysis_options.yaml'),
-      ).writeAsStringSync(sanitizedLines.join('\n'));
-    }
+    return null;
   }
 
   /// Writes a synthetic pubspec.yaml into the staging directory.
-  ///
-  /// - Strips `dev_dependencies` completely.
-  /// - Strips `resolution: workspace` completely so dependencies resolve from
-  ///   pub.dev.
-  /// - Pins external dependencies to exact declared floors if [pinLowerBounds]
-  ///   is true.
-  /// - Links unreleased `-wip` local siblings via path overrides and emits soft
-  ///   warnings.
   void writePubspec({
     bool pinLowerBounds = true,
     Set<String> excludeOverrides = const {},
@@ -117,86 +103,127 @@ class SyntheticStaging {
     resolvedFloorMetadata.clear();
 
     final buffer = StringBuffer();
+    _writeHeader(buffer);
+    _writeDependencies(buffer);
+
+    final (:exactVersionOverrides, :pathOverrides) = _collectOverrides(
+      pinLowerBounds: pinLowerBounds,
+      excludeOverrides: excludeOverrides,
+    );
+
+    _writeOverrides(buffer, exactVersionOverrides, pathOverrides);
+
+    File(
+      p.join(stagingDir.path, 'pubspec.yaml'),
+    ).writeAsStringSync(buffer.toString());
+  }
+
+  void _writeHeader(StringBuffer buffer) {
     buffer.writeln('name: ${pubspec.name}');
     buffer.writeln('publish_to: none');
     buffer.writeln();
     buffer.writeln('environment:');
     buffer.writeln('  sdk: \'${pubspec.sdkConstraint}\'');
     buffer.writeln();
+  }
 
-    if (pubspec.rawDependencies.isNotEmpty) {
-      buffer.writeln('dependencies:');
-      for (final entry in pubspec.rawDependencies.entries) {
-        buffer.writeln('  ${entry.key}: \'${entry.value}\'');
-      }
-      buffer.writeln();
+  void _writeDependencies(StringBuffer buffer) {
+    if (pubspec.rawDependencies.isEmpty) return;
+    buffer.writeln('dependencies:');
+    for (final entry in pubspec.rawDependencies.entries) {
+      buffer.writeln('  ${entry.key}: \'${entry.value}\'');
     }
+    buffer.writeln();
+  }
 
+  ({
+    Map<String, String> exactVersionOverrides,
+    Map<String, String> pathOverrides,
+  })
+  _collectOverrides({
+    required bool pinLowerBounds,
+    required Set<String> excludeOverrides,
+  }) {
     final exactVersionOverrides = <String, String>{};
     final pathOverrides = <String, String>{};
 
     for (final dep in pubspec.dependencies) {
       final sibling = localSiblings[dep.name];
-      final isUnreleasedWipSibling =
-          sibling != null && (sibling.isWip || sibling.isPublishToNone);
-
-      if (isUnreleasedWipSibling) {
-        // Local -wip sibling fallback
-        pathOverrides[dep.name] = sibling.path;
-        final rawVer = sibling.rawVersion ?? 'unreleased';
-        final warningMsg =
-            'Package \'${pubspec.name}\' depends on unreleased local sibling '
-            '\'${dep.name}\' ($rawVer). Linked via local path override for '
-            'lower-bound validation.';
-        warnings.add(warningMsg);
-        emitGitHubWarning(
-          warningMsg,
-          file: p.join(sourcePackagePath, 'pubspec.yaml'),
-          title: 'Unreleased Local Sibling Dependency',
-        );
-
-        resolvedFloorMetadata.add(
-          DependencyFloor(
-            name: dep.name,
-            declaredConstraint: dep.declaredConstraint,
-            lowerBound: dep.lowerBound,
-            isLocalPathOverride: true,
-            localPath: sibling.path,
-            localVersion: sibling.rawVersion,
-          ),
-        );
+      if (_isUnreleasedWipSibling(sibling)) {
+        _handleWipSibling(dep, sibling!, pathOverrides);
+      } else if (pinLowerBounds && !excludeOverrides.contains(dep.name)) {
+        _handleExactFloorOverride(dep, exactVersionOverrides);
       } else {
-        resolvedFloorMetadata.add(
-          DependencyFloor(
-            name: dep.name,
-            declaredConstraint: dep.declaredConstraint,
-            lowerBound: dep.lowerBound,
-            isLocalPathOverride: false,
-          ),
-        );
-
-        if (pinLowerBounds &&
-            !excludeOverrides.contains(dep.name) &&
-            dep.lowerBound != null) {
-          exactVersionOverrides[dep.name] = dep.lowerBound.toString();
-        }
+        resolvedFloorMetadata.add(dep);
       }
     }
 
-    if (exactVersionOverrides.isNotEmpty || pathOverrides.isNotEmpty) {
-      buffer.writeln('dependency_overrides:');
-      for (final entry in exactVersionOverrides.entries) {
-        buffer.writeln('  ${entry.key}: \'${entry.value}\'');
-      }
-      for (final entry in pathOverrides.entries) {
-        buffer.writeln('  ${entry.key}:');
-        buffer.writeln('    path: \'${entry.value}\'');
-      }
-      buffer.writeln();
-    }
+    return (
+      exactVersionOverrides: exactVersionOverrides,
+      pathOverrides: pathOverrides,
+    );
+  }
 
-    final stagedPubspec = File(p.join(stagingDir.path, 'pubspec.yaml'));
-    stagedPubspec.writeAsStringSync(buffer.toString());
+  bool _isUnreleasedWipSibling(LocalSibling? sibling) {
+    return sibling != null && (sibling.isWip || sibling.isPublishToNone);
+  }
+
+  void _handleWipSibling(
+    DependencyFloor dep,
+    LocalSibling sibling,
+    Map<String, String> pathOverrides,
+  ) {
+    pathOverrides[dep.name] = sibling.path;
+    final rawVer = sibling.rawVersion ?? 'unreleased';
+    final warningMsg =
+        'Package \'${pubspec.name}\' depends on unreleased local sibling '
+        '\'${dep.name}\' ($rawVer). Linked via local path override for '
+        'lower-bound validation.';
+    warnings.add(warningMsg);
+    emitGitHubWarning(
+      warningMsg,
+      file: p.join(sourcePackagePath, 'pubspec.yaml'),
+      title: 'Unreleased Local Sibling Dependency',
+    );
+
+    resolvedFloorMetadata.add(
+      DependencyFloor(
+        name: dep.name,
+        declaredConstraint: dep.declaredConstraint,
+        lowerBound: dep.lowerBound,
+        isLocalPathOverride: true,
+        localPath: sibling.path,
+        localVersion: sibling.rawVersion,
+      ),
+    );
+  }
+
+  void _handleExactFloorOverride(
+    DependencyFloor dep,
+    Map<String, String> exactVersionOverrides,
+  ) {
+    if (dep.lowerBound != null) {
+      exactVersionOverrides[dep.name] = dep.lowerBound.toString();
+    }
+    resolvedFloorMetadata.add(dep);
+  }
+
+  void _writeOverrides(
+    StringBuffer buffer,
+    Map<String, String> exactVersionOverrides,
+    Map<String, String> pathOverrides,
+  ) {
+    if (exactVersionOverrides.isEmpty && pathOverrides.isEmpty) return;
+
+    buffer.writeln('dependency_overrides:');
+    for (final entry in exactVersionOverrides.entries) {
+      buffer.writeln('  ${entry.key}: \'${entry.value}\'');
+    }
+    for (final entry in pathOverrides.entries) {
+      buffer.writeln('  ${entry.key}:');
+      buffer.writeln('    path: \'${entry.value}\'');
+    }
+    buffer.writeln();
   }
 
   /// Reads resolved dependency versions from the generated package_config.json.
@@ -207,44 +234,21 @@ class SyntheticStaging {
     if (!configFile.existsSync()) return {};
 
     try {
-      final content = configFile.readAsStringSync();
-      final json = jsonDecode(content);
-      if (json is! Map<String, dynamic>) return {};
+      final json = loadYaml(configFile.readAsStringSync());
+      if (json is! YamlMap) return {};
       final packages = json['packages'];
-      if (packages is! List) return {};
+      if (packages is! YamlList) return {};
 
       final result = <String, String>{};
       for (final pkg in packages) {
-        if (pkg is Map<String, dynamic>) {
+        if (pkg is YamlMap) {
           final name = pkg['name'] as String?;
           final rootUri = pkg['rootUri'] as String?;
           if (name != null && rootUri != null) {
-            // Check if rootUri is a pub cache path containing version
-            final match = RegExp(r'-(\d+\.\d+\.\d+.*)$').firstMatch(rootUri);
-            if (match != null) {
-              result[name] = match.group(1)!;
-              continue;
+            final version = _extractPackageVersion(name, rootUri);
+            if (version != null) {
+              result[name] = version;
             }
-
-            // If it's a file URI or path, try reading pubspec from directory
-            try {
-              final uri = Uri.parse(rootUri);
-              final String packageDir;
-              if (uri.isAbsolute && uri.scheme == 'file') {
-                packageDir = uri.toFilePath();
-              } else {
-                packageDir = p.normalize(
-                  p.join(stagingDir.path, '.dart_tool', rootUri),
-                );
-              }
-              final pubspecFile = File(p.join(packageDir, 'pubspec.yaml'));
-              if (pubspecFile.existsSync()) {
-                final pubspecParsed = PubspecHelper.parse(packageDir);
-                if (pubspecParsed.rawVersion != null) {
-                  result[name] = pubspecParsed.rawVersion!;
-                }
-              }
-            } catch (_) {}
           }
         }
       }
@@ -252,6 +256,18 @@ class SyntheticStaging {
     } catch (_) {
       return {};
     }
+  }
+
+  String? _extractPackageVersion(String name, String rootUri) {
+    final match = RegExp(r'-(\d+\.\d+\.\d+.*)$').firstMatch(rootUri);
+    if (match != null) {
+      return match.group(1);
+    }
+    final sibling = localSiblings[name];
+    if (sibling?.rawVersion != null) {
+      return sibling!.rawVersion;
+    }
+    return null;
   }
 
   void dispose() {

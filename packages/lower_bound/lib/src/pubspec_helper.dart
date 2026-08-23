@@ -7,7 +7,7 @@ import 'package:pubspec_parse/pubspec_parse.dart';
 import 'exceptions.dart';
 import 'models.dart';
 
-/// Metadata for a locally discovered sibling package in the repository.
+/// Represents a local sibling package candidate discovered in the repository.
 class LocalSibling {
   final String name;
   final String path;
@@ -40,8 +40,8 @@ class ParsedPubspec {
 
   const ParsedPubspec({
     required this.name,
-    this.version,
-    this.rawVersion,
+    required this.version,
+    required this.rawVersion,
     required this.publishTo,
     required this.minSdk,
     required this.sdkConstraint,
@@ -63,7 +63,7 @@ class PubspecHelper {
   static ParsedPubspec parse(String packagePath) {
     final file = File(p.join(packagePath, 'pubspec.yaml'));
     if (!file.existsSync()) {
-      throw MissingInputException('No pubspec.yaml found', path: packagePath);
+      throw MissingInputException('No pubspec.yaml found in $packagePath');
     }
 
     final content = file.readAsStringSync();
@@ -86,7 +86,6 @@ class PubspecHelper {
     }
 
     final minSdk = _extractMinSdk(sdkConstraint, file.path);
-
     final dependencies = <DependencyFloor>[];
     final rawDependencies = <String, String>{};
 
@@ -94,18 +93,13 @@ class PubspecHelper {
       final depName = entry.key;
       final dep = entry.value;
 
-      final VersionConstraint constraint;
-      if (dep is HostedDependency) {
-        constraint = dep.version;
-      } else if (dep is PathDependency) {
-        constraint = VersionConstraint.any;
-      } else {
-        constraint = VersionConstraint.any;
-      }
+      final constraint = dep is HostedDependency
+          ? dep.version
+          : VersionConstraint.any;
 
       rawDependencies[depName] = constraint.toString();
-
       final floor = _extractFloor(constraint);
+
       dependencies.add(
         DependencyFloor(
           name: depName,
@@ -131,38 +125,50 @@ class PubspecHelper {
   /// Discovers local sibling packages in the repository containing [startPath].
   static Map<String, LocalSibling> findLocalSiblings(String startPath) {
     final siblings = <String, LocalSibling>{};
+    final rootDir = _findRepoOrWorkspaceRoot(startPath);
+    final candidateDirs = _collectCandidateSiblingDirs(rootDir);
+
+    for (final dir in candidateDirs) {
+      final sibling = _inspectCandidateSibling(dir);
+      if (sibling != null) {
+        siblings[sibling.name] = sibling;
+      }
+    }
+
+    return siblings;
+  }
+
+  static Directory _findRepoOrWorkspaceRoot(String startPath) {
     var searchDir = Directory(p.normalize(p.absolute(startPath)));
-
-    // Walk upwards to find repository or workspace root
-    Directory? repoRoot;
     while (true) {
-      final workspacePubspec = File(p.join(searchDir.path, 'pubspec.yaml'));
-      final gitDir = Directory(p.join(searchDir.path, '.git'));
-      if (workspacePubspec.existsSync()) {
-        try {
-          final content = workspacePubspec.readAsStringSync();
-          final parsed = Pubspec.parse(content);
-          if (parsed.workspace != null && parsed.workspace!.isNotEmpty) {
-            repoRoot = searchDir;
-            break;
-          }
-        } catch (_) {}
+      if (_isRootCandidate(searchDir)) {
+        return searchDir;
       }
-
-      if (gitDir.existsSync()) {
-        repoRoot = searchDir;
-        break;
-      }
-
       final parent = searchDir.parent;
       if (parent.path == searchDir.path) break;
       searchDir = parent;
     }
+    return Directory(p.normalize(p.absolute(startPath)));
+  }
 
-    final rootDir = repoRoot ?? Directory(p.normalize(p.absolute(startPath)));
+  static bool _isRootCandidate(Directory dir) {
+    if (Directory(p.join(dir.path, '.git')).existsSync()) return true;
+
+    final workspacePubspec = File(p.join(dir.path, 'pubspec.yaml'));
+    if (!workspacePubspec.existsSync()) return false;
+
+    try {
+      final parsed = Pubspec.parse(workspacePubspec.readAsStringSync());
+      return parsed.workspace != null && parsed.workspace!.isNotEmpty;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  static List<Directory> _collectCandidateSiblingDirs(Directory rootDir) {
     final candidateDirs = <Directory>[];
 
-    // Check workspace members if root is a workspace pubspec
+    // Check workspace members from root pubspec
     final rootPubspecFile = File(p.join(rootDir.path, 'pubspec.yaml'));
     if (rootPubspecFile.existsSync()) {
       try {
@@ -185,30 +191,32 @@ class PubspecHelper {
       }
     }
 
-    for (final dir in candidateDirs) {
-      final pubspecFile = File(p.join(dir.path, 'pubspec.yaml'));
-      if (pubspecFile.existsSync()) {
-        try {
-          final parsed = Pubspec.parse(pubspecFile.readAsStringSync());
-          final rawVersion = parsed.version?.toString();
-          final isWip =
-              rawVersion != null &&
-              (rawVersion.contains('-wip') || rawVersion.contains('.wip'));
-          final isPublishNone = parsed.publishTo == 'none';
+    return candidateDirs;
+  }
 
-          siblings[parsed.name] = LocalSibling(
-            name: parsed.name,
-            path: dir.path,
-            version: parsed.version,
-            rawVersion: rawVersion,
-            isWip: isWip,
-            isPublishToNone: isPublishNone,
-          );
-        } catch (_) {}
-      }
+  static LocalSibling? _inspectCandidateSibling(Directory dir) {
+    final pubspecFile = File(p.join(dir.path, 'pubspec.yaml'));
+    if (!pubspecFile.existsSync()) return null;
+
+    try {
+      final parsed = Pubspec.parse(pubspecFile.readAsStringSync());
+      final rawVersion = parsed.version?.toString();
+      final isWip =
+          rawVersion != null &&
+          (rawVersion.contains('-wip') || rawVersion.contains('.wip'));
+      final isPublishNone = parsed.publishTo == 'none';
+
+      return LocalSibling(
+        name: parsed.name,
+        path: dir.path,
+        version: parsed.version,
+        rawVersion: rawVersion,
+        isWip: isWip,
+        isPublishToNone: isPublishNone,
+      );
+    } catch (_) {
+      return null;
     }
-
-    return siblings;
   }
 
   static Version _extractMinSdk(VersionConstraint constraint, String filePath) {
