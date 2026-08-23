@@ -117,7 +117,12 @@ ParsedPubspec parsePubspec(String packagePath) {
         ),
       );
     } else if (dep is PathDependency) {
-      rawNonHostedDependencies[depName] = "path: '${dep.path}'";
+      // Staging lives in a temp directory, so a relative path would resolve
+      // against it instead of the source package.
+      final depPath = p.isAbsolute(dep.path)
+          ? dep.path
+          : p.normalize(p.join(p.absolute(packagePath), dep.path));
+      rawNonHostedDependencies[depName] = "path: '$depPath'";
       dependencies.add(
         DependencyFloor(
           name: depName,
@@ -128,7 +133,9 @@ ParsedPubspec parsePubspec(String packagePath) {
       );
     } else if (dep is GitDependency) {
       final gitPath = dep.path != null ? ", path: '${dep.path}'" : '';
-      rawNonHostedDependencies[depName] = "git: {url: '${dep.url}'$gitPath}";
+      final gitRef = dep.ref != null ? ", ref: '${dep.ref}'" : '';
+      rawNonHostedDependencies[depName] =
+          "git: {url: '${dep.url}'$gitPath$gitRef}";
       dependencies.add(
         DependencyFloor(
           name: depName,

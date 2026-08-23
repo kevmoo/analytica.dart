@@ -5,6 +5,7 @@ import 'package:lower_bound/src/pubspec_helper.dart';
 import 'package:lower_bound/src/synthetic_staging.dart';
 import 'package:path/path.dart' as p;
 import 'package:pub_semver/pub_semver.dart';
+import 'package:pubspec_parse/pubspec_parse.dart';
 import 'package:test/test.dart';
 import 'package:test_descriptor/test_descriptor.dart' as d;
 
@@ -185,6 +186,70 @@ dependencies:
         final versions = staging.readResolvedVersions();
         check(versions).containsKey('path');
         check(versions['path']).equals('1.9.0');
+      } finally {
+        staging.dispose();
+      }
+    });
+
+    test('emits parseable descriptors for non-hosted dependencies', () async {
+      await d.dir('non_hosted', [
+        d.dir('local_dep', [
+          d.file('pubspec.yaml', '''
+name: local_dep
+version: 1.0.0
+environment:
+  sdk: '^3.12.0'
+'''),
+        ]),
+        d.dir('app', [
+          d.file('pubspec.yaml', '''
+name: app
+version: 1.0.0
+environment:
+  sdk: '^3.12.0'
+dependencies:
+  path: ^1.9.0
+  flutter:
+    sdk: flutter
+  local_dep:
+    path: ../local_dep
+  io:
+    git:
+      url: https://github.com/dart-lang/tools.git
+      path: pkgs/io
+      ref: main
+'''),
+          d.dir('lib', [d.file('app.dart', 'const a = 1;')]),
+        ]),
+      ]).create();
+
+      final appPath = p.join(d.sandbox, 'non_hosted', 'app');
+      final parsed = parsePubspec(appPath);
+      final staging = SyntheticStaging.create(
+        sourcePackagePath: appPath,
+        pubspec: parsed,
+      );
+
+      try {
+        staging.writePubspec();
+        final staged = File(
+          p.join(staging.stagingDir.path, 'pubspec.yaml'),
+        ).readAsStringSync();
+
+        // The staged pubspec must be valid YAML that pub can actually read.
+        final reparsed = Pubspec.parse(staged);
+
+        check(reparsed.dependencies['flutter']).isA<SdkDependency>();
+        check(reparsed.dependencies['io']).isA<GitDependency>();
+        check(
+          (reparsed.dependencies['io'] as GitDependency).ref,
+        ).equals('main');
+
+        // A relative path would resolve against the staging temp directory.
+        final pathDep = reparsed.dependencies['local_dep'];
+        check(pathDep).isA<PathDependency>();
+        check(p.isAbsolute((pathDep as PathDependency).path)).isTrue();
+        check(Directory(pathDep.path).existsSync()).isTrue();
       } finally {
         staging.dispose();
       }

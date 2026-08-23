@@ -128,7 +128,9 @@ class SyntheticStaging {
       buffer.writeln('  ${entry.key}: \'${entry.value}\'');
     }
     for (final entry in pubspec.rawNonHostedDependencies.entries) {
-      buffer.writeln('  ${entry.key}: ${entry.value}');
+      // Descriptors are nested mappings (`sdk:`, `path:`, `git:`), so they must
+      // be wrapped in a flow map rather than written on the key's own line.
+      buffer.writeln('  ${entry.key}: {${entry.value}}');
     }
     buffer.writeln();
   }
