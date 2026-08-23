@@ -264,6 +264,88 @@ void auditLogTraceEvent(String eventName, int eventId) {
       check(cluster.instances.length).equals(60);
       check(cluster.bucket).equals(CloneBucket.identical);
     });
+
+    test('detects repeated duplicate blocks within the same function', () {
+      const code = '''
+void executePipelineTasks() {
+  {
+    final alpha = 100;
+    final beta = alpha * 2;
+    if (beta > 50) {
+      print('Processing batch task alpha');
+    }
+  }
+
+  for (var i = 0; i < 5; i++) {
+    print('Intervening loop: \$i');
+  }
+
+  {
+    final alpha = 100;
+    final beta = alpha * 2;
+    if (beta > 50) {
+      print('Processing batch task alpha');
+    }
+  }
+}
+''';
+      final seq = const DartTokenizer().tokenize(
+        filePath: 'pipeline.dart',
+        content: code,
+      );
+      const detector = CloneDetector(minTokens: 15, minLines: 4);
+      final clusters = detector.detect([seq]);
+
+      check(clusters.length).equals(1);
+      final cluster = clusters.first;
+      check(cluster.instances.length).equals(2);
+      check(cluster.instances[0].filePath).equals('pipeline.dart');
+      check(cluster.instances[1].filePath).equals('pipeline.dart');
+      check(cluster.bucket).equals(CloneBucket.identical);
+    });
+
+    test(
+      'deduplicates identical line-range clusters across repeated blocks',
+      () {
+        const code = '''
+void multiBlockSequence() {
+  {
+    print('Block step 1');
+    print('Block step 2');
+    print('Block step 3');
+    print('Block step 4');
+  }
+  {
+    print('Block step 1');
+    print('Block step 2');
+    print('Block step 3');
+    print('Block step 4');
+  }
+  {
+    print('Block step 1');
+    print('Block step 2');
+    print('Block step 3');
+    print('Block step 4');
+  }
+}
+''';
+        final seq = const DartTokenizer().tokenize(
+          filePath: 'blocks.dart',
+          content: code,
+        );
+        const detector = CloneDetector(minTokens: 10, minLines: 4);
+        final clusters = detector.detect([seq]);
+
+        final signatures = <String>{};
+        for (final c in clusters) {
+          final sig = c.instances
+              .map((i) => '${i.filePath}:${i.startLine}-${i.endLine}')
+              .join(';');
+          check(signatures.add(sig)).isTrue();
+        }
+      },
+    );
+
     test('expands to maximal k-gram extent when AST candidate is present', () {
       const function1 = '''
 void processOrderBatchA(List<String> items) {
