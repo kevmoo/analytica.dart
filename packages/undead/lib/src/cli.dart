@@ -9,7 +9,7 @@ import 'formatters/markdown_formatter.dart';
 import 'models.dart';
 import 'reachability_engine.dart';
 
-const String undeadVersion = '0.1.1-wip';
+const String undeadVersion = '0.1.2-wip';
 
 /// Configures and parses CLI arguments for `pkg:undead`.
 ArgParser buildArgParser() {
@@ -110,10 +110,10 @@ ArgParser buildArgParser() {
 /// Main CLI runner for `pkg:undead`.
 class UndeadCliRunner {
   final ArgParser parser;
-  final IOSink outSink;
-  final IOSink errSink;
+  final StringSink outSink;
+  final StringSink errSink;
 
-  UndeadCliRunner({ArgParser? parser, IOSink? outSink, IOSink? errSink})
+  UndeadCliRunner({ArgParser? parser, StringSink? outSink, StringSink? errSink})
     : parser = parser ?? buildArgParser(),
       outSink = outSink ?? stdout,
       errSink = errSink ?? stderr;

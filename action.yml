@@ -1,184 +1,32 @@
-name: 'Dart Cognitive Complexity Audit'
-description: 'Deterministic Cognitive Complexity calculator and Git diff regression scanner for Dart and Flutter repositories.'
+name: 'Analytica (Deprecated Root Action)'
+description: 'The root action entrypoint is deprecated. Use packages/<tool> instead.'
 author: 'kevmoo'
 
 branding:
-  icon: 'trending-up'
-  color: 'blue'
-
-inputs:
-  targets:
-    description: 'Space-separated list of target files or directories to analyze.'
-    required: false
-    default: 'lib'
-  threshold:
-    description: 'Minimum complexity score to display in reports.'
-    required: false
-    default: '0'
-  fail-threshold:
-    description: 'Exit with non-zero status if any function score exceeds this ceiling.'
-    required: false
-    default: '15'
-  diff-base:
-    description: 'Git ref (e.g. origin/main) to compare against. Auto-detects PR base by default.'
-    required: false
-    default: ''
-  fail-on-increase:
-    description: 'Exit with non-zero status if any function increased in complexity over diff-base.'
-    required: false
-    default: 'false'
-  format:
-    description: 'Output format: github (summary table + annotations), text, or json.'
-    required: false
-    default: 'github'
-  exclude:
-    description: >-
-      Comma-separated glob patterns to skip, e.g.
-      "**.g.dart,**.freezed.dart". Generated code exceeds any sensible
-      threshold and cannot be simplified by hand, so reporting it is noise.
-      Empty by default, so nothing is skipped unless you opt in.
-    required: false
-    default: ''
-  max-comment-rows:
-    description: >-
-      Maximum table rows in the sticky PR comment, most significant first
-      (0 = unlimited). The step summary always keeps the full table. GitHub
-      rejects comment bodies over 65536 characters, so an uncapped table on a
-      large diff fails to post.
-    required: false
-    default: '0'
+  icon: 'alert-triangle'
+  color: 'red'
 
 runs:
   using: 'composite'
   steps:
-    - name: Resolve Diff Base & Fetch History
-      id: prepare
+    - name: Deprecation Notice
       shell: bash
-      env:
-        INPUT_DIFF_BASE: ${{ inputs.diff-base }}
-        EVENT_NAME: ${{ github.event_name }}
-        BASE_REF: ${{ github.base_ref }}
       run: |
-        diff_arg=""
-        base="$INPUT_DIFF_BASE"
-        if [ -z "$base" ]; then
-          if [ "$EVENT_NAME" = "pull_request" ] || [ "$EVENT_NAME" = "pull_request_target" ]; then
-            base="origin/$BASE_REF"
-          fi
-        fi
-        if [ -n "$base" ]; then
-          echo "Fetching Git object history for diff base $base..."
-          git fetch origin "${base#origin/}" 2>/dev/null || true
-          diff_arg="--git-diff=$base"
-        fi
-        echo "diff_arg=$diff_arg" >> "$GITHUB_OUTPUT"
-
-    - name: Execute Cognitive Complexity Scanner
-      shell: bash
-      env:
-        INPUT_THRESHOLD: ${{ inputs.threshold }}
-        INPUT_FAIL_THRESHOLD: ${{ inputs.fail-threshold }}
-        INPUT_FAIL_ON_INCREASE: ${{ inputs.fail-on-increase }}
-        INPUT_FORMAT: ${{ inputs.format }}
-        INPUT_TARGETS: ${{ inputs.targets }}
-        INPUT_MAX_COMMENT_ROWS: ${{ inputs.max-comment-rows }}
-        INPUT_EXCLUDE: ${{ inputs.exclude }}
-        DIFF_ARG: ${{ steps.prepare.outputs.diff_arg }}
-        ACTION_PATH: ${{ github.action_path }}
-        GH_TOKEN: ${{ github.token }}
-        PR_NUMBER: ${{ github.event.pull_request.number }}
-      run: |
-        fail_inc_arg=""
-        if [ "$INPUT_FAIL_ON_INCREASE" = "true" ]; then
-          fail_inc_arg="--fail-on-increase"
-        fi
-
-        case "${INPUT_MAX_COMMENT_ROWS:-0}" in
-          ''|*[!0-9]*)
-            echo "::error::max-comment-rows must be a non-negative integer, got '${INPUT_MAX_COMMENT_ROWS}'."
-            exit 1
-            ;;
-        esac
-
-        # When a row cap is requested, the scanner renders a second, trimmed
-        # report for the PR comment while the step summary keeps every row.
-        # Absolute path so it is independent of the scanner's cwd.
-        # An array keeps the path intact even if RUNNER_TEMP contains spaces.
-        # Quoted array expansion: no word splitting, and no globbing -- the
-        # patterns are globs for the scanner, not for bash to expand against
-        # the action directory.
-        exclude_args=()
-        if [ -n "$INPUT_EXCLUDE" ]; then
-          exclude_args=(--exclude="$INPUT_EXCLUDE")
-        fi
-
-        comment_args=()
-        comment_file=""
-        if [ "$INPUT_FORMAT" = "github" ] && [ "${INPUT_MAX_COMMENT_ROWS:-0}" -gt 0 ]; then
-          comment_file="${RUNNER_TEMP}/complexity-comment.md"
-          comment_args=(--comment-output="$comment_file" --max-comment-rows="$INPUT_MAX_COMMENT_ROWS")
-        fi
-
-        # Auto-detect monorepos when default 'lib' target does not exist in caller workspace
-        workspace="${GITHUB_WORKSPACE:-$PWD}"
-        targets="$INPUT_TARGETS"
-        if [ "$targets" = "lib" ] && [ ! -d "$workspace/lib" ] && [ -d "$workspace/packages" ]; then
-          targets="packages"
-        fi
-
-        # Resolve the scanner's dependencies inside the action checkout, but
-        # run it from the caller's workspace: relative targets and the
-        # --git-diff working tree must both resolve against the repository
-        # under audit, not the action download directory (which is not even
-        # a git clone). `dart run <absolute script>` picks up the action's
-        # package config from the script location, so no activation is
-        # needed.
-        (cd "$ACTION_PATH" && dart pub get >/dev/null)
-        cd "$workspace"
-
-        # Execute the scanner CLI tool and capture exit code.
-        set +e
-        dart run "$ACTION_PATH/packages/cognitive_complexity/bin/cognitive_complexity.dart" \
-          --threshold="$INPUT_THRESHOLD" \
-          --fail-threshold="$INPUT_FAIL_THRESHOLD" \
-          --format="$INPUT_FORMAT" \
-          $DIFF_ARG \
-          $fail_inc_arg \
-          "${exclude_args[@]}" \
-          "${comment_args[@]}" \
-          $targets
-        exit_code=$?
-        set -e
-
-        # If running inside a PR context and GH_TOKEN is present, post or update sticky comment
-        if [ -n "$PR_NUMBER" ] && [ -n "$GH_TOKEN" ]; then
-          # Prefer the trimmed report when a row cap produced one; the step
-          # summary keeps the full table either way.
-          body_file="$GITHUB_STEP_SUMMARY"
-          if [ -n "$comment_file" ] && [ -s "$comment_file" ]; then
-            body_file="$comment_file"
-          fi
-
-          if [ -f "$body_file" ] && [ -s "$body_file" ]; then
-            echo "Searching for existing complexity audit comment on PR #$PR_NUMBER..."
-
-            # Find the ID of any existing comment containing our tracking marker.
-            # --paginate is required: without it only the first page of comments is
-            # searched, so on busy PRs the marker is missed and a duplicate posted.
-            # Collect fully before selecting: piping gh directly into `head` closes
-            # the pipe early, and SIGPIPE + pipefail would fail the step.
-            comment_ids=$(gh api --paginate "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/comments" \
-              --jq '.[] | select(.body | contains("<!-- complexity-comment-marker -->")) | .id')
-            comment_id=$(printf '%s\n' "$comment_ids" | head -n 1)
-
-            if [ -n "$comment_id" ]; then
-              echo "Updating existing comment (ID: $comment_id)..."
-              gh api -X PATCH "repos/$GITHUB_REPOSITORY/issues/comments/$comment_id" -F body=@"$body_file" > /dev/null || true
-            else
-              echo "Creating new PR comment..."
-              gh pr comment "$PR_NUMBER" --body-file "$body_file" --repo "$GITHUB_REPOSITORY" > /dev/null || true
-            fi
-          fi
-        fi
-
-        exit $exit_code
+        echo "::error title=Deprecated Action Entrypoint::The root action 'kevmoo/analytica.dart' has been deprecated in favor of modular subdirectory actions."
+        echo ""
+        echo "=================================================================================="
+        echo "🚨 ACTION CONFIGURATION UPDATE REQUIRED"
+        echo "=================================================================================="
+        echo "The root action 'uses: kevmoo/analytica.dart@...' is no longer supported."
+        echo ""
+        echo "Please update your workflow configuration to use the specific tool:"
+        echo ""
+        echo "  • Cognitive Complexity:"
+        echo "      uses: kevmoo/analytica.dart/packages/cognitive_complexity@main"
+        echo ""
+        echo "  • Dependency Lower-Bound Validator:"
+        echo "      uses: kevmoo/analytica.dart/packages/lower_bound@main"
+        echo ""
+        echo "For documentation, visit: https://github.com/kevmoo/analytica.dart"
+        echo "=================================================================================="
+        exit 1

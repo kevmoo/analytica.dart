@@ -1,3 +1,9 @@
+## 0.1.2-wip
+
+- Add `package:analytica/testing.dart` with `resolvePackageDirectory`,
+  `resolvePackageFile`, `resolvePackageExecutable`, and `capturePrints`
+  test helpers.
+
 ## 0.1.1
 
 - Add `parseCommaSeparated` utility function in `package:analytica/cli.dart`.

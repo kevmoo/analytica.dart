@@ -1,7 +1,17 @@
 name: cognitive_complexity
-description: Algorithmic Cognitive Complexity calculation and Data-Flow analysis library and CLI tools for Dart and Flutter.
-version: 0.2.4-wip
+description: >-
+  Algorithmic Cognitive Complexity calculation and Data-Flow analysis library
+  and CLI tools for Dart and Flutter.
+version: 0.2.5-wip
 repository: https://github.com/kevmoo/analytica.dart/tree/main/packages/cognitive_complexity
+issue_tracker: https://github.com/kevmoo/analytica.dart/issues
+
+topics:
+  - static-analysis
+  - code-quality
+  - linter
+  - cli
+  - complexity
 
 resolution: workspace
 
@@ -14,7 +24,7 @@ executables:
 
 # Add regular dependencies here.
 dependencies:
-  analytica: ^0.1.0
+  analytica: ^0.1.2-wip
   analyzer: '>=12.0.0 <15.0.0'
   args: ^2.7.0
   glob: ^2.1.3
@@ -25,6 +35,7 @@ dependencies:
 
 dev_dependencies:
   checks: ^0.3.1
+  cli_readme:
   dart_flutter_team_lints: ^3.5.2
   test: ^1.25.0
   test_descriptor: ^2.0.2

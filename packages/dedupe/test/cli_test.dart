@@ -1,7 +1,9 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:analytica/testing.dart';
 import 'package:checks/checks.dart';
+import 'package:dedupe/dedupe.dart';
 import 'package:dedupe/src/cli.dart';
 import 'package:path/path.dart' as p;
 import 'package:test/test.dart';
@@ -9,9 +11,11 @@ import 'package:test_descriptor/test_descriptor.dart' as d;
 import 'package:test_process/test_process.dart';
 
 void main() {
-  final binPath = File('bin/dedupe.dart').existsSync()
-      ? p.normalize(p.absolute('bin/dedupe.dart'))
-      : p.normalize(p.absolute('packages/dedupe/bin/dedupe.dart'));
+  late String binPath;
+
+  setUpAll(() async {
+    binPath = await resolvePackageExecutable('package:dedupe/dedupe.dart');
+  });
 
   Future<TestProcess> runDedupe(List<String> args, {String? workingDirectory}) {
     return TestProcess.start(Platform.resolvedExecutable, [
@@ -45,7 +49,7 @@ void main() {
       final stdout = await proc.stdoutStream().join('\n');
       await proc.shouldExit(0);
 
-      check(stdout).contains('dedupe version: 0.1.0-wip');
+      check(stdout).contains('dedupe version: $dedupeVersion');
     });
 
     test('invalid flag exits with code 64 (usage)', () async {
@@ -367,28 +371,40 @@ void uniqueB() {
   });
 
   group('DedupeCliRunner In-Process', () {
+    late StringBuffer outSink;
+    late StringBuffer errSink;
+    late DedupeCliRunner runner;
+
+    setUp(() {
+      outSink = StringBuffer();
+      errSink = StringBuffer();
+      runner = DedupeCliRunner(outSink: outSink, errSink: errSink);
+    });
+
     test('run parses flags and outputs help', () async {
-      final runner = DedupeCliRunner();
       final code = await runner.run(['--help']);
       check(code).equals(0);
+      check(
+        outSink.toString(),
+      ).contains('Usage: dedupe [options] [target_path]');
     });
 
     test('run parses version flag', () async {
-      final runner = DedupeCliRunner();
       final code = await runner.run(['--version']);
       check(code).equals(0);
+      check(outSink.toString()).contains('dedupe version: $dedupeVersion');
     });
 
     test('run reports usage on invalid flag', () async {
-      final runner = DedupeCliRunner();
       final code = await runner.run(['--invalid-flag-xyz']);
       check(code).equals(64);
+      check(errSink.toString()).contains('Could not find an option named');
     });
 
     test('run fails on nonexistent path', () async {
-      final runner = DedupeCliRunner();
       final code = await runner.run(['does/not/exist/directory']);
       check(code).equals(66);
+      check(errSink.toString()).contains('Target path does not exist');
     });
 
     test('run fails when any positional path does not exist', () async {
@@ -396,7 +412,6 @@ void uniqueB() {
         d.dir('lib', [d.file('a.dart', 'void main() {}')]),
       ]).create();
 
-      final runner = DedupeCliRunner();
       final code = await runner.run([
         d.path('in_proc_pkg_valid'),
         'does/not/exist/second_dir',
@@ -405,7 +420,6 @@ void uniqueB() {
     });
 
     test('run reports usage on invalid numeric options', () async {
-      final runner = DedupeCliRunner();
       check(await runner.run(['--min-tokens=abc', '.'])).equals(64);
       check(await runner.run(['--min-tokens=-5', '.'])).equals(64);
       check(await runner.run(['--min-lines=foo', '.'])).equals(64);
@@ -423,7 +437,6 @@ void uniqueB() {
     test(
       'run prioritizes flag validation errors over nonexistent paths',
       () async {
-        final runner = DedupeCliRunner();
         final code = await runner.run([
           '--min-tokens=abc',
           'does/not/exist/path',
@@ -437,9 +450,11 @@ void uniqueB() {
         d.dir('lib', [d.file('a.dart', 'void main() { print("hi"); }')]),
       ]).create();
 
-      final runner = DedupeCliRunner();
       final code = await runner.run(['--format=json', d.path('in_proc_pkg')]);
       check(code).equals(0);
+      final decoded = jsonDecode(outSink.toString()) as Map<String, dynamic>;
+      final summary = decoded['summary'] as Map<String, dynamic>;
+      check(summary['filesAnalyzed']).equals(1);
     });
 
     test(
@@ -452,20 +467,28 @@ void uniqueB() {
           ]),
         ]).create();
 
-        final runner = DedupeCliRunner();
         final code1 = await runner.run([
           '--format=json',
           '--ignore-comments',
           d.path('in_proc_comments_pkg'),
         ]);
         check(code1).equals(0);
+        final decoded1 = jsonDecode(outSink.toString()) as Map<String, dynamic>;
+        final summary1 = decoded1['summary'] as Map<String, dynamic>;
+        check(summary1['filesAnalyzed']).equals(2);
+        check(summary1['totalTokens']).equals(22);
 
+        outSink.clear();
         final code2 = await runner.run([
           '--format=json',
           '--no-ignore-comments',
           d.path('in_proc_comments_pkg'),
         ]);
         check(code2).equals(0);
+        final decoded2 = jsonDecode(outSink.toString()) as Map<String, dynamic>;
+        final summary2 = decoded2['summary'] as Map<String, dynamic>;
+        check(summary2['filesAnalyzed']).equals(2);
+        check(summary2['totalTokens']).equals(24);
       },
     );
 
@@ -477,7 +500,6 @@ void uniqueB() {
         ]).create();
 
         final customCache = p.join(d.sandbox, 'custom_cache_dir');
-        final runner = DedupeCliRunner();
 
         final code1 = await runner.run([
           '--format=json',
@@ -486,7 +508,11 @@ void uniqueB() {
         ]);
         check(code1).equals(0);
         check(Directory(customCache).existsSync()).isTrue();
+        final decoded1 = jsonDecode(outSink.toString()) as Map<String, dynamic>;
+        final summary1 = decoded1['summary'] as Map<String, dynamic>;
+        check(summary1['filesAnalyzed']).equals(1);
 
+        outSink.clear();
         final code2 = await runner.run([
           '--format=json',
           '--cache-dir=$customCache',
@@ -494,13 +520,20 @@ void uniqueB() {
           d.path('in_proc_cache_flags_pkg'),
         ]);
         check(code2).equals(0);
+        final decoded2 = jsonDecode(outSink.toString()) as Map<String, dynamic>;
+        final summary2 = decoded2['summary'] as Map<String, dynamic>;
+        check(summary2['filesAnalyzed']).equals(1);
 
+        outSink.clear();
         final code3 = await runner.run([
           '--format=json',
           '--no-cache',
           d.path('in_proc_cache_flags_pkg'),
         ]);
         check(code3).equals(0);
+        final decoded3 = jsonDecode(outSink.toString()) as Map<String, dynamic>;
+        final summary3 = decoded3['summary'] as Map<String, dynamic>;
+        check(summary3['filesAnalyzed']).equals(1);
       },
     );
   });

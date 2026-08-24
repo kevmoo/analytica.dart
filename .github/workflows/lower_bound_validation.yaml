@@ -1,0 +1,24 @@
+name: Dependency Lower-Bound Validation
+
+on:
+  pull_request:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      contents: read
+    steps:
+      - name: Checkout Codebase
+        uses: actions/checkout@v7
+
+      - name: Setup Dart SDK
+        uses: dart-lang/setup-dart@v1
+
+      - name: Self-Dogfood Lower-Bound Check
+        uses: ./packages/lower_bound
+        with:
+          allow-local-siblings: 'true'
+          format: 'github'
+          fail-on-error: 'true'
