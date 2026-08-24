@@ -7,12 +7,13 @@ on:
     paths:
       - '.github/workflows/cli_readme.yaml'
       - 'packages/cli_readme/**'
+      - 'packages/analytica/**'
       - 'pubspec.yaml'
   pull_request:
-    branches: [ main ]
     paths:
       - '.github/workflows/cli_readme.yaml'
       - 'packages/cli_readme/**'
+      - 'packages/analytica/**'
       - 'pubspec.yaml'
   schedule:
     - cron: "0 0 * * 0"
@@ -34,7 +35,7 @@ jobs:
       matrix:
         sdk: [dev]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: dart-lang/setup-dart@v1
         with:
           sdk: ${{ matrix.sdk }}
@@ -58,7 +59,7 @@ jobs:
         os: [ubuntu-latest]
         sdk: ['3.12', dev]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: dart-lang/setup-dart@v1
         with:
           sdk: ${{ matrix.sdk }}

@@ -473,6 +473,9 @@ void uniqueB() {
           d.path('in_proc_comments_pkg'),
         ]);
         check(code1).equals(0);
+        final decoded1 = jsonDecode(outSink.toString()) as Map<String, dynamic>;
+        final summary1 = decoded1['summary'] as Map<String, dynamic>;
+        check(summary1['filesAnalyzed']).equals(2);
 
         outSink.clear();
         final code2 = await runner.run([
@@ -481,6 +484,9 @@ void uniqueB() {
           d.path('in_proc_comments_pkg'),
         ]);
         check(code2).equals(0);
+        final decoded2 = jsonDecode(outSink.toString()) as Map<String, dynamic>;
+        final summary2 = decoded2['summary'] as Map<String, dynamic>;
+        check(summary2['filesAnalyzed']).equals(2);
       },
     );
 
@@ -500,6 +506,9 @@ void uniqueB() {
         ]);
         check(code1).equals(0);
         check(Directory(customCache).existsSync()).isTrue();
+        final decoded1 = jsonDecode(outSink.toString()) as Map<String, dynamic>;
+        final summary1 = decoded1['summary'] as Map<String, dynamic>;
+        check(summary1['filesAnalyzed']).equals(1);
 
         outSink.clear();
         final code2 = await runner.run([
@@ -509,6 +518,9 @@ void uniqueB() {
           d.path('in_proc_cache_flags_pkg'),
         ]);
         check(code2).equals(0);
+        final decoded2 = jsonDecode(outSink.toString()) as Map<String, dynamic>;
+        final summary2 = decoded2['summary'] as Map<String, dynamic>;
+        check(summary2['filesAnalyzed']).equals(1);
 
         outSink.clear();
         final code3 = await runner.run([
@@ -517,6 +529,9 @@ void uniqueB() {
           d.path('in_proc_cache_flags_pkg'),
         ]);
         check(code3).equals(0);
+        final decoded3 = jsonDecode(outSink.toString()) as Map<String, dynamic>;
+        final summary3 = decoded3['summary'] as Map<String, dynamic>;
+        check(summary3['filesAnalyzed']).equals(1);
       },
     );
   });

@@ -25,13 +25,14 @@ Future<String> resolvePackageDirectory(String packageUri) async {
     );
   }
 
-  final filePath = resolved.toFilePath();
-  final relativeInLib = uri.pathSegments.sublist(1).join('/');
-  final libDir = (relativeInLib.isNotEmpty && filePath.endsWith(relativeInLib))
-      ? filePath.substring(0, filePath.length - relativeInLib.length)
-      : p.dirname(filePath);
-
-  return p.normalize(p.join(libDir, '..'));
+  var currentDir = p.dirname(resolved.toFilePath());
+  // The path inside lib/ has (uri.pathSegments.length - 1) segments.
+  // Climbing up (uri.pathSegments.length - 1) times from the file's parent
+  // directory reaches the package root across all platform path separators.
+  for (var i = 1; i < uri.pathSegments.length; i++) {
+    currentDir = p.dirname(currentDir);
+  }
+  return p.normalize(currentDir);
 }
 
 /// Resolves a [File] relative to a package root given a [packageUri] string
@@ -46,6 +47,8 @@ Future<File> resolvePackageFile(String packageUri, String relativePath) async {
 ///
 /// If [executableName] is omitted, defaults to the package name (the first path
 /// segment of [packageUri]).
+///
+/// Throws a [StateError] if the executable file does not exist.
 Future<String> resolvePackageExecutable(
   String packageUri, [
   String? executableName,
@@ -53,5 +56,11 @@ Future<String> resolvePackageExecutable(
   final pkgDir = await resolvePackageDirectory(packageUri);
   final exec = executableName ?? Uri.parse(packageUri).pathSegments.first;
   final binFile = File(p.join(pkgDir, 'bin', '$exec.dart'));
+  if (!binFile.existsSync()) {
+    throw StateError(
+      'Executable not found at "${binFile.path}". '
+      'Ensure bin/$exec.dart exists in package "$packageUri".',
+    );
+  }
   return p.normalize(binFile.path);
 }
