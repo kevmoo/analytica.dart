@@ -107,3 +107,11 @@ void main() async {
   }
 }
 ```
+
+## 🧠 AI Agent Integration
+
+This repository packages an agent skill (`dart-dedupe`) to train AI pair programmers on structural code duplication audits, clone triage, and safe deduplication refactoring:
+
+```bash
+npx skills add kevmoo/analytica.dart --skill dart-dedupe
+```
