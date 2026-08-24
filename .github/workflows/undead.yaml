@@ -1,16 +1,34 @@
-name: CI
+name: package:undead
 
 on:
+  # Run on PRs and pushes to the default branch.
   push:
     branches: [ main ]
+    paths:
+      - '.github/workflows/undead.yaml'
+      - 'packages/undead/**'
+      - 'packages/analytica/**'
+      - 'pubspec.yaml'
   pull_request:
+    branches: [ main ]
+    paths:
+      - '.github/workflows/undead.yaml'
+      - 'packages/undead/**'
+      - 'packages/analytica/**'
+      - 'pubspec.yaml'
   schedule:
     - cron: "0 0 * * 0"
 
 env:
   PUB_ENVIRONMENT: bot.github
 
+defaults:
+  run:
+    working-directory: packages/undead/
+
 jobs:
+  # Check code formatting and static analysis on a single OS (linux)
+  # against Dart dev.
   analyze:
     runs-on: ubuntu-latest
     strategy:
@@ -18,7 +36,7 @@ jobs:
       matrix:
         sdk: [dev]
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v4
       - uses: dart-lang/setup-dart@v1
         with:
           sdk: ${{ matrix.sdk }}
@@ -32,6 +50,7 @@ jobs:
         run: dart analyze --fatal-infos
         if: always() && steps.install.outcome == 'success'
 
+  # Run tests on ubuntu-latest across supported SDKs.
   test:
     needs: analyze
     runs-on: ${{ matrix.os }}
@@ -41,35 +60,13 @@ jobs:
         os: [ubuntu-latest]
         sdk: ['3.12', dev]
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v4
       - uses: dart-lang/setup-dart@v1
         with:
           sdk: ${{ matrix.sdk }}
       - id: install
         name: Install dependencies
         run: dart pub get
-      - name: Run tests (analytica)
-        working-directory: packages/analytica
+      - name: Run tests
         run: dart test
         if: always() && steps.install.outcome == 'success'
-      - name: Run tests (cognitive_complexity)
-        working-directory: packages/cognitive_complexity
-        run: dart test
-        if: always() && steps.install.outcome == 'success'
-      - name: Run tests (dedupe)
-        working-directory: packages/dedupe
-        run: dart test
-        if: always() && steps.install.outcome == 'success'
-      - name: Run tests (undead)
-        working-directory: packages/undead
-        run: dart test
-        if: always() && steps.install.outcome == 'success'
-      - name: Run tests (cli_readme)
-        working-directory: packages/cli_readme
-        run: dart test
-        if: always() && steps.install.outcome == 'success'
-      - name: Run tests (lower_bound)
-        working-directory: packages/lower_bound
-        run: dart test
-        if: always() && steps.install.outcome == 'success'
-

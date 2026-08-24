@@ -153,10 +153,10 @@ ArgParser buildArgParser() {
 /// Main CLI runner for `pkg:dedupe`.
 class DedupeCliRunner {
   final ArgParser parser;
-  final IOSink outSink;
-  final IOSink errSink;
+  final StringSink outSink;
+  final StringSink errSink;
 
-  DedupeCliRunner({ArgParser? parser, IOSink? outSink, IOSink? errSink})
+  DedupeCliRunner({ArgParser? parser, StringSink? outSink, StringSink? errSink})
     : parser = parser ?? buildArgParser(),
       outSink = outSink ?? stdout,
       errSink = errSink ?? stderr;

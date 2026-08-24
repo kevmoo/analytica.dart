@@ -2,3 +2,4 @@
 library;
 
 export 'src/testing/package_resolution.dart';
+export 'src/testing/prints.dart';
