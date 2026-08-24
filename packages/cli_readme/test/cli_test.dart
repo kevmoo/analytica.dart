@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:isolate';
 
 import 'package:checks/checks.dart';
 import 'package:path/path.dart' as p;
@@ -7,9 +8,16 @@ import 'package:test_descriptor/test_descriptor.dart' as d;
 import 'package:test_process/test_process.dart';
 
 void main() {
-  final binPath = File('bin/cli_readme.dart').existsSync()
-      ? p.absolute('bin/cli_readme.dart')
-      : p.absolute('packages/cli_readme/bin/cli_readme.dart');
+  late String binPath;
+
+  setUpAll(() async {
+    final libUri = await Isolate.resolvePackageUri(
+      Uri.parse('package:cli_readme/cli_readme.dart'),
+    );
+    binPath = p.normalize(
+      p.join(p.dirname(libUri!.toFilePath()), '../bin/cli_readme.dart'),
+    );
+  });
 
   test('CLI --help prints usage and exits 0', () async {
     final proc = await TestProcess.start(Platform.resolvedExecutable, [
