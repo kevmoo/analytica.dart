@@ -476,6 +476,7 @@ void uniqueB() {
         final decoded1 = jsonDecode(outSink.toString()) as Map<String, dynamic>;
         final summary1 = decoded1['summary'] as Map<String, dynamic>;
         check(summary1['filesAnalyzed']).equals(2);
+        check(summary1['totalTokens']).equals(22);
 
         outSink.clear();
         final code2 = await runner.run([
@@ -487,6 +488,7 @@ void uniqueB() {
         final decoded2 = jsonDecode(outSink.toString()) as Map<String, dynamic>;
         final summary2 = decoded2['summary'] as Map<String, dynamic>;
         check(summary2['filesAnalyzed']).equals(2);
+        check(summary2['totalTokens']).equals(24);
       },
     );
 

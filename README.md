@@ -1,6 +1,6 @@
 # Analytica
 
-[![CI](https://github.com/kevmoo/analytica.dart/actions/workflows/ci.yml/badge.svg)](https://github.com/kevmoo/analytica.dart/actions/workflows/ci.yml)
+[![CI](https://github.com/kevmoo/analytica.dart/actions/workflows/health.yaml/badge.svg)](https://github.com/kevmoo/analytica.dart/actions/workflows/health.yaml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 A unified suite of high-performance static analysis engines, CLI tools, GitHub Actions, and AI Agent Skills for Dart and Flutter repositories.
