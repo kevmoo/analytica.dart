@@ -1,9 +1,8 @@
 ## 0.1.2-wip
 
 - Add `package:analytica/testing.dart` with `resolvePackageDirectory`,
-  `resolvePackageFile`, and `resolvePackageExecutable` test helpers.
-- Add `capturePrints` and `package:checks` print extensions (`prints`)
-  in `package:analytica/testing.dart`.
+  `resolvePackageFile`, `resolvePackageExecutable`, and `capturePrints`
+  test helpers.
 
 ## 0.1.1
 
