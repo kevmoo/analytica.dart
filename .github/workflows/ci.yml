@@ -64,6 +64,10 @@ jobs:
         working-directory: packages/undead
         run: dart test
         if: always() && steps.install.outcome == 'success'
+      - name: Run tests (cli_readme)
+        working-directory: packages/cli_readme
+        run: dart test
+        if: always() && steps.install.outcome == 'success'
       - name: Run tests (lower_bound)
         working-directory: packages/lower_bound
         run: dart test

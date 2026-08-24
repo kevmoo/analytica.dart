@@ -6,6 +6,7 @@ environment:
 
 workspace:
   - packages/analytica
+  - packages/cli_readme
   - packages/cognitive_complexity
   - packages/dedupe
   - packages/lower_bound

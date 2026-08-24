@@ -1,5 +1,6 @@
 ## 0.1.1-wip
 
+- Add `ensure_cli_readme_test.dart` to verify CLI `--help` documentation in `README.md`.
 - Add `dart-dedupe` agent skill integration guide in `README.md`.
 
 ## 0.1.0
