@@ -1,18 +1,15 @@
-import 'dart:io';
-
+import 'package:analytica/testing.dart';
 import 'package:checks/checks.dart';
 import 'package:test/test.dart';
 import 'package:undead/src/cli.dart';
 import 'package:yaml/yaml.dart';
 
 void main() {
-  test('undeadVersion matches pubspec.yaml', () {
-    final pubspecFile =
-        File('pubspec.yaml').existsSync() &&
-            (loadYaml(File('pubspec.yaml').readAsStringSync()) as YamlMap)
-                .containsKey('version')
-        ? File('pubspec.yaml')
-        : File('packages/undead/pubspec.yaml');
+  test('undeadVersion matches pubspec.yaml', () async {
+    final pubspecFile = await resolvePackageFile(
+      'package:undead/undead.dart',
+      'pubspec.yaml',
+    );
     check(pubspecFile.existsSync()).isTrue();
 
     final content = pubspecFile.readAsStringSync();

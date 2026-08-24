@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:analytica/testing.dart';
 import 'package:checks/checks.dart';
 import 'package:path/path.dart' as p;
 import 'package:test/scaffolding.dart';
@@ -10,11 +11,14 @@ import 'package:test_process/test_process.dart';
 void main() {
   // Pin subprocesses to the SDK running the tests rather than PATH's `dart`.
   final dartExe = Platform.resolvedExecutable;
-  final binPath = File('bin/data_flow.dart').existsSync()
-      ? p.normalize(p.absolute('bin/data_flow.dart'))
-      : p.normalize(
-          p.absolute('packages/cognitive_complexity/bin/data_flow.dart'),
-        );
+  late String binPath;
+
+  setUpAll(() async {
+    binPath = await resolvePackageExecutable(
+      'package:cognitive_complexity/cognitive_complexity.dart',
+      'data_flow',
+    );
+  });
 
   group('DataFlow CLI Integration', () {
     test('Displays usage help and exits with code 0 on --help', () async {

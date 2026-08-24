@@ -1,6 +1,6 @@
 import 'dart:io';
-import 'dart:isolate';
 
+import 'package:analytica/testing.dart';
 import 'package:checks/checks.dart';
 import 'package:path/path.dart' as p;
 import 'package:test/test.dart';
@@ -11,11 +11,8 @@ void main() {
   late String binPath;
 
   setUpAll(() async {
-    final libUri = await Isolate.resolvePackageUri(
-      Uri.parse('package:cli_readme/cli_readme.dart'),
-    );
-    binPath = p.normalize(
-      p.join(p.dirname(libUri!.toFilePath()), '../bin/cli_readme.dart'),
+    binPath = await resolvePackageExecutable(
+      'package:cli_readme/cli_readme.dart',
     );
   });
 

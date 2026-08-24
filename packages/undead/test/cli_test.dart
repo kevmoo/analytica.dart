@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:analytica/testing.dart';
 import 'package:checks/checks.dart';
 import 'package:path/path.dart' as p;
 import 'package:test/test.dart';
@@ -27,9 +28,11 @@ d.DirectoryDescriptor packageConfig(String pkgName) {
 }
 
 void main() {
-  final binPath = File('bin/undead.dart').existsSync()
-      ? p.normalize(p.absolute('bin/undead.dart'))
-      : p.normalize(p.absolute('packages/undead/bin/undead.dart'));
+  late String binPath;
+
+  setUpAll(() async {
+    binPath = await resolvePackageExecutable('package:undead/undead.dart');
+  });
 
   Future<TestProcess> runUndead(List<String> args, {String? workingDirectory}) {
     return TestProcess.start(Platform.resolvedExecutable, [

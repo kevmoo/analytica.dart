@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:analytica/testing.dart';
 import 'package:checks/checks.dart';
 import 'package:path/path.dart' as p;
 import 'package:test/test.dart';
@@ -69,13 +70,13 @@ int _tableRowCount(String report) =>
     report.split('\n').where((l) => l.startsWith('| ')).length;
 
 void main() {
-  final binPath = File('bin/cognitive_complexity.dart').existsSync()
-      ? p.normalize(p.absolute('bin/cognitive_complexity.dart'))
-      : p.normalize(
-          p.absolute(
-            'packages/cognitive_complexity/bin/cognitive_complexity.dart',
-          ),
-        );
+  late String binPath;
+
+  setUpAll(() async {
+    binPath = await resolvePackageExecutable(
+      'package:cognitive_complexity/cognitive_complexity.dart',
+    );
+  });
 
   group('--comment-output', () {
     late String repoPath;

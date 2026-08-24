@@ -1,18 +1,19 @@
 import 'dart:io';
+
+import 'package:analytica/testing.dart';
 import 'package:checks/checks.dart';
-import 'package:path/path.dart' as p;
 import 'package:test/scaffolding.dart';
 import 'package:test_descriptor/test_descriptor.dart' as d;
 import 'package:test_process/test_process.dart';
 
 void main() {
-  final binPath = File('bin/cognitive_complexity.dart').existsSync()
-      ? p.normalize(p.absolute('bin/cognitive_complexity.dart'))
-      : p.normalize(
-          p.absolute(
-            'packages/cognitive_complexity/bin/cognitive_complexity.dart',
-          ),
-        );
+  late String binPath;
+
+  setUpAll(() async {
+    binPath = await resolvePackageExecutable(
+      'package:cognitive_complexity/cognitive_complexity.dart',
+    );
+  });
 
   group('CLI Integration Tests', () {
     test('Calculates complexity and displays text table report', () async {

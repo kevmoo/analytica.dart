@@ -1,16 +1,14 @@
-import 'dart:io';
-
+import 'package:analytica/testing.dart';
 import 'package:checks/checks.dart';
 import 'package:dedupe/src/engine.dart';
 import 'package:test/test.dart';
 
 void main() {
-  test('dedupeVersion matches pubspec.yaml', () {
-    final pubspecFile =
-        File('pubspec.yaml').existsSync() &&
-            File('pubspec.yaml').readAsStringSync().contains('name: dedupe')
-        ? File('pubspec.yaml')
-        : File('packages/dedupe/pubspec.yaml');
+  test('dedupeVersion matches pubspec.yaml', () async {
+    final pubspecFile = await resolvePackageFile(
+      'package:dedupe/dedupe.dart',
+      'pubspec.yaml',
+    );
     check(pubspecFile.existsSync()).isTrue();
 
     final content = pubspecFile.readAsStringSync();

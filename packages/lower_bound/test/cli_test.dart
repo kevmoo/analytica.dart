@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:analytica/testing.dart';
 import 'package:checks/checks.dart';
 import 'package:lower_bound/src/cli.dart';
 import 'package:lower_bound/src/sdk_discovery.dart';
@@ -9,26 +10,14 @@ import 'package:test/test.dart';
 import 'package:test_descriptor/test_descriptor.dart' as d;
 import 'package:test_process/test_process.dart';
 
-String _resolveBinPath() {
-  var dir = Directory.current;
-  while (true) {
-    final candidate = File(
-      p.join(dir.path, 'packages', 'lower_bound', 'bin', 'lower_bound.dart'),
-    );
-    if (candidate.existsSync()) return candidate.path;
-
-    final direct = File(p.join(dir.path, 'bin', 'lower_bound.dart'));
-    if (direct.existsSync()) return direct.path;
-
-    final parent = dir.parent;
-    if (parent.path == dir.path) break;
-    dir = parent;
-  }
-  return p.join(Directory.current.path, 'bin', 'lower_bound.dart');
-}
-
 void main() {
-  final binPath = _resolveBinPath();
+  late String binPath;
+
+  setUpAll(() async {
+    binPath = await resolvePackageExecutable(
+      'package:lower_bound/lower_bound.dart',
+    );
+  });
 
   group('CLI Options & Resolution', () {
     test('displays help with --help and exits 0', () async {
