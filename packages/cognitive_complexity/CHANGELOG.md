@@ -1,5 +1,9 @@
 ## 0.2.5-wip
 
+- Add `--exclude` CLI option and matching `exclude` GitHub Action input:
+  comma-separated or repeated glob patterns to skip files (empty by default).
+  Useful for generated sources such as `**.g.dart` and `**.freezed.dart`
+  (#90).
 - Add `ensure_cli_readme_test.dart` to verify CLI `--help` documentation in `README.md`.
 - Update GitHub Action documentation in `README.md` to reference modular
   subdirectory path (`packages/cognitive_complexity`) and add rendered Action

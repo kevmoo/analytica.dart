@@ -31,6 +31,14 @@ inputs:
     description: 'Output format: github (summary table + annotations), text, or json.'
     required: false
     default: 'github'
+  exclude:
+    description: >-
+      Comma-separated glob patterns to skip, e.g.
+      "**.g.dart,**.freezed.dart". Generated code exceeds any sensible
+      threshold and cannot be simplified by hand, so reporting it is noise.
+      Empty by default, so nothing is skipped unless you opt in.
+    required: false
+    default: ''
   max-comment-rows:
     description: >-
       Maximum table rows in the sticky PR comment, most significant first
@@ -74,6 +82,7 @@ runs:
         INPUT_FORMAT: ${{ inputs.format }}
         INPUT_TARGETS: ${{ inputs.targets }}
         INPUT_MAX_COMMENT_ROWS: ${{ inputs.max-comment-rows }}
+        INPUT_EXCLUDE: ${{ inputs.exclude }}
         DIFF_ARG: ${{ steps.prepare.outputs.diff_arg }}
         ACTION_PATH: ${{ github.action_path }}
         GH_TOKEN: ${{ github.token }}
@@ -95,6 +104,14 @@ runs:
         # report for the PR comment while the step summary keeps every row.
         # Absolute path so it is independent of the scanner's cwd.
         # An array keeps the path intact even if RUNNER_TEMP contains spaces.
+        # Quoted array expansion: no word splitting, and no globbing -- the
+        # patterns are globs for the scanner, not for bash to expand against
+        # the action directory.
+        exclude_args=()
+        if [ -n "$INPUT_EXCLUDE" ]; then
+          exclude_args=(--exclude="$INPUT_EXCLUDE")
+        fi
+
         comment_args=()
         comment_file=""
         if [ "$INPUT_FORMAT" = "github" ] && [ "${INPUT_MAX_COMMENT_ROWS:-0}" -gt 0 ]; then
@@ -122,6 +139,7 @@ runs:
           --format="$INPUT_FORMAT" \
           $DIFF_ARG \
           $fail_inc_arg \
+          "${exclude_args[@]}" \
           "${comment_args[@]}" \
           $targets
         exit_code=$?

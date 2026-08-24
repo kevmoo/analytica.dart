@@ -54,6 +54,7 @@ Options:
     --comment-output=<path>       With --format=github, also write a standalone report to this path, ordered by significance and capped by --max-comment-rows. Intended for posting as a PR comment while the step summary keeps the full table.
     --max-comment-rows=<count>    Maximum table rows in --comment-output (0 = unlimited). GitHub rejects comment bodies over 65536 characters.
                                   (defaults to "0")
+    --exclude=<glob>              Glob patterns to skip, comma-separated or repeated. Useful for generated sources, e.g. --exclude="**.g.dart,**.freezed.dart".
 ```
 <!-- CLI_README_END cognitive_complexity -->
 
@@ -153,6 +154,7 @@ jobs:
 | `diff-base` | _Auto_ | Git ref to compare against (e.g. `origin/main`). Auto-detects PR base. |
 | `fail-on-increase` | `false` | When `true`, blocks PR merge on complexity increases exceeding `fail-threshold`. |
 | `format` | `github` | Output format: `github` (annotations + step summary), `text`, or `json`. |
+| `exclude` | _empty_ | Comma-separated glob patterns to skip (e.g. `**.g.dart,**.freezed.dart`). |
 | `max-comment-rows` | `0` | Maximum table rows in the sticky PR comment (0 = unlimited). |
 <!-- mdformat on -->
 

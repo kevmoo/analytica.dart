@@ -52,6 +52,7 @@ cognitive_complexity [options] [targets]
 | `-d, --git-diff <git-ref>`     | `String` | _None_  | Compares current workspace declarations against `<git-ref>`, evaluating complexity deltas (Δ). |
 | `--fail-on-increase`           | `flag`   | `false` | When using `--git-diff`, fails if any modified function increases in complexity.               |
 | `--format <type>`              | `enum`   | `text`  | Output format: `text` (terminal), `json` (machine-readable), or `github` (GHA annotations).    |
+| `--exclude <glob>`             | `glob`   | _empty_ | Skip files matching glob patterns. Comma-separated or repeated. Useful for generated sources.  |
 | `--sdk-path <path>`            | `String` | _Auto_  | Overrides automated Dart/Flutter SDK location discovery.                                       |
 
 <!-- mdformat on -->
