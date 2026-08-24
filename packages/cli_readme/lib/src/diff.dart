@@ -9,29 +9,28 @@ String generateDiff({
   final expLines = expected.split('\n');
   final actLines = actual.split('\n');
 
-  final buffer = StringBuffer();
-  buffer.writeln('--- $actualHeader');
-  buffer.writeln('+++ $expectedHeader');
+  final buffer = StringBuffer()
+    ..writeln('--- $actualHeader')
+    ..writeln('+++ $expectedHeader');
 
   final maxLen = expLines.length > actLines.length
       ? expLines.length
       : actLines.length;
 
   for (var i = 0; i < maxLen; i++) {
-    final expLine = i < expLines.length ? expLines[i] : null;
-    final actLine = i < actLines.length ? actLines[i] : null;
-
-    if (expLine == actLine) {
-      buffer.writeln('  $actLine');
-    } else {
-      if (actLine != null) {
-        buffer.writeln('- $actLine');
-      }
-      if (expLine != null) {
-        buffer.writeln('+ $expLine');
-      }
-    }
+    final exp = i < expLines.length ? expLines[i] : null;
+    final act = i < actLines.length ? actLines[i] : null;
+    _writeDiffLine(buffer, exp, act);
   }
 
   return buffer.toString();
+}
+
+void _writeDiffLine(StringBuffer buffer, String? exp, String? act) {
+  if (exp == act) {
+    buffer.writeln('  $act');
+    return;
+  }
+  if (act != null) buffer.writeln('- $act');
+  if (exp != null) buffer.writeln('+ $exp');
 }

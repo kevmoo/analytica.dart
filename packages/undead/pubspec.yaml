@@ -1,6 +1,6 @@
 name: undead
 description: Reachability and dead/unused declaration analysis for Dart and Flutter packages.
-version: 0.1.1
+version: 0.1.2-wip
 repository: https://github.com/kevmoo/analytica.dart/tree/main/packages/undead
 issue_tracker: https://github.com/kevmoo/analytica.dart/issues
 

@@ -29,37 +29,8 @@ class PackageContext {
     String? readmePath,
     List<CliTarget>? customTargets,
   }) {
-    var dir = workingDir != null
-        ? Directory(workingDir).resolveSymbolicLinksSync()
-        : Directory.current.resolveSymbolicLinksSync();
-
-    if (packageRelativeDirectory != null &&
-        packageRelativeDirectory.isNotEmpty) {
-      dir = p.normalize(p.join(dir, packageRelativeDirectory));
-    } else if (workingDir == null) {
-      // Check if current directory is a workspace root
-      final currentPubspec = File(p.join(dir, 'pubspec.yaml'));
-      if (currentPubspec.existsSync()) {
-        final yaml = loadYaml(currentPubspec.readAsStringSync()) as Map?;
-        if (yaml != null && yaml.containsKey('workspace')) {
-          final inferredPkgDir = _inferPackageFromTestRunner(dir);
-          if (inferredPkgDir != null) {
-            dir = inferredPkgDir;
-          }
-        }
-      }
-    }
-
-    final pubspecFile = File(p.join(dir, 'pubspec.yaml'));
-    if (!pubspecFile.existsSync()) {
-      throw StateError(
-        'Could not locate pubspec.yaml in $dir. '
-        'Ensure the command is run from a Dart package root or specify '
-        'packageRelativeDirectory.',
-      );
-    }
-
-    final pubspecYaml = loadYaml(pubspecFile.readAsStringSync()) as Map;
+    final dir = _resolvePackageDirectory(workingDir, packageRelativeDirectory);
+    final pubspecYaml = _readPubspecYaml(dir);
     final pkgName = pubspecYaml['name'] as String? ?? 'app';
 
     final resolvedReadmePath = readmePath != null
@@ -85,22 +56,63 @@ class PackageContext {
     );
   }
 
+  static String _resolvePackageDirectory(
+    String? workingDir,
+    String? packageRelativeDirectory,
+  ) {
+    var dir = workingDir != null
+        ? Directory(workingDir).resolveSymbolicLinksSync()
+        : Directory.current.resolveSymbolicLinksSync();
+
+    if (packageRelativeDirectory != null &&
+        packageRelativeDirectory.isNotEmpty) {
+      return p.normalize(p.join(dir, packageRelativeDirectory));
+    }
+
+    if (workingDir == null && _isWorkspaceRoot(dir)) {
+      final inferred = _inferPackageFromTestRunner(dir);
+      if (inferred != null) return inferred;
+    }
+
+    return dir;
+  }
+
+  static bool _isWorkspaceRoot(String dir) {
+    final pubspecFile = File(p.join(dir, 'pubspec.yaml'));
+    if (!pubspecFile.existsSync()) return false;
+    final yaml = loadYaml(pubspecFile.readAsStringSync()) as Map?;
+    return yaml != null && yaml.containsKey('workspace');
+  }
+
+  static Map _readPubspecYaml(String dir) {
+    final pubspecFile = File(p.join(dir, 'pubspec.yaml'));
+    if (!pubspecFile.existsSync()) {
+      throw StateError(
+        'Could not locate pubspec.yaml in $dir. '
+        'Ensure the command is run from a Dart package root or specify '
+        'packageRelativeDirectory.',
+      );
+    }
+    return loadYaml(pubspecFile.readAsStringSync()) as Map;
+  }
+
   static String? _inferPackageFromTestRunner(String workspaceRoot) {
     try {
       final suitePath = Invoker.current?.liveTest.suite.path;
-      if (suitePath != null && suitePath.isNotEmpty) {
-        final absPath = p.isAbsolute(suitePath)
-            ? suitePath
-            : p.join(workspaceRoot, suitePath);
-        var parent = Directory(p.dirname(absPath));
-        while (parent.path != workspaceRoot && parent.path.length > 3) {
-          if (File(p.join(parent.path, 'pubspec.yaml')).existsSync()) {
-            return parent.path;
-          }
-          final next = parent.parent;
-          if (next.path == parent.path) break;
-          parent = next;
+      if (suitePath == null || suitePath.isEmpty) return null;
+
+      final absPath = p.isAbsolute(suitePath)
+          ? suitePath
+          : p.join(workspaceRoot, suitePath);
+
+      var parent = Directory(p.dirname(absPath));
+      while (parent.path != workspaceRoot && parent.path.length > 3) {
+        if (File(p.join(parent.path, 'pubspec.yaml')).existsSync()) {
+          return parent.path;
         }
+        final next = parent.parent;
+        if (next.path == parent.path) break;
+        parent = next;
       }
     } catch (_) {
       // Ignored if not running inside package:test
@@ -112,76 +124,76 @@ class PackageContext {
     String dir,
     String pkgName,
     Map pubspecYaml,
-  ) {
-    final targets = <CliTarget>[];
+  ) =>
+      _targetsFromExecutables(pubspecYaml) ??
+      _targetFromDefaultBin(dir, pkgName) ??
+      _targetsFromBinDirectory(dir, pkgName) ??
+      const [];
+
+  static List<CliTarget>? _targetsFromExecutables(Map pubspecYaml) {
     final executables = pubspecYaml['executables'] as Map?;
+    if (executables == null || executables.isEmpty) return null;
 
-    if (executables != null && executables.isNotEmpty) {
-      final isSingle = executables.length == 1;
-      for (final entry in executables.entries) {
-        final execName = entry.key.toString();
-        final scriptValue = entry.value?.toString();
-        final scriptRelPath = (scriptValue != null && scriptValue.isNotEmpty)
-            ? 'bin/$scriptValue.dart'
-            : 'bin/$execName.dart';
+    final isSingle = executables.length == 1;
+    final targets = <CliTarget>[];
 
-        targets.add(
-          CliTarget.executable(
-            id: isSingle ? '' : execName,
-            executablePath: scriptRelPath,
-            commandName: execName,
-          ),
-        );
-      }
-      return targets;
-    }
+    for (final entry in executables.entries) {
+      final execName = entry.key.toString();
+      final scriptValue = entry.value?.toString();
+      final scriptRelPath = (scriptValue != null && scriptValue.isNotEmpty)
+          ? 'bin/$scriptValue.dart'
+          : 'bin/$execName.dart';
 
-    // Check bin/<pkgName>.dart
-    final defaultBin = p.join(dir, 'bin', '$pkgName.dart');
-    if (File(defaultBin).existsSync()) {
       targets.add(
         CliTarget.executable(
-          id: '',
-          executablePath: 'bin/$pkgName.dart',
-          commandName: pkgName,
+          id: isSingle ? '' : execName,
+          executablePath: scriptRelPath,
+          commandName: execName,
         ),
       );
-      return targets;
     }
-
-    // Check all files in bin/
-    final binDir = Directory(p.join(dir, 'bin'));
-    if (binDir.existsSync()) {
-      final dartFiles = binDir
-          .listSync()
-          .whereType<File>()
-          .where((f) => f.path.endsWith('.dart'))
-          .toList();
-
-      if (dartFiles.length == 1) {
-        final rel = p.relative(dartFiles.first.path, from: dir);
-        targets.add(
-          CliTarget.executable(
-            id: '',
-            executablePath: rel,
-            commandName: pkgName,
-          ),
-        );
-      } else if (dartFiles.length > 1) {
-        for (final f in dartFiles) {
-          final rel = p.relative(f.path, from: dir);
-          final base = p.basenameWithoutExtension(f.path);
-          targets.add(
-            CliTarget.executable(
-              id: base,
-              executablePath: rel,
-              commandName: base,
-            ),
-          );
-        }
-      }
-    }
-
     return targets;
+  }
+
+  static List<CliTarget>? _targetFromDefaultBin(String dir, String pkgName) {
+    final defaultBin = p.join(dir, 'bin', '$pkgName.dart');
+    if (!File(defaultBin).existsSync()) return null;
+
+    return [
+      CliTarget.executable(
+        id: '',
+        executablePath: 'bin/$pkgName.dart',
+        commandName: pkgName,
+      ),
+    ];
+  }
+
+  static List<CliTarget>? _targetsFromBinDirectory(String dir, String pkgName) {
+    final binDir = Directory(p.join(dir, 'bin'));
+    if (!binDir.existsSync()) return null;
+
+    final dartFiles = binDir
+        .listSync()
+        .whereType<File>()
+        .where((f) => f.path.endsWith('.dart'))
+        .toList();
+
+    if (dartFiles.isEmpty) return null;
+
+    if (dartFiles.length == 1) {
+      final rel = p.relative(dartFiles.first.path, from: dir);
+      return [
+        CliTarget.executable(id: '', executablePath: rel, commandName: pkgName),
+      ];
+    }
+
+    return [
+      for (final f in dartFiles)
+        CliTarget.executable(
+          id: p.basenameWithoutExtension(f.path),
+          executablePath: p.relative(f.path, from: dir),
+          commandName: p.basenameWithoutExtension(f.path),
+        ),
+    ];
   }
 }
