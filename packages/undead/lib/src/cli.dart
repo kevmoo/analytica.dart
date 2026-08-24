@@ -110,10 +110,10 @@ ArgParser buildArgParser() {
 /// Main CLI runner for `pkg:undead`.
 class UndeadCliRunner {
   final ArgParser parser;
-  final IOSink outSink;
-  final IOSink errSink;
+  final StringSink outSink;
+  final StringSink errSink;
 
-  UndeadCliRunner({ArgParser? parser, IOSink? outSink, IOSink? errSink})
+  UndeadCliRunner({ArgParser? parser, StringSink? outSink, StringSink? errSink})
     : parser = parser ?? buildArgParser(),
       outSink = outSink ?? stdout,
       errSink = errSink ?? stderr;
