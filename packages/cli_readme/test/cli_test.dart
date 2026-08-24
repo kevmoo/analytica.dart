@@ -7,7 +7,9 @@ import 'package:test_descriptor/test_descriptor.dart' as d;
 import 'package:test_process/test_process.dart';
 
 void main() {
-  final binPath = p.absolute('packages/cli_readme/bin/cli_readme.dart');
+  final binPath = File('bin/cli_readme.dart').existsSync()
+      ? p.absolute('bin/cli_readme.dart')
+      : p.absolute('packages/cli_readme/bin/cli_readme.dart');
 
   test('CLI --help prints usage and exits 0', () async {
     final proc = await TestProcess.start(Platform.resolvedExecutable, [
