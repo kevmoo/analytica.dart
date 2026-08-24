@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:analytica/testing.dart';
 import 'package:checks/checks.dart';
 import 'package:dedupe/dedupe.dart';
 import 'package:dedupe/src/cli.dart';
@@ -10,9 +11,11 @@ import 'package:test_descriptor/test_descriptor.dart' as d;
 import 'package:test_process/test_process.dart';
 
 void main() {
-  final binPath = File('bin/dedupe.dart').existsSync()
-      ? p.normalize(p.absolute('bin/dedupe.dart'))
-      : p.normalize(p.absolute('packages/dedupe/bin/dedupe.dart'));
+  late String binPath;
+
+  setUpAll(() async {
+    binPath = await resolvePackageExecutable('package:dedupe/dedupe.dart');
+  });
 
   Future<TestProcess> runDedupe(List<String> args, {String? workingDirectory}) {
     return TestProcess.start(Platform.resolvedExecutable, [
