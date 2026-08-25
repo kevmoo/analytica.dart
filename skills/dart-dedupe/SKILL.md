@@ -61,7 +61,7 @@ detect:
 Run the official package CLI directly:
 
 ```bash
-dart run dedupe [options] [target_path]
+dart run dedupe@^0.1.0 [options] [target_path]
 ```
 
 ### Execution Modes
@@ -69,13 +69,13 @@ dart run dedupe [options] [target_path]
 #### Mode 1: Full Repository / Directory Scan
 ```bash
 # Markdown summary with clickable file links
-dart run dedupe
+dart run dedupe@^0.1.0
 
 # Machine-readable JSON output for agent pipelines
-dart run dedupe --format=json
+dart run dedupe@^0.1.0 --format=json
 
 # Write JSON report to file alongside human stdout
-dart run dedupe --json-output=report.json
+dart run dedupe@^0.1.0 --json-output=report.json
 ```
 
 #### Mode 2: PR / Git Diff Delta Scan (`--git-diff`)
@@ -83,13 +83,13 @@ Focus strictly on code modified in a branch or PR:
 
 ```bash
 # In Git checkouts:
-dart run dedupe --git-diff=origin/main
+dart run dedupe@^0.1.0 --git-diff=origin/main
 
 # Filter report strictly to clusters intersecting modified lines:
-dart run dedupe --git-diff=origin/main --only-changed
+dart run dedupe@^0.1.0 --git-diff=origin/main --only-changed
 
 # Fail CI if diff duplication exceeds 5%:
-dart run dedupe --git-diff=origin/main --fail-threshold=5
+dart run dedupe@^0.1.0 --git-diff=origin/main --fail-threshold=5
 ```
 
 ### Common CLI Options Reference

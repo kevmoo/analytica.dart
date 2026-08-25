@@ -59,7 +59,7 @@ Execute the official package CLI directly in the terminal to retrieve reachabili
 findings deterministically:
 
 ```bash
-dart run undead@ [options] [target_path]
+dart run undead@^0.1.1 [options] [target_path]
 ```
 
 > [!NOTE]
@@ -67,7 +67,7 @@ dart run undead@ [options] [target_path]
 > `.dart_tool/package_config.json` to resolve `package:<name>/...` imports. If
 > packages are unresolved, pass `--pub-get` to automatically run `dart pub get`
 > or `flutter pub get`. If encountering `.dart_tool` atomic rename errors in
-> sandboxed environments, pass `--no-precompile` (e.g. `dart run --no-precompile undead@`).
+> sandboxed environments, pass `--no-precompile` (e.g. `dart run --no-precompile undead@^0.1.1`).
 
 ### Execution Modes
 
@@ -78,10 +78,10 @@ tests:
 
 ```bash
 # Markdown output for human review
-dart run undead@
+dart run undead@^0.1.1
 
 # Machine-readable JSON output for agent automation
-dart run undead@ --format=json
+dart run undead@^0.1.1 --format=json
 ```
 
 #### Mode 2: Closed Application (`--mode=closed-app`)
@@ -89,7 +89,7 @@ Traces execution strictly from executable entrypoints (`bin/**`, `lib/main.dart`
 `lib/main_*.dart`). Treats unreferenced public declarations as dead:
 
 ```bash
-dart run undead@ --mode=closed-app
+dart run undead@^0.1.1 --mode=closed-app
 ```
 
 #### Mode 3: Example Code Handling (`--example-mode`)

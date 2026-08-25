@@ -43,7 +43,7 @@ Rely on deterministic evaluation to target structures matching these indicators:
 Execute the official package CLI directly in the terminal to retrieve exact
 complexity scores deterministically without LLM arithmetic or AST interpretation.
 
-> **SDK Compatibility Note**: Executing `dart run cognitive_complexity@` requires
+> **SDK Compatibility Note**: Executing `dart run cognitive_complexity@^0.2.4` requires
 > Dart SDK version **3.12.0 or greater** installed in the host environment. Verify
 > compatibility via `dart --version` before initiating scans.
 
@@ -54,7 +54,7 @@ When the user references a discrete component (e.g., "check complexity in
 `lib/src/auth/`" or "audit `order_service.dart`"), pass explicit targets:
 
 ```bash
-dart run cognitive_complexity@ --threshold 15 lib/src/auth/
+dart run cognitive_complexity@^0.2.4 --threshold 15 lib/src/auth/
 ```
 
 ### Scope 2: Delta (Pull Request, Branch, or Pre-flight Audit)
@@ -62,7 +62,7 @@ When reviewing a feature branch, active commit stack, or PR, avoid full-project
 scanning. Isolate evaluation strictly to modified declarations against trunk:
 
 ```bash
-dart run cognitive_complexity@ --git-diff origin/main --fail-threshold 15 --fail-on-increase
+dart run cognitive_complexity@^0.2.4 --git-diff origin/main --fail-threshold 15 --fail-on-increase
 ```
 
 With both flags set, only increases that exceed the threshold fail — healthy
@@ -76,10 +76,10 @@ When invoked without targeting parameters ("scan my project for complexity" or
 
 ```bash
 # Production logic target (threshold 15)
-dart run cognitive_complexity@ --threshold 15 lib/
+dart run cognitive_complexity@^0.2.4 --threshold 15 lib/
 
 # Test harness target (threshold 40)
-dart run cognitive_complexity@ --threshold 40 test/
+dart run cognitive_complexity@^0.2.4 --threshold 40 test/
 ```
 
 ---
@@ -246,7 +246,7 @@ statement-level data-flow analyzer (on-demand form; same SDK 3.12.0+
 requirement as the scanner) on each line slice you intend to extract:
 
 ```bash
-dart run cognitive_complexity:data_flow@ lib/src/my_file.dart:45-80
+dart run cognitive_complexity:data_flow@^0.2.4 lib/src/my_file.dart:45-80
 ```
 
 Its report (`inputs`, `mutations`, live `outputs`, control-flow escapes, and
@@ -398,7 +398,7 @@ when the loop body alone is the hotspot.
 
 Run these verification commands before committing refactored code:
 
-1. **Complexity Audit**: Run `dart run cognitive_complexity@
+1. **Complexity Audit**: Run `dart run cognitive_complexity@^0.2.4
    --fail-threshold 15 <refactored files>` scoped to the files you touched.
    Pre-existing breaches elsewhere in the project do not invalidate the
    refactor.
@@ -448,7 +448,7 @@ To reproduce or re-evaluate cognitive complexity scores:
 
 <!-- If statement data-flow analysis was used during decomposition: -->
 ```bash
-dart run cognitive_complexity:data_flow@ {file}:{start_line}-{end_line}
+dart run cognitive_complexity:data_flow@^0.2.4 {file}:{start_line}-{end_line}
 ```
 ````
 
