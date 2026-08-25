@@ -82,7 +82,9 @@ Usage: dedupe [options] [target_path]
     --fail-threshold=<percentage>          Exit with non-zero code (1) if overall duplication percentage (or diff duplication percentage when --git-diff is set) exceeds this ceiling.
 -d, --git-diff=<git-ref>                   Git reference (e.g. origin/main or HEAD~1) to compare against for PR/CL delta evaluation.
     --[no-]only-changed                    Only report duplicate clusters that intersect modified lines in the Git diff.
-    --exclude=<pattern1,pattern2>          Comma-separated glob/wildcard patterns of files to exclude.
+    --exclude=<glob>                       Glob patterns of files/directories to exclude (repeatable or comma-separated).
+    --[no-]ignore-generated                Exclude generated files (*.g.dart, *.freezed.dart, *.mocks.dart, etc.).
+                                           (defaults to on)
     --include=<pattern1,pattern2>          Comma-separated glob/wildcard patterns of files to include.
     --[no-]files                           Include per-file duplication metrics table in report.
                                            (defaults to on)

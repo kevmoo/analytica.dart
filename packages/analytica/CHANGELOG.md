@@ -1,8 +1,13 @@
 ## 0.1.2-wip
 
+- Add `PathFilter` in `package:analytica/analyzer.dart` for centralized path
+  exclusion matching and generated Dart code filtering.
+- Add `addPathFilterOptions`, `addPathFilterArgs`, and `parsePathFilter` CLI
+  utilities in `package:analytica/cli.dart`.
 - Add `package:analytica/testing.dart` with `resolvePackageDirectory`,
   `resolvePackageFile`, `resolvePackageExecutable`, and `capturePrints`
   test helpers.
+
 
 ## 0.1.1
 

@@ -68,7 +68,9 @@ Usage: undead [options] [target_path]
                                            [demonstration (default), strict, skip]
 -m, --mode                                 Package analysis mode.
                                            [library (default), closed-app]
-    --[no-]include-generated               Include generated files (*.g.dart, *.freezed.dart) in analysis.
+    --exclude=<glob>                       Glob patterns of files/directories to exclude (repeatable or comma-separated).
+    --[no-]ignore-generated                Exclude generated files (*.g.dart, *.freezed.dart, *.mocks.dart, etc.).
+                                           (defaults to on)
     --[no-]fail-on-undead                  Exit with non-zero code (1) if any undead declaration is detected.
     --test-support-patterns                Comma-separated naming wildcard patterns for test fixtures and hooks.
                                            (defaults to "Fake*,Mock*")

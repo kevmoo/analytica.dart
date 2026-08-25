@@ -1,6 +1,9 @@
 ## 0.1.2-wip
 
+- Adopt centralized `PathFilter` in `UndeadOptions` and CLI for `--exclude`
+  and `--[no-]ignore-generated` file filtering.
 - Add `ensure_cli_readme_test.dart` to verify CLI `--help` documentation in `README.md`.
+
 
 ## 0.1.1
 

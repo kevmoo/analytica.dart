@@ -1,7 +1,10 @@
 ## 0.1.1-wip
 
+- Adopt centralized `PathFilter` for `--exclude` and generated code filtering
+  (`--[no-]ignore-generated`).
 - Add `ensure_cli_readme_test.dart` to verify CLI `--help` documentation in `README.md`.
 - Add `dart-dedupe` agent skill integration guide in `README.md`.
+
 
 ## 0.1.0
 

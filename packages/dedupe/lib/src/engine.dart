@@ -409,7 +409,7 @@ class DedupeEngine {
       return const [];
     }
 
-    final excludes = options.excludePatterns.map(WildcardPattern.new).toList();
+    final pathFilter = options.pathFilter;
     final includes = options.includePatterns.map(WildcardPattern.new).toList();
 
     final discovered = <String>{};
@@ -418,7 +418,7 @@ class DedupeEngine {
         targetDir: targetDir,
         target: target,
         includes: includes,
-        excludes: excludes,
+        pathFilter: pathFilter,
         discovered: discovered,
       );
     }
@@ -431,14 +431,14 @@ class DedupeEngine {
     required Directory targetDir,
     required String target,
     required List<WildcardPattern> includes,
-    required List<WildcardPattern> excludes,
+    required PathFilter pathFilter,
     required Set<String> discovered,
   }) {
     final fullPath = p.normalize(p.join(targetDir.path, target));
     final type = FileSystemEntity.typeSync(fullPath);
 
     if (type == FileSystemEntityType.file) {
-      if (_matchesFilters(fullPath, targetDir.path, includes, excludes)) {
+      if (_matchesFilters(fullPath, targetDir.path, includes, pathFilter)) {
         discovered.add(fullPath);
       }
     } else if (type == FileSystemEntityType.directory) {
@@ -446,7 +446,7 @@ class DedupeEngine {
         dir: Directory(fullPath),
         rootDirPath: targetDir.path,
         includes: includes,
-        excludes: excludes,
+        pathFilter: pathFilter,
         discovered: discovered,
       );
     }
@@ -456,12 +456,12 @@ class DedupeEngine {
     required Directory dir,
     required String rootDirPath,
     required List<WildcardPattern> includes,
-    required List<WildcardPattern> excludes,
+    required PathFilter pathFilter,
     required Set<String> discovered,
   }) {
     for (final entity in dir.listSync(recursive: true, followLinks: false)) {
       if (entity is File &&
-          _matchesFilters(entity.path, rootDirPath, includes, excludes)) {
+          _matchesFilters(entity.path, rootDirPath, includes, pathFilter)) {
         discovered.add(entity.path);
       }
     }
@@ -471,22 +471,20 @@ class DedupeEngine {
     String filePath,
     String rootDirPath,
     List<WildcardPattern> includes,
-    List<WildcardPattern> excludes,
+    PathFilter pathFilter,
   ) {
     if (!filePath.endsWith('.dart')) return false;
 
     final relPath = p.normalize(p.relative(filePath, from: rootDirPath));
+    if (pathFilter.isExcluded(relPath)) {
+      return false;
+    }
+
+    if (includes.isEmpty) return true;
+
     final forwardRelPath = relPath.replaceAll(r'\', '/');
     final rootedPath = '/$forwardRelPath';
     final basename = p.basename(filePath);
-
-    for (final pattern in excludes) {
-      if (pattern.matches(forwardRelPath) ||
-          pattern.matches(rootedPath) ||
-          pattern.matches(basename)) {
-        return false;
-      }
-    }
 
     for (final pattern in includes) {
       if (pattern.matches(forwardRelPath) ||

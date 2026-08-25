@@ -54,6 +54,9 @@ Options:
     --comment-output=<path>       With --format=github, also write a standalone report to this path, ordered by significance and capped by --max-comment-rows. Intended for posting as a PR comment while the step summary keeps the full table.
     --max-comment-rows=<count>    Maximum table rows in --comment-output (0 = unlimited). GitHub rejects comment bodies over 65536 characters.
                                   (defaults to "0")
+    --exclude=<glob>              Glob patterns of files/directories to exclude (repeatable or comma-separated).
+    --[no-]ignore-generated       Exclude generated files (*.g.dart, *.freezed.dart, *.mocks.dart, etc.).
+                                  (defaults to on)
 ```
 <!-- CLI_README_END cognitive_complexity -->
 

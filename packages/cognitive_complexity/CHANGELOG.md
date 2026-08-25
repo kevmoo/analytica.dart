@@ -1,9 +1,13 @@
 ## 0.2.5-wip
 
+- Support `--exclude` and `--[no-]ignore-generated` CLI options to configure
+  file exclusion and generated code filtering via `PathFilter`.
+- Add `pathFilter` parameter to `ComplexityAnalyzer` and `DeltaAnalyzer`.
 - Add `ensure_cli_readme_test.dart` to verify CLI `--help` documentation in `README.md`.
 - Update GitHub Action documentation in `README.md` to reference modular
   subdirectory path (`packages/cognitive_complexity`) and add rendered Action
   Inputs Reference table.
+
 
 ## 0.2.4
 

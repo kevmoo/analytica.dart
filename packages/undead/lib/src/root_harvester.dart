@@ -353,45 +353,11 @@ class RootHarvester {
     );
   }
 
-  bool _isExcluded(String relativePath) {
-    final segments = p.split(p.normalize(relativePath));
-    if (segments.isEmpty) return false;
-    if (segments.contains('.dart_tool') ||
-        segments.contains('.git') ||
-        segments.first == 'build') {
-      return true;
-    }
+  bool _isExcluded(String relativePath) =>
+      options.pathFilter.isExcluded(relativePath);
 
-    if (!options.includeGenerated) {
-      final filename = p.basename(relativePath);
-      if (filename.endsWith('.g.dart') ||
-          filename.endsWith('.freezed.dart') ||
-          filename.endsWith('.mocks.dart')) {
-        return true;
-      }
-    }
-
-    return false;
-  }
-
-  bool _isExcludedFromExtraRoot(String relativePath) {
-    final segments = p.split(p.normalize(relativePath));
-    if (segments.isEmpty) return false;
-    if (segments.contains('.dart_tool') || segments.contains('.git')) {
-      return true;
-    }
-
-    if (!options.includeGenerated) {
-      final filename = p.basename(relativePath);
-      if (filename.endsWith('.g.dart') ||
-          filename.endsWith('.freezed.dart') ||
-          filename.endsWith('.mocks.dart')) {
-        return true;
-      }
-    }
-
-    return false;
-  }
+  bool _isExcludedFromExtraRoot(String relativePath) =>
+      options.pathFilter.isExcluded(relativePath);
 
   String _extractPackageName(String pubspecContent) {
     final match = RegExp(
