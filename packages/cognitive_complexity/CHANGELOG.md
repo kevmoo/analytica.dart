@@ -3,11 +3,11 @@
 - Support `--exclude` and `--[no-]ignore-generated` CLI options to configure
   file exclusion and generated code filtering via `PathFilter`.
 - Add `pathFilter` parameter to `ComplexityAnalyzer` and `DeltaAnalyzer`.
-- Add `ensure_cli_readme_test.dart` to verify CLI `--help` documentation in `README.md`.
+- Add `ensure_cli_readme_test.dart` to verify CLI `--help` documentation in
+  `README.md`.
 - Update GitHub Action documentation in `README.md` to reference modular
   subdirectory path (`packages/cognitive_complexity`) and add rendered Action
   Inputs Reference table.
-
 
 ## 0.2.4
 
@@ -23,11 +23,12 @@
   (violations, then increases, then additions) for posting as a PR comment,
   while the step summary keeps the full table (#49).
 - Add `commentFile` and `maxCommentRows` parameters to `GitHubReporter`.
-- Add `max-comment-rows` input to the GitHub Action (default `0` = unlimited)
-  to keep sticky comments under GitHub's 65536-character body limit.
-- Anchor GitHub annotations to the declaration line only, so they render
-  under the function signature instead of after the closing brace (#55).
-- Move package into pub workspace monorepo layout under `packages/cognitive_complexity`.
+- Add `max-comment-rows` input to the GitHub Action (default `0` = unlimited) to
+  keep sticky comments under GitHub's 65536-character body limit.
+- Anchor GitHub annotations to the declaration line only, so they render under
+  the function signature instead of after the closing brace (#55).
+- Move package into pub workspace monorepo layout under
+  `packages/cognitive_complexity`.
 - Restore root `action.yml` and `skills/` structure for monorepo workspace.
 
 ## 0.2.3

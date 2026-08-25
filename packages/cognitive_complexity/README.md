@@ -36,6 +36,7 @@ _(Requires Dart SDK **3.12.0 or greater**)_.
 ### `cognitive_complexity` CLI Options
 
 <!-- CLI_README_START cognitive_complexity -->
+
 ```console
 $ cognitive_complexity --help
 Dart & Flutter Cognitive Complexity Calculator
@@ -58,11 +59,13 @@ Options:
     --[no-]ignore-generated       Exclude generated files (*.g.dart, *.freezed.dart, *.mocks.dart, etc.).
                                   (defaults to on)
 ```
+
 <!-- CLI_README_END cognitive_complexity -->
 
 ### `data_flow` CLI Options
 
 <!-- CLI_README_START data_flow -->
+
 ```console
 $ data_flow --help
 Dart Data-Flow & Method Extraction Analyzer
@@ -92,6 +95,7 @@ Options:
                   [json (default), text]
     --sdk-path    Path to the Dart SDK root used for analysis. Defaults to auto-discovery (running VM, DART_SDK environment variable, PATH, FLUTTER_ROOT).
 ```
+
 <!-- CLI_README_END data_flow -->
 
 ### Library API
@@ -148,15 +152,17 @@ jobs:
 #### Action Inputs Reference
 
 <!-- mdformat off(prevent table wrapping) -->
-| Input | Default | Description |
-| :--- | :---: | :--- |
-| `targets` | `lib` | Space-separated list of directories or files to scan. |
-| `threshold` | `0` | Minimum score required to include a declaration in summary tables. |
-| `fail-threshold` | `15` | Maximum complexity ceiling allowed before failing the build. |
-| `diff-base` | _Auto_ | Git ref to compare against (e.g. `origin/main`). Auto-detects PR base. |
-| `fail-on-increase` | `false` | When `true`, blocks PR merge on complexity increases exceeding `fail-threshold`. |
-| `format` | `github` | Output format: `github` (annotations + step summary), `text`, or `json`. |
-| `max-comment-rows` | `0` | Maximum table rows in the sticky PR comment (0 = unlimited). |
+
+| Input              | Default  | Description                                                                      |
+| :----------------- | :------: | :------------------------------------------------------------------------------- |
+| `targets`          |  `lib`   | Space-separated list of directories or files to scan.                            |
+| `threshold`        |   `0`    | Minimum score required to include a declaration in summary tables.               |
+| `fail-threshold`   |   `15`   | Maximum complexity ceiling allowed before failing the build.                     |
+| `diff-base`        |  _Auto_  | Git ref to compare against (e.g. `origin/main`). Auto-detects PR base.           |
+| `fail-on-increase` | `false`  | When `true`, blocks PR merge on complexity increases exceeding `fail-threshold`. |
+| `format`           | `github` | Output format: `github` (annotations + step summary), `text`, or `json`.         |
+| `max-comment-rows` |   `0`    | Maximum table rows in the sticky PR comment (0 = unlimited).                     |
+
 <!-- mdformat on -->
 
 ## 🧠 AI Agent Integration
