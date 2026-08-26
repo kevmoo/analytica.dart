@@ -120,24 +120,38 @@ a ranked Markdown **Complexity Triage Report** directly in chat (or to an
 artifact for extensive findings) containing:
 
 - Flagged function name and clickable file local path.
-- Current complexity score versus operational ceiling.
+- Current complexity score versus operational ceiling (sorted descending by
+  score).
 - Recommended refactoring strategy (Pattern A, B, D, E, or a Pattern C tier) and
   unit test status.
+
+### Invariant: Outlier-First Mandate (Tackle the Monster)
+
+- **Must Target the #1 Outlier**: When remediating complexity, you MUST target
+  the single highest-scoring function in the report (e.g. Score >= 25, or the top
+  outlier like a score 100 method) first.
+- **Forbid Timid Sub-Threshold Picks**: It is strictly forbidden to pick an easy,
+  mildly elevated helper (e.g. score 18) while ignoring a severe monster
+  outlier (e.g. score 100 or 50) in the report.
+- **Aggressive Decomposition Target**: Apply Dart 3 pattern matching, guard
+  clauses, and method decomposition to drive the top outlier's score down to
+  `<= 15`.
 
 ### Stage 2: Interactive User Selection (Confirmation Gate)
 
 Pause execution and prompt the user (via interactive choice or chat) to select
 the desired sequencing:
 
-1. **(Recommended) Refactor Top Hotspot Only**: Target the single
-   highest-scoring declaration first, verify via unit tests, and present diffs
-   cleanly.
-2. **Selective Batch Refactor**: Remediate a user-specified subset of functions.
+1. **(Recommended) Refactor Top Monster Outlier First**: Target the single
+   highest-scoring declaration in the report, decompose to score <= 15, verify
+   via unit tests, and present diffs cleanly.
+2. **Selective Batch Refactor**: Remediate the top $N$ highest-scoring functions
+   in descending order.
 3. **Report-Only / Exit**: Acknowledge complexity scores without code mutation.
 
 > **Explicit Bypass Exception**: Skip Stage 1 triage only when the user provides
 > an explicit remediation directive upfront (e.g., "Refactor `processOrder` in
-> `lib/src/order.dart` to fix complexity").
+> `lib/src/order.dart` to fix complexity" or "Refactor the top complexity outlier").
 
 ---
 

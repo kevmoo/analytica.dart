@@ -169,6 +169,26 @@ To suppress intentional dead code or API placeholders without deleting:
 - _(Note: Never use `// ignore: ...` as the Dart analyzer treats unknown lint
   codes as errors)._
 
+### Invariant 5: Monorepo & External Entrypoint Protection
+
+In monorepos with multiple inter-dependent packages (e.g. `pkgs/test` wrapping
+`pkgs/test_core`), some declarations in `lib/src/` (such as `runTests` in
+`executable.dart`) serve as execution entrypoints invoked by sibling packages or
+top-level executables.
+- Check if the target package is consumed by parent/sibling packages in the
+  workspace before deleting top-level `lib/src/` functions.
+- If an unexported function is an intended external entrypoint, protect it with
+  `// ignore: unreachable_from_main` or `// undead:ignore`.
+
+### Invariant 6: Holistic Pruning Mandate (No Trivial-Only Edits)
+
+When pruning dead code, do not settle for trivial bookkeeping (like deleting a
+few unused exit codes while leaving entire unreferenced subsystems intact).
+- Delete all verified pure dead classes, functions, and files in `lib/src/`
+  (e.g., dead listeners, obsolete runner scaffolds) in one cohesive pass.
+- Remove orphaned imports, associated dead private helpers, and obsolete test
+  fixtures concurrently.
+
 ---
 
 ## 4. The 2-Stage Triage & Confirmation Protocol
@@ -194,8 +214,9 @@ Output a ranked **Dead Code Triage Report** containing:
 Pause execution and prompt the user (via interactive choice or chat) to select
 the desired remediation scope:
 
-1. **(Recommended) Prune Internal Dead Code Only**: Delete unreferenced
-   declarations in `lib/src/**` and isolated test files.
+1. **(Recommended) Prune All Verified Dead Subsystems & Files**: Concurrently
+   delete all unreferenced internal classes, functions, and files in
+   `lib/src/**` and isolated dead test files.
 2. **Prune Application Entrypoints**: Target dead features in a closed app
    (`--mode=closed-app`).
 3. **Suppress Findings**: Add `// undead:ignore` comments to intentional

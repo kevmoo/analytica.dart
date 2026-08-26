@@ -158,6 +158,19 @@ Evaluate each candidate cluster before modifying code:
 - **DAMP Test Boilerplate:** Repetitive setup structures in table-driven unit
   tests.
 
+### Invariant: Exhaustive Cluster Adoption (Anti-Half-Measure Rule)
+
+When extracting a shared helper, mixin, or base class for an actionable duplicate
+cluster:
+- **Mandatory 100% Adoption**: You MUST apply the shared abstraction across
+  **ALL participating files** in that cluster in the same refactoring pass.
+- **No Timid Half-Measures**: Never refactor only 1 participating file while
+  leaving the remaining $N-1$ files with duplicate copy-paste logic.
+- **Subsystem Consolidation**: If multiple sibling classes (e.g. 5 reporter
+  classes) share multiple duplicate clusters (e.g. description formatting, error
+  handling, stream subscriptions), design a comprehensive shared base class or
+  mixin (e.g. `ReporterBase`) that consolidates all shared clusters at once.
+
 ---
 
 ## 4. The 2-Stage Triage & Confirmation Protocol
@@ -178,16 +191,19 @@ Output a ranked **Duplication Triage Report** containing:
    (`identical`, `structural`, `parameterized`, `gapped`).
 3. **Actionability Annotations**: Highlight recommended extraction strategy or
    mark as "Necessary Duplication (Preserve)".
+4. **Prioritization**: Rank by highest token volume and widest file footprint
+   first.
 
 ### Stage 2: Interactive User Confirmation Gate
 
 Pause execution and prompt the user (via interactive choice or chat) to select
 the desired remediation scope:
 
-1. **(Recommended) Refactor Top Actionable Cluster Only**: Target the single
-   highest-impact duplicate helper or decoder.
-2. **Refactor All Actionable Clusters in Scope**: Sequentially extract all
-   approved duplicate blocks.
+1. **(Recommended) Refactor Top Actionable Cluster Across All Files**:
+   Consolidate the highest-impact duplicate cluster and refactor 100% of the
+   participating files in that cluster.
+2. **Subsystem Base Refactor**: Consolidate multiple related duplicate clusters
+   across sibling classes into a unified shared base/mixin.
 3. **Report-Only / Exit**: Acknowledge findings without code mutations.
 
 ---
