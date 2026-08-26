@@ -45,6 +45,18 @@ Specialized agent skills are maintained in the [`skills/`](skills/) directory an
 * [**`dart-dedupe`**](skills/dart-dedupe/SKILL.md) (documented in [`dedupe`](packages/dedupe/README.md#-ai-agent-integration)): Structural code duplication audits, clone triage, and safe deduplication.
 * [**`dart-undead`**](skills/dart-undead/SKILL.md) (documented in [`undead`](packages/undead/README.md#-ai-agent-integration)): Deterministic dead code reachability audits and safe declaration pruning.
 
+Install using either the dart skills CLI:
+
+```bash
+dart run skills@ add kevmoo/analytica.dart --skill <skill-name>
+```
+
+Or npx skills:
+
+```bash
+npx skills add kevmoo/analytica.dart --skill <skill-name>
+```
+
 ---
 
 ## ⚡ CLI Quick Run

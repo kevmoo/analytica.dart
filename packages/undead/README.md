@@ -116,6 +116,14 @@ This repository packages an agent skill (`dart-undead`) to train AI pair
 programmers on dead code audits, reachability analysis, and safe deletion
 protocols:
 
+Install using either the dart skills CLI:
+
+```bash
+dart run skills@ add kevmoo/analytica.dart --skill dart-undead
+```
+
+Or npx skills:
+
 ```bash
 npx skills add kevmoo/analytica.dart --skill dart-undead
 ```

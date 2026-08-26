@@ -133,6 +133,14 @@ This repository packages an agent skill (`dart-dedupe`) to train AI pair
 programmers on structural code duplication audits, clone triage, and safe
 deduplication refactoring:
 
+Install using either the dart skills CLI:
+
+```bash
+dart run skills@ add kevmoo/analytica.dart --skill dart-dedupe
+```
+
+Or npx skills:
+
 ```bash
 npx skills add kevmoo/analytica.dart --skill dart-dedupe
 ```
