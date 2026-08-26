@@ -107,7 +107,7 @@ Controls how code in `example/` is treated during reachability analysis:
 - `skip`: Ignores `example/` completely during analysis.
 
 ```bash
-dart run undead@ --example-mode=demonstration
+dart run undead@^0.1.1 --example-mode=demonstration
 ```
 
 ### Common CLI Options Reference
@@ -166,8 +166,48 @@ To suppress intentional dead code or API placeholders without deleting:
 
 - **Declaration Level**: `// undead:ignore` (placed directly above declaration).
 - **File Level**: `// undead:ignore_for_file` (placed at top of file).
-- _(Note: Never use `// ignore: ...` as the Dart analyzer treats unknown lint
-  codes as errors)._
+- _(Note: The standard `// ignore: unreachable_from_main` is strictly for the
+  built-in Dart analyzer lint rule; `pkg:undead` requires `// undead:ignore`)._
+
+### Invariant 5: Dynamic Invocation & Non-AST Reference Check
+
+Static AST analysis (`pkg:undead`) only traces typed Dart import trees. It
+cannot see declarations referenced through runtime meta-programming:
+- Dynamic isolate spawners (`dart.runInIsolate`, `Isolate.spawnUri`)
+- Code-generation string templates (`'''import "package:.../foo.dart";'''`)
+- JS / WASM compilation targets and runtime asset bootstrap runners
+- Build hooks and `build.yaml` references
+
+**The Pre-Deletion Check Protocol:**
+1. Before deleting any candidate file or top-level declaration in `lib/src/`,
+   perform a literal string search (`grep_search "<filename_or_symbol>"`) across
+   the repository.
+2. If text matches exist outside the target file itself, **inspect and understand
+   the match context** before deleting:
+   - **KEEP**: The match is an active runtime string template, dynamic isolate
+     entrypoint, or compilation target. Protect it with `// undead:ignore`.
+   - **PRUNE**: The match is merely a doc comment, obsolete README reference, or
+     dead test fixture that should be deleted alongside the target.
+
+### Invariant 6: Monorepo & External Entrypoint Protection
+
+In multi-package workspaces where internal implementation libraries export
+entrypoints consumed by sibling CLI wrappers or test runners:
+- Include sibling packages and root integration test folders using
+  `--extra-roots` or enable `--workspace-discovery`.
+- If an unexported function is an intended external entrypoint, protect it with
+  `// undead:ignore` (and `// ignore: unreachable_from_main` if analyzer lint is
+  active).
+
+### Invariant 7: Cohesive Subsystem Pruning
+
+When pruning dead code, avoid partial or purely cosmetic deletions that leave
+larger unreferenced subsystems intact:
+- Delete all verified unreferenced internal classes, functions, and files in
+  `lib/src/` (e.g., unreferenced listener classes, unused event sinks, obsolete
+  scaffold runners) in one cohesive pass.
+- Remove orphaned imports, associated dead private helpers, and obsolete test
+  fixtures concurrently.
 
 ---
 
@@ -178,7 +218,7 @@ follow this strict 2-stage workflow:
 
 ### Stage 1: Read-Only Audit & Reporting (Mandatory Stop)
 
-Run `dart run undead@ --format=markdown` (or `--format=json`).
+Run `dart run undead@^0.1.1 --format=markdown` (or `--format=json`).
 
 Output a ranked **Dead Code Triage Report** containing:
 
@@ -194,13 +234,21 @@ Output a ranked **Dead Code Triage Report** containing:
 Pause execution and prompt the user (via interactive choice or chat) to select
 the desired remediation scope:
 
-1. **(Recommended) Prune Internal Dead Code Only**: Delete unreferenced
-   declarations in `lib/src/**` and isolated test files.
+1. **(Recommended) Prune All Verified Dead Subsystems & Files**: Concurrently
+   delete all unreferenced internal classes, functions, and files in
+   `lib/src/**` and isolated dead test files.
 2. **Prune Application Entrypoints**: Target dead features in a closed app
    (`--mode=closed-app`).
 3. **Suppress Findings**: Add `// undead:ignore` comments to intentional
    placeholders.
 4. **Report-Only / Exit**: Acknowledge findings without code mutations.
+
+> **Explicit Bypass & Headless Fallback**:
+> - **Direct Directives**: Skip Stage 1 pause if given explicit remediation
+>   instructions (e.g., "Prune dead code in `pkgs/foo` using `dart-undead`").
+> - **Autonomous Sessions**: In non-interactive contexts (e.g. `evalin` or
+>   subagents), proceed with Option 1 (Prune All Verified Dead Subsystems)
+>   automatically after verifying baseline tests pass.
 
 ---
 
@@ -208,27 +256,23 @@ the desired remediation scope:
 
 Always wrap code deletions in a strict test and analysis sandwich:
 
-```mermaid
-graph TD
-    A[Step 1: Baseline Verification<br>dart test] -->|Pass| B[Step 2: Run Undead Scan<br>dart run undead@]
-    B --> C[Step 3: Triage & Confirmation Gate<br>User Selects Targets]
-    C --> D[Step 4: Surgical Pruning<br>Remove Dead AST Nodes]
-    D --> E[Step 5: Post-Pruning Verification<br>dart analyze && dart test]
-    E -->|Pass| F[Step 6: Stage Clean Diffs]
-    E -->|Fail| G[Step 7: Rollback / Fix Hazard]
-```
-
-1. **Pre-Flight Baseline**: Execute `dart test` to confirm the test suite is
-   100% green before touching any code.
+1. **Pre-Flight Baseline**: 
+   - Check `pubspec.yaml`: if `sdk: flutter` is declared, run `flutter test`;
+     otherwise run `dart test`.
+   - Confirm test suite is 100% green before touching code.
 2. **Surgical Deletion**: Remove the flagged declaration and any orphaned
    imports associated with it.
 3. **Post-Flight Verification**:
-   - Run `dart analyze` to ensure zero compilation or unresolved reference
-     errors.
-   - Run `dart test` to confirm all remaining tests pass.
-4. **Clean Diff Staging**: Inspect modifications using `git diff --stat` (or
-   isolate in a temporary feature branch/worktree) to ensure only intended
-   declarations were removed.
+   - Run `flutter analyze` or `dart analyze` to ensure zero compilation or
+     unresolved reference errors.
+   - Run `flutter test` or `dart test` to confirm all remaining tests pass.
+   - **Monorepo Downstream Gate**: In multi-package repositories, run tests
+     across all dependent workspace packages and root integration tests before
+     staging.
+   - **Repository Policies**: If the repository enforces changelog tracking,
+     update `CHANGELOG.md` alongside the change.
+4. **Clean Diff Staging**: Inspect modifications using `git diff --stat` to
+   ensure only intended declarations were removed.
 
 ---
 
@@ -268,6 +312,6 @@ To reproduce or re-run this reachability audit locally:
 
 Determine the package version dynamically:
 
-- Check `pubspec.lock` in the workspace or run `dart run undead@ --version`.
-- If invoked with a specific version constraint (e.g. `undead@0.1.0`), use that
+- Check `pubspec.lock` in the workspace or run `dart run undead@^0.1.1 --version`.
+- If invoked with a specific version constraint (e.g. `undead@^0.1.1`), use that
   exact version.

@@ -155,8 +155,27 @@ Evaluate each candidate cluster before modifying code:
 - **Speculative wrapping of standalone entry points:** Abstracting trivial
   4-to-6 line `try/catch` fallback formatting across unrelated standalone CLI
   entry points (`bin/<script>.dart`).
+- **Code generator template strings:** Repetitive structural patterns in
+  multiline source code generation templates (e.g. `build_runner` code
+  emitters).
 - **DAMP Test Boilerplate:** Repetitive setup structures in table-driven unit
   tests.
+
+### Invariant: Exhaustive Cluster Adoption
+
+When extracting a shared helper, mixin, or base class for an actionable duplicate
+cluster:
+- **Mandatory Full-Cluster Scope**: Within a target package or subsystem, you
+  MUST apply the shared abstraction across **ALL participating files** in that
+  cluster in the same refactoring pass. Do not refactor only 1 file while leaving
+  the remaining N - 1 files with duplicate logic.
+- **Subsystem Consolidation**: If multiple sibling classes share multiple
+  duplicate clusters (e.g. description formatting, error handling, or stream
+  lifecycle), design a unified shared base class or mixin consolidating all
+  shared clusters at once.
+- **Encapsulation & Directory Placement**: Place extracted internal shared
+  abstractions under `lib/src/` (e.g. `lib/src/shared/` or `lib/src/common/`).
+  Never place internal helpers directly in the public `lib/` root.
 
 ---
 
@@ -167,7 +186,7 @@ strict 2-stage workflow:
 
 ### Stage 1: Read-Only Audit & Reporting (Mandatory Stop)
 
-Run `dart run dedupe --format=markdown` (or `--format=json`).
+Run `dart run dedupe@^0.1.0 --format=markdown` (or `--format=json`).
 
 Output a ranked **Duplication Triage Report** containing:
 
@@ -178,17 +197,27 @@ Output a ranked **Duplication Triage Report** containing:
    (`identical`, `structural`, `parameterized`, `gapped`).
 3. **Actionability Annotations**: Highlight recommended extraction strategy or
    mark as "Necessary Duplication (Preserve)".
+4. **Prioritization**: Rank by highest token volume and widest file footprint
+   first.
 
 ### Stage 2: Interactive User Confirmation Gate
 
 Pause execution and prompt the user (via interactive choice or chat) to select
 the desired remediation scope:
 
-1. **(Recommended) Refactor Top Actionable Cluster Only**: Target the single
-   highest-impact duplicate helper or decoder.
-2. **Refactor All Actionable Clusters in Scope**: Sequentially extract all
-   approved duplicate blocks.
+1. **(Recommended) Refactor Top Actionable Cluster Across All Files**:
+   Consolidate the highest-impact duplicate cluster and refactor 100% of the
+   participating files in that cluster.
+2. **Subsystem Base Refactor**: Consolidate multiple related duplicate clusters
+   across sibling classes into a unified shared base/mixin.
 3. **Report-Only / Exit**: Acknowledge findings without code mutations.
+
+> **Explicit Bypass & Headless Fallback**:
+> - **Direct Directives**: Skip Stage 1 pause if given explicit remediation
+>   instructions (e.g., "Deduplicate clusters in `pkgs/foo` using `dart-dedupe`").
+> - **Autonomous Sessions**: In non-interactive contexts (e.g. `evalin` or
+>   subagents), proceed with Option 1 (Refactor Top Actionable Cluster Across
+>   All Files) automatically after verifying baseline tests pass.
 
 ---
 
@@ -196,25 +225,20 @@ the desired remediation scope:
 
 Wrap all deduplication refactoring in a strict verification sandwich:
 
-```mermaid
-graph TD
-    A[Step 1: Baseline Verification<br>dart test] -->|Pass| B[Step 2: Run Dedupe Scan<br>dart run dedupe]
-    B --> C[Step 3: Triage & Confirmation Gate<br>User Selects Target Clusters]
-    C --> D[Step 4: Surgical Refactoring<br>Extract Shared Helper / Module]
-    D --> E[Step 5: Post-Refactor Health<br>dart analyze && dart test]
-    E -->|Pass| F[Step 6: Confirm Zero Clones<br>Re-run dedupe]
-    F --> G[Step 7: Stage Verified Diffs]
-    E -->|Fail| H[Step 8: Rollback / Fix Regressions]
-```
-
-1. **Verify Baseline:** Run `dart test` prior to modification. Ensure 100% pass.
-2. **Surgical Modification:** Extract shared functions or helper classes
-   cleanly.
-3. **Verify Post-Refactor Health:** Run `dart analyze --fatal-infos` and
-   `dart test`.
-4. **Zero-Clone Confirmation:** Re-run `dart run dedupe` to confirm the target
-   cluster was eliminated.
-5. **Local Staging:** Stage verified diffs locally (`git add .`).
+1. **Pre-Flight Baseline**: 
+   - Check `pubspec.yaml`: if `sdk: flutter` is declared, run `flutter test`;
+     otherwise run `dart test`.
+   - Confirm test suite is 100% green before touching code.
+2. **Surgical Modification**: Extract shared functions or helper classes under
+   `lib/src/` cleanly.
+3. **Verify Post-Refactor Health**:
+   - Run `flutter analyze` or `dart analyze --fatal-infos`.
+   - Run `flutter test` or `dart test`.
+   - **Monorepo Downstream Gate**: In multi-package workspaces, run tests across
+     all dependent packages.
+4. **Zero-Clone Confirmation**: Re-run `dart run dedupe@^0.1.0` to confirm the
+   target cluster was eliminated.
+5. **Local Staging**: Stage verified diffs locally (`git add .`).
 
 ---
 
