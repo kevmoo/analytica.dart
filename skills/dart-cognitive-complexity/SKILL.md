@@ -125,33 +125,37 @@ artifact for extensive findings) containing:
 - Recommended refactoring strategy (Pattern A, B, D, E, or a Pattern C tier) and
   unit test status.
 
-### Invariant: Outlier-First Mandate (Tackle the Monster)
+### Invariant: Outlier-First Mandate
 
-- **Must Target the #1 Outlier**: When remediating complexity, you MUST target
-  the single highest-scoring function in the report (e.g. Score >= 25, or the top
-  outlier like a score 100 method) first.
-- **Forbid Timid Sub-Threshold Picks**: It is strictly forbidden to pick an easy,
-  mildly elevated helper (e.g. score 18) while ignoring a severe monster
-  outlier (e.g. score 100 or 50) in the report.
-- **Aggressive Decomposition Target**: Apply Dart 3 pattern matching, guard
-  clauses, and method decomposition to drive the top outlier's score down to
-  `<= 15`.
+- **Target the Primary Outlier**: When remediating complexity, prioritize the
+  highest-scoring declaration in the report (e.g. Score >= 25 or top outlier)
+  to achieve the highest measurable reduction.
+- **Prioritize High-Impact Reductions**: Avoid selecting only minor
+  sub-threshold helpers while leaving severe complexity outliers unaddressed.
+- **Decomposition Target**: Apply Dart 3 pattern matching, guard clauses, and
+  method decomposition targeting a post-refactoring score of `<= 15`. For
+  massive legacy functions (score > 60), safe phased decomposition across
+  isolated PRs is permitted if a single pass would exceed reviewable diff limits.
 
 ### Stage 2: Interactive User Selection (Confirmation Gate)
 
 Pause execution and prompt the user (via interactive choice or chat) to select
 the desired sequencing:
 
-1. **(Recommended) Refactor Top Monster Outlier First**: Target the single
-   highest-scoring declaration in the report, decompose to score <= 15, verify
-   via unit tests, and present diffs cleanly.
-2. **Selective Batch Refactor**: Remediate the top $N$ highest-scoring functions
+1. **(Recommended) Refactor Primary Outlier First**: Target the single
+   highest-scoring declaration in the report, decompose towards score <= 15,
+   verify via unit tests, and present diffs cleanly.
+2. **Selective Batch Refactor**: Remediate the top N highest-scoring functions
    in descending order.
 3. **Report-Only / Exit**: Acknowledge complexity scores without code mutation.
 
-> **Explicit Bypass Exception**: Skip Stage 1 triage only when the user provides
-> an explicit remediation directive upfront (e.g., "Refactor `processOrder` in
-> `lib/src/order.dart` to fix complexity" or "Refactor the top complexity outlier").
+> **Explicit Bypass & Headless Fallback**:
+> - **Direct Directives**: Skip Stage 1 triage if given an explicit remediation
+>   directive upfront (e.g., "Refactor `processOrder` in `lib/src/order.dart` to
+>   fix complexity" or "Refactor the top complexity outlier").
+> - **Autonomous Sessions**: In non-interactive contexts (e.g. `evalin` or
+>   subagents), proceed with Option 1 (Refactor Primary Outlier) automatically
+>   after verifying baseline tests pass.
 
 ---
 
@@ -167,17 +171,15 @@ this verification baseline:
    - If the **`dart-collect-coverage`** companion skill is available in your
      agent runtime, invoke it to check line and branch coverage on the targeted
      declarations.
-   - At minimum, execute the relevant test suite
-     (`dart test test/foo_test.dart`) to confirm a passing green regression
+   - At minimum, execute the relevant test suite (`dart test test/foo_test.dart`
+     or `flutter test test/foo_test.dart`) to confirm a passing green regression
      baseline before touching code.
 3. **Low-Coverage Safety Gate**: If tests are missing or coverage around the
-   flagged function is inadequate, pause execution and explicitly warn the user:
-
-   > ⚠️ **Low Test Coverage Warning**: Function `<name>` in `<path>` lacks unit
-   > test coverage. Structural refactoring risks silent behavioral regression.
-
-   Offer clear remediation paths:
-   1. **(Recommended)** Write unit tests to lock in baseline behavior first.
+   flagged function is inadequate:
+   - **Interactive Sessions**: Pause execution and warn the user. Offer options
+     to (1) write unit tests first, or (2) proceed with surgical refactoring.
+   - **Autonomous / Headless Sessions**: Log a low-coverage warning and author a
+     minimal regression test before modifying complex logic.
    2. Proceed with structural refactoring and verify functionality manually.
 
 ---
@@ -277,86 +279,61 @@ bugs.
 
 #### Deterministic Tier Selection via `data_flow`
 
-Do not eyeball which tier a candidate slice belongs to. Run the companion
-statement-level data-flow analyzer (on-demand form; same SDK 3.12.0+ requirement
-as the scanner) on each line slice you intend to extract:
+#### Deterministic 3-Tier Selection via `data_flow`
+
+Do not manually estimate or guess which tier a candidate slice belongs to. Run
+the companion statement-level data-flow analyzer (on-demand form; same SDK
+3.12.0+ requirement as the scanner) on each line slice you intend to extract:
 
 ```bash
 dart run cognitive_complexity:data_flow@^0.2.4 lib/src/my_file.dart:45-80
 ```
 
 Its report (`inputs`, `mutations`, live `outputs`, control-flow escapes, and a
-synthesized Dart 3 record signature) selects the tier.
+synthesized Dart 3 record signature) selects the tier:
 
-**Slice at natural seams first.** If a slice reports control-flow escapes or a
-tightly coupled pair of mutable variables (`queue` + `visited`, `buffer` +
-`cursor`), the usual culprit is the slice boundary, not the code. Enlarge the
-slice to the whole loop or state machine and re-run `data_flow`: escapes
-targeting a loop inside the slice stop being escapes, coupled state becomes
-interior, and the enlarged slice usually extracts cleanly as Tier 1/2.
+1. **Tier 1 — Pure Functional Decomposition (First Choice)**:
+   - **Selection**: Cleanly extractable slice with 2+ live outputs.
+   - **Idiom**: Extract a static or top-level function returning the synthesized
+     Dart 3 named record signature verbatim (`final (:data, :errors) = _stepOne(input);`).
+   - **Dataclass Boundary**: Private, file-local slices use named records at ANY
+     output count—do not create single-use `_XxxResult` dataclasses for them.
+     Reserve dedicated dataclasses only for values that cross public API
+     boundaries or require specialized invariants/methods.
+   - **State Scoping**: If the helper does not read or mutate class instance
+     state (`this`), declare it as a private top-level function (or static
+     method) to guarantee referential transparency.
 
-These bullets are the ONLY selection rules:
+2. **Tier 2 — Standard Helper Extraction (Second Choice)**:
+   - **Selection**: Cleanly extractable slice with <= 1 live output and <= 3
+     inputs.
+   - **Idiom**: Extract a standard private helper method or private top-level
+     function returning that single value.
 
-- **Cleanly extractable, ≤ 1 live output, ≤ 3 inputs** → Tier 2: extract a
-  standard private helper returning that value. If the helper does not read or
-  mutate class instance state (`this`), declare it as a private top-level
-  function (or static method) rather than an instance method.
-- **Cleanly extractable, 2+ live outputs** → Tier 1: extract a static or
-  top-level function and use the synthesized named record signature verbatim.
-  Private, file-local slices use named records at ANY output count — do NOT mint
-  single-use `_XxxResult` dataclasses for them. Reserve a dedicated `Result`
-  dataclass for values that cross a public API or library boundary, or that need
-  methods or invariants. If the helper does not read or mutate class instance
-  state (`this`), declare it as a private top-level function (or static method)
-  rather than an instance method. _Advisory_: 5+ live outputs usually means the
-  slice is cut at the wrong seam — try a different boundary before shipping a
-  wide record.
-- **Control-flow escapes** → apply in preference order:
-  1. Enlarge the slice to include the whole loop (natural seams, above) and
-     re-run the analysis.
-  2. If the loop _body_ is itself the hotspot, extract it with an explicit
-     signal return (Pattern E) — never a `shouldBreak` boolean flag.
-  3. Use guard-clause inversion (Pattern B) when the escape exists only to skip
-     nested conditions — it fixes nesting, not escapes. `yield` is none of
-     these: restructure the generator before attempting any extraction.
-- **Tier 3 gate (mutation-web check)** → Tier 3 requires recorded evidence, not
-  judgment. Run `data_flow` on at least two distinct candidate slices of the
-  function. Tier 3 is permitted ONLY if the intersection of their `mutations`
-  variable names contains 3 or more entries — i.e. the same mutable variables
-  thread through every candidate extraction. Paste the JSON reports into the
-  Triage Report as evidence; without that evidence, stay in Tier 1/2. A
-  recurring 2-variable coupling never qualifies: enlarge the slice, or take the
-  domain-modeling exit (below).
+3. **Control-Flow Escapes & Loop Bodies**:
+   - Apply natural seams: enlarge the slice to include the entire enclosing loop
+     or state machine and re-run `data_flow`.
+   - If the loop body itself is the hotspot, extract it with an explicit signal
+     return (Pattern E)—never a `shouldBreak` boolean flag.
+   - Use guard-clause inversion (Pattern B) when the escape exists only to skip
+     nested conditions.
 
-When choosing how to reduce complexity on a large Dart function, follow this
-**3-Tier Decision Hierarchy**:
+4. **Tier 3 — Encapsulated Method Object (Last Resort)**:
+   - **Mutation-Web Check Gate**: Permitted ONLY if `data_flow` reports on at
+     least two distinct candidate slices show that the intersection of their
+     `mutations` variable names contains 3 or more entries (the same mutable
+     variables thread through every candidate extraction).
+   - **Mechanics**: Read [references/method-object.md](references/method-object.md)
+     for extraction mechanics and mandatory idioms. Do not load or apply it
+     speculatively.
 
-1. **Tier 1 — Pure Functional Decomposition (first choice)**: static or
-   top-level functions returning Dart 3 named records
-   (`final (:data, :errors) = _stepOne(input);`); a dedicated `Result` /
-   `Response` dataclass only where the value crosses a public API or library
-   boundary or needs methods/invariants. All extracted helpers that do not
-   access class instance state (`this`) MUST be declared as private top-level
-   functions (or static methods) to guarantee referential transparency and
-   prevent temporal coupling.
-2. **Tier 2 — Standard Extract Method (second choice)**: standard private helper
-   methods or top-level private functions taking <= 3 arguments.
-3. **Tier 3 — Encapsulated Method Object (last resort)**: permitted only when
-   the mutation-web check above passes with recorded evidence. Then read
-   [references/method-object.md](references/method-object.md) for the extraction
-   mechanics and mandatory idioms. Do not load or apply it speculatively.
-
-**Domain-modeling exit**: when the same tightly coupled mutable state keeps
+**Domain-Modeling Exit**: When the same tightly coupled mutable state keeps
 resurfacing across a function (a parser's `buffer` + `cursor`, a traversal's
 `queue` + `visited`), the code may be asking to become a real, cohesively
 _named_ domain class (`Parser`, `GraphTraversal`) with a public, unit-tested
-API. That is domain modeling, not complexity remediation — it exits this rubric
-entirely and is not subject to the Tier 3 gate. The gate exists to ban
-single-use `_XxxRunner` facades, not real abstractions. To qualify for the exit,
-the class MUST have cohesive entity state, more than one public behavior, and
-its own dedicated test suite. A single-use private class with a constructor and
-one `run()` method is a runner no matter what it is renamed to (`_ScanEngine`,
-`_BatchProcessor`) and remains subject to the gate.
+API. To qualify for the exit, the class MUST have cohesive entity state, more
+than one public behavior, and its own dedicated test suite. Single-use private
+facades with one `run()` method remain subject to the Tier 3 gate.
 
 ---
 
@@ -437,12 +414,14 @@ Run these verification commands before committing refactored code:
    `dart run cognitive_complexity@^0.2.4 --fail-threshold 15 <refactored files>`
    scoped to the files you touched. Pre-existing breaches elsewhere in the
    project do not invalidate the refactor.
-2. **Code Presentation**: Run `dart format .` to maintain uniform syntactic
-   styling.
-3. **Static Analysis**: Run `dart analyze` to ensure zero static warnings, lint
-   violations, or un-awaited asynchronous gaps.
-4. **Test Fidelity**: Run `dart test` (or `flutter test`) to confirm zero
-   behavioral drift across existing test suites.
+2. **Code Presentation**: Run `dart format .` (or `flutter format .`) to
+   maintain uniform syntactic styling.
+3. **Static Analysis**: Run `dart analyze` (or `flutter analyze`) to ensure zero
+   static warnings, lint violations, or un-awaited asynchronous gaps.
+4. **Test Fidelity**:
+   - Check `pubspec.yaml`: if `sdk: flutter` is declared, run `flutter test`;
+     otherwise run `dart test`.
+   - In multi-package workspaces, run tests across all dependent packages.
 
 ---
 
@@ -500,6 +479,6 @@ dart run cognitive_complexity:data_flow@^0.2.4 {file}:{start_line}-{end_line}
 Determine the package version dynamically:
 
 - Check `pubspec.lock` in the workspace or run
-  `dart run cognitive_complexity@ --version`.
+  `dart run cognitive_complexity@^0.2.4 --version`.
 - If invoked with a specific version constraint (e.g.
-  `cognitive_complexity@0.2.3`), use that exact version.
+  `cognitive_complexity@^0.2.4`), use that exact version.
