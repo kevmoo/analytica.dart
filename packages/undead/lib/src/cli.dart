@@ -40,10 +40,14 @@ ArgParser buildArgParser() {
       allowed: ['library', 'closed-app'],
       defaultsTo: 'library',
     )
+    ..addPathFilterOptions()
     ..addFlag(
       'include-generated',
-      help: 'Include generated files (*.g.dart, *.freezed.dart) in analysis.',
+      help:
+          'Include generated files (*.g.dart, *.freezed.dart) in analysis '
+          '(deprecated: use --no-ignore-generated).',
       defaultsTo: false,
+      hide: true,
     )
     ..addFlag(
       'fail-on-undead',
@@ -167,7 +171,14 @@ class UndeadCliRunner {
     final format = OutputFormat.fromString(results.option('format')!);
     final exampleMode = ExampleMode.fromString(results.option('example-mode')!);
     final mode = AnalysisMode.fromString(results.option('mode')!);
-    final includeGenerated = results.flag('include-generated');
+    var pathFilter = parsePathFilter(results);
+    if (results.wasParsed('include-generated') &&
+        results.flag('include-generated')) {
+      pathFilter = PathFilter(
+        excludePatterns: pathFilter.excludePatterns,
+        ignoreGenerated: false,
+      );
+    }
     final failOnUndead = results.flag('fail-on-undead');
     final autoPubGet = results.flag('pub-get');
     final ignoreExternalBindings = results.flag('ignore-external-bindings');
@@ -188,7 +199,7 @@ class UndeadCliRunner {
       format: format,
       exampleMode: exampleMode,
       mode: mode,
-      includeGenerated: includeGenerated,
+      pathFilter: pathFilter,
       failOnUndead: failOnUndead,
       autoPubGet: autoPubGet,
       ignoreExternalBindings: ignoreExternalBindings,

@@ -168,19 +168,20 @@ void main() {
     });
 
     test('UndeadOptions default and custom values', () {
-      const defaultOptions = UndeadOptions(packagePath: '/path/to/pkg');
+      final defaultOptions = UndeadOptions(packagePath: '/path/to/pkg');
       check(defaultOptions.testSupportPatterns).deepEquals(['Fake*', 'Mock*']);
       check(defaultOptions.ignoreNamePatterns).isEmpty();
       check(defaultOptions.format).equals(OutputFormat.markdown);
       check(defaultOptions.exampleMode).equals(ExampleMode.demonstration);
       check(defaultOptions.mode).equals(AnalysisMode.library);
       check(defaultOptions.includeGenerated).isFalse();
+      check(defaultOptions.ignoreGenerated).isTrue();
       check(defaultOptions.failOnUndead).isFalse();
       check(defaultOptions.autoPubGet).isFalse();
       check(defaultOptions.workspaceDiscovery).isTrue();
       check(defaultOptions.suggestPrivate).isFalse();
 
-      const customOptions = UndeadOptions(
+      final customOptions = UndeadOptions(
         packagePath: '/path/to/pkg',
         testSupportPatterns: ['*Stub', 'CustomFixture*'],
         ignoreNamePatterns: ['*_generated', 'Ignored*'],
@@ -188,6 +189,7 @@ void main() {
         workspaceDiscovery: false,
         suggestPrivate: true,
       );
+
       check(
         customOptions.testSupportPatterns,
       ).deepEquals(['*Stub', 'CustomFixture*']);

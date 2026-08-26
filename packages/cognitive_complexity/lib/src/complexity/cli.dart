@@ -80,7 +80,8 @@ Future<int> runCli(
       help:
           'Maximum table rows in --comment-output (0 = unlimited). GitHub '
           'rejects comment bodies over 65536 characters.',
-    );
+    )
+    ..addPathFilterOptions();
 
   try {
     final argResults = parser.parse(args);
@@ -111,6 +112,7 @@ Future<int> runCli(
       argResults['max-comment-rows'] as String,
       'max-comment-rows',
     );
+    final pathFilter = parsePathFilter(argResults);
 
     _warnIgnoredFlags(
       failOnIncrease: failOnIncrease,
@@ -127,6 +129,7 @@ Future<int> runCli(
       return await _handleDiffMode(
         gitDiffBase: gitDiffBase,
         targets: targets,
+        pathFilter: pathFilter,
         format: format,
         failThreshold: failThreshold,
         failOnIncrease: failOnIncrease,
@@ -139,6 +142,7 @@ Future<int> runCli(
 
     return _handleRegularMode(
       targets: targets,
+      pathFilter: pathFilter,
       threshold: threshold,
       failThreshold: failThreshold,
       format: format,
@@ -184,6 +188,7 @@ void _warnIgnoredFlags({
 Future<int> _handleDiffMode({
   required String gitDiffBase,
   required List<String> targets,
+  required PathFilter pathFilter,
   required String format,
   required int? failThreshold,
   required bool failOnIncrease,
@@ -192,7 +197,7 @@ Future<int> _handleDiffMode({
   String? commentOutput,
   int maxCommentRows = 0,
 }) async {
-  final deltaAnalyzer = DeltaAnalyzer();
+  final deltaAnalyzer = DeltaAnalyzer(pathFilter: pathFilter);
   final summary = await deltaAnalyzer.computeDeltas(
     gitDiffBase,
     targetPaths: targets,
@@ -242,13 +247,14 @@ Future<int> _handleDiffMode({
 
 int _handleRegularMode({
   required List<String> targets,
+  required PathFilter pathFilter,
   required int threshold,
   required int? failThreshold,
   required String format,
   required StringSink out,
   required StringSink err,
 }) {
-  final analyzer = ComplexityAnalyzer();
+  final analyzer = ComplexityAnalyzer(pathFilter: pathFilter);
   final allResults = <FunctionComplexity>[];
 
   for (final target in targets) {

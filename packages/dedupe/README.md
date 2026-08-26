@@ -55,6 +55,7 @@ dart run dedupe@ --git-diff=origin/main --fail-threshold=5
 ## CLI options
 
 <!-- CLI_README_START -->
+
 ```console
 $ dedupe --help
 dedupe - High-performance code duplication and clone detection engine for Dart.
@@ -82,7 +83,9 @@ Usage: dedupe [options] [target_path]
     --fail-threshold=<percentage>          Exit with non-zero code (1) if overall duplication percentage (or diff duplication percentage when --git-diff is set) exceeds this ceiling.
 -d, --git-diff=<git-ref>                   Git reference (e.g. origin/main or HEAD~1) to compare against for PR/CL delta evaluation.
     --[no-]only-changed                    Only report duplicate clusters that intersect modified lines in the Git diff.
-    --exclude=<pattern1,pattern2>          Comma-separated glob/wildcard patterns of files to exclude.
+    --exclude=<glob>                       Glob patterns of files/directories to exclude (repeatable or comma-separated).
+    --[no-]ignore-generated                Exclude generated files (*.g.dart, *.freezed.dart, *.mocks.dart, etc.).
+                                           (defaults to on)
     --include=<pattern1,pattern2>          Comma-separated glob/wildcard patterns of files to include.
     --[no-]files                           Include per-file duplication metrics table in report.
                                            (defaults to on)
@@ -96,6 +99,7 @@ Usage: dedupe [options] [target_path]
 -h, --help                                 Print usage information.
     --version                              Print dedupe version.
 ```
+
 <!-- CLI_README_END -->
 
 ## Programmatic API
@@ -125,7 +129,9 @@ void main() async {
 
 ## 🧠 AI Agent Integration
 
-This repository packages an agent skill (`dart-dedupe`) to train AI pair programmers on structural code duplication audits, clone triage, and safe deduplication refactoring:
+This repository packages an agent skill (`dart-dedupe`) to train AI pair
+programmers on structural code duplication audits, clone triage, and safe
+deduplication refactoring:
 
 ```bash
 npx skills add kevmoo/analytica.dart --skill dart-dedupe

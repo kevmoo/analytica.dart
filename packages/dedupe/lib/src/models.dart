@@ -1,17 +1,12 @@
+import 'package:analytica/analyzer.dart';
+
 /// Standard code-generation, binding, and test mock exclusions for duplication
 /// analysis.
 const List<String> defaultDartExclusions = [
-  '**/*.g.dart',
-  '**/*.freezed.dart',
-  '**/*.pb.dart',
-  '**/*.pbjson.dart',
-  '**/*.pbenum.dart',
-  '**/*.pbserver.dart',
+  ...PathFilter.defaultGeneratedPatterns,
   '**/*_bindings.dart',
   '**/native_*.dart',
   '**/jni_*.dart',
-  '**/*.mocks.dart',
-  '**/*.config.dart',
 ];
 
 /// Classification category for duplicate code clusters.
@@ -525,7 +520,7 @@ final class DedupeOptions {
   final bool ignoreComments;
   final bool ignoreLiterals;
   final bool ignoreIdentifiers;
-  final List<String> excludePatterns;
+  final PathFilter pathFilter;
   final List<String> includePatterns;
   final String? gitDiffBase;
   final bool onlyChanged;
@@ -542,6 +537,9 @@ final class DedupeOptions {
   final String? cacheDir;
   final bool clearCache;
 
+  List<String> get excludePatterns => pathFilter.excludePatterns;
+  bool get ignoreGenerated => pathFilter.ignoreGenerated;
+
   DedupeOptions({
     required this.targetPath,
     List<String> targets = const ['lib'],
@@ -550,7 +548,9 @@ final class DedupeOptions {
     this.ignoreComments = true,
     this.ignoreLiterals = true,
     this.ignoreIdentifiers = false,
-    List<String> excludePatterns = defaultDartExclusions,
+    PathFilter? pathFilter,
+    Iterable<String> excludePatterns = defaultDartExclusions,
+    bool ignoreGenerated = true,
     List<String> includePatterns = const ['**/*.dart'],
     this.gitDiffBase,
     this.onlyChanged = false,
@@ -567,7 +567,12 @@ final class DedupeOptions {
     this.cacheDir,
     this.clearCache = false,
   }) : targets = List.unmodifiable(targets),
-       excludePatterns = List.unmodifiable(excludePatterns),
+       pathFilter =
+           pathFilter ??
+           PathFilter(
+             excludePatterns: excludePatterns,
+             ignoreGenerated: ignoreGenerated,
+           ),
        includePatterns = List.unmodifiable(includePatterns);
 
   @override

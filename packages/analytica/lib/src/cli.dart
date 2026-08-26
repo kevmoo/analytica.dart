@@ -1,7 +1,11 @@
 import 'package:args/args.dart';
 import 'package:path/path.dart' as p;
 
+import 'analyzer/path_filter.dart';
+
 export 'package:io/io.dart' show ExitCode;
+
+export 'analyzer/path_filter.dart';
 
 /// Standard CLI argument parsing options and helpers across Analytica tools.
 extension AnalyticaArgParserExtensions on ArgParser {
@@ -36,6 +40,49 @@ extension AnalyticaArgParserExtensions on ArgParser {
   void addVersionFlag({String help = 'Print version information.'}) {
     addFlag('version', negatable: false, help: help);
   }
+
+  /// Adds standardized `--exclude` and `--[no-]ignore-generated` options to
+  /// this parser.
+  void addPathFilterOptions() {
+    addMultiOption(
+      'exclude',
+      help:
+          'Glob patterns of files/directories to exclude (repeatable or '
+          'comma-separated).',
+      valueHelp: 'glob',
+    );
+    addFlag(
+      'ignore-generated',
+      defaultsTo: true,
+      help:
+          'Exclude generated files (*.g.dart, *.freezed.dart, *.mocks.dart, '
+          'etc.).',
+    );
+  }
+}
+
+/// Parses a [PathFilter] from the standard `--exclude` and `--ignore-generated`
+/// options in [results].
+PathFilter parsePathFilter(
+  ArgResults results, {
+  Iterable<String> defaultExcludes = const [],
+}) {
+  final rawExcludes = results.options.contains('exclude')
+      ? results.multiOption('exclude')
+      : const <String>[];
+  final userExcludes = rawExcludes
+      .expand((e) => e.split(','))
+      .map((e) => e.trim())
+      .where((e) => e.isNotEmpty);
+
+  final ignoreGenerated = results.options.contains('ignore-generated')
+      ? results.flag('ignore-generated')
+      : true;
+
+  return PathFilter(
+    excludePatterns: [...defaultExcludes, ...userExcludes],
+    ignoreGenerated: ignoreGenerated,
+  );
 }
 
 /// Parses a 1-based line range of format `<start>-<end>` (e.g. `45-80`).

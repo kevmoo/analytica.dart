@@ -147,12 +147,21 @@ class DeltaSummary {
 
 /// Evaluates git diffs to calculate cognitive complexity score deltas.
 class DeltaAnalyzer {
-  final ComplexityAnalyzer _analyzer = ComplexityAnalyzer();
+  final ComplexityAnalyzer _analyzer;
   final GitDiffService _gitService;
+  final PathFilter pathFilter;
 
-  DeltaAnalyzer({GitDiffService? gitService, String? workingDirectory})
-    : _gitService =
-          gitService ?? GitDiffService(workingDirectory: workingDirectory);
+  DeltaAnalyzer({
+    ComplexityAnalyzer? analyzer,
+    GitDiffService? gitService,
+    String? workingDirectory,
+    PathFilter? pathFilter,
+  }) : pathFilter = pathFilter ?? PathFilter.defaults,
+       _analyzer =
+           analyzer ??
+           ComplexityAnalyzer(pathFilter: pathFilter ?? PathFilter.defaults),
+       _gitService =
+           gitService ?? GitDiffService(workingDirectory: workingDirectory);
 
   /// Computes complexity deltas between [baseRef] and current working tree.
   Future<DeltaSummary> computeDeltas(
@@ -160,10 +169,13 @@ class DeltaAnalyzer {
     List<String> targetPaths = const [],
   }) async {
     final mergeBase = await _gitService.getMergeBase(baseRef);
-    final modFiles = await _gitService.getModifiedDartFiles(
+    final rawModFiles = await _gitService.getModifiedDartFiles(
       mergeBase,
       targetPaths: targetPaths,
     );
+    final modFiles = rawModFiles
+        .where((f) => !pathFilter.isExcluded(f))
+        .toList();
     final allDeltas = <ComplexityDelta>[];
 
     final pool = Pool(8);

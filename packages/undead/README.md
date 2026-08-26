@@ -1,8 +1,8 @@
 Deterministic reachability and dead/unused declaration analysis for Dart and
 Flutter packages.
 
-`undead` performs whole-package AST analysis using `package:analyzer` to build
-a reachability graph from known entrypoints to all internal declarations,
+`undead` performs whole-package AST analysis using `package:analyzer` to build a
+reachability graph from known entrypoints to all internal declarations,
 identifying unused top-level declarations, classes, functions, and variables.
 
 ## ✨ Features
@@ -55,6 +55,7 @@ dart run undead@ --format=markdown
 ### CLI Options
 
 <!-- CLI_README_START -->
+
 ```console
 $ undead --help
 undead - Reachability and dead declaration analysis for Dart packages.
@@ -68,7 +69,9 @@ Usage: undead [options] [target_path]
                                            [demonstration (default), strict, skip]
 -m, --mode                                 Package analysis mode.
                                            [library (default), closed-app]
-    --[no-]include-generated               Include generated files (*.g.dart, *.freezed.dart) in analysis.
+    --exclude=<glob>                       Glob patterns of files/directories to exclude (repeatable or comma-separated).
+    --[no-]ignore-generated                Exclude generated files (*.g.dart, *.freezed.dart, *.mocks.dart, etc.).
+                                           (defaults to on)
     --[no-]fail-on-undead                  Exit with non-zero code (1) if any undead declaration is detected.
     --test-support-patterns                Comma-separated naming wildcard patterns for test fixtures and hooks.
                                            (defaults to "Fake*,Mock*")
@@ -85,6 +88,7 @@ Usage: undead [options] [target_path]
 -h, --help                                 Print usage information.
     --version                              Print undead version.
 ```
+
 <!-- CLI_README_END -->
 
 ### Library API
@@ -108,9 +112,10 @@ void main() async {
 
 ## 🧠 AI Agent Integration
 
-This repository packages an agent skill (`dart-undead`) to train AI pair programmers on dead code audits, reachability analysis, and safe deletion protocols:
+This repository packages an agent skill (`dart-undead`) to train AI pair
+programmers on dead code audits, reachability analysis, and safe deletion
+protocols:
 
 ```bash
 npx skills add kevmoo/analytica.dart --skill dart-undead
 ```
-

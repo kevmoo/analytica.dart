@@ -8,7 +8,7 @@ import 'package:analyzer/source/line_info.dart';
 import 'package:path/path.dart' as p;
 import 'cognitive_complexity_visitor.dart';
 
-export 'package:analytica/analyzer.dart' show isExcludedPath;
+export 'package:analytica/analyzer.dart' show PathFilter, isExcludedPath;
 
 /// Represents the analyzed cognitive complexity of a specific declaration.
 class FunctionComplexity {
@@ -40,7 +40,11 @@ class FunctionComplexity {
 
 /// Analyzes Dart files and directories to compute Cognitive Complexity scores.
 class ComplexityAnalyzer {
+  final PathFilter pathFilter;
   final FeatureSet _featureSet = FeatureSet.latestLanguageVersion();
+
+  ComplexityAnalyzer({PathFilter? pathFilter})
+    : pathFilter = pathFilter ?? PathFilter.defaults;
 
   /// Analyzes a file or directory at [targetPath].
   List<FunctionComplexity> analyzePath(String targetPath) {
@@ -68,7 +72,7 @@ class ComplexityAnalyzer {
     for (final entity in dir.listSync(recursive: true, followLinks: false)) {
       if (entity is File && p.extension(entity.path) == '.dart') {
         final relative = p.relative(entity.path, from: targetPath);
-        if (isExcludedPath(relative)) {
+        if (pathFilter.isExcluded(relative)) {
           continue;
         }
         results.addAll(analyzeFile(entity.path));

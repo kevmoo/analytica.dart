@@ -1,8 +1,10 @@
+import 'package:analytica/analyzer.dart';
 import 'package:analyzer/dart/element/element.dart';
 
 import 'adapters/adapters.dart';
 
 export 'package:analytica/analytica.dart' show PackageResolutionException;
+export 'package:analytica/analyzer.dart' show PathFilter;
 
 /// The classification category of a detected undead declaration.
 enum UndeadClassification {
@@ -149,7 +151,7 @@ final class UndeadOptions {
   final OutputFormat format;
   final ExampleMode exampleMode;
   final AnalysisMode mode;
-  final bool includeGenerated;
+  final PathFilter pathFilter;
   final bool failOnUndead;
   final bool autoPubGet;
   final String? sdkPath;
@@ -162,12 +164,19 @@ final class UndeadOptions {
   final bool workspaceDiscovery;
   final bool suggestPrivate;
 
-  const UndeadOptions({
+  bool get includeGenerated => !pathFilter.ignoreGenerated;
+  bool get ignoreGenerated => pathFilter.ignoreGenerated;
+  List<String> get excludePatterns => pathFilter.excludePatterns;
+
+  UndeadOptions({
     required this.packagePath,
     this.format = OutputFormat.markdown,
     this.exampleMode = ExampleMode.demonstration,
     this.mode = AnalysisMode.library,
-    this.includeGenerated = false,
+    PathFilter? pathFilter,
+    bool? includeGenerated,
+    bool ignoreGenerated = true,
+    Iterable<String> excludePatterns = const [],
     this.failOnUndead = false,
     this.autoPubGet = false,
     this.sdkPath,
@@ -179,7 +188,14 @@ final class UndeadOptions {
     this.ignoreExternalBindings = false,
     this.workspaceDiscovery = true,
     this.suggestPrivate = false,
-  });
+  }) : pathFilter =
+           pathFilter ??
+           PathFilter(
+             excludePatterns: excludePatterns,
+             ignoreGenerated: includeGenerated != null
+                 ? !includeGenerated
+                 : ignoreGenerated,
+           );
 }
 
 /// Details about a test call site referencing a dead declaration.

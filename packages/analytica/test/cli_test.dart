@@ -29,6 +29,25 @@ void main() {
       check(results['help'] as bool).isTrue();
       check(results['version'] as bool).isTrue();
     });
+
+    test('addPathFilterOptions configures exclude and ignore-generated', () {
+      final parser = ArgParser()..addPathFilterOptions();
+      final defaultResults = parser.parse([]);
+      final defaultFilter = parsePathFilter(defaultResults);
+      check(defaultFilter.ignoreGenerated).isTrue();
+      check(defaultFilter.excludePatterns).isEmpty();
+
+      final customResults = parser.parse([
+        '--exclude=test/fixtures/**',
+        '--exclude=legacy/**,*.gen.dart',
+        '--no-ignore-generated',
+      ]);
+      final customFilter = parsePathFilter(customResults);
+      check(customFilter.ignoreGenerated).isFalse();
+      check(
+        customFilter.excludePatterns,
+      ).deepEquals(['test/fixtures/**', 'legacy/**', '*.gen.dart']);
+    });
   });
 
   group('parseLineBounds', () {

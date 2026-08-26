@@ -1,5 +1,5 @@
-Test utility and CLI tool to ensure command-line usage and help documentation
-in `README.md` files are accurate and up-to-date.
+Test utility and CLI tool to ensure command-line usage and help documentation in
+`README.md` files are accurate and up-to-date.
 
 Inspired by [`package:build_verify`](https://pub.dev/packages/build_verify),
 `cli_readme` gives you a **3-line test** to guarantee your CLI arguments and
@@ -26,6 +26,7 @@ usage examples never drift from the real executable output.
 Add HTML comment markers around the CLI output in your `README.md`:
 
 <!-- CLI_README_START -->
+
 ```console
 $ cli_readme --help
 Test utility and CLI tool to ensure CLI usage in README files is up-to-date.
@@ -39,6 +40,7 @@ Usage: cli_readme [options]
     --package-dir    Path to package directory (defaults to current directory).
     --readme         Path to README.md file (defaults to README.md in package root).
 ```
+
 <!-- CLI_README_END -->
 
 ### 2. Add the Test
@@ -96,19 +98,25 @@ Specify target IDs to map multiple sections in your `README.md`:
 
 ````markdown
 ### Server CLI
+
 <!-- CLI_README_START server -->
+
 ```console
 $ my_server --help
 ...
 ```
+
 <!-- CLI_README_END server -->
 
 ### Client CLI
+
 <!-- CLI_README_START client -->
+
 ```console
 $ my_client --help
 ...
 ```
+
 <!-- CLI_README_END client -->
 ````
 

@@ -102,11 +102,7 @@ ArgParser buildArgParser() {
           'Only report duplicate clusters that intersect modified lines in '
           'the Git diff.',
     )
-    ..addOption(
-      'exclude',
-      valueHelp: 'pattern1,pattern2',
-      help: 'Comma-separated glob/wildcard patterns of files to exclude.',
-    )
+    ..addPathFilterOptions()
     ..addOption(
       'include',
       valueHelp: 'pattern1,pattern2',
@@ -249,7 +245,10 @@ class DedupeCliRunner {
       failThreshold = parsed;
     }
 
-    final excludeList = parseCommaSeparated(results.option('exclude'));
+    final pathFilter = parsePathFilter(
+      results,
+      defaultExcludes: defaultDartExclusions,
+    );
     final includeList = parseCommaSeparated(results.option('include'));
 
     final String targetPath;
@@ -280,13 +279,11 @@ class DedupeCliRunner {
       ignoreComments: ignoreComments,
       ignoreLiterals: ignoreLiterals,
       ignoreIdentifiers: ignoreIdentifiers,
-      excludePatterns: [
-        if (excludeList.isNotEmpty) ...excludeList,
-        if (excludeList.isEmpty) ...defaultDartExclusions,
-      ],
+      pathFilter: pathFilter,
       includePatterns: includeList.isNotEmpty
           ? includeList
           : const ['**/*.dart'],
+
       gitDiffBase: results.option('git-diff'),
       onlyChanged: results.flag('only-changed'),
       failThreshold: failThreshold,

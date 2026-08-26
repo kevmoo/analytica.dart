@@ -2023,10 +2023,7 @@ void internalHelper() {}
           // Without suggestPrivate: internalHelper is live, 0 undead findings.
           final defaultReport = await analyzePackage(
             d.path('suggest_private_pkg'),
-            options: const UndeadOptions(
-              packagePath: '',
-              suggestPrivate: false,
-            ),
+            options: UndeadOptions(packagePath: '', suggestPrivate: false),
           );
           check(defaultReport.undead).isEmpty();
           check(defaultReport.privateCandidatesFound).equals(0);
@@ -2034,7 +2031,7 @@ void internalHelper() {}
           // With suggestPrivate: internalHelper is flagged as privateCandidate.
           final privateReport = await analyzePackage(
             d.path('suggest_private_pkg'),
-            options: const UndeadOptions(packagePath: '', suggestPrivate: true),
+            options: UndeadOptions(packagePath: '', suggestPrivate: true),
           );
           check(privateReport.privateCandidatesFound).equals(1);
           check(privateReport.undead.length).equals(1);
@@ -2086,7 +2083,7 @@ void partWorker() {
 
         final report = await analyzePackage(
           d.path('part_private_pkg'),
-          options: const UndeadOptions(packagePath: '', suggestPrivate: true),
+          options: UndeadOptions(packagePath: '', suggestPrivate: true),
         );
 
         check(report.privateCandidatesFound).equals(2);
@@ -2126,7 +2123,7 @@ class Consumer {
 
         final report = await analyzePackage(
           d.path('cross_lib_pkg'),
-          options: const UndeadOptions(packagePath: '', suggestPrivate: true),
+          options: UndeadOptions(packagePath: '', suggestPrivate: true),
         );
 
         check(report.privateCandidatesFound).equals(0);
@@ -2174,7 +2171,7 @@ void main() {
 
         final report = await analyzePackage(
           d.path('tested_private_pkg'),
-          options: const UndeadOptions(packagePath: '', suggestPrivate: true),
+          options: UndeadOptions(packagePath: '', suggestPrivate: true),
         );
 
         // testHelper is referenced in test/live_test.dart, so it must not be suggested for privatization.
