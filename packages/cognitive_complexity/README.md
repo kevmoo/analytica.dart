@@ -170,6 +170,14 @@ jobs:
 This repository packages an agent skill (`dart-cognitive-complexity`) to train
 AI pair programmers on Cognitive Complexity scoring and refactoring patterns:
 
+Install using either the dart skills CLI:
+
+```bash
+dart run skills@ add kevmoo/analytica.dart --skill dart-cognitive-complexity
+```
+
+Or npx skills:
+
 ```bash
 npx skills add kevmoo/analytica.dart --skill dart-cognitive-complexity
 ```
