@@ -169,7 +169,27 @@ To suppress intentional dead code or API placeholders without deleting:
 - _(Note: Never use `// ignore: ...` as the Dart analyzer treats unknown lint
   codes as errors)._
 
-### Invariant 5: Monorepo & External Entrypoint Protection
+### Invariant 5: Dynamic Invocation & Non-AST Reference Check ("Understand the Match")
+
+Static AST analysis (`pkg:undead`) only traces typed Dart import trees. It
+cannot see declarations referenced through runtime meta-programming:
+- Dynamic isolate spawners (`dart.runInIsolate`, `Isolate.spawnUri`)
+- Code-generation string templates (`'''import "package:.../foo.dart";'''`)
+- JS / WASM compilation targets and runtime asset bootstrap runners
+- Build hooks and `build.yaml` references
+
+**The Pre-Deletion Check Protocol:**
+1. Before deleting any candidate file or top-level declaration in `lib/src/`,
+   perform a literal string search (`grep_search "<filename_or_symbol>"`) across
+   the repository.
+2. If text matches exist outside the target file itself, **inspect and understand
+   the match context** before deleting:
+   - **KEEP**: The match is an active runtime string template, dynamic isolate
+     entrypoint, or compilation target. Protect it with `// undead:ignore`.
+   - **PRUNE**: The match is merely a doc comment, obsolete README reference, or
+     dead test fixture that should be deleted alongside the target.
+
+### Invariant 6: Monorepo & External Entrypoint Protection
 
 In monorepos with multiple inter-dependent packages (e.g. `pkgs/test` wrapping
 `pkgs/test_core`), some declarations in `lib/src/` (such as `runTests` in
@@ -180,7 +200,7 @@ top-level executables.
 - If an unexported function is an intended external entrypoint, protect it with
   `// ignore: unreachable_from_main` or `// undead:ignore`.
 
-### Invariant 6: Holistic Pruning Mandate (No Trivial-Only Edits)
+### Invariant 7: Holistic Pruning Mandate (No Trivial-Only Edits)
 
 When pruning dead code, do not settle for trivial bookkeeping (like deleting a
 few unused exit codes while leaving entire unreferenced subsystems intact).
