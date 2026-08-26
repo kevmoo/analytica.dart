@@ -61,19 +61,16 @@ extension AnalyticaArgParserExtensions on ArgParser {
   }
 }
 
-/// Adds standardized path exclusion options (`--exclude`,
-/// `--[no-]ignore-generated`) to [parser].
-void addPathFilterArgs(ArgParser parser) {
-  parser.addPathFilterOptions();
-}
-
 /// Parses a [PathFilter] from the standard `--exclude` and `--ignore-generated`
 /// options in [results].
-PathFilter parsePathFilter(ArgResults results) {
+PathFilter parsePathFilter(
+  ArgResults results, {
+  Iterable<String> defaultExcludes = const [],
+}) {
   final rawExcludes = results.options.contains('exclude')
       ? results.multiOption('exclude')
       : const <String>[];
-  final expandedExcludes = rawExcludes
+  final userExcludes = rawExcludes
       .expand((e) => e.split(','))
       .map((e) => e.trim())
       .where((e) => e.isNotEmpty);
@@ -83,7 +80,7 @@ PathFilter parsePathFilter(ArgResults results) {
       : true;
 
   return PathFilter(
-    excludePatterns: expandedExcludes,
+    excludePatterns: [...defaultExcludes, ...userExcludes],
     ignoreGenerated: ignoreGenerated,
   );
 }

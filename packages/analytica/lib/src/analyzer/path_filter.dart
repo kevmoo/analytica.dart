@@ -63,6 +63,9 @@ class PathFilter {
     if (pat.startsWith('./')) {
       pat = pat.substring(2);
     }
+    if (pat.startsWith('/')) {
+      pat = pat.substring(1);
+    }
     // If the pattern contains no slash, treat it as matching anywhere.
     if (!pat.contains('/') && !pat.startsWith('**')) {
       return '**/$pat';

@@ -549,7 +549,7 @@ final class DedupeOptions {
     this.ignoreLiterals = true,
     this.ignoreIdentifiers = false,
     PathFilter? pathFilter,
-    Iterable<String> excludePatterns = const [],
+    Iterable<String> excludePatterns = defaultDartExclusions,
     bool ignoreGenerated = true,
     List<String> includePatterns = const ['**/*.dart'],
     this.gitDiffBase,

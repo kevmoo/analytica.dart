@@ -60,11 +60,14 @@ void main() {
       check(filter.isExcluded('lib/src/regular_parser.dart')).isFalse();
     });
 
-    test('normalizes leading ./ and backslashes', () {
-      final filter = PathFilter(excludePatterns: ['custom/**']);
+    test('normalizes leading ./, /, and backslashes', () {
+      final filter = PathFilter(excludePatterns: ['/custom/**', './other/**']);
 
       check(filter.isExcluded(r'.\custom\sub\file.dart')).isTrue();
       check(filter.isExcluded('./custom/sub/file.dart')).isTrue();
+      check(filter.isExcluded('/custom/sub/file.dart')).isTrue();
+      check(filter.isExcluded('custom/sub/file.dart')).isTrue();
+      check(filter.isExcluded('other/sub/file.dart')).isTrue();
       check(filter.isExcluded(r'lib\src\model.g.dart')).isTrue();
     });
   });

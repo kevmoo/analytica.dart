@@ -245,7 +245,10 @@ class DedupeCliRunner {
       failThreshold = parsed;
     }
 
-    final pathFilter = parsePathFilter(results);
+    final pathFilter = parsePathFilter(
+      results,
+      defaultExcludes: defaultDartExclusions,
+    );
     final includeList = parseCommaSeparated(results.option('include'));
 
     final String targetPath;
