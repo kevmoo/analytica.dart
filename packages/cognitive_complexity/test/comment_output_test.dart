@@ -165,8 +165,7 @@ void main() {
       check(comment).not((c) => c.contains('most significant of'));
     });
 
-    test('annotates every changed declaration regardless of the '
-        'cap', () async {
+    test('annotates violations regardless of the cap', () async {
       final out = await runScanner([
         '--comment-output=$commentPath',
         '--max-comment-rows=1',
@@ -174,7 +173,7 @@ void main() {
 
       // Capping the comment must not hide inline Files-changed annotations.
       check('::error'.allMatches(out).length).equals(3);
-      check('::warning'.allMatches(out).length).equals(3);
+      check('::warning'.allMatches(out).length).equals(0);
     });
 
     test('writes no comment file when --comment-output is omitted', () async {

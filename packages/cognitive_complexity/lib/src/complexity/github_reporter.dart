@@ -136,7 +136,7 @@ class GitHubReporter {
 
     // Annotations are emitted once for every changed declaration, independent
     // of how many rows each table renders. Capping the comment must not hide
-    // an inline warning from the Files-changed view.
+    // an inline error from the Files-changed view.
     for (final d in changed) {
       _emitDiagnostic(d, failThreshold, failOnIncrease);
     }
@@ -256,13 +256,6 @@ class GitHubReporter {
         '::error file=${d.filePath},line=${d.startLine},'
         'title=Cognitive Complexity Violation::'
         '${d.name} was $reason to score ${d.newScore}.',
-      );
-    } else if (d.status == DeltaStatus.increased) {
-      _stdoutSink.writeln(
-        '::warning file=${d.filePath},line=${d.startLine},'
-        'title=Cognitive Complexity Increased '
-        '(+${d.delta})::${d.name} increased from ${d.oldScore} to '
-        '${d.newScore} (+${d.delta} points).',
       );
     }
   }

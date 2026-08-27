@@ -3,6 +3,9 @@
 - Support `--exclude` and `--[no-]ignore-generated` CLI options to configure
   file exclusion and generated code filtering via `PathFilter`.
 - Add `pathFilter` parameter to `ComplexityAnalyzer` and `DeltaAnalyzer`.
+- Remove noisy GitHub workflow `::warning` annotations on non-violating
+  complexity increases, keeping inline annotations reserved for violations (`::error`)
+  while full deltas remain tracked in step summaries and PR comment tables.
 - Add `ensure_cli_readme_test.dart` to verify CLI `--help` documentation in
   `README.md`.
 - Update GitHub Action documentation in `README.md` to reference modular
