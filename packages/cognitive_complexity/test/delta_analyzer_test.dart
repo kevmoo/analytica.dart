@@ -115,34 +115,34 @@ void main() {
   });
 
   group('GitHubReporter Annotation Emissions', () {
-    test('Emits workflow warning annotations for increased complexity', () {
-      final outBuf = StringBuffer();
-      final reporter = GitHubReporter(stdoutSink: outBuf);
+    test(
+      'Does not emit workflow warning annotations for non-violating increases',
+      () {
+        final outBuf = StringBuffer();
+        final reporter = GitHubReporter(stdoutSink: outBuf);
 
-      const delta = ComplexityDelta(
-        filePath: 'lib/service.dart',
-        name: 'Service.execute',
-        startLine: 12,
-        endLine: 40,
-        oldScore: 5,
-        newScore: 10,
-        status: DeltaStatus.increased,
-      );
+        const delta = ComplexityDelta(
+          filePath: 'lib/service.dart',
+          name: 'Service.execute',
+          startLine: 12,
+          endLine: 40,
+          oldScore: 5,
+          newScore: 10,
+          status: DeltaStatus.increased,
+        );
 
-      const summary = DeltaSummary(
-        baseRef: 'main',
-        targetRef: 'HEAD',
-        filesAnalyzed: 1,
-        deltas: [delta],
-      );
+        const summary = DeltaSummary(
+          baseRef: 'main',
+          targetRef: 'HEAD',
+          filesAnalyzed: 1,
+          deltas: [delta],
+        );
 
-      reporter.printReport(deltaSummary: summary);
-      check(outBuf.toString()).contains(
-        '::warning file=lib/service.dart,line=12,'
-        'title=Cognitive Complexity Increased (+5)::Service.execute '
-        'increased from 5 to 10 (+5 points).',
-      );
-    });
+        reporter.printReport(deltaSummary: summary, failThreshold: 15);
+        check(outBuf.toString()).not((s) => s.contains('::warning'));
+        check(outBuf.toString()).not((s) => s.contains('::error'));
+      },
+    );
 
     test('Emits workflow error annotations when failure thresholds breach', () {
       final outBuf = StringBuffer();
