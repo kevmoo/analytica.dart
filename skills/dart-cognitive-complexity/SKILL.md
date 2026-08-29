@@ -149,12 +149,13 @@ the desired sequencing:
    in descending order.
 3. **Report-Only / Exit**: Acknowledge complexity scores without code mutation.
 
-> **Explicit Bypass & Direct Directives**:
+> **Explicit Bypass & Non-Interactive Fallback**:
 > - **Direct Directives**: Skip Stage 1 triage if given an explicit remediation
 >   directive upfront (e.g., "Refactor `processOrder` in `lib/src/order.dart` to
 >   fix complexity" or "Refactor the top complexity outlier").
-> - **Automated Task Execution**: When explicitly directed to remediate, proceed
->   with Option 1 (Refactor Primary Outlier) after verifying baseline tests pass.
+> - **Non-Interactive Execution**: In unattended or automated evaluation
+>   workflows (e.g. `evalin` or subagents), proceed with Option 1 (Refactor
+>   Primary Outlier) automatically after verifying baseline tests pass.
 
 ---
 
@@ -179,7 +180,6 @@ this verification baseline:
      to (1) write unit tests first, or (2) proceed with surgical refactoring.
    - **Automated Task Execution**: Log a low-coverage warning and author a
      minimal regression test before modifying complex logic.
-   2. Proceed with structural refactoring and verify functionality manually.
 
 ---
 
@@ -275,8 +275,6 @@ Future<void> syncPayload(User? user, Payload? data) async {
 single-use runner classes with mutable instance variables just to bring scores
 below 15. Reducing the metric must never sacrifice transparent data flow or hide
 bugs.
-
-#### Deterministic Tier Selection via `data_flow`
 
 #### Deterministic 3-Tier Selection via `data_flow`
 

@@ -212,12 +212,13 @@ the desired remediation scope:
    across sibling classes into a unified shared base/mixin.
 3. **Report-Only / Exit**: Acknowledge findings without code mutations.
 
-> **Explicit Bypass & Direct Directives**:
+> **Explicit Bypass & Non-Interactive Fallback**:
 > - **Direct Directives**: Skip Stage 1 pause if given explicit remediation
 >   instructions (e.g., "Deduplicate clusters in `pkgs/foo` using `dart-dedupe`").
-> - **Automated Task Execution**: When explicitly directed to remediate, proceed
->   with Option 1 (Refactor Top Actionable Cluster Across All Files) after
->   verifying baseline tests pass.
+> - **Non-Interactive Execution**: In unattended or automated evaluation
+>   workflows (e.g. `evalin` or subagents), proceed with Option 1 (Refactor
+>   Top Actionable Cluster Across All Files) automatically after verifying
+>   baseline tests pass.
 
 ---
 
@@ -278,4 +279,7 @@ To reproduce or re-run this duplication scan locally:
 
 Determine the package version dynamically:
 
-- Check `pubspec.lock` in the workspace or run `dart run dedupe --version`.
+- Check `pubspec.lock` in the workspace or run
+  `dart run dedupe@^0.1.0 --version`.
+- If invoked with a specific version constraint (e.g. `dedupe@^0.1.0`), use that
+  exact version.
