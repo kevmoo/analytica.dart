@@ -14,7 +14,7 @@ key_features:
   - Co-invoked test hazard detection
   - Sealed class & framework entrypoint protection
   - Safe 2-stage triage & deletion protocol
-  - Reproducible PR provenance injection
+  - Reproducible PR provenance reporting
 ---
 
 # Dart Undead (`dart-undead`)
@@ -243,12 +243,12 @@ the desired remediation scope:
    placeholders.
 4. **Report-Only / Exit**: Acknowledge findings without code mutations.
 
-> **Explicit Bypass & Headless Fallback**:
+> **Explicit Bypass & Direct Directives**:
 > - **Direct Directives**: Skip Stage 1 pause if given explicit remediation
 >   instructions (e.g., "Prune dead code in `pkgs/foo` using `dart-undead`").
-> - **Autonomous Sessions**: In non-interactive contexts (e.g. `evalin` or
->   subagents), proceed with Option 1 (Prune All Verified Dead Subsystems)
->   automatically after verifying baseline tests pass.
+> - **Automated Task Execution**: When explicitly directed to remediate, proceed
+>   with Option 1 (Prune All Verified Dead Subsystems) after verifying baseline
+>   tests pass.
 
 ---
 
@@ -280,19 +280,20 @@ Always wrap code deletions in a strict test and analysis sandwich:
 
 When staging pruned code and preparing a commit message or Pull Request:
 
-### 1. User Confirmation Gate & Headless Defaults
+### 1. User Confirmation Gate
 
 - **Interactive Sessions**: Before writing the PR description or commit body,
   explicitly prompt the user in chat or via the harness confirmation tool (e.g.
   `ask_question`) whether to include a **Tool Provenance & Reproduction block**.
-- **Headless / Autonomous Fallback**: In non-interactive contexts (e.g.
-  subagents, automated eval suites like `evalin`, or headless CI), default to
-  including the block automatically without blocking on user confirmation.
+- **User Prompt Inclusion**: When the user explicitly requests inclusion (or
+  confirms via prompt), append the standardized markdown block below. In
+  unattended or automated workflows, output the summary to chat or step
+  summaries rather than modifying commit bodies without user confirmation.
 
 ### 2. Standardized Provenance Block Format
 
-When confirmed (or running headlessly), append the following markdown block to
-the PR description or commit body so reviewers understand where the deletions
+When confirmed by the user, include the following markdown block in the PR
+description or commit body so reviewers understand where the deletions
 originated and can rerun the reachability analysis locally:
 
 ````markdown

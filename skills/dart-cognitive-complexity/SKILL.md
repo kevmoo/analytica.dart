@@ -13,7 +13,7 @@ key_features:
   - Scoped execution matrix (targeted / delta / full)
   - Interactive refactoring triage
   - Dart 3 pattern matching refactorings
-  - Reproducible PR provenance injection
+  - Reproducible PR provenance reporting
 ---
 
 ## 1. When to Use This Skill
@@ -149,13 +149,12 @@ the desired sequencing:
    in descending order.
 3. **Report-Only / Exit**: Acknowledge complexity scores without code mutation.
 
-> **Explicit Bypass & Headless Fallback**:
+> **Explicit Bypass & Direct Directives**:
 > - **Direct Directives**: Skip Stage 1 triage if given an explicit remediation
 >   directive upfront (e.g., "Refactor `processOrder` in `lib/src/order.dart` to
 >   fix complexity" or "Refactor the top complexity outlier").
-> - **Autonomous Sessions**: In non-interactive contexts (e.g. `evalin` or
->   subagents), proceed with Option 1 (Refactor Primary Outlier) automatically
->   after verifying baseline tests pass.
+> - **Automated Task Execution**: When explicitly directed to remediate, proceed
+>   with Option 1 (Refactor Primary Outlier) after verifying baseline tests pass.
 
 ---
 
@@ -178,7 +177,7 @@ this verification baseline:
    flagged function is inadequate:
    - **Interactive Sessions**: Pause execution and warn the user. Offer options
      to (1) write unit tests first, or (2) proceed with surgical refactoring.
-   - **Autonomous / Headless Sessions**: Log a low-coverage warning and author a
+   - **Automated Task Execution**: Log a low-coverage warning and author a
      minimal regression test before modifying complex logic.
    2. Proceed with structural refactoring and verify functionality manually.
 
@@ -429,22 +428,22 @@ Run these verification commands before committing refactored code:
 
 When staging refactored code and preparing a commit message or Pull Request:
 
-### 1. User Confirmation Gate & Headless Defaults
+### 1. User Confirmation Gate
 
 - **Interactive Sessions**: Before writing the PR description or commit body,
   explicitly prompt the user in chat or via the harness confirmation tool (e.g.
   `ask_question`) whether to include a **Tool Provenance & Complexity Delta
   block**.
-- **Headless / Autonomous Fallback**: In non-interactive contexts (e.g.
-  subagents, automated eval suites like `evalin`, or headless CI), default to
-  including the block automatically without blocking on user confirmation.
+- **User Prompt Inclusion**: When the user explicitly requests inclusion (or
+  confirms via prompt), append the standardized markdown block below. In
+  unattended or automated workflows, output the summary to chat or step
+  summaries rather than modifying commit bodies without user confirmation.
 
 ### 2. Standardized Provenance Block Format
 
-When confirmed (or running headlessly), append the following markdown block to
-the PR description or commit body so reviewers understand where the changes
-originated, see the quantified readability improvements, and can rerun the audit
-locally:
+When confirmed by the user, include the following markdown block in the PR
+description or commit body so reviewers understand where the changes originated,
+see the quantified readability improvements, and can rerun the audit locally:
 
 ````markdown
 ### 🤖 Tool Provenance & Complexity Delta
