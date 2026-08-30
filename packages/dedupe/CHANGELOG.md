@@ -1,5 +1,7 @@
 ## 0.1.1-wip
 
+- `--exclude` now accepts the full glob syntax, including brace expansion and
+  character classes, via `PathFilter`.
 - Adopt centralized `PathFilter` for `--exclude` and generated code filtering
   (`--[no-]ignore-generated`).
 - Add `ensure_cli_readme_test.dart` to verify CLI `--help` documentation in

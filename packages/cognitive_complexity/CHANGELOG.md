@@ -1,5 +1,7 @@
 ## 0.2.5-wip
 
+- `--exclude` now accepts the full glob syntax, including brace expansion and
+  character classes, via `PathFilter`.
 - Support `--exclude` and `--[no-]ignore-generated` CLI options to configure
   file exclusion and generated code filtering via `PathFilter`.
 - Add `pathFilter` parameter to `ComplexityAnalyzer` and `DeltaAnalyzer`.
