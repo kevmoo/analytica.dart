@@ -122,16 +122,21 @@ class UndeadCliRunner {
       outSink = outSink ?? stdout,
       errSink = errSink ?? stderr;
 
+  /// Reports [message] as a usage error with the full option list.
+  int _usageError(String message) {
+    errSink.writeln('Error: $message');
+    errSink.writeln();
+    errSink.writeln('Usage: undead [options] [target_path]');
+    errSink.writeln(parser.usage);
+    return ExitCode.usage.code;
+  }
+
   Future<int> run(List<String> args) async {
     final ArgResults results;
     try {
       results = parser.parse(args);
     } on FormatException catch (e) {
-      errSink.writeln('Error: ${e.message}');
-      errSink.writeln();
-      errSink.writeln('Usage: undead [options] [target_path]');
-      errSink.writeln(parser.usage);
-      return ExitCode.usage.code;
+      return _usageError(e.message);
     }
 
     if (results.flag('help')) {
@@ -171,7 +176,13 @@ class UndeadCliRunner {
     final format = OutputFormat.fromString(results.option('format')!);
     final exampleMode = ExampleMode.fromString(results.option('example-mode')!);
     final mode = AnalysisMode.fromString(results.option('mode')!);
-    var pathFilter = parsePathFilter(results);
+    final PathFilter parsedFilter;
+    try {
+      parsedFilter = parsePathFilter(results);
+    } on FormatException catch (e) {
+      return _usageError(e.message);
+    }
+    var pathFilter = parsedFilter;
     if (results.wasParsed('include-generated') &&
         results.flag('include-generated')) {
       pathFilter = PathFilter(
