@@ -71,4 +71,39 @@ void main() {
       check(filter.isExcluded(r'lib\src\model.g.dart')).isTrue();
     });
   });
+
+  group('PathFilter glob syntax', () {
+    test('supports brace expansion', () {
+      final filter = PathFilter(
+        excludePatterns: ['**/*.{g,freezed}.dart'],
+        ignoreGenerated: false,
+      );
+
+      check(filter.isExcluded('lib/src/model.g.dart')).isTrue();
+      check(filter.isExcluded('lib/src/model.freezed.dart')).isTrue();
+      check(filter.isExcluded('model.g.dart')).isTrue();
+      check(filter.isExcluded('lib/src/model.dart')).isFalse();
+    });
+
+    test('supports character classes', () {
+      final filter = PathFilter(
+        excludePatterns: ['**/*_[0-9].dart'],
+        ignoreGenerated: false,
+      );
+
+      check(filter.isExcluded('lib/part_3.dart')).isTrue();
+      check(filter.isExcluded('part_0.dart')).isTrue();
+      check(filter.isExcluded('lib/part_x.dart')).isFalse();
+    });
+
+    test('rejects a malformed pattern, naming the pattern', () {
+      // The previous matcher escaped anything it did not understand, so a
+      // typo silently matched nothing for the life of the process.
+      check(
+          () => PathFilter(excludePatterns: ['lib/[unclosed']),
+        ).throws<FormatException>().has((e) => e.message, 'message')
+        ..contains('lib/[unclosed')
+        ..contains('Invalid exclude pattern');
+    });
+  });
 }

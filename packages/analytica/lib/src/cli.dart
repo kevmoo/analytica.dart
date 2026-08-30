@@ -50,6 +50,9 @@ extension AnalyticaArgParserExtensions on ArgParser {
           'Glob patterns of files/directories to exclude (repeatable or '
           'comma-separated).',
       valueHelp: 'glob',
+      // Split in parsePathFilter instead: a brace group such as
+      // `**/*.{g,freezed}.dart` contains commas that must survive.
+      splitCommas: false,
     );
     addFlag(
       'ignore-generated',
@@ -59,6 +62,32 @@ extension AnalyticaArgParserExtensions on ArgParser {
           'etc.).',
     );
   }
+}
+
+/// Splits a comma-separated list of glob patterns, ignoring commas inside a
+/// brace group.
+///
+/// `**/*.{g,freezed}.dart,lib/**` yields `['**/*.{g,freezed}.dart', 'lib/**']`
+/// rather than tearing the brace group apart on its inner comma.
+List<String> splitGlobPatterns(String value) {
+  final parts = <String>[];
+  final buffer = StringBuffer();
+  var depth = 0;
+  for (final rune in value.runes) {
+    final char = String.fromCharCode(rune);
+    if (char == '{') {
+      depth++;
+    } else if (char == '}') {
+      if (depth > 0) depth--;
+    } else if (char == ',' && depth == 0) {
+      parts.add(buffer.toString());
+      buffer.clear();
+      continue;
+    }
+    buffer.write(char);
+  }
+  parts.add(buffer.toString());
+  return parts;
 }
 
 /// Parses a [PathFilter] from the standard `--exclude` and `--ignore-generated`
@@ -71,7 +100,7 @@ PathFilter parsePathFilter(
       ? results.multiOption('exclude')
       : const <String>[];
   final userExcludes = rawExcludes
-      .expand((e) => e.split(','))
+      .expand(splitGlobPatterns)
       .map((e) => e.trim())
       .where((e) => e.isNotEmpty);
 

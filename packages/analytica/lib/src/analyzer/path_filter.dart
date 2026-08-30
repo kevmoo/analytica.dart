@@ -1,9 +1,15 @@
+import 'package:glob/glob.dart';
 import 'package:path/path.dart' as p;
-
-import 'glob_matcher.dart';
 
 /// Configurable path filter evaluating whether file paths should be excluded
 /// from analysis.
+///
+/// Patterns are matched with `package:glob`, so the full glob syntax is
+/// available: `*` and `?` within a segment, `**` across segments, brace
+/// expansion (`**/*.{g,freezed}.dart`), and character classes
+/// (`**/*_[0-9].dart`). Matching is always case-sensitive and always uses
+/// `/` as the separator, on every platform. A literal `[`, `]`, `{` or `}`
+/// in a pattern must be escaped with [Glob.quote].
 class PathFilter {
   /// Default directory names and glob patterns excluded from scanning.
   static const defaultIgnoredDirectories = <String>[
@@ -28,6 +34,16 @@ class PathFilter {
     '**/*.pbserver.dart',
   ];
 
+  /// Prefix applied to every compiled pattern and every candidate path.
+  ///
+  /// `package:glob` cannot otherwise express "zero or more leading
+  /// directories". The natural spelling, `{**/,}`, parses correctly but throws
+  /// `StateError` when matched, because `SequenceNode.canMatchAbsolute` reads
+  /// `nodes.first` of the empty alternative. That read only happens when the
+  /// options group is the first node of the pattern, so a constant leading
+  /// segment keeps the relaxation legal wherever it appears.
+  static const _anchor = '<root>/';
+
   /// The custom exclusion glob patterns configured on this filter.
   final List<String> excludePatterns;
 
@@ -35,28 +51,55 @@ class PathFilter {
   /// excluded.
   final bool ignoreGenerated;
 
-  final List<WildcardPattern> _wildcards;
+  final List<Glob> _globs;
 
   /// Creates a [PathFilter] with optional custom [excludePatterns] and
   /// [ignoreGenerated] toggle (defaults to `true`).
+  ///
+  /// Throws a [FormatException] naming the offending pattern if any of
+  /// [excludePatterns] is not valid glob syntax.
   PathFilter({
     Iterable<String> excludePatterns = const [],
     this.ignoreGenerated = true,
   }) : excludePatterns = List.unmodifiable(excludePatterns),
-       _wildcards = [
-         ...defaultIgnoredDirectories.map(
-           (p) => WildcardPattern(_normalizePattern(p)),
-         ),
-         if (ignoreGenerated)
-           ...defaultGeneratedPatterns.map(
-             (p) => WildcardPattern(_normalizePattern(p)),
-           ),
-         ...excludePatterns.map((p) => WildcardPattern(_normalizePattern(p))),
-       ];
+       _globs = _compileAll([
+         ...defaultIgnoredDirectories,
+         if (ignoreGenerated) ...defaultGeneratedPatterns,
+         ...excludePatterns,
+       ]);
 
   /// Default constant filter instance with standard ignored directories and
   /// generated file exclusion enabled.
   static final PathFilter defaults = PathFilter();
+
+  static List<Glob> _compileAll(Iterable<String> patterns) {
+    final globs = <Glob>[];
+    for (final raw in patterns) {
+      // A trailing comma or an unset CI variable yields a blank entry, which
+      // `Glob` rejects. Dropping it keeps such input inert, as it was before.
+      if (raw.trim().isEmpty) continue;
+      globs.add(_compile(raw));
+    }
+    return List.unmodifiable(globs);
+  }
+
+  static Glob _compile(String raw) {
+    // Relax `**` at a path boundary to span zero or more directories, so
+    // `**/*.g.dart` also matches a root-level `model.g.dart`. Scoped to
+    // boundaries so a caller's own brace group is left intact.
+    final anchored = '$_anchor${_normalizePattern(raw)}'.replaceAll(
+      '/**/',
+      '/{**/,}',
+    );
+    try {
+      // p.posix pins the separator and case sensitivity. Glob's default
+      // context is case-insensitive on Windows, which the Linux-only CI
+      // would never surface.
+      return Glob(anchored, context: p.posix);
+    } on FormatException catch (e) {
+      throw FormatException('Invalid exclude pattern "$raw": ${e.message}');
+    }
+  }
 
   static String _normalizePattern(String raw) {
     var pat = raw.trim().replaceAll(r'\', '/');
@@ -93,6 +136,18 @@ class PathFilter {
       return true;
     }
 
-    return WildcardPattern.anyMatch(_wildcards, clean);
+    // Patterns describe the scanned tree, so a path that escapes it — as
+    // `undead --extra-roots` and multi-target runs produce via `p.relative` —
+    // is matched on its in-tree remainder. `**` will not match a leading
+    // `../` on its own.
+    while (clean.startsWith('../')) {
+      clean = clean.substring(3);
+    }
+
+    final candidate = '$_anchor$clean';
+    for (final glob in _globs) {
+      if (glob.matches(candidate)) return true;
+    }
+    return false;
   }
 }
