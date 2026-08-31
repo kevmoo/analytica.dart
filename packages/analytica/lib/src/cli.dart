@@ -65,19 +65,20 @@ extension AnalyticaArgParserExtensions on ArgParser {
 }
 
 /// Splits a comma-separated list of glob patterns, ignoring commas inside a
-/// brace group.
+/// brace group or a character class.
 ///
 /// `**/*.{g,freezed}.dart,lib/**` yields `['**/*.{g,freezed}.dart', 'lib/**']`
-/// rather than tearing the brace group apart on its inner comma.
+/// rather than tearing the brace group apart on its inner comma, and
+/// `**/*_[0,1].dart` is likewise left whole.
 List<String> splitGlobPatterns(String value) {
   final parts = <String>[];
   final buffer = StringBuffer();
   var depth = 0;
   for (final rune in value.runes) {
     final char = String.fromCharCode(rune);
-    if (char == '{') {
+    if (char == '{' || char == '[') {
       depth++;
-    } else if (char == '}') {
+    } else if (char == '}' || char == ']') {
       if (depth > 0) depth--;
     } else if (char == ',' && depth == 0) {
       parts.add(buffer.toString());

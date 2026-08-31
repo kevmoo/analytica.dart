@@ -7,9 +7,12 @@ import 'package:path/path.dart' as p;
 /// Patterns are matched with `package:glob`, so the full glob syntax is
 /// available: `*` and `?` within a segment, `**` across segments, brace
 /// expansion (`**/*.{g,freezed}.dart`), and character classes
-/// (`**/*_[0-9].dart`). Matching is always case-sensitive and always uses
-/// `/` as the separator, on every platform. A literal `[`, `]`, `{` or `}`
-/// in a pattern must be escaped with [Glob.quote].
+/// (`**/*_[0-9].dart`). Matching is always case-sensitive.
+///
+/// Patterns always use `/` as the segment separator, on every platform, and
+/// `\` escapes a metacharacter — so a literal `[`, `]`, `{` or `}` is written
+/// with [Glob.quote]. Candidate paths passed to [isExcluded] may use either
+/// separator.
 class PathFilter {
   /// Default directory names and glob patterns excluded from scanning.
   static const defaultIgnoredDirectories = <String>[
@@ -87,10 +90,12 @@ class PathFilter {
     // Relax `**` at a path boundary to span zero or more directories, so
     // `**/*.g.dart` also matches a root-level `model.g.dart`. Scoped to
     // boundaries so a caller's own brace group is left intact.
-    final anchored = '$_anchor${_normalizePattern(raw)}'.replaceAll(
-      '/**/',
-      '/{**/,}',
-    );
+    // Collapse runs of `**/` first: `replaceAll` is non-overlapping, so
+    // `**/**/x` would otherwise leave the second occurrence unrelaxed.
+    final collapsed = _normalizePattern(
+      raw,
+    ).replaceAll(RegExp(r'(?:\*\*/)+'), '**/');
+    final anchored = '$_anchor$collapsed'.replaceAll('/**/', '/{**/,}');
     try {
       // p.posix pins the separator and case sensitivity. Glob's default
       // context is case-insensitive on Windows, which the Linux-only CI
@@ -102,7 +107,10 @@ class PathFilter {
   }
 
   static String _normalizePattern(String raw) {
-    var pat = raw.trim().replaceAll(r'\', '/');
+    // Patterns are glob syntax: `/` separates segments on every platform and
+    // `\` escapes a metacharacter, as `Glob.quote` produces. Candidate paths
+    // are still normalized from Windows separators in [isExcluded].
+    var pat = raw.trim();
     if (pat.startsWith('./')) {
       pat = pat.substring(2);
     }

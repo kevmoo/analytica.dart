@@ -122,6 +122,23 @@ class UndeadCliRunner {
       outSink = outSink ?? stdout,
       errSink = errSink ?? stderr;
 
+  /// Builds the path filter, honouring the deprecated `--include-generated`
+  /// alias for `--no-ignore-generated`.
+  ///
+  /// Throws a [FormatException] if an `--exclude` pattern is not valid glob
+  /// syntax; patterns are compiled eagerly.
+  PathFilter _resolvePathFilter(ArgResults results) {
+    final filter = parsePathFilter(results);
+    if (results.wasParsed('include-generated') &&
+        results.flag('include-generated')) {
+      return PathFilter(
+        excludePatterns: filter.excludePatterns,
+        ignoreGenerated: false,
+      );
+    }
+    return filter;
+  }
+
   /// Reports [message] as a usage error with the full option list.
   int _usageError(String message) {
     errSink.writeln('Error: $message');
@@ -176,19 +193,11 @@ class UndeadCliRunner {
     final format = OutputFormat.fromString(results.option('format')!);
     final exampleMode = ExampleMode.fromString(results.option('example-mode')!);
     final mode = AnalysisMode.fromString(results.option('mode')!);
-    final PathFilter parsedFilter;
+    final PathFilter pathFilter;
     try {
-      parsedFilter = parsePathFilter(results);
+      pathFilter = _resolvePathFilter(results);
     } on FormatException catch (e) {
       return _usageError(e.message);
-    }
-    var pathFilter = parsedFilter;
-    if (results.wasParsed('include-generated') &&
-        results.flag('include-generated')) {
-      pathFilter = PathFilter(
-        excludePatterns: pathFilter.excludePatterns,
-        ignoreGenerated: false,
-      );
     }
     final failOnUndead = results.flag('fail-on-undead');
     final autoPubGet = results.flag('pub-get');

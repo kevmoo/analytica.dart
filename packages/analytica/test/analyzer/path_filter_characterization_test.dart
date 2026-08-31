@@ -115,6 +115,20 @@ void main() {
       );
     });
 
+    test('consecutive ** segments collapse', () {
+      // `replaceAll` is non-overlapping, so a run of `**/` would otherwise
+      // leave all but the first unrelaxed and stop matching at the root.
+      _expectAll(
+        PathFilter(excludePatterns: ['**/**/x.dart'], ignoreGenerated: false),
+        const [
+          (path: 'x.dart', excluded: true),
+          (path: 'lib/x.dart', excluded: true),
+          (path: 'a/b/x.dart', excluded: true),
+          (path: 'lib/y.dart', excluded: false),
+        ],
+      );
+    });
+
     test('a slash-less pattern matches at any depth', () {
       _expectAll(
         PathFilter(excludePatterns: ['legacy_*.dart'], ignoreGenerated: false),

@@ -1,5 +1,6 @@
 import 'package:analytica/analyzer.dart';
 import 'package:checks/checks.dart';
+import 'package:glob/glob.dart';
 import 'package:test/scaffolding.dart';
 
 void main() {
@@ -94,6 +95,41 @@ void main() {
       check(filter.isExcluded('lib/part_3.dart')).isTrue();
       check(filter.isExcluded('part_0.dart')).isTrue();
       check(filter.isExcluded('lib/part_x.dart')).isFalse();
+    });
+
+    test('Glob.quote escapes a metacharacter back to a literal', () {
+      // The documented migration path for the literal -> metacharacter break.
+      final filter = PathFilter(
+        excludePatterns: [Glob.quote('lib/a[0].dart')],
+        ignoreGenerated: false,
+      );
+
+      check(filter.isExcluded('lib/a[0].dart')).isTrue();
+      check(filter.isExcluded('lib/a0.dart')).isFalse();
+    });
+
+    test('a backslash in a pattern escapes, it does not separate', () {
+      // Patterns are glob syntax on every platform; only candidate paths are
+      // normalized from Windows separators.
+      final filter = PathFilter(
+        excludePatterns: [r'lib/a\{b.dart'],
+        ignoreGenerated: false,
+      );
+
+      check(filter.isExcluded('lib/a{b.dart')).isTrue();
+      check(filter.isExcluded(r'lib\a{b.dart')).isTrue();
+    });
+
+    test('consecutive ** segments still match at the root', () {
+      final filter = PathFilter(
+        excludePatterns: ['**/**/x.dart'],
+        ignoreGenerated: false,
+      );
+
+      check(filter.isExcluded('x.dart')).isTrue();
+      check(filter.isExcluded('lib/x.dart')).isTrue();
+      check(filter.isExcluded('a/b/x.dart')).isTrue();
+      check(filter.isExcluded('lib/y.dart')).isFalse();
     });
 
     test('rejects a malformed pattern, naming the pattern', () {
