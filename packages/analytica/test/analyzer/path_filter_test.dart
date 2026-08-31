@@ -109,8 +109,7 @@ void main() {
     });
 
     test('a backslash in a pattern escapes, it does not separate', () {
-      // Patterns are glob syntax on every platform; only candidate paths are
-      // normalized from Windows separators.
+      // Only candidate paths are normalized from Windows separators.
       final filter = PathFilter(
         excludePatterns: [r'lib/a\{b.dart'],
         ignoreGenerated: false,

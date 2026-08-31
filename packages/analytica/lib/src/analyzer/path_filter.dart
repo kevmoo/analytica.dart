@@ -78,8 +78,8 @@ class PathFilter {
   static List<Glob> _compileAll(Iterable<String> patterns) {
     final globs = <Glob>[];
     for (final raw in patterns) {
-      // A trailing comma or an unset CI variable yields a blank entry, which
-      // `Glob` rejects. Dropping it keeps such input inert, as it was before.
+      // A trailing comma or unset CI variable yields a blank entry, which
+      // `Glob` rejects but the previous matcher treated as inert.
       if (raw.trim().isEmpty) continue;
       globs.add(_compile(raw));
     }
@@ -87,19 +87,15 @@ class PathFilter {
   }
 
   static Glob _compile(String raw) {
-    // Relax `**` at a path boundary to span zero or more directories, so
-    // `**/*.g.dart` also matches a root-level `model.g.dart`. Scoped to
-    // boundaries so a caller's own brace group is left intact.
-    // Collapse runs of `**/` first: `replaceAll` is non-overlapping, so
-    // `**/**/x` would otherwise leave the second occurrence unrelaxed.
+    // `replaceAll` is non-overlapping, so a run of `**/` must collapse before
+    // the boundaries are relaxed, or all but the first survive unrelaxed.
     final collapsed = _normalizePattern(
       raw,
     ).replaceAll(RegExp(r'(?:\*\*/)+'), '**/');
     final anchored = '$_anchor$collapsed'.replaceAll('/**/', '/{**/,}');
     try {
-      // p.posix pins the separator and case sensitivity. Glob's default
-      // context is case-insensitive on Windows, which the Linux-only CI
-      // would never surface.
+      // Glob's default context is case-insensitive on Windows, which the
+      // Linux-only CI would never surface.
       return Glob(anchored, context: p.posix);
     } on FormatException catch (e) {
       throw FormatException('Invalid exclude pattern "$raw": ${e.message}');
@@ -107,9 +103,6 @@ class PathFilter {
   }
 
   static String _normalizePattern(String raw) {
-    // Patterns are glob syntax: `/` separates segments on every platform and
-    // `\` escapes a metacharacter, as `Glob.quote` produces. Candidate paths
-    // are still normalized from Windows separators in [isExcluded].
     var pat = raw.trim();
     if (pat.startsWith('./')) {
       pat = pat.substring(2);

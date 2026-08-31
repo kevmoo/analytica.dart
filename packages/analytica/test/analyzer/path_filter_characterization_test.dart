@@ -4,16 +4,13 @@ import 'package:test/scaffolding.dart';
 
 /// Golden matrix pinning [PathFilter] matching behaviour.
 ///
-/// Every expectation here was captured from the running implementation rather
-/// than written by hand, so the matrix records what the filter *does*, not what
-/// it was assumed to do. Its purpose is to make behaviour changes to the
-/// matching engine visible in review: a change that edits no rows is
-/// behaviour-preserving, and a change that edits rows has documented precisely
-/// what it altered.
+/// Expectations were captured from the running implementation, so the matrix
+/// records what the filter *does*, not what it was assumed to do: a change
+/// that edits no rows is behaviour-preserving, and one that edits rows has
+/// listed exactly what it altered.
 ///
-/// Exclusion is not opt-in — [PathFilter.defaults] applies fifteen patterns to
-/// every scanned file before any `--exclude` is supplied — so a silent
-/// regression here changes the output of every tool in the workspace.
+/// Exclusion is not opt-in — [PathFilter.defaults] applies fifteen patterns
+/// before any `--exclude` — so a regression here reaches every tool.
 typedef _Case = ({String path, bool excluded});
 
 void _expectAll(PathFilter filter, List<_Case> cases) {
@@ -54,7 +51,6 @@ void main() {
     test('ignored directories, including the bare directory itself', () {
       _expectAll(PathFilter.defaults, const [
         (path: '.dart_tool/package_config.json', excluded: true),
-        // Matched at any depth, not only at the root.
         (path: 'lib/.dart_tool/x.dart', excluded: true),
         (path: '.dart_tool', excluded: true),
         (path: '.git/HEAD', excluded: true),
@@ -227,25 +223,21 @@ void main() {
   });
 
   group('PathFilter characterization: glob metacharacters', () {
-    // CHANGED by the move to package:glob. Previously every metacharacter was
-    // escaped and matched literally; they are now glob syntax. This is the
-    // point of the change, but it is a breaking one for any pattern that
-    // relied on the old literal reading.
+    // CHANGED by the move to package:glob: metacharacters were escaped and
+    // matched literally, and are now syntax.
     test('bracket characters are a character class, not literal', () {
       _expectAll(
         PathFilter(excludePatterns: [r'lib/a[0].dart'], ignoreGenerated: false),
         const [
-          // Was `true` under the literal matcher.
           (path: 'lib/a[0].dart', excluded: false),
-          // Was `false`.
           (path: 'lib/a0.dart', excluded: true),
         ],
       );
     });
 
     test('a brace group with a single option is a syntax error', () {
-      // Was matched literally and silently. Failing loudly is the intended
-      // trade: a pattern that cannot mean what the author wrote should say so.
+      // Was matched literally. A pattern that cannot mean what the author
+      // wrote should say so.
       check(
           () => PathFilter(excludePatterns: [r'lib/b{c}.dart']),
         ).throws<FormatException>().has((e) => e.message, 'message')
@@ -262,12 +254,10 @@ void main() {
       _expectAll(
         PathFilter(excludePatterns: ['custom/**'], ignoreGenerated: false),
         const [
-          // CHANGED, both were `false`. Escaping segments are now stripped
-          // before matching, so a root-anchored pattern applies to an
-          // out-of-tree path by its in-tree remainder. Without the strip the
-          // asymmetry runs the other way and `**` stops absorbing `../`,
-          // which would silently un-exclude generated files under an extra
-          // root -- the more damaging direction of the two.
+          // CHANGED, both were `false`. Escaping segments are stripped, so
+          // a root-anchored pattern now reaches an out-of-tree path. Without
+          // the strip `**` stops absorbing `../` instead, silently
+          // un-excluding generated files under an extra root.
           (path: '../custom/x.dart', excluded: true),
           (path: '../../custom/x.dart', excluded: true),
           (path: 'custom/x.dart', excluded: true),

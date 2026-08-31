@@ -124,9 +124,6 @@ class UndeadCliRunner {
 
   /// Builds the path filter, honouring the deprecated `--include-generated`
   /// alias for `--no-ignore-generated`.
-  ///
-  /// Throws a [FormatException] if an `--exclude` pattern is not valid glob
-  /// syntax; patterns are compiled eagerly.
   PathFilter _resolvePathFilter(ArgResults results) {
     final filter = parsePathFilter(results);
     if (results.wasParsed('include-generated') &&
@@ -139,7 +136,6 @@ class UndeadCliRunner {
     return filter;
   }
 
-  /// Reports [message] as a usage error with the full option list.
   int _usageError(String message) {
     errSink.writeln('Error: $message');
     errSink.writeln();
