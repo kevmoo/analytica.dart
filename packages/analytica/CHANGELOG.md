@@ -1,5 +1,26 @@
 ## 0.1.2-wip
 
+- Power `PathFilter` with `package:glob`, so exclusion patterns support the
+  full glob syntax including brace expansion (`**/*.{g,freezed}.dart`) and
+  character classes (`**/*_[0-9].dart`).
+- **Breaking:** `[`, `]`, `{` and `}` in an exclusion pattern are now glob
+  metacharacters rather than literal characters. Escape them with
+  `Glob.quote` to match them literally.
+- **Breaking:** a backslash in an exclusion *pattern* is now a glob escape
+  rather than a path separator, so patterns use `/` on every platform.
+  Candidate paths passed to `PathFilter.isExcluded` are still normalized from
+  Windows separators.
+- Add `splitGlobPatterns`, which splits a comma-separated pattern list without
+  breaking commas inside a brace group or character class. `parsePathFilter`
+  uses it, and `addPathFilterOptions` sets `splitCommas: false` so the two do
+  not fight.
+- **Breaking:** a malformed exclusion pattern now throws a `FormatException`
+  naming the pattern, where it previously matched nothing silently.
+- Match paths that escape the scanned tree (a leading `../`, as produced by
+  `undead --extra-roots`) on their in-tree remainder, so a root-anchored
+  pattern now applies to them.
+- Pin exclusion matching to POSIX separators and case sensitivity on every
+  platform.
 - Add `PathFilter` in `package:analytica/analyzer.dart` for centralized path
   exclusion matching and generated Dart code filtering.
 - Add `addPathFilterOptions` and `parsePathFilter` CLI utilities in

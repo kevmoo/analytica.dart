@@ -1,5 +1,12 @@
 ## 0.1.2-wip
 
+- `--exclude` now accepts the full glob syntax, including brace expansion and
+  character classes, via `PathFilter`.
+- `PathFilter` construction now validates patterns eagerly, so building
+  options with a malformed `excludePatterns` entry throws a `FormatException`
+  where it previously matched nothing silently.
+- Report a malformed `--exclude` pattern as a usage error instead of an
+  unhandled exception.
 - Adopt centralized `PathFilter` in `UndeadOptions` and CLI for `--exclude` and
   `--[no-]ignore-generated` file filtering.
 - Add `ensure_cli_readme_test.dart` to verify CLI `--help` documentation in

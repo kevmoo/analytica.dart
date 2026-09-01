@@ -48,6 +48,28 @@ void main() {
         customFilter.excludePatterns,
       ).deepEquals(['test/fixtures/**', 'legacy/**', '*.gen.dart']);
     });
+
+    test('keeps character classes intact when splitting on commas', () {
+      final parser = ArgParser()..addPathFilterOptions();
+      final results = parser.parse(['--exclude=**/*_[0,1].dart,lib/legacy/**']);
+
+      check(
+        parsePathFilter(results).excludePatterns,
+      ).deepEquals(['**/*_[0,1].dart', 'lib/legacy/**']);
+    });
+
+    test('keeps brace groups intact when splitting on commas', () {
+      // A brace group contains commas, so naive comma splitting tears
+      // `**/*.{g,freezed}.dart` into two invalid patterns.
+      final parser = ArgParser()..addPathFilterOptions();
+      final results = parser.parse([
+        '--exclude=**/*.{g,freezed}.dart,lib/legacy/**',
+      ]);
+
+      check(
+        parsePathFilter(results).excludePatterns,
+      ).deepEquals(['**/*.{g,freezed}.dart', 'lib/legacy/**']);
+    });
   });
 
   group('parseLineBounds', () {

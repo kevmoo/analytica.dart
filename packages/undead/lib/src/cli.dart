@@ -122,16 +122,34 @@ class UndeadCliRunner {
       outSink = outSink ?? stdout,
       errSink = errSink ?? stderr;
 
+  /// Builds the path filter, honouring the deprecated `--include-generated`
+  /// alias for `--no-ignore-generated`.
+  PathFilter _resolvePathFilter(ArgResults results) {
+    final filter = parsePathFilter(results);
+    if (results.wasParsed('include-generated') &&
+        results.flag('include-generated')) {
+      return PathFilter(
+        excludePatterns: filter.excludePatterns,
+        ignoreGenerated: false,
+      );
+    }
+    return filter;
+  }
+
+  int _usageError(String message) {
+    errSink.writeln('Error: $message');
+    errSink.writeln();
+    errSink.writeln('Usage: undead [options] [target_path]');
+    errSink.writeln(parser.usage);
+    return ExitCode.usage.code;
+  }
+
   Future<int> run(List<String> args) async {
     final ArgResults results;
     try {
       results = parser.parse(args);
     } on FormatException catch (e) {
-      errSink.writeln('Error: ${e.message}');
-      errSink.writeln();
-      errSink.writeln('Usage: undead [options] [target_path]');
-      errSink.writeln(parser.usage);
-      return ExitCode.usage.code;
+      return _usageError(e.message);
     }
 
     if (results.flag('help')) {
@@ -171,13 +189,11 @@ class UndeadCliRunner {
     final format = OutputFormat.fromString(results.option('format')!);
     final exampleMode = ExampleMode.fromString(results.option('example-mode')!);
     final mode = AnalysisMode.fromString(results.option('mode')!);
-    var pathFilter = parsePathFilter(results);
-    if (results.wasParsed('include-generated') &&
-        results.flag('include-generated')) {
-      pathFilter = PathFilter(
-        excludePatterns: pathFilter.excludePatterns,
-        ignoreGenerated: false,
-      );
+    final PathFilter pathFilter;
+    try {
+      pathFilter = _resolvePathFilter(results);
+    } on FormatException catch (e) {
+      return _usageError(e.message);
     }
     final failOnUndead = results.flag('fail-on-undead');
     final autoPubGet = results.flag('pub-get');

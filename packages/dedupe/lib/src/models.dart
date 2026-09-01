@@ -540,6 +540,8 @@ final class DedupeOptions {
   List<String> get excludePatterns => pathFilter.excludePatterns;
   bool get ignoreGenerated => pathFilter.ignoreGenerated;
 
+  /// Throws a [FormatException] if an `excludePatterns` entry is not valid
+  /// glob syntax; [PathFilter] compiles patterns eagerly.
   DedupeOptions({
     required this.targetPath,
     List<String> targets = const ['lib'],

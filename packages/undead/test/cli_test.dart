@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:analytica/analytica.dart';
 import 'package:analytica/testing.dart';
 import 'package:checks/checks.dart';
 import 'package:path/path.dart' as p;
@@ -506,6 +507,33 @@ void onlyUsedHere() {}
       check(firstFinding['name']).equals('onlyUsedHere');
       check(firstFinding['classification']).equals('privateCandidate');
       check(firstFinding['suggestedAction']).equals('makePrivate');
+    });
+  });
+
+  group('--exclude pattern errors', () {
+    test('reports a malformed pattern as a usage error', () async {
+      // Patterns are compiled eagerly, so an invalid glob throws from
+      // parsePathFilter -- which sits outside the arg-parsing try block.
+      // Unguarded that surfaces as an unhandled exception and exit 255.
+      await d.dir('bad_glob_pkg', [
+        d.file('pubspec.yaml', '''
+name: bad_glob_pkg
+environment:
+  sdk: '^3.5.0'
+'''),
+        d.dir('lib', [d.file('main.dart', 'void main() {}')]),
+      ]).create();
+
+      final err = StringBuffer();
+      final code = await UndeadCliRunner(
+        outSink: StringBuffer(),
+        errSink: err,
+      ).run(['--exclude=lib/[unclosed', d.path('bad_glob_pkg')]);
+
+      check(code).equals(ExitCode.usage.code);
+      check(err.toString())
+        ..contains('lib/[unclosed')
+        ..contains('Invalid exclude pattern');
     });
   });
 }

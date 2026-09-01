@@ -168,6 +168,8 @@ final class UndeadOptions {
   bool get ignoreGenerated => pathFilter.ignoreGenerated;
   List<String> get excludePatterns => pathFilter.excludePatterns;
 
+  /// Throws a [FormatException] if an `excludePatterns` entry is not valid
+  /// glob syntax; [PathFilter] compiles patterns eagerly.
   UndeadOptions({
     required this.packagePath,
     this.format = OutputFormat.markdown,
