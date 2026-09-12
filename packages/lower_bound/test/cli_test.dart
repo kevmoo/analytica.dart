@@ -68,36 +68,71 @@ void main() {
       check(err.toString()).contains('No pubspec.yaml found');
     });
 
-    test(
-      'writes sticky PR comment with marker and honors max-comment-rows',
-      () async {
-        await d.dir('valid_pkg', [
-          d.file('pubspec.yaml', '''
+    test('does not write sticky PR comment when run is clean', () async {
+      await d.dir('valid_pkg', [
+        d.file('pubspec.yaml', '''
 name: valid_pkg
 environment:
   sdk: '^3.12.0'
 '''),
-          d.dir('lib', [d.file('valid_pkg.dart', 'const a = 1;')]),
-        ]).create();
+        d.dir('lib', [d.file('valid_pkg.dart', 'const a = 1;')]),
+      ]).create();
 
-        final commentFile = p.join(d.sandbox, 'nested_dir', 'comment.md');
+      final commentFile = p.join(d.sandbox, 'comment.md');
 
-        final proc = await TestProcess.start(dartExecutable, [
-          binPath,
-          '--comment-output=$commentFile',
-          '--max-comment-rows=1',
-          p.join(d.sandbox, 'valid_pkg'),
-        ]);
-        await proc.shouldExit(0);
+      final proc = await TestProcess.start(dartExecutable, [
+        binPath,
+        '--comment-output=$commentFile',
+        '--max-comment-rows=1',
+        p.join(d.sandbox, 'valid_pkg'),
+      ]);
+      await proc.shouldExit(0);
 
-        final commentContent = File(commentFile).readAsStringSync();
-        check(commentContent).contains('<!-- lower-bound-comment-marker -->');
-        check(
-          commentContent,
-        ).contains('## 📦 Dependency Lower-Bound Validation Summary');
-        check(commentContent).contains('valid_pkg');
-      },
-    );
+      check(File(commentFile).existsSync()).isFalse();
+    });
+
+    test('writes sticky PR comment when run is dirty', () async {
+      await d.dir('dirty_pkg', [
+        d.file('pubspec.yaml', '''
+name: dirty_pkg
+environment:
+  sdk: '^3.12.0'
+dependencies:
+  path: ^1.9.0
+'''),
+        d.dir('lib', [
+          d.file('dirty_pkg.dart', '''
+import 'package:path/path.dart' as p;
+void main() {
+  p.thisFunctionDoesNotExistAtFloor();
+}
+          '''),
+        ]),
+      ]).create();
+
+      final commentFile = p.join(d.sandbox, 'comment.md');
+
+      final proc = await TestProcess.start(dartExecutable, [
+        binPath,
+        '--comment-output=$commentFile',
+        '--max-comment-rows=1',
+        p.join(d.sandbox, 'dirty_pkg'),
+      ]);
+      // 70 (ExitCode.software) is also what a `pub get` failure yields, so
+      // pin the *reason*: without this the test passes even if the fixture
+      // stops exercising the lower-bound analysis path.
+      await proc.shouldExit(70);
+
+      final commentContent = File(commentFile).readAsStringSync();
+      check(commentContent).contains('<!-- lower-bound-comment-marker -->');
+      check(
+        commentContent,
+      ).contains('## 📦 Dependency Lower-Bound Validation Summary');
+      check(commentContent).contains('dirty_pkg');
+      check(
+        commentContent,
+      ).contains('Static Analysis Errors at Dependency Floor');
+    });
 
     test('formats output as JSON with --format=json', () async {
       await d.dir('json_pkg', [

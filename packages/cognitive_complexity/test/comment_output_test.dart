@@ -182,5 +182,71 @@ void main() {
       check(File(commentPath).existsSync()).isFalse();
       check(await File(summaryPath).readAsString()).contains('| 🔴 |');
     });
+
+    test('writes no comment file when run is clean', () async {
+      // An empty commit leaves HEAD identical to HEAD~1, so the diff is
+      // resolvable but contains zero changed declarations.
+      await _runGit(repoPath, ['commit', '--allow-empty', '-m', 'clean']);
+
+      final process = await TestProcess.start(
+        Platform.resolvedExecutable,
+        [
+          binPath,
+          '--git-diff=HEAD~1', // But HEAD is now equal to HEAD~1
+          '--fail-threshold=15',
+          '--format=github',
+          '--comment-output=$commentPath',
+          'lib',
+        ],
+        workingDirectory: repoPath,
+        environment: {
+          'GITHUB_STEP_SUMMARY': summaryPath,
+          'GITHUB_WORKSPACE': repoPath,
+        },
+      );
+      await process.shouldExit(0);
+      check(File(commentPath).existsSync()).isFalse();
+    });
+
+    test(
+      'writes no comment file when the diff only improves complexity',
+      () async {
+        // Revert the violations, so HEAD~1 -> HEAD is a non-empty diff whose
+        // every delta is an improvement. This distinguishes "0 violations and
+        // 0 increases" from the weaker "nothing changed at all": a predicate
+        // keyed on an empty delta list would wrongly post a comment here.
+        await File(p.join(repoPath, 'lib', 'a.dart')).writeAsString(
+          [
+            for (var i = 0; i < 6; i++) 'int f$i(int x) { return x + $i; }\n',
+          ].join('\n'),
+        );
+        await _runGit(repoPath, ['add', '.']);
+        await _runGit(repoPath, ['commit', '-m', 'simplify']);
+
+        final process = await TestProcess.start(
+          Platform.resolvedExecutable,
+          [
+            binPath,
+            '--git-diff=HEAD~1',
+            '--fail-threshold=15',
+            '--fail-on-increase',
+            '--format=github',
+            '--comment-output=$commentPath',
+            'lib',
+          ],
+          workingDirectory: repoPath,
+          environment: {
+            'GITHUB_STEP_SUMMARY': summaryPath,
+            'GITHUB_WORKSPACE': repoPath,
+          },
+        );
+        await process.shouldExit(0);
+
+        check(File(commentPath).existsSync()).isFalse();
+        // The improvements are still reported, just not as an email.
+        final summary = await File(summaryPath).readAsString();
+        check(summary).contains('**Improved**: 6');
+      },
+    );
   });
 }
