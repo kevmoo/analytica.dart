@@ -325,11 +325,13 @@ void _renderResults({
   required String workspaceRoot,
 }) {
   if (commentOutput != null && commentOutput.isNotEmpty) {
-    final commentReport = buildMarkdownReport(
-      results,
-      maxCommentRows: maxCommentRows,
-    );
-    _writeCommentFile(commentOutput, commentReport, errSink);
+    if (results.any((r) => !r.isClean)) {
+      final commentReport = buildMarkdownReport(
+        results,
+        maxCommentRows: maxCommentRows,
+      );
+      _writeCommentFile(commentOutput, commentReport, errSink);
+    }
   }
 
   switch (format) {

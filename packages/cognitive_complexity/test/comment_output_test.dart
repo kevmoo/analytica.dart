@@ -182,5 +182,29 @@ void main() {
       check(File(commentPath).existsSync()).isFalse();
       check(await File(summaryPath).readAsString()).contains('| 🔴 |');
     });
+
+    test('writes no comment file when run is clean', () async {
+      // Re-create the fixture to be identical between HEAD and HEAD~1 (no deltas)
+      await _runGit(repoPath, ['commit', '--allow-empty', '-m', 'clean']);
+
+      final process = await TestProcess.start(
+        Platform.resolvedExecutable,
+        [
+          binPath,
+          '--git-diff=HEAD~1', // But HEAD is now equal to HEAD~1
+          '--fail-threshold=15',
+          '--format=github',
+          '--comment-output=$commentPath',
+          'lib',
+        ],
+        workingDirectory: repoPath,
+        environment: {
+          'GITHUB_STEP_SUMMARY': summaryPath,
+          'GITHUB_WORKSPACE': repoPath,
+        },
+      );
+      await process.shouldExit(0);
+      check(File(commentPath).existsSync()).isFalse();
+    });
   });
 }

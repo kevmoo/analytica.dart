@@ -30,9 +30,19 @@ class GitHubReporter {
     bool failOnIncrease = false,
   }) {
     final summaryBuf = _newBuffer();
-    final commentBuf = _commentFile == null ? null : _newBuffer();
+    StringBuffer? commentBuf = _commentFile == null ? null : _newBuffer();
 
     if (deltaSummary != null) {
+      final isClean =
+          deltaSummary.countViolations(
+                failThreshold: failThreshold,
+                failOnIncrease: failOnIncrease,
+              ) ==
+              0 &&
+          deltaSummary.countIncreased == 0;
+      if (isClean) {
+        commentBuf = null;
+      }
       _reportDelta(
         deltaSummary,
         failThreshold,
@@ -41,6 +51,12 @@ class GitHubReporter {
         commentBuf,
       );
     } else if (regularResults != null) {
+      final isClean = failThreshold != null
+          ? regularResults.every((r) => r.score <= failThreshold)
+          : regularResults.isEmpty;
+      if (isClean) {
+        commentBuf = null;
+      }
       _reportRegular(regularResults, failThreshold, summaryBuf);
     }
 
