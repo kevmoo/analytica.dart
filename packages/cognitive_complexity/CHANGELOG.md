@@ -1,5 +1,9 @@
 ## 0.2.5-wip
 
+- Skip writing the `--comment-output` file entirely when a run has zero
+  violations and zero complexity increases, so the GitHub Action stays quiet on
+  the PR thread instead of posting an all-zeroes summary comment. The full
+  report still lands in `$GITHUB_STEP_SUMMARY`.
 - Support `--exclude` and `--[no-]ignore-generated` CLI options to configure
   file exclusion and generated code filtering via `PathFilter`.
 - Add `pathFilter` parameter to `ComplexityAnalyzer` and `DeltaAnalyzer`.

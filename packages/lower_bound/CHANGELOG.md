@@ -1,5 +1,8 @@
 ## 0.1.0-wip
 
+- Skip writing the `--comment-output` file entirely when every validated
+  package is clean, so the GitHub Action stays quiet on the PR thread instead
+  of posting a zero-finding summary comment.
 - Initial release of automated Dart dependency lower-bound validator and
   synthetic runtime isolation engine.
 - Synthetic staging engine:
