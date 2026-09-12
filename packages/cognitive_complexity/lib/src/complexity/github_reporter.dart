@@ -30,7 +30,7 @@ class GitHubReporter {
     bool failOnIncrease = false,
   }) {
     final summaryBuf = _newBuffer();
-    StringBuffer? commentBuf = _commentFile == null ? null : _newBuffer();
+    var commentBuf = _commentFile == null ? null : _newBuffer();
 
     if (deltaSummary != null) {
       final isClean =

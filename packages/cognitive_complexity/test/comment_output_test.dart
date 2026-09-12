@@ -184,7 +184,8 @@ void main() {
     });
 
     test('writes no comment file when run is clean', () async {
-      // Re-create the fixture to be identical between HEAD and HEAD~1 (no deltas)
+      // An empty commit leaves HEAD identical to HEAD~1, so the diff is
+      // resolvable but contains zero changed declarations.
       await _runGit(repoPath, ['commit', '--allow-empty', '-m', 'clean']);
 
       final process = await TestProcess.start(
