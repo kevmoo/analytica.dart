@@ -102,6 +102,10 @@ runs:
         (cd "$ACTION_PATH" && dart pub get >/dev/null)
         cd "$workspace"
 
+        # The absence of this file is how the CLI signals "clean", so a stale
+        # copy from an earlier invocation in the same job must not survive.
+        rm -f "$comment_file"
+
         # Execute lower_bound CLI and capture exit code
         set +e
         dart run "$ACTION_PATH/bin/lower_bound.dart" "${run_args[@]}"
@@ -111,8 +115,11 @@ runs:
         # If running inside a PR context and GH_TOKEN is present, post or update sticky comment
         if [ -n "$PR_NUMBER" ] && [ -n "$GH_TOKEN" ]; then
           echo "Searching for existing lower-bound validation comment on PR #$PR_NUMBER..."
+          # Never let a transient API failure fail the step: the lookup now runs
+          # on clean runs too, so an unguarded non-zero exit under `set -e`
+          # would skip `exit $exit_code` and mask the real result.
           comment_ids=$(gh api --paginate "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/comments" \
-            --jq '.[] | select(.body | contains("<!-- lower-bound-comment-marker -->")) | .id')
+            --jq '.[] | select(.body | contains("<!-- lower-bound-comment-marker -->")) | .id' 2>/dev/null || true)
           comment_id=$(printf '%s\n' "$comment_ids" | head -n 1)
 
           if [ -f "$comment_file" ] && [ -s "$comment_file" ]; then
@@ -123,13 +130,21 @@ runs:
               echo "Creating new PR comment..."
               gh pr comment "$PR_NUMBER" --body-file "$comment_file" --repo "$GITHUB_REPOSITORY" > /dev/null || true
             fi
-          else
-            if [ -n "$comment_id" ]; then
-              echo "Run is clean. Patching existing comment to resolved status..."
-              resolved_file="${RUNNER_TEMP}/resolved-lower-bound-comment.md"
-              echo -e "<!-- lower-bound-comment-marker -->\n## 📦 Dependency Lower-Bound Validation Summary\n\n> [!TIP]\n> **Status:** Clean - all previous limit violations resolved!" > "$resolved_file"
-              gh api -X PATCH "repos/$GITHUB_REPOSITORY/issues/comments/$comment_id" -F body=@"$resolved_file" > /dev/null || true
-            fi
+          elif [ "$exit_code" -eq 0 ] && [ -n "$comment_id" ]; then
+            # Only a successful run proves the diff is clean. A crash also
+            # leaves no comment file, and must not be reported as resolved.
+            echo "Run is clean. Patching existing comment to resolved status..."
+            resolved_file="${RUNNER_TEMP}/resolved-lower-bound-comment.md"
+            {
+              echo "<!-- lower-bound-comment-marker -->"
+              echo "## 📦 Dependency Lower-Bound Validation Summary"
+              echo
+              echo "> [!TIP]"
+              echo "> **Status:** Clean - no dependency floor violations in the current diff."
+              echo
+              echo "_Last checked: ${GITHUB_SHA:-unknown} ([run](${GITHUB_SERVER_URL:-https://github.com}/$GITHUB_REPOSITORY/actions/runs/${GITHUB_RUN_ID:-0}))._"
+            } > "$resolved_file"
+            gh api -X PATCH "repos/$GITHUB_REPOSITORY/issues/comments/$comment_id" -F body=@"$resolved_file" > /dev/null || true
           fi
         fi
 

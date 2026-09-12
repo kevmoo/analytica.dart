@@ -33,14 +33,13 @@ class GitHubReporter {
     var commentBuf = _commentFile == null ? null : _newBuffer();
 
     if (deltaSummary != null) {
-      final isClean =
-          deltaSummary.countViolations(
-                failThreshold: failThreshold,
-                failOnIncrease: failOnIncrease,
-              ) ==
-              0 &&
-          deltaSummary.countIncreased == 0;
-      if (isClean) {
+      // A clean diff gets no comment at all: the action reads the absence of
+      // the comment file as "nothing to report". The step summary below is
+      // written either way.
+      if (deltaSummary.isClean(
+        failThreshold: failThreshold,
+        failOnIncrease: failOnIncrease,
+      )) {
         commentBuf = null;
       }
       _reportDelta(
@@ -51,12 +50,8 @@ class GitHubReporter {
         commentBuf,
       );
     } else if (regularResults != null) {
-      final isClean = failThreshold != null
-          ? regularResults.every((r) => r.score <= failThreshold)
-          : regularResults.isEmpty;
-      if (isClean) {
-        commentBuf = null;
-      }
+      // Regular (non-delta) mode never configures a comment file, so
+      // commentBuf is already null here.
       _reportRegular(regularResults, failThreshold, summaryBuf);
     }
 

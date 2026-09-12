@@ -118,7 +118,9 @@ void main() {
         '--max-comment-rows=1',
         p.join(d.sandbox, 'dirty_pkg'),
       ]);
-      // it fails validation
+      // 70 (ExitCode.software) is also what a `pub get` failure yields, so
+      // pin the *reason*: without this the test passes even if the fixture
+      // stops exercising the lower-bound analysis path.
       await proc.shouldExit(70);
 
       final commentContent = File(commentFile).readAsStringSync();
@@ -127,6 +129,9 @@ void main() {
         commentContent,
       ).contains('## 📦 Dependency Lower-Bound Validation Summary');
       check(commentContent).contains('dirty_pkg');
+      check(
+        commentContent,
+      ).contains('Static Analysis Errors at Dependency Floor');
     });
 
     test('formats output as JSON with --format=json', () async {

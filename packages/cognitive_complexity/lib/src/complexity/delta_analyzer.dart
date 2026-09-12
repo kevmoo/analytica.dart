@@ -111,6 +111,19 @@ class DeltaSummary {
           )
           .length;
 
+  /// Whether this diff is quiet enough to skip a PR comment.
+  ///
+  /// Clean means nothing crossed [failThreshold] *and* no declaration got more
+  /// complex. A diff that only improves complexity is clean: the numbers still
+  /// land in the step summary, but they are not worth an email.
+  bool isClean({int? failThreshold, bool failOnIncrease = false}) =>
+      countViolations(
+            failThreshold: failThreshold,
+            failOnIncrease: failOnIncrease,
+          ) ==
+          0 &&
+      countIncreased == 0;
+
   Map<String, dynamic> toJson({
     int? failThreshold,
     bool failOnIncrease = false,
