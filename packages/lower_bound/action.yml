@@ -56,6 +56,7 @@ runs:
         ACTION_PATH: ${{ github.action_path }}
         GH_TOKEN: ${{ github.token }}
         PR_NUMBER: ${{ github.event.pull_request.number }}
+        HEAD_SHA: ${{ github.event.pull_request.head.sha }}
       run: |
         case "${INPUT_MAX_COMMENT_ROWS:-0}" in
           ''|*[!0-9]*)
@@ -135,6 +136,9 @@ runs:
             # leaves no comment file, and must not be reported as resolved.
             echo "Run is clean. Patching existing comment to resolved status..."
             resolved_file="${RUNNER_TEMP}/resolved-lower-bound-comment.md"
+            # GITHUB_SHA is the ephemeral refs/pull/N/merge commit on
+            # pull_request events, which is not reachable in the branch.
+            sha="${HEAD_SHA:-${GITHUB_SHA:-unknown}}"
             {
               echo "<!-- lower-bound-comment-marker -->"
               echo "## 📦 Dependency Lower-Bound Validation Summary"
@@ -142,7 +146,7 @@ runs:
               echo "> [!TIP]"
               echo "> **Status:** Clean - no dependency floor violations in the current diff."
               echo
-              echo "_Last checked: ${GITHUB_SHA:-unknown} ([run](${GITHUB_SERVER_URL:-https://github.com}/$GITHUB_REPOSITORY/actions/runs/${GITHUB_RUN_ID:-0}))._"
+              echo "_Last checked: ${sha:0:7} ([run](${GITHUB_SERVER_URL:-https://github.com}/$GITHUB_REPOSITORY/actions/runs/${GITHUB_RUN_ID:-0}))._"
             } > "$resolved_file"
             gh api -X PATCH "repos/$GITHUB_REPOSITORY/issues/comments/$comment_id" -F body=@"$resolved_file" > /dev/null || true
           fi
