@@ -1,12 +1,12 @@
 ## 0.1.0-wip
 
-- Skip writing the `--comment-output` file entirely when every validated
-  package is clean, so the GitHub Action stays quiet on the PR thread instead
-  of posting a zero-finding summary comment.
+- Skip writing the `--comment-output` file entirely when every validated package
+  is clean, so the GitHub Action stays quiet on the PR thread instead of posting
+  a zero-finding summary comment.
 - GitHub Action: when a previously reported PR gets clean, the existing sticky
-  comment is **updated in place** to a resolved status (never deleted), and
-  only a successful run is treated as clean, so a crashed validation can no
-  longer mark stale findings resolved.
+  comment is **updated in place** to a resolved status (never deleted), and only
+  a successful run is treated as clean, so a crashed validation can no longer
+  mark stale findings resolved.
 - Initial release of automated Dart dependency lower-bound validator and
   synthetic runtime isolation engine.
 - Synthetic staging engine:

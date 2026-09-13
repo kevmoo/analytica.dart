@@ -3,20 +3,21 @@
 - Skip writing the `--comment-output` file entirely when a run has zero
   violations and zero complexity increases, so the GitHub Action stays quiet on
   the PR thread instead of posting an all-zeroes summary comment. The full
-  report still lands in `$GITHUB_STEP_SUMMARY`. A diff that only *improves*
+  report still lands in `$GITHUB_STEP_SUMMARY`. A diff that only _improves_
   complexity now also stays quiet.
 - Add `DeltaSummary.isClean()`, the predicate behind that decision.
 - GitHub Action: when a previously reported PR gets clean, the existing sticky
-  comment is **updated in place** to a resolved status (never deleted), and
-  only a successful run is treated as clean, so a crashed scan can no longer
-  mark stale findings resolved. `--comment-output` is only requested when the
-  scanner runs in `github` format against a diff base.
+  comment is **updated in place** to a resolved status (never deleted), and only
+  a successful run is treated as clean, so a crashed scan can no longer mark
+  stale findings resolved. `--comment-output` is only requested when the scanner
+  runs in `github` format against a diff base.
 - Support `--exclude` and `--[no-]ignore-generated` CLI options to configure
   file exclusion and generated code filtering via `PathFilter`.
 - Add `pathFilter` parameter to `ComplexityAnalyzer` and `DeltaAnalyzer`.
 - Remove noisy GitHub workflow `::warning` annotations on non-violating
-  complexity increases, keeping inline annotations reserved for violations (`::error`)
-  while full deltas remain tracked in step summaries and PR comment tables.
+  complexity increases, keeping inline annotations reserved for violations
+  (`::error`) while full deltas remain tracked in step summaries and PR comment
+  tables.
 - Add `ensure_cli_readme_test.dart` to verify CLI `--help` documentation in
   `README.md`.
 - Update GitHub Action documentation in `README.md` to reference modular

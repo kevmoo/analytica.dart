@@ -1,69 +1,69 @@
 # Tier 3 Reference: Encapsulated Method Object
 
 > **GATE**: This is the last-resort tier of the 3-Tier Decomposition Rubric in
-> [SKILL.md](../SKILL.md). Apply it ONLY when the mutation-web check has
-> passed with recorded evidence: `data_flow` reports on at least two distinct
-> candidate slices whose `mutations` variable names intersect in 3 or more
-> entries. If Tier 1 (records / `Result` dataclass) or Tier 2 (standard
-> private helpers) can express the extraction, use those instead. A
-> recurring 2-variable coupling (`queue` + `visited`, `buffer` + `cursor`)
-> never qualifies — enlarge the slice to the natural seam, or take the
-> domain-modeling exit in SKILL.md (a real named class, not a runner).
+> [SKILL.md](../SKILL.md). Apply it ONLY when the mutation-web check has passed
+> with recorded evidence: `data_flow` reports on at least two distinct candidate
+> slices whose `mutations` variable names intersect in 3 or more entries. If
+> Tier 1 (records / `Result` dataclass) or Tier 2 (standard private helpers) can
+> express the extraction, use those instead. A recurring 2-variable coupling
+> (`queue` + `visited`, `buffer` + `cursor`) never qualifies — enlarge the slice
+> to the natural seam, or take the domain-modeling exit in SKILL.md (a real
+> named class, not a runner).
 
 This is a Dart-specific variation of Martin Fowler's classic refactoring
 **"Replace Method with Method Object"**.
 
 ## Contraindications (Do NOT apply when...)
 
-* **The gate did not pass**: fewer than 3 shared mutable variables in the
+- **The gate did not pass**: fewer than 3 shared mutable variables in the
   intersection, or only a single candidate slice was analyzed.
-* **A domain object is trying to be born**: if the coupled state has a
-  coherent domain identity (`Parser`, `GraphTraversal`, `Cursor`), model a
-  real named class with a public, unit-tested API instead of a private
-  runner — see the domain-modeling exit in SKILL.md.
-* **Simpler refactoring suffices**: state can be cleanly passed via
-  parameters without bloating signatures — use standard private helpers.
-* **Sequential pipelines & transformations**: never convert pure linear
-  pipelines, simple scripts, or validation routines into runner classes.
-  Pass state via arguments; return via Dart 3 records or `Result` classes.
-  Encapsulation resolves *shared mutable state* and *nested scope bloat*,
-  NOT line length.
+- **A domain object is trying to be born**: if the coupled state has a coherent
+  domain identity (`Parser`, `GraphTraversal`, `Cursor`), model a real named
+  class with a public, unit-tested API instead of a private runner — see the
+  domain-modeling exit in SKILL.md.
+- **Simpler refactoring suffices**: state can be cleanly passed via parameters
+  without bloating signatures — use standard private helpers.
+- **Sequential pipelines & transformations**: never convert pure linear
+  pipelines, simple scripts, or validation routines into runner classes. Pass
+  state via arguments; return via Dart 3 records or `Result` classes.
+  Encapsulation resolves _shared mutable state_ and _nested scope bloat_, NOT
+  line length.
 
 ## Mechanics
 
-1. **Phase 1 — Method Object Extraction**: migrate the function's logic into
-   a dedicated class. Parameters become constructor arguments, the shared
-   mutable locals become instance fields, and inner functions become
-   instance methods.
+1. **Phase 1 — Method Object Extraction**: migrate the function's logic into a
+   dedicated class. Parameters become constructor arguments, the shared mutable
+   locals become instance fields, and inner functions become instance methods.
 2. **Phase 2 — Facade Delegation**: make the runner class **private**
    (`_`-prefixed). The original public function remains as a one-line facade
-   that instantiates the runner and calls its orchestrator method
-   (typically `run()`).
+   that instantiates the runner and calls its orchestrator method (typically
+   `run()`).
 
 ### Workflow
 
-1. **Confirm coverage**: verify the target has passing tests before touching
-   it (see the Pre-Refactoring Assessment gate in SKILL.md).
+1. **Confirm coverage**: verify the target has passing tests before touching it
+   (see the Pre-Refactoring Assessment gate in SKILL.md).
 2. **Analyze scopes**: inputs → constructor args; shared mutable locals →
    instance fields; if the outer function is an instance method, pass the
    enclosing instance (`this`) to the runner's constructor.
-3. **Draft the private runner**: `_OriginalFunctionNameRunner` (or
-   `..._State`), private fields, entry point `run()`.
-4. **Port sub-tasks**: decision logic becomes *pure query methods* returning
+3. **Draft the private runner**: `_OriginalFunctionNameRunner` (or `..._State`),
+   private fields, entry point `run()`.
+4. **Port sub-tasks**: decision logic becomes _pure query methods_ returning
    explicit values; all mutations of instance state happen in `run()` at the
    call sites of those queries (see the example and the void ban below).
 5. **Construct the facade**: replace the original body with a single runner
    call; prefer fat-arrow syntax if it fits on one line.
-6. **Verify**: `dart format`, `dart analyze` (zero diagnostics),
-   `dart test` — and re-run the complexity scan on the refactored file.
+6. **Verify**: `dart format`, `dart analyze` (zero diagnostics), `dart test` —
+   and re-run the complexity scan on the refactored file.
 
 ## Worked Example: Interleaved Mutation Web
 
-The gate-qualifying smell: 3+ mutable locals shared by multiple inner
-functions whose reads and writes interleave, so any standard extraction
-would trampoline the same variables through every helper signature.
+The gate-qualifying smell: 3+ mutable locals shared by multiple inner functions
+whose reads and writes interleave, so any standard extraction would trampoline
+the same variables through every helper signature.
 
 **Before** (shared mutable web: `applied`, `conflicts`, `warnings`):
+
 ```dart
 SyncReport reconcileInventory(List<Item> local, List<Item> remote) {
   final applied = <Change>[];
@@ -97,8 +97,9 @@ SyncReport reconcileInventory(List<Item> local, List<Item> remote) {
 }
 ```
 
-**After** — facade + private runner. Note the shape: helpers are *pure
-queries*; every mutation of instance state is visible in `run()`:
+**After** — facade + private runner. Note the shape: helpers are _pure queries_;
+every mutation of instance state is visible in `run()`:
+
 ```dart
 // The Facade (original API signature preserved)
 SyncReport reconcileInventory(List<Item> local, List<Item> remote) =>
@@ -147,10 +148,9 @@ query methods returning explicit values; mutations stay in `run()`.
 
 ## Outer Instance Binding
 
-When the target is an *instance method* (one that has already passed the
-gate), the runner needs the enclosing object's dependencies. Bind the
-enclosing instance in the constructor; generics map directly onto the
-runner class:
+When the target is an _instance method_ (one that has already passed the gate),
+the runner needs the enclosing object's dependencies. Bind the enclosing
+instance in the constructor; generics map directly onto the runner class:
 
 ```dart
 class DataProcessor {
@@ -187,31 +187,31 @@ class _ProcessBatchRunner<T> {
 
 ## Constraints
 
-* **API Footprint Preservation**: the original public signature (parameters,
+- **API Footprint Preservation**: the original public signature (parameters,
   return type, annotations, generics) MUST be preserved unchanged.
-* **Strict Class Encapsulation**: the runner class MUST be `_`-private.
-* **Single-use Execution Scope**: a runner instance represents one
-  invocation. Never store it long-term or call `run()` twice.
-* **Command-Query Separation**: lookup/search/resolver methods on the runner
+- **Strict Class Encapsulation**: the runner class MUST be `_`-private.
+- **Single-use Execution Scope**: a runner instance represents one invocation.
+  Never store it long-term or call `run()` twice.
+- **Command-Query Separation**: lookup/search/resolver methods on the runner
   must be pure. State mutations occur only in orchestrator methods upon
   confirmed resolution success.
-* **Testability Demotion**: if a computational or parsing subroutine is
-  complex enough to need dedicated unit tests, it must NOT live inside the
-  private runner — extract it to a top-level function or public utility
-  class, since `_Runner` is library-private and inaccessible to external
-  test files.
-* **Constructor Purity**: constructors and factories only map and validate
-  inputs (an input-validation throw such as a null-assert is acceptable).
-  Logic, async work, and side effects live in `run()`.
+- **Testability Demotion**: if a computational or parsing subroutine is complex
+  enough to need dedicated unit tests, it must NOT live inside the private
+  runner — extract it to a top-level function or public utility class, since
+  `_Runner` is library-private and inaccessible to external test files.
+- **Constructor Purity**: constructors and factories only map and validate
+  inputs (an input-validation throw such as a null-assert is acceptable). Logic,
+  async work, and side effects live in `run()`.
 
 ## Anti-Patterns & Mandatory Idioms
 
 ### 🚫 `late final` Constructor Unpacking
 
-When the runner receives a complex input object (`Command`, `ArgResults`),
-do NOT mark fields `late final` and unpack them in the constructor body.
+When the runner receives a complex input object (`Command`, `ArgResults`), do
+NOT mark fields `late final` and unpack them in the constructor body.
 
 **❌ BANNED:**
+
 ```dart
 final class _ScanRunner {
   final ScanCommand command;
@@ -229,6 +229,7 @@ final class _ScanRunner {
 ```
 
 **✅ MANDATORY — private generative constructor + factory unpacking:**
+
 ```dart
 final class _ScanRunner {
   final ArgResults results;
@@ -252,17 +253,16 @@ final class _ScanRunner {
 }
 ```
 
-All fields stay truly `final` (no `late` fields, no
-`LateInitializationError` hazard), and initialization order is explicit in
-one place.
+All fields stay truly `final` (no `late` fields, no `LateInitializationError`
+hazard), and initialization order is explicit in one place.
 
 ### 🚫 "Global-in-a-Box" & Parameterless Voids
 
 Never use a Method Object just to avoid passing arguments. A runner must not
 become a dumping ground of mutable `this.*` state.
 
-* **The `void` Ban**: private runner methods should almost never be
+- **The `void` Ban**: private runner methods should almost never be
   parameterless `void` methods that silently mutate instance fields.
-* **Explicit Data Flow**: subroutines accept explicit parameters and return
+- **Explicit Data Flow**: subroutines accept explicit parameters and return
   explicit values. Mutate instance state explicitly at the call site in the
   orchestrator (e.g. `currentCount = _calculateNewCount(currentCount);`).
