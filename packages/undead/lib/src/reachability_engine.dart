@@ -32,321 +32,512 @@ class UndeadEngine {
   Future<UndeadReport> analyze() async {
     final harvester = RootHarvester(options);
     final topology = harvester.harvestTopology();
-
     final absolutePackagePath = p.normalize(p.absolute(options.packagePath));
+
+    final contextHelper = _createContextHelper(
+      absolutePackagePath: absolutePackagePath,
+      topology: topology,
+    );
+
+    // Step 1: Single-pass parse and resolution for all files in topology.
+    final data = await _harvestDeclarationsAndTestSites(
+      contextHelper: contextHelper,
+      topology: topology,
+      absolutePackagePath: absolutePackagePath,
+    );
+
+    // Step 2: Connect reference edges and sealed hierarchies.
+    final (crossLibraryReferenced, testReferencedIds) = _connectReferenceEdges(
+      data: data,
+      topology: topology,
+    );
+
+    // Step 3: Identify roots for Production and Tests.
+    final (productionRoots, testRoots, exportedNodeIds) = await _identifyRoots(
+      contextHelper: contextHelper,
+      topology: topology,
+      absolutePackagePath: absolutePackagePath,
+      data: data,
+      crossLibraryReferenced: crossLibraryReferenced,
+    );
+
+    // Step 4: Dual-Pass BFS Graph Traversal.
+    final productionLive = _runBfs(
+      startIds: productionRoots,
+      idToNode: data.idToNode,
+      sealedSubtypes: data.sealedSubtypes,
+    );
+
+    final testReachable = _runBfs(
+      startIds: testRoots,
+      idToNode: data.idToNode,
+      sealedSubtypes: data.sealedSubtypes,
+    );
+
+    // Step 5: Candidate Classification and Hazard Detection.
+    final classification = _classifyFindings(
+      allNodes: data.allNodes,
+      topology: topology,
+      productionLive: productionLive,
+      testReachable: testReachable,
+      nodeDirectSuperElements: data.nodeDirectSuperElements,
+      elementToNode: data.elementToNode,
+      testSites: data.testSites,
+    );
+
+    final findings = classification.findings;
+    var privateCandidates = 0;
+    if (options.suggestPrivate) {
+      final candidates = _collectPrivateCandidates(
+        allNodes: data.allNodes,
+        topology: topology,
+        exportedNodeIds: exportedNodeIds,
+        productionLive: productionLive,
+        crossLibraryReferenced: crossLibraryReferenced,
+        testReferencedIds: testReferencedIds,
+      );
+      privateCandidates = candidates.length;
+      findings.addAll(candidates);
+    }
+
+    findings.sort(_compareFindings);
+
+    return UndeadReport(
+      version: '0.1.1-wip',
+      package: topology.packageName,
+      totalDeclarations: data.totalDeclarationsCount,
+      pureUndeadFound: classification.pureUndead,
+      testedUndeadFound: classification.testedUndead,
+      coInvokedHazardsFound: classification.coInvokedHazards,
+      privateCandidatesFound: privateCandidates,
+      undead: findings,
+    );
+  }
+
+  AnalysisContextHelper _createContextHelper({
+    required String absolutePackagePath,
+    required PackageTopology topology,
+  }) {
     final extraPaths = <String>{};
-    for (final extra in options.extraRoots) {
-      if (extra.trim().isEmpty) continue;
-      final resolved = p.normalize(
-        p.isAbsolute(extra) ? extra : p.join(absolutePackagePath, extra),
-      );
-      if (FileSystemEntity.typeSync(resolved) !=
-          FileSystemEntityType.notFound) {
-        extraPaths.add(resolved);
-      }
-    }
-    for (final file in [
-      ...topology.extraProductionFiles,
-      ...topology.extraTestFiles,
-    ]) {
-      final resolved = p.normalize(
-        p.isAbsolute(file) ? file : p.join(absolutePackagePath, file),
-      );
-      if (FileSystemEntity.typeSync(resolved) !=
-          FileSystemEntityType.notFound) {
-        extraPaths.add(resolved);
-      }
-    }
-    final contextHelper = AnalysisContextHelper(
+    _collectExistingPaths(options.extraRoots, absolutePackagePath, extraPaths);
+    _collectExistingPaths(
+      topology.extraProductionFiles,
+      absolutePackagePath,
+      extraPaths,
+    );
+    _collectExistingPaths(
+      topology.extraTestFiles,
+      absolutePackagePath,
+      extraPaths,
+    );
+    return AnalysisContextHelper(
       includedPaths: [absolutePackagePath, ...extraPaths],
       sdkPath: options.sdkPath,
     );
+  }
 
-    final allNodes = <DeclarationNode>[];
-    final elementToNode = <Element, DeclarationNode>{};
-    final locationToNode = <String, DeclarationNode>{};
-    final idToNode = <String, DeclarationNode>{};
-    final testSites = <TestBlockSite>[];
-    final testSiteRawElements = <TestBlockSite, Set<Element>>{};
-    final nodeOutboundElements = <DeclarationNode, Set<Element>>{};
-    final nodeDirectSuperElements = <DeclarationNode, List<Element>>{};
-    final sealedSubtypes = <String, Set<String>>{};
-    final conditionalTargets = <String, Set<String>>{};
+  static void _collectExistingPaths(
+    Iterable<String> paths,
+    String basePath,
+    Set<String> result,
+  ) {
+    for (final item in paths) {
+      if (item.trim().isEmpty) continue;
+      final resolved = p.normalize(
+        p.isAbsolute(item) ? item : p.join(basePath, item),
+      );
+      if (FileSystemEntity.typeSync(resolved) !=
+          FileSystemEntityType.notFound) {
+        result.add(resolved);
+      }
+    }
+  }
 
-    var totalDeclarationsCount = 0;
-
-    // Step 1: Single-pass parse and resolution for all files in topology.
+  Future<_HarvestedData> _harvestDeclarationsAndTestSites({
+    required AnalysisContextHelper contextHelper,
+    required PackageTopology topology,
+    required String absolutePackagePath,
+  }) async {
+    final data = _HarvestedData();
     for (final relPath in topology.allFiles) {
       final absPath = p.normalize(
         p.isAbsolute(relPath) ? relPath : p.join(absolutePackagePath, relPath),
       );
       final unitResult = await contextHelper.getResolvedUnit(absPath);
+      if (unitResult == null) continue;
 
-      if (unitResult == null) {
-        continue;
-      }
-
-      final isFileIgnored = CommentParser.hasIgnoreForFile(unitResult.unit);
-      final role = topology.roleOf(relPath);
-
-      // Collect conditional imports in directives.
-      _collectConditionalImports(
-        directives: unitResult.unit.directives,
+      _processResolvedUnit(
+        unitResult: unitResult,
         relPath: relPath,
-        packageName: topology.packageName,
-        conditionalTargets: conditionalTargets,
+        absPath: absPath,
+        absolutePackagePath: absolutePackagePath,
+        topology: topology,
+        data: data,
       );
+    }
+    return data;
+  }
 
-      // Collect file-level export directive references.
-      final fileDirectivesExtractor = ElementReferenceExtractor(
-        absolutePackagePath,
-      );
-      for (final directive in unitResult.unit.directives) {
-        if (directive is ExportDirective) {
-          directive.accept(fileDirectivesExtractor);
-        }
+  void _processResolvedUnit({
+    required ResolvedUnitResult unitResult,
+    required String relPath,
+    required String absPath,
+    required String absolutePackagePath,
+    required PackageTopology topology,
+    required _HarvestedData data,
+  }) {
+    final isFileIgnored = CommentParser.hasIgnoreForFile(unitResult.unit);
+    final role = topology.roleOf(relPath);
+
+    _collectConditionalImports(
+      directives: unitResult.unit.directives,
+      relPath: relPath,
+      packageName: topology.packageName,
+      conditionalTargets: data.conditionalTargets,
+    );
+
+    final fileDirectivesExtractor = ElementReferenceExtractor(
+      absolutePackagePath,
+    );
+    for (final directive in unitResult.unit.directives) {
+      if (directive is ExportDirective) {
+        directive.accept(fileDirectivesExtractor);
       }
+    }
 
-      // Collect top-level declarations.
-      for (final decl in unitResult.unit.declarations) {
-        final isDeclIgnored =
-            isFileIgnored || CommentParser.isDeclarationIgnored(decl);
-
-        if (decl is TopLevelVariableDeclaration) {
-          final isExternalBinding = options.frameworkAdapter.isExternalBinding(
-            decl,
-            null,
-          );
-          final isNativeRoot =
-              isNativeOrEntryPoint(decl) ||
-              options.frameworkAdapter.isFrameworkEntryPoint(decl, null);
-          for (final variable in decl.variables.variables) {
-            totalDeclarationsCount++;
-            final isVarIgnored =
-                isFileIgnored ||
-                CommentParser.isDeclarationIgnored(variable) ||
-                CommentParser.isDeclarationIgnored(decl);
-            final name =
-                variable.declaredFragment?.element.name ?? variable.name.lexeme;
-            final id = '$relPath#var#$name#${variable.offset}';
-            final lineInfo = unitResult.lineInfo.getLocation(variable.offset);
-            final element = variable.declaredFragment?.element;
-            final isTestSupport = isTestSupportDeclaration(decl, name);
-
-            final node = DeclarationNode(
-              id: id,
-              name: name,
-              kind: DeclarationKind.variable,
-              relativeFilePath: relPath,
-              offset: variable.offset,
-              length: variable.length,
-              line: lineInfo.lineNumber,
-              column: lineInfo.columnNumber,
-              element: element,
-              isIgnored: isVarIgnored,
-              isTestSupport: isTestSupport,
-              isExternalBinding:
-                  isExternalBinding ||
-                  options.frameworkAdapter.isExternalBinding(decl, element),
-              isNativeRoot:
-                  isNativeRoot ||
-                  options.frameworkAdapter.isFrameworkEntryPoint(decl, element),
-            );
-
-            allNodes.add(node);
-            idToNode[id] = node;
-            locationToNode['${p.canonicalize(absPath)}#$name'] = node;
-            if (element != null) {
-              elementToNode[element] = node;
-              if (element is TopLevelVariableElement) {
-                final getter = element.getter;
-                if (getter != null) {
-                  elementToNode[getter] = node;
-                  final getterKey = '${p.canonicalize(absPath)}#${getter.name}';
-                  locationToNode[getterKey] = node;
-                }
-                final setter = element.setter;
-                if (setter != null) {
-                  elementToNode[setter] = node;
-                  final setterKey = '${p.canonicalize(absPath)}#${setter.name}';
-                  locationToNode[setterKey] = node;
-                }
-              }
-            }
-
-            final extractor = ElementReferenceExtractor(absolutePackagePath);
-            decl.variables.type?.accept(extractor);
-            for (final meta in decl.metadata) {
-              meta.accept(extractor);
-            }
-            variable.accept(extractor);
-            if (fileDirectivesExtractor.referencedTopLevelElements.isNotEmpty) {
-              extractor.referencedTopLevelElements.addAll(
-                fileDirectivesExtractor.referencedTopLevelElements,
-              );
-            }
-            nodeOutboundElements[node] = extractor.referencedTopLevelElements;
-          }
-        } else {
-          totalDeclarationsCount++;
-          final name = extractNodeName(decl) ?? 'anonymous';
-          final (kind, isSealed) = _classifyDeclaration(decl);
-          final id = '$relPath#${kind.jsonValue}#$name#${decl.offset}';
-          final lineInfo = unitResult.lineInfo.getLocation(decl.offset);
-          final element = decl.declaredFragment?.element;
-          final isTestSupport = isTestSupportDeclaration(decl, name);
-          final isExternalBinding = options.frameworkAdapter.isExternalBinding(
-            decl,
-            element,
-          );
-          final isNativeRoot =
-              isNativeOrEntryPoint(decl) ||
-              options.frameworkAdapter.isFrameworkEntryPoint(decl, element);
-
-          final superElements = <Element>[];
-          if (element is InterfaceElement) {
-            final supertype = element.supertype;
-            if (supertype != null) superElements.add(supertype.element);
-            for (final iface in element.interfaces) {
-              superElements.add(iface.element);
-            }
-            for (final mixinType in element.mixins) {
-              superElements.add(mixinType.element);
-            }
-          }
-
-          final node = DeclarationNode(
-            id: id,
-            name: name,
-            kind: kind,
-            relativeFilePath: relPath,
-            offset: decl.offset,
-            length: decl.length,
-            line: lineInfo.lineNumber,
-            column: lineInfo.columnNumber,
-            element: element,
-            isIgnored: isDeclIgnored,
-            isTestSupport: isTestSupport,
-            isSealed: isSealed,
-            isExternalBinding: isExternalBinding,
-            isNativeRoot: isNativeRoot,
-          );
-
-          allNodes.add(node);
-          idToNode[id] = node;
-          locationToNode['${p.canonicalize(absPath)}#$name'] = node;
-          if (element != null) {
-            elementToNode[element] = node;
-          }
-          if (superElements.isNotEmpty) {
-            nodeDirectSuperElements[node] = superElements;
-          }
-
-          final extractor = ElementReferenceExtractor(absolutePackagePath);
-          decl.accept(extractor);
-          if (fileDirectivesExtractor.referencedTopLevelElements.isNotEmpty) {
-            extractor.referencedTopLevelElements.addAll(
-              fileDirectivesExtractor.referencedTopLevelElements,
-            );
-          }
-          nodeOutboundElements[node] = extractor.referencedTopLevelElements;
-        }
-      }
-
-      // If test file, extract test block sites.
-      if (role == FileRole.test) {
-        final visitor = _TestCallSiteVisitor(
-          packageRoot: absolutePackagePath,
-          relativeFilePath: relPath,
-          lineInfo: unitResult.lineInfo,
-          frameworkAdapter: options.frameworkAdapter,
+    for (final decl in unitResult.unit.declarations) {
+      if (decl is TopLevelVariableDeclaration) {
+        _registerVariableDeclaration(
+          decl: decl,
+          unitResult: unitResult,
+          relPath: relPath,
+          absPath: absPath,
+          absolutePackagePath: absolutePackagePath,
+          isFileIgnored: isFileIgnored,
+          fileDirectivesExtractor: fileDirectivesExtractor,
+          data: data,
         );
-        unitResult.unit.accept(visitor);
-        for (final entry in visitor.discoveredSites) {
-          testSites.add(entry.site);
-          testSiteRawElements[entry.site] = entry.referencedElements;
-        }
+      } else {
+        _registerNonVariableDeclaration(
+          decl: decl,
+          unitResult: unitResult,
+          relPath: relPath,
+          absPath: absPath,
+          absolutePackagePath: absolutePackagePath,
+          isFileIgnored: isFileIgnored,
+          fileDirectivesExtractor: fileDirectivesExtractor,
+          data: data,
+        );
       }
     }
 
-    DeclarationNode? resolveNodeForElement(Element elem) {
-      final direct = elementToNode[elem];
-      if (direct != null) return direct;
+    if (role == FileRole.test) {
+      _extractTestSites(unitResult, relPath, absolutePackagePath, data);
+    }
+  }
 
-      final sourcePath =
-          elem.library?.firstFragment.source.fullName ??
-          elem.firstFragment.libraryFragment?.source.fullName;
-      if (sourcePath == null) return null;
+  void _registerVariableDeclaration({
+    required TopLevelVariableDeclaration decl,
+    required ResolvedUnitResult unitResult,
+    required String relPath,
+    required String absPath,
+    required String absolutePackagePath,
+    required bool isFileIgnored,
+    required ElementReferenceExtractor fileDirectivesExtractor,
+    required _HarvestedData data,
+  }) {
+    final isExternalBinding = options.frameworkAdapter.isExternalBinding(
+      decl,
+      null,
+    );
+    final isNativeRoot =
+        isNativeOrEntryPoint(decl) ||
+        options.frameworkAdapter.isFrameworkEntryPoint(decl, null);
 
-      final canonicalPath = p.canonicalize(sourcePath);
-      final name = elem.name;
-      if (name != null) {
-        final match = locationToNode['$canonicalPath#$name'];
-        if (match != null) return match;
+    for (final variable in decl.variables.variables) {
+      data.totalDeclarationsCount++;
+      final isVarIgnored =
+          isFileIgnored ||
+          CommentParser.isDeclarationIgnored(variable) ||
+          CommentParser.isDeclarationIgnored(decl);
+      final name =
+          variable.declaredFragment?.element.name ?? variable.name.lexeme;
+      final id = '$relPath#var#$name#${variable.offset}';
+      final lineInfo = unitResult.lineInfo.getLocation(variable.offset);
+      final element = variable.declaredFragment?.element;
+      final isTestSupport = isTestSupportDeclaration(decl, name);
+
+      final node = DeclarationNode(
+        id: id,
+        name: name,
+        kind: DeclarationKind.variable,
+        relativeFilePath: relPath,
+        offset: variable.offset,
+        length: variable.length,
+        line: lineInfo.lineNumber,
+        column: lineInfo.columnNumber,
+        element: element,
+        isIgnored: isVarIgnored,
+        isTestSupport: isTestSupport,
+        isExternalBinding:
+            isExternalBinding ||
+            options.frameworkAdapter.isExternalBinding(decl, element),
+        isNativeRoot:
+            isNativeRoot ||
+            options.frameworkAdapter.isFrameworkEntryPoint(decl, element),
+      );
+
+      data.allNodes.add(node);
+      data.idToNode[id] = node;
+      data.locationToNode['${p.canonicalize(absPath)}#$name'] = node;
+      _indexVariableElement(
+        element: element,
+        node: node,
+        absPath: absPath,
+        data: data,
+      );
+
+      final extractor = ElementReferenceExtractor(absolutePackagePath);
+      decl.variables.type?.accept(extractor);
+      for (final meta in decl.metadata) {
+        meta.accept(extractor);
       }
-
-      final topLevel = getTopLevelElement(elem);
-      if (topLevel != null && topLevel.name != null) {
-        final match = locationToNode['$canonicalPath#${topLevel.name}'];
-        if (match != null) return match;
+      variable.accept(extractor);
+      if (fileDirectivesExtractor.referencedTopLevelElements.isNotEmpty) {
+        extractor.referencedTopLevelElements.addAll(
+          fileDirectivesExtractor.referencedTopLevelElements,
+        );
       }
+      data.nodeOutboundElements[node] = extractor.referencedTopLevelElements;
+    }
+  }
 
-      return null;
+  static void _indexVariableElement({
+    required Element? element,
+    required DeclarationNode node,
+    required String absPath,
+    required _HarvestedData data,
+  }) {
+    if (element == null) return;
+    data.elementToNode[element] = node;
+    if (element is! TopLevelVariableElement) return;
+
+    final getter = element.getter;
+    if (getter != null) {
+      data.elementToNode[getter] = node;
+      final getterKey = '${p.canonicalize(absPath)}#${getter.name}';
+      data.locationToNode[getterKey] = node;
+    }
+    final setter = element.setter;
+    if (setter != null) {
+      data.elementToNode[setter] = node;
+      final setterKey = '${p.canonicalize(absPath)}#${setter.name}';
+      data.locationToNode[setterKey] = node;
+    }
+  }
+
+  void _registerNonVariableDeclaration({
+    required Declaration decl,
+    required ResolvedUnitResult unitResult,
+    required String relPath,
+    required String absPath,
+    required String absolutePackagePath,
+    required bool isFileIgnored,
+    required ElementReferenceExtractor fileDirectivesExtractor,
+    required _HarvestedData data,
+  }) {
+    data.totalDeclarationsCount++;
+    final name = extractNodeName(decl) ?? 'anonymous';
+    final (kind, isSealed) = _classifyDeclaration(decl);
+    final id = '$relPath#${kind.jsonValue}#$name#${decl.offset}';
+    final lineInfo = unitResult.lineInfo.getLocation(decl.offset);
+    final element = decl.declaredFragment?.element;
+    final isDeclIgnored =
+        isFileIgnored || CommentParser.isDeclarationIgnored(decl);
+    final isTestSupport = isTestSupportDeclaration(decl, name);
+    final isExternalBinding = options.frameworkAdapter.isExternalBinding(
+      decl,
+      element,
+    );
+    final isNativeRoot =
+        isNativeOrEntryPoint(decl) ||
+        options.frameworkAdapter.isFrameworkEntryPoint(decl, element);
+
+    final superElements = _extractSuperElements(element);
+
+    final node = DeclarationNode(
+      id: id,
+      name: name,
+      kind: kind,
+      relativeFilePath: relPath,
+      offset: decl.offset,
+      length: decl.length,
+      line: lineInfo.lineNumber,
+      column: lineInfo.columnNumber,
+      element: element,
+      isIgnored: isDeclIgnored,
+      isTestSupport: isTestSupport,
+      isSealed: isSealed,
+      isExternalBinding: isExternalBinding,
+      isNativeRoot: isNativeRoot,
+    );
+
+    data.allNodes.add(node);
+    data.idToNode[id] = node;
+    data.locationToNode['${p.canonicalize(absPath)}#$name'] = node;
+    if (element != null) {
+      data.elementToNode[element] = node;
+    }
+    if (superElements.isNotEmpty) {
+      data.nodeDirectSuperElements[node] = superElements;
     }
 
-    // Step 2: Connect reference edges and sealed hierarchies.
+    final extractor = ElementReferenceExtractor(absolutePackagePath);
+    decl.accept(extractor);
+    if (fileDirectivesExtractor.referencedTopLevelElements.isNotEmpty) {
+      extractor.referencedTopLevelElements.addAll(
+        fileDirectivesExtractor.referencedTopLevelElements,
+      );
+    }
+    data.nodeOutboundElements[node] = extractor.referencedTopLevelElements;
+  }
+
+  static List<Element> _extractSuperElements(Element? element) {
+    if (element is! InterfaceElement) return const [];
+    final superElements = <Element>[];
+    final supertype = element.supertype;
+    if (supertype != null) superElements.add(supertype.element);
+    for (final iface in element.interfaces) {
+      superElements.add(iface.element);
+    }
+    for (final mixinType in element.mixins) {
+      superElements.add(mixinType.element);
+    }
+    return superElements;
+  }
+
+  void _extractTestSites(
+    ResolvedUnitResult unitResult,
+    String relPath,
+    String absolutePackagePath,
+    _HarvestedData data,
+  ) {
+    final visitor = _TestCallSiteVisitor(
+      packageRoot: absolutePackagePath,
+      relativeFilePath: relPath,
+      lineInfo: unitResult.lineInfo,
+      frameworkAdapter: options.frameworkAdapter,
+    );
+    unitResult.unit.accept(visitor);
+    for (final entry in visitor.discoveredSites) {
+      data.testSites.add(entry.site);
+      data.testSiteRawElements[entry.site] = entry.referencedElements;
+    }
+  }
+
+  (Set<String>, Set<String>) _connectReferenceEdges({
+    required _HarvestedData data,
+    required PackageTopology topology,
+  }) {
     final crossLibraryReferenced = <String>{};
     final testReferencedIds = <String>{};
 
-    for (final node in allNodes) {
+    for (final node in data.allNodes) {
       final isTestNode =
           topology.roleOf(node.relativeFilePath) == FileRole.test ||
           topology.extraTestFiles.contains(node.relativeFilePath);
-      final outbound = nodeOutboundElements[node];
-      if (outbound != null) {
-        for (final refElem in outbound) {
-          final targetNode = resolveNodeForElement(refElem);
-          if (targetNode != null && targetNode.id != node.id) {
-            node.outgoingTargetIds.add(targetNode.id);
-            _trackEdge(
-              node,
-              targetNode,
-              isTestNode: isTestNode,
-              crossLibraryReferenced: crossLibraryReferenced,
-              testReferencedIds: testReferencedIds,
-            );
-          }
-        }
-      }
 
-      final superElems = nodeDirectSuperElements[node];
-      if (superElems != null) {
-        for (final superElem in superElems) {
-          final parentNode = resolveNodeForElement(superElem);
-          if (parentNode != null) {
-            if (parentNode.isSealed) {
-              sealedSubtypes.putIfAbsent(parentNode.id, () => {}).add(node.id);
-            }
-            _trackEdge(
-              node,
-              parentNode,
-              isTestNode: isTestNode,
-              crossLibraryReferenced: crossLibraryReferenced,
-              testReferencedIds: testReferencedIds,
-            );
-          }
-        }
-      }
+      _connectNodeOutboundEdges(
+        node: node,
+        isTestNode: isTestNode,
+        data: data,
+        crossLibraryReferenced: crossLibraryReferenced,
+        testReferencedIds: testReferencedIds,
+      );
+
+      _connectNodeSuperEdges(
+        node: node,
+        isTestNode: isTestNode,
+        data: data,
+        crossLibraryReferenced: crossLibraryReferenced,
+        testReferencedIds: testReferencedIds,
+      );
     }
 
-    // Connect conditional import reachability edges from importing files.
-    for (final entry in conditionalTargets.entries) {
+    _connectConditionalImportEdges(
+      data: data,
+      crossLibraryReferenced: crossLibraryReferenced,
+    );
+
+    _connectTestSiteEdges(
+      data: data,
+      crossLibraryReferenced: crossLibraryReferenced,
+      testReferencedIds: testReferencedIds,
+    );
+
+    return (crossLibraryReferenced, testReferencedIds);
+  }
+
+  static void _connectNodeOutboundEdges({
+    required DeclarationNode node,
+    required bool isTestNode,
+    required _HarvestedData data,
+    required Set<String> crossLibraryReferenced,
+    required Set<String> testReferencedIds,
+  }) {
+    final outbound = data.nodeOutboundElements[node];
+    if (outbound == null) return;
+    for (final refElem in outbound) {
+      final targetNode = data.resolveNodeForElement(refElem);
+      if (targetNode != null && targetNode.id != node.id) {
+        node.outgoingTargetIds.add(targetNode.id);
+        _trackEdge(
+          node,
+          targetNode,
+          isTestNode: isTestNode,
+          crossLibraryReferenced: crossLibraryReferenced,
+          testReferencedIds: testReferencedIds,
+        );
+      }
+    }
+  }
+
+  static void _connectNodeSuperEdges({
+    required DeclarationNode node,
+    required bool isTestNode,
+    required _HarvestedData data,
+    required Set<String> crossLibraryReferenced,
+    required Set<String> testReferencedIds,
+  }) {
+    final superElems = data.nodeDirectSuperElements[node];
+    if (superElems == null) return;
+    for (final superElem in superElems) {
+      final parentNode = data.resolveNodeForElement(superElem);
+      if (parentNode == null) continue;
+      if (parentNode.isSealed) {
+        data.sealedSubtypes.putIfAbsent(parentNode.id, () => {}).add(node.id);
+      }
+      _trackEdge(
+        node,
+        parentNode,
+        isTestNode: isTestNode,
+        crossLibraryReferenced: crossLibraryReferenced,
+        testReferencedIds: testReferencedIds,
+      );
+    }
+  }
+
+  static void _connectConditionalImportEdges({
+    required _HarvestedData data,
+    required Set<String> crossLibraryReferenced,
+  }) {
+    for (final entry in data.conditionalTargets.entries) {
       final sourceRelPath = entry.key;
       final targetRelPaths = entry.value;
-      final sourceNodes = allNodes
+      final sourceNodes = data.allNodes
           .where((n) => n.relativeFilePath == sourceRelPath)
           .toList();
-      final targetNodes = allNodes
+      final targetNodes = data.allNodes
           .where((n) => targetRelPaths.contains(n.relativeFilePath))
           .toList();
       for (final sourceNode in sourceNodes) {
@@ -356,162 +547,320 @@ class UndeadEngine {
         }
       }
     }
+  }
 
-    for (final site in testSites) {
-      final rawElems = testSiteRawElements[site];
-      if (rawElems != null) {
-        for (final elem in rawElems) {
-          final targetNode = resolveNodeForElement(elem);
-          if (targetNode != null) {
-            site.referencedDeclarationIds.add(targetNode.id);
-            testReferencedIds.add(targetNode.id);
-            crossLibraryReferenced.add(targetNode.id);
-          }
+  static void _connectTestSiteEdges({
+    required _HarvestedData data,
+    required Set<String> crossLibraryReferenced,
+    required Set<String> testReferencedIds,
+  }) {
+    for (final site in data.testSites) {
+      final rawElems = data.testSiteRawElements[site];
+      if (rawElems == null) continue;
+      for (final elem in rawElems) {
+        final targetNode = data.resolveNodeForElement(elem);
+        if (targetNode != null) {
+          site.referencedDeclarationIds.add(targetNode.id);
+          testReferencedIds.add(targetNode.id);
+          crossLibraryReferenced.add(targetNode.id);
         }
       }
     }
+  }
 
-    // Step 3: Identify roots for Production and Tests.
+  Future<(Set<String>, Set<String>, Set<String>)> _identifyRoots({
+    required AnalysisContextHelper contextHelper,
+    required PackageTopology topology,
+    required String absolutePackagePath,
+    required _HarvestedData data,
+    required Set<String> crossLibraryReferenced,
+  }) async {
     final productionRoots = <String>{};
     final testRoots = <String>{};
     final exportedNodeIds = <String>{};
 
-    // 3.1 Public API roots (Open-World Invariant under library mode).
-    if (options.mode == AnalysisMode.library) {
-      for (final relPath in topology.publicLibFiles) {
-        final absPath = p.join(absolutePackagePath, relPath);
-        final unitResult = await contextHelper.getResolvedUnit(absPath);
-        if (unitResult is ResolvedUnitResult) {
-          final libElem = unitResult.libraryElement;
-          for (final exportedElem
-              in libElem.exportNamespace.definedNames2.values) {
-            final topLevel = getTopLevelElement(exportedElem);
-            if (topLevel != null) {
-              final node = elementToNode[topLevel];
-              if (node != null) {
-                productionRoots.add(node.id);
-                exportedNodeIds.add(node.id);
-                crossLibraryReferenced.add(node.id);
-              }
-            }
-          }
-        }
+    await _harvestPublicApiRoots(
+      contextHelper: contextHelper,
+      topology: topology,
+      absolutePackagePath: absolutePackagePath,
+      data: data,
+      productionRoots: productionRoots,
+      exportedNodeIds: exportedNodeIds,
+      crossLibraryReferenced: crossLibraryReferenced,
+    );
 
-        // Also add non-private top-level declarations in public files as roots.
-        for (final node in allNodes) {
-          if (node.relativeFilePath == relPath && !node.name.startsWith('_')) {
-            productionRoots.add(node.id);
-            exportedNodeIds.add(node.id);
-            crossLibraryReferenced.add(node.id);
-          }
-        }
+    _harvestNonLibraryRoots(
+      allNodes: data.allNodes,
+      topology: topology,
+      productionRoots: productionRoots,
+      testRoots: testRoots,
+    );
 
-        // Activate conditional import targets of public library files.
-        final targets = conditionalTargets[relPath];
-        if (targets != null) {
-          for (final targetRelPath in targets) {
-            for (final node in allNodes) {
-              if (node.relativeFilePath == targetRelPath &&
-                  !node.name.startsWith('_')) {
-                productionRoots.add(node.id);
-                exportedNodeIds.add(node.id);
-                crossLibraryReferenced.add(node.id);
-              }
-            }
-          }
+    return (productionRoots, testRoots, exportedNodeIds);
+  }
+
+  Future<void> _harvestPublicApiRoots({
+    required AnalysisContextHelper contextHelper,
+    required PackageTopology topology,
+    required String absolutePackagePath,
+    required _HarvestedData data,
+    required Set<String> productionRoots,
+    required Set<String> exportedNodeIds,
+    required Set<String> crossLibraryReferenced,
+  }) async {
+    if (options.mode != AnalysisMode.library) return;
+
+    for (final relPath in topology.publicLibFiles) {
+      final absPath = p.join(absolutePackagePath, relPath);
+      final unitResult = await contextHelper.getResolvedUnit(absPath);
+      if (unitResult is ResolvedUnitResult) {
+        _harvestExportedNamespace(
+          unitResult.libraryElement,
+          data,
+          productionRoots,
+          exportedNodeIds,
+          crossLibraryReferenced,
+        );
+      }
+
+      _addPublicNodesForFile(
+        relPath,
+        data.allNodes,
+        productionRoots,
+        exportedNodeIds,
+        crossLibraryReferenced,
+      );
+
+      _harvestConditionalPublicTargets(
+        relPath,
+        data,
+        productionRoots,
+        exportedNodeIds,
+        crossLibraryReferenced,
+      );
+    }
+  }
+
+  static void _harvestExportedNamespace(
+    LibraryElement libElem,
+    _HarvestedData data,
+    Set<String> productionRoots,
+    Set<String> exportedNodeIds,
+    Set<String> crossLibraryReferenced,
+  ) {
+    for (final exportedElem in libElem.exportNamespace.definedNames2.values) {
+      final topLevel = getTopLevelElement(exportedElem);
+      if (topLevel != null) {
+        final node = data.elementToNode[topLevel];
+        if (node != null) {
+          _addPublicRoot(
+            node.id,
+            productionRoots,
+            exportedNodeIds,
+            crossLibraryReferenced,
+          );
         }
       }
     }
+  }
 
-    // 3.2 Executable roots (bin/** main, lib/main.dart & lib/main_*.dart main).
+  static void _addPublicNodesForFile(
+    String targetRelPath,
+    List<DeclarationNode> allNodes,
+    Set<String> productionRoots,
+    Set<String> exportedNodeIds,
+    Set<String> crossLibraryReferenced,
+  ) {
     for (final node in allNodes) {
-      final isBinMain =
-          topology.roleOf(node.relativeFilePath) == FileRole.executable &&
-          node.name == 'main';
-      final isFlutterMain =
-          PackageTopology.isFlutterEntrypoint(node.relativeFilePath) &&
-          node.name == 'main' &&
-          topology.frameworkRoots.contains('main');
-      if (isBinMain || isFlutterMain) {
-        productionRoots.add(node.id);
+      if (node.relativeFilePath == targetRelPath &&
+          !node.name.startsWith('_')) {
+        _addPublicRoot(
+          node.id,
+          productionRoots,
+          exportedNodeIds,
+          crossLibraryReferenced,
+        );
       }
     }
+  }
 
-    // 3.3 Demonstration roots (example/**).
-    if (options.exampleMode == ExampleMode.demonstration) {
-      for (final node in allNodes) {
-        if (topology.roleOf(node.relativeFilePath) == FileRole.demonstration) {
-          productionRoots.add(node.id);
-        }
-      }
-    } else if (options.exampleMode == ExampleMode.strict) {
-      for (final node in allNodes) {
-        if (topology.roleOf(node.relativeFilePath) == FileRole.demonstration &&
-            node.name == 'main') {
-          productionRoots.add(node.id);
-        }
-      }
+  static void _harvestConditionalPublicTargets(
+    String relPath,
+    _HarvestedData data,
+    Set<String> productionRoots,
+    Set<String> exportedNodeIds,
+    Set<String> crossLibraryReferenced,
+  ) {
+    final targets = data.conditionalTargets[relPath];
+    if (targets == null) return;
+    for (final targetRelPath in targets) {
+      _addPublicNodesForFile(
+        targetRelPath,
+        data.allNodes,
+        productionRoots,
+        exportedNodeIds,
+        crossLibraryReferenced,
+      );
     }
+  }
 
-    // 3.4 Auxiliary roots (tool/**, benchmark/**, web/** main).
+  static void _addPublicRoot(
+    String id,
+    Set<String> productionRoots,
+    Set<String> exportedNodeIds,
+    Set<String> crossLibraryReferenced,
+  ) {
+    productionRoots.add(id);
+    exportedNodeIds.add(id);
+    crossLibraryReferenced.add(id);
+  }
+
+  void _harvestNonLibraryRoots({
+    required List<DeclarationNode> allNodes,
+    required PackageTopology topology,
+    required Set<String> productionRoots,
+    required Set<String> testRoots,
+  }) {
     for (final node in allNodes) {
-      if (topology.roleOf(node.relativeFilePath) == FileRole.auxiliary &&
-          node.name == 'main') {
-        productionRoots.add(node.id);
-      }
-    }
-
-    // 3.5 Config and native roots (build.yaml, pubspec plugins, @Native,
-    // @pragma, framework roots).
-    for (final node in allNodes) {
-      if (node.isNativeRoot) {
-        productionRoots.add(node.id);
-      } else if (topology.frameworkRoots.contains(node.name)) {
-        if (node.name != 'main' ||
-            PackageTopology.isFlutterEntrypoint(node.relativeFilePath)) {
-          productionRoots.add(node.id);
-        }
-      }
-    }
-
-    // 3.6 Test roots (test/** declarations).
-    for (final node in allNodes) {
-      if (topology.roleOf(node.relativeFilePath) == FileRole.test) {
+      if (_isTestRoot(node, topology)) {
         testRoots.add(node.id);
       }
-    }
-
-    // 3.7 Extra and companion production roots.
-    for (final node in allNodes) {
-      if (topology.extraProductionFiles.contains(node.relativeFilePath)) {
+      if (_isExecutableRoot(node, topology) ||
+          _isDemonstrationRoot(node, topology) ||
+          _isAuxiliaryRoot(node, topology) ||
+          _isConfigOrNativeRoot(node, topology) ||
+          _isExtraProductionRoot(node, topology)) {
         productionRoots.add(node.id);
       }
     }
+  }
 
-    // Step 4: Dual-Pass BFS Graph Traversal.
-    final productionLive = _runBfs(
-      startIds: productionRoots,
-      idToNode: idToNode,
-      sealedSubtypes: sealedSubtypes,
-    );
+  static bool _isExecutableRoot(
+    DeclarationNode node,
+    PackageTopology topology,
+  ) {
+    final isBinMain =
+        topology.roleOf(node.relativeFilePath) == FileRole.executable &&
+        node.name == 'main';
+    final isFlutterMain =
+        PackageTopology.isFlutterEntrypoint(node.relativeFilePath) &&
+        node.name == 'main' &&
+        topology.frameworkRoots.contains('main');
+    return isBinMain || isFlutterMain;
+  }
 
-    final testReachable = _runBfs(
-      startIds: testRoots,
-      idToNode: idToNode,
-      sealedSubtypes: sealedSubtypes,
-    );
+  bool _isDemonstrationRoot(DeclarationNode node, PackageTopology topology) {
+    if (topology.roleOf(node.relativeFilePath) != FileRole.demonstration) {
+      return false;
+    }
+    if (options.exampleMode == ExampleMode.demonstration) return true;
+    if (options.exampleMode == ExampleMode.strict) return node.name == 'main';
+    return false;
+  }
 
-    // Step 5: Candidate Classification and Hazard Detection.
+  static bool _isAuxiliaryRoot(
+    DeclarationNode node,
+    PackageTopology topology,
+  ) =>
+      topology.roleOf(node.relativeFilePath) == FileRole.auxiliary &&
+      node.name == 'main';
+
+  static bool _isConfigOrNativeRoot(
+    DeclarationNode node,
+    PackageTopology topology,
+  ) {
+    if (node.isNativeRoot) return true;
+    if (!topology.frameworkRoots.contains(node.name)) return false;
+    return node.name != 'main' ||
+        PackageTopology.isFlutterEntrypoint(node.relativeFilePath);
+  }
+
+  static bool _isExtraProductionRoot(
+    DeclarationNode node,
+    PackageTopology topology,
+  ) => topology.extraProductionFiles.contains(node.relativeFilePath);
+
+  static bool _isTestRoot(DeclarationNode node, PackageTopology topology) =>
+      topology.roleOf(node.relativeFilePath) == FileRole.test;
+
+  _ClassificationResult _classifyFindings({
+    required List<DeclarationNode> allNodes,
+    required PackageTopology topology,
+    required Set<String> productionLive,
+    required Set<String> testReachable,
+    required Map<DeclarationNode, List<Element>> nodeDirectSuperElements,
+    required Map<Element, DeclarationNode> elementToNode,
+    required List<TestBlockSite> testSites,
+  }) {
     final findings = <UndeadFinding>[];
     var pureUndead = 0;
     var testedUndead = 0;
     var coInvokedHazards = 0;
 
     for (final node in allNodes) {
-      final role = topology.roleOf(node.relativeFilePath);
+      if (!_isUndeadCandidate(
+        node,
+        topology: topology,
+        productionLive: productionLive,
+        nodeDirectSuperElements: nodeDirectSuperElements,
+        elementToNode: elementToNode,
+      )) {
+        continue;
+      }
 
-      // Check if this node is in an analysis candidate scope.
-      final isCandidate = switch (role) {
+      if (!testReachable.contains(node.id)) {
+        pureUndead++;
+        findings.add(_createPureUndeadFinding(node));
+      } else {
+        final (finding, isHazard) = _classifyTestedNode(
+          node,
+          testSites: testSites,
+          productionLive: productionLive,
+        );
+        if (finding == null) continue;
+        if (isHazard) {
+          coInvokedHazards++;
+        } else {
+          testedUndead++;
+        }
+        findings.add(finding);
+      }
+    }
+
+    return _ClassificationResult(
+      findings: findings,
+      pureUndead: pureUndead,
+      testedUndead: testedUndead,
+      coInvokedHazards: coInvokedHazards,
+    );
+  }
+
+  bool _isUndeadCandidate(
+    DeclarationNode node, {
+    required PackageTopology topology,
+    required Set<String> productionLive,
+    required Map<DeclarationNode, List<Element>> nodeDirectSuperElements,
+    required Map<Element, DeclarationNode> elementToNode,
+  }) {
+    final role = topology.roleOf(node.relativeFilePath);
+    if (!_isAnalysisCandidateScope(node, role)) return false;
+    if (node.isIgnored) return false;
+    if (options.ignoreExternalBindings && node.isExternalBinding) return false;
+    if (WildcardPattern.anyMatch(_ignoreNameWildcards, node.name)) return false;
+    if (productionLive.contains(node.id)) return false;
+    if (_isDirectSubtypeOfLiveSealed(
+      node,
+      nodeDirectSuperElements: nodeDirectSuperElements,
+      elementToNode: elementToNode,
+      productionLive: productionLive,
+    )) {
+      return false;
+    }
+    return true;
+  }
+
+  bool _isAnalysisCandidateScope(DeclarationNode node, FileRole role) =>
+      switch (role) {
         FileRole.internalSrc => true,
         FileRole.executable when node.name != 'main' => true,
         FileRole.auxiliary when node.name != 'main' => true,
@@ -523,156 +872,105 @@ class UndeadEngine {
         _ => false,
       };
 
-      if (!isCandidate) continue;
-      if (node.isIgnored) continue;
-      if (options.ignoreExternalBindings && node.isExternalBinding) continue;
-      if (WildcardPattern.anyMatch(_ignoreNameWildcards, node.name)) continue;
-      if (productionLive.contains(node.id)) continue;
-
-      // Sealed class direct subtype preservation:
-      final superElems = nodeDirectSuperElements[node];
-      var isDirectSubtypeOfLiveSealed = false;
-      if (superElems != null) {
-        for (final superElem in superElems) {
-          final parentNode = elementToNode[superElem];
-          if (parentNode != null &&
-              parentNode.isSealed &&
-              productionLive.contains(parentNode.id)) {
-            isDirectSubtypeOfLiveSealed = true;
-            break;
-          }
-        }
-      }
-      if (isDirectSubtypeOfLiveSealed) {
-        // Direct subtype of live sealed class: preserved for exhaustiveness!
-        continue;
-      }
-
-      if (!testReachable.contains(node.id)) {
-        // Pure Undead
-        pureUndead++;
-        findings.add(
-          UndeadFinding(
-            id: node.name,
-            name: node.name,
-            kind: node.kind,
-            file: node.relativeFilePath,
-            line: node.line,
-            column: node.column,
-            length: node.length,
-            classification: UndeadClassification.pureUndead,
-            suggestedAction: SuggestedAction.delete,
-            isExternalBinding: node.isExternalBinding,
-          ),
-        );
-      } else {
-        // Reached by tests.
-        final isTestHook =
-            node.isTestSupport ||
-            WildcardPattern.anyMatch(_testSupportWildcards, node.name);
-        if (isTestHook) {
-          // Explicit test fixture/hook (@visibleForTesting, Fake*): preserved!
-          continue;
-        }
-
-        // Evaluate orphan test sites and co-invoked hazards.
-        final matchingSites = testSites
-            .where((site) => site.referencedDeclarationIds.contains(node.id))
-            .toList();
-
-        final orphanSites = <OrphanTestSite>[];
-        var hasCoInvokedHazard = false;
-
-        for (final site in matchingSites) {
-          final referencesLiveCode = site.referencedDeclarationIds.any(
-            productionLive.contains,
-          );
-
-          if (referencesLiveCode) {
-            hasCoInvokedHazard = true;
-          }
-
-          orphanSites.add(
-            OrphanTestSite(
-              file: site.relativeFilePath,
-              line: site.line,
-              column: site.column,
-              description: site.description,
-              coInvokedHazard: referencesLiveCode,
-            ),
-          );
-        }
-
-        if (hasCoInvokedHazard) {
-          coInvokedHazards++;
-          findings.add(
-            UndeadFinding(
-              id: node.name,
-              name: node.name,
-              kind: node.kind,
-              file: node.relativeFilePath,
-              line: node.line,
-              column: node.column,
-              length: node.length,
-              classification: UndeadClassification.coInvokedHazard,
-              suggestedAction: SuggestedAction.manualRefactorHazard,
-              orphanTests: orphanSites.isNotEmpty ? orphanSites : null,
-              isExternalBinding: node.isExternalBinding,
-            ),
-          );
-        } else {
-          testedUndead++;
-          findings.add(
-            UndeadFinding(
-              id: node.name,
-              name: node.name,
-              kind: node.kind,
-              file: node.relativeFilePath,
-              line: node.line,
-              column: node.column,
-              length: node.length,
-              classification: UndeadClassification.testedUndead,
-              suggestedAction: SuggestedAction.deleteWithOrphanTests,
-              orphanTests: orphanSites.isNotEmpty ? orphanSites : null,
-              isExternalBinding: node.isExternalBinding,
-            ),
-          );
-        }
+  static bool _isDirectSubtypeOfLiveSealed(
+    DeclarationNode node, {
+    required Map<DeclarationNode, List<Element>> nodeDirectSuperElements,
+    required Map<Element, DeclarationNode> elementToNode,
+    required Set<String> productionLive,
+  }) {
+    final superElems = nodeDirectSuperElements[node];
+    if (superElems == null) return false;
+    for (final superElem in superElems) {
+      final parentNode = elementToNode[superElem];
+      if (parentNode != null &&
+          parentNode.isSealed &&
+          productionLive.contains(parentNode.id)) {
+        return true;
       }
     }
+    return false;
+  }
 
-    var privateCandidates = 0;
-    if (options.suggestPrivate) {
-      final candidates = _collectPrivateCandidates(
-        allNodes: allNodes,
-        topology: topology,
-        exportedNodeIds: exportedNodeIds,
-        productionLive: productionLive,
-        crossLibraryReferenced: crossLibraryReferenced,
-        testReferencedIds: testReferencedIds,
+  static UndeadFinding _createPureUndeadFinding(DeclarationNode node) =>
+      UndeadFinding(
+        id: node.name,
+        name: node.name,
+        kind: node.kind,
+        file: node.relativeFilePath,
+        line: node.line,
+        column: node.column,
+        length: node.length,
+        classification: UndeadClassification.pureUndead,
+        suggestedAction: SuggestedAction.delete,
+        isExternalBinding: node.isExternalBinding,
       );
-      privateCandidates = candidates.length;
-      findings.addAll(candidates);
+
+  (UndeadFinding?, bool isHazard) _classifyTestedNode(
+    DeclarationNode node, {
+    required List<TestBlockSite> testSites,
+    required Set<String> productionLive,
+  }) {
+    final isTestHook =
+        node.isTestSupport ||
+        WildcardPattern.anyMatch(_testSupportWildcards, node.name);
+    if (isTestHook) return (null, false);
+
+    final matchingSites = testSites
+        .where((site) => site.referencedDeclarationIds.contains(node.id))
+        .toList();
+
+    final orphanSites = <OrphanTestSite>[];
+    var hasCoInvokedHazard = false;
+
+    for (final site in matchingSites) {
+      final referencesLiveCode = site.referencedDeclarationIds.any(
+        productionLive.contains,
+      );
+      if (referencesLiveCode) {
+        hasCoInvokedHazard = true;
+      }
+      orphanSites.add(
+        OrphanTestSite(
+          file: site.relativeFilePath,
+          line: site.line,
+          column: site.column,
+          description: site.description,
+          coInvokedHazard: referencesLiveCode,
+        ),
+      );
     }
 
-    findings.sort((a, b) {
-      final fileComp = a.file.compareTo(b.file);
-      if (fileComp != 0) return fileComp;
-      final lineComp = a.line.compareTo(b.line);
-      if (lineComp != 0) return lineComp;
-      return a.column.compareTo(b.column);
-    });
+    final classification = hasCoInvokedHazard
+        ? UndeadClassification.coInvokedHazard
+        : UndeadClassification.testedUndead;
+    final action = hasCoInvokedHazard
+        ? SuggestedAction.manualRefactorHazard
+        : SuggestedAction.deleteWithOrphanTests;
 
-    return UndeadReport(
-      version: '0.1.1-wip',
-      package: topology.packageName,
-      totalDeclarations: totalDeclarationsCount,
-      pureUndeadFound: pureUndead,
-      testedUndeadFound: testedUndead,
-      coInvokedHazardsFound: coInvokedHazards,
-      privateCandidatesFound: privateCandidates,
-      undead: findings,
+    return (
+      UndeadFinding(
+        id: node.name,
+        name: node.name,
+        kind: node.kind,
+        file: node.relativeFilePath,
+        line: node.line,
+        column: node.column,
+        length: node.length,
+        classification: classification,
+        suggestedAction: action,
+        orphanTests: orphanSites.isNotEmpty ? orphanSites : null,
+        isExternalBinding: node.isExternalBinding,
+      ),
+      hasCoInvokedHazard,
     );
+  }
+
+  static int _compareFindings(UndeadFinding a, UndeadFinding b) {
+    final fileComp = a.file.compareTo(b.file);
+    if (fileComp != 0) return fileComp;
+    final lineComp = a.line.compareTo(b.line);
+    if (lineComp != 0) return lineComp;
+    return a.column.compareTo(b.column);
   }
 
   static Set<String> _extractDirectiveTargets(
@@ -833,20 +1131,32 @@ class UndeadEngine {
         }
       }
 
-      // If this is a sealed class, also traverse all its direct subtypes.
       if (node.isSealed) {
-        final subtypes = sealedSubtypes[currentId];
-        if (subtypes != null) {
-          for (final subId in subtypes) {
-            if (visited.add(subId)) {
-              queue.add(subId);
-            }
-          }
-        }
+        _enqueueSealedSubtypes(
+          currentId: currentId,
+          sealedSubtypes: sealedSubtypes,
+          visited: visited,
+          queue: queue,
+        );
       }
     }
 
     return visited;
+  }
+
+  static void _enqueueSealedSubtypes({
+    required String currentId,
+    required Map<String, Set<String>> sealedSubtypes,
+    required Set<String> visited,
+    required List<String> queue,
+  }) {
+    final subtypes = sealedSubtypes[currentId];
+    if (subtypes == null) return;
+    for (final subId in subtypes) {
+      if (visited.add(subId)) {
+        queue.add(subId);
+      }
+    }
   }
 
   (DeclarationKind, bool) _classifyDeclaration(Declaration decl) {
@@ -898,6 +1208,61 @@ class UndeadEngine {
     final currentDir = p.dirname(currentRelPath);
     return p.normalize(p.join(currentDir, uriString));
   }
+}
+
+/// Harvested declaration, site, and element data accumulated during analysis.
+class _HarvestedData {
+  final List<DeclarationNode> allNodes = [];
+  final Map<Element, DeclarationNode> elementToNode = {};
+  final Map<String, DeclarationNode> locationToNode = {};
+  final Map<String, DeclarationNode> idToNode = {};
+  final List<TestBlockSite> testSites = [];
+  final Map<TestBlockSite, Set<Element>> testSiteRawElements = {};
+  final Map<DeclarationNode, Set<Element>> nodeOutboundElements = {};
+  final Map<DeclarationNode, List<Element>> nodeDirectSuperElements = {};
+  final Map<String, Set<String>> sealedSubtypes = {};
+  final Map<String, Set<String>> conditionalTargets = {};
+  int totalDeclarationsCount = 0;
+
+  DeclarationNode? resolveNodeForElement(Element elem) {
+    final direct = elementToNode[elem];
+    if (direct != null) return direct;
+
+    final sourcePath =
+        elem.library?.firstFragment.source.fullName ??
+        elem.firstFragment.libraryFragment?.source.fullName;
+    if (sourcePath == null) return null;
+
+    final canonicalPath = p.canonicalize(sourcePath);
+    final name = elem.name;
+    if (name != null) {
+      final match = locationToNode['$canonicalPath#$name'];
+      if (match != null) return match;
+    }
+
+    final topLevel = getTopLevelElement(elem);
+    if (topLevel != null && topLevel.name != null) {
+      final match = locationToNode['$canonicalPath#${topLevel.name}'];
+      if (match != null) return match;
+    }
+
+    return null;
+  }
+}
+
+/// Result of classifying candidates into undead categories.
+class _ClassificationResult {
+  final List<UndeadFinding> findings;
+  final int pureUndead;
+  final int testedUndead;
+  final int coInvokedHazards;
+
+  const _ClassificationResult({
+    required this.findings,
+    required this.pureUndead,
+    required this.testedUndead,
+    required this.coInvokedHazards,
+  });
 }
 
 /// Discovered test invocation metadata.

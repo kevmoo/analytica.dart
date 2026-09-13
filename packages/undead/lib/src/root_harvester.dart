@@ -93,37 +93,7 @@ class PackageTopology {
     if (extraProductionFiles.contains(normalized)) {
       return FileRole.other;
     }
-    if (normalized.startsWith('lib/src/') ||
-        normalized.startsWith('lib/src\\')) {
-      return FileRole.internalSrc;
-    }
-    if (normalized.startsWith('lib/') || normalized.startsWith('lib\\')) {
-      return FileRole.publicLib;
-    }
-    if (normalized.startsWith('bin/') || normalized.startsWith('bin\\')) {
-      return FileRole.executable;
-    }
-    if (normalized.startsWith('example/') ||
-        normalized.startsWith('example\\')) {
-      return FileRole.demonstration;
-    }
-    if (normalized.startsWith('test/') ||
-        normalized.startsWith('test\\') ||
-        normalized.startsWith('integration_test/') ||
-        normalized.startsWith('integration_test\\') ||
-        normalized.startsWith('test_driver/') ||
-        normalized.startsWith('test_driver\\')) {
-      return FileRole.test;
-    }
-    if (normalized.startsWith('tool/') ||
-        normalized.startsWith('tool\\') ||
-        normalized.startsWith('benchmark/') ||
-        normalized.startsWith('benchmark\\') ||
-        normalized.startsWith('web/') ||
-        normalized.startsWith('web\\')) {
-      return FileRole.auxiliary;
-    }
-    return FileRole.other;
+    return _classifyPathPrefix(normalized.replaceAll(r'\', '/'));
   }
 
   /// Whether [relativeFilePath] is a Flutter main entrypoint (`lib/main.dart` or `lib/main_*.dart`).
@@ -146,6 +116,54 @@ class RootHarvester {
   /// Discovers the package topology from the filesystem.
   PackageTopology harvestTopology() {
     final rootDir = Directory(options.packagePath);
+    final pubspecFile = File(p.join(options.packagePath, 'pubspec.yaml'));
+    _verifyPackageAndConfig(rootDir, pubspecFile);
+
+    final pubspecContent = pubspecFile.readAsStringSync();
+    final packageName = _extractPackageName(pubspecContent);
+
+    final files = _classifyPackageFiles(rootDir);
+    final extraProduction = <String>[];
+    final extraTest = <String>[];
+
+    _discoverWorkspaceConsumers(packageName, extraProduction, extraTest);
+    _harvestExtraRoots(extraProduction, extraTest);
+
+    final initialTopology = PackageTopology(
+      packagePath: options.packagePath,
+      packageName: packageName,
+      publicLibFiles: files.publicLib,
+      internalSrcFiles: files.internalSrc,
+      executableFiles: files.bin,
+      demonstrationFiles: files.example,
+      auxiliaryFiles: files.auxiliary,
+      testFiles: files.test,
+      extraProductionFiles: extraProduction,
+      extraTestFiles: extraTest,
+    );
+
+    final frameworkRoots = options.frameworkAdapter.harvestRoots(
+      topology: initialTopology,
+      packageDir: rootDir,
+      pubspecContent: pubspecContent,
+    );
+
+    return PackageTopology(
+      packagePath: options.packagePath,
+      packageName: packageName,
+      publicLibFiles: files.publicLib,
+      internalSrcFiles: files.internalSrc,
+      executableFiles: files.bin,
+      demonstrationFiles: files.example,
+      auxiliaryFiles: files.auxiliary,
+      testFiles: files.test,
+      frameworkRoots: frameworkRoots,
+      extraProductionFiles: extraProduction,
+      extraTestFiles: extraTest,
+    );
+  }
+
+  void _verifyPackageAndConfig(Directory rootDir, File pubspecFile) {
     if (!rootDir.existsSync()) {
       throw FileSystemException(
         'Target package directory does not exist',
@@ -153,7 +171,6 @@ class RootHarvester {
       );
     }
 
-    final pubspecFile = File(p.join(options.packagePath, 'pubspec.yaml'));
     if (!pubspecFile.existsSync()) {
       throw FileSystemException(
         'Missing pubspec.yaml in package root',
@@ -161,41 +178,40 @@ class RootHarvester {
       );
     }
 
-    if (!hasPackageConfig(options.packagePath) &&
-        !hasEnclosingPackageConfig(options.packagePath)) {
-      if (options.autoPubGet) {
-        final result = runPubGet(options.packagePath, sdkPath: options.sdkPath);
-        if (result.exitCode != 0) {
-          final isFlutter = isFlutterPackage(options.packagePath);
-          final toolName = isFlutter ? 'flutter' : 'dart';
-          throw PackageResolutionException(
-            'Failed to resolve dependencies with "$toolName pub get":\n'
-            '${result.stderr}',
-            options.packagePath,
-          );
-        }
-      } else {
-        throw PackageResolutionException(
-          'Missing .dart_tool/package_config.json for '
-          '"${options.packagePath}".\n'
-          'Please run "dart pub get" (or "flutter pub get") before running '
-          'undead (or pass --pub-get).',
-          options.packagePath,
-        );
-      }
+    if (hasPackageConfig(options.packagePath) ||
+        hasEnclosingPackageConfig(options.packagePath)) {
+      return;
     }
 
-    final pubspecContent = pubspecFile.readAsStringSync();
-    final packageName = _extractPackageName(pubspecContent);
+    if (!options.autoPubGet) {
+      throw PackageResolutionException(
+        'Missing .dart_tool/package_config.json for '
+        '"${options.packagePath}".\n'
+        'Please run "dart pub get" (or "flutter pub get") before running '
+        'undead (or pass --pub-get).',
+        options.packagePath,
+      );
+    }
 
+    final result = runPubGet(options.packagePath, sdkPath: options.sdkPath);
+    if (result.exitCode != 0) {
+      final isFlutter = isFlutterPackage(options.packagePath);
+      final toolName = isFlutter ? 'flutter' : 'dart';
+      throw PackageResolutionException(
+        'Failed to resolve dependencies with "$toolName pub get":\n'
+        '${result.stderr}',
+        options.packagePath,
+      );
+    }
+  }
+
+  _PackageFiles _classifyPackageFiles(Directory rootDir) {
     final publicLib = <String>[];
     final internalSrc = <String>[];
     final bin = <String>[];
     final example = <String>[];
     final auxiliary = <String>[];
     final test = <String>[];
-    final extraProduction = <String>[];
-    final extraTest = <String>[];
 
     for (final entity in rootDir.listSync(
       recursive: true,
@@ -207,59 +223,67 @@ class RootHarvester {
       if (_isExcluded(relPath)) continue;
 
       final normalized = p.normalize(relPath);
-      if (normalized.startsWith('lib/src/') ||
-          normalized.startsWith('lib/src\\')) {
-        internalSrc.add(normalized);
-      } else if (normalized.startsWith('lib/') ||
-          normalized.startsWith('lib\\')) {
-        publicLib.add(normalized);
-      } else if (normalized.startsWith('bin/') ||
-          normalized.startsWith('bin\\')) {
-        bin.add(normalized);
-      } else if (normalized.startsWith('example/') ||
-          normalized.startsWith('example\\')) {
-        if (options.exampleMode != ExampleMode.skip) {
-          example.add(normalized);
-        }
-      } else if (normalized.startsWith('test/') ||
-          normalized.startsWith('test\\') ||
-          normalized.startsWith('integration_test/') ||
-          normalized.startsWith('integration_test\\') ||
-          normalized.startsWith('test_driver/') ||
-          normalized.startsWith('test_driver\\')) {
-        test.add(normalized);
-      } else if (normalized.startsWith('tool/') ||
-          normalized.startsWith('tool\\') ||
-          normalized.startsWith('benchmark/') ||
-          normalized.startsWith('benchmark\\') ||
-          normalized.startsWith('web/') ||
-          normalized.startsWith('web\\')) {
-        auxiliary.add(normalized);
+      final role = _classifyPathPrefix(normalized.replaceAll(r'\', '/'));
+      switch (role) {
+        case FileRole.internalSrc:
+          internalSrc.add(normalized);
+        case FileRole.publicLib:
+          publicLib.add(normalized);
+        case FileRole.executable:
+          bin.add(normalized);
+        case FileRole.demonstration:
+          if (options.exampleMode != ExampleMode.skip) {
+            example.add(normalized);
+          }
+        case FileRole.test:
+          test.add(normalized);
+        case FileRole.auxiliary:
+          auxiliary.add(normalized);
+        case FileRole.other:
+          break;
       }
     }
 
-    // Discover companion consumers in workspace if enabled
-    if (options.workspaceDiscovery) {
-      const discovery = WorkspaceConsumerDiscovery();
-      final discovered = discovery.discoverConsumers(
-        packagePath: options.packagePath,
-        targetPackageName: packageName,
-      );
-      for (final root in discovered.productionRoots) {
-        final relPath = p.relative(root, from: options.packagePath);
-        if (!_isExcludedFromExtraRoot(relPath)) {
-          extraProduction.add(p.normalize(relPath));
-        }
-      }
-      for (final root in discovered.testRoots) {
-        final relPath = p.relative(root, from: options.packagePath);
-        if (!_isExcludedFromExtraRoot(relPath)) {
-          extraTest.add(p.normalize(relPath));
-        }
+    return (
+      publicLib: publicLib,
+      internalSrc: internalSrc,
+      bin: bin,
+      example: example,
+      auxiliary: auxiliary,
+      test: test,
+    );
+  }
+
+  void _discoverWorkspaceConsumers(
+    String packageName,
+    List<String> extraProduction,
+    List<String> extraTest,
+  ) {
+    if (!options.workspaceDiscovery) return;
+
+    const discovery = WorkspaceConsumerDiscovery();
+    final discovered = discovery.discoverConsumers(
+      packagePath: options.packagePath,
+      targetPackageName: packageName,
+    );
+    for (final root in discovered.productionRoots) {
+      final relPath = p.relative(root, from: options.packagePath);
+      if (!_isExcludedFromExtraRoot(relPath)) {
+        extraProduction.add(p.normalize(relPath));
       }
     }
+    for (final root in discovered.testRoots) {
+      final relPath = p.relative(root, from: options.packagePath);
+      if (!_isExcludedFromExtraRoot(relPath)) {
+        extraTest.add(p.normalize(relPath));
+      }
+    }
+  }
 
-    // Harvest files from extra roots (explicit files or companion directories)
+  void _harvestExtraRoots(
+    List<String> extraProduction,
+    List<String> extraTest,
+  ) {
     for (final extraRoot in options.extraRoots) {
       if (extraRoot.trim().isEmpty) continue;
       final extraPath = p.normalize(
@@ -277,80 +301,37 @@ class RootHarvester {
         continue;
       }
 
-      final extraDir = Directory(extraPath);
-      if (!extraDir.existsSync()) continue;
-
-      final libSubdir = Directory(p.join(extraPath, 'lib'));
-      final testSubdir = Directory(p.join(extraPath, 'test'));
-
-      if (libSubdir.existsSync() || testSubdir.existsSync()) {
-        if (libSubdir.existsSync()) {
-          for (final entity in libSubdir.listSync(
-            recursive: true,
-            followLinks: false,
-          )) {
-            if (entity is! File || !entity.path.endsWith('.dart')) continue;
-            final relPath = p.relative(entity.path, from: options.packagePath);
-            if (_isExcludedFromExtraRoot(relPath)) continue;
-            extraProduction.add(p.normalize(relPath));
-          }
-        }
-        if (testSubdir.existsSync()) {
-          for (final entity in testSubdir.listSync(
-            recursive: true,
-            followLinks: false,
-          )) {
-            if (entity is! File || !entity.path.endsWith('.dart')) continue;
-            final relPath = p.relative(entity.path, from: options.packagePath);
-            if (_isExcludedFromExtraRoot(relPath)) continue;
-            extraTest.add(p.normalize(relPath));
-          }
-        }
-      } else {
-        for (final entity in extraDir.listSync(
-          recursive: true,
-          followLinks: false,
-        )) {
-          if (entity is! File || !entity.path.endsWith('.dart')) continue;
-          final relPath = p.relative(entity.path, from: options.packagePath);
-          if (_isExcludedFromExtraRoot(relPath)) continue;
-          extraTest.add(p.normalize(relPath));
-        }
-      }
+      _harvestExtraDirectory(extraPath, extraProduction, extraTest);
     }
+  }
 
-    final initialTopology = PackageTopology(
-      packagePath: options.packagePath,
-      packageName: packageName,
-      publicLibFiles: publicLib,
-      internalSrcFiles: internalSrc,
-      executableFiles: bin,
-      demonstrationFiles: example,
-      auxiliaryFiles: auxiliary,
-      testFiles: test,
-      extraProductionFiles: extraProduction,
-      extraTestFiles: extraTest,
-    );
+  void _harvestExtraDirectory(
+    String extraPath,
+    List<String> extraProduction,
+    List<String> extraTest,
+  ) {
+    final extraDir = Directory(extraPath);
+    if (!extraDir.existsSync()) return;
 
-    final frameworkRoots = options.frameworkAdapter.harvestRoots(
-      topology: initialTopology,
-      packageDir: rootDir,
-      pubspecContent: pubspecContent,
-    );
+    final libSubdir = Directory(p.join(extraPath, 'lib'));
+    final testSubdir = Directory(p.join(extraPath, 'test'));
 
-    return PackageTopology(
-      packagePath: options.packagePath,
-      packageName: packageName,
-      publicLibFiles: publicLib,
-      internalSrcFiles: internalSrc,
-      executableFiles: bin,
-      demonstrationFiles: example,
-      auxiliaryFiles: auxiliary,
-      testFiles: test,
-      frameworkRoots: frameworkRoots,
-      extraProductionFiles: extraProduction,
-      extraTestFiles: extraTest,
-    );
+    if (libSubdir.existsSync() || testSubdir.existsSync()) {
+      _scanDartFiles(libSubdir, extraProduction.add);
+      _scanDartFiles(testSubdir, extraTest.add);
+    } else {
+      _scanDartFiles(extraDir, extraTest.add);
+    }
+  }
+
+  void _scanDartFiles(Directory dir, void Function(String relPath) onFile) {
+    if (!dir.existsSync()) return;
+    for (final entity in dir.listSync(recursive: true, followLinks: false)) {
+      if (entity is! File || !entity.path.endsWith('.dart')) continue;
+      final relPath = p.relative(entity.path, from: options.packagePath);
+      if (_isExcludedFromExtraRoot(relPath)) continue;
+      onFile(p.normalize(relPath));
+    }
   }
 
   bool _isExcluded(String relativePath) =>
@@ -366,4 +347,31 @@ class RootHarvester {
     ).firstMatch(pubspecContent);
     return match?.group(1) ?? 'unknown_package';
   }
+}
+
+typedef _PackageFiles = ({
+  List<String> publicLib,
+  List<String> internalSrc,
+  List<String> bin,
+  List<String> example,
+  List<String> auxiliary,
+  List<String> test,
+});
+
+FileRole _classifyPathPrefix(String path) {
+  if (path.startsWith('lib/src/')) return FileRole.internalSrc;
+  if (path.startsWith('lib/')) return FileRole.publicLib;
+  if (path.startsWith('bin/')) return FileRole.executable;
+  if (path.startsWith('example/')) return FileRole.demonstration;
+  if (path.startsWith('test/') ||
+      path.startsWith('integration_test/') ||
+      path.startsWith('test_driver/')) {
+    return FileRole.test;
+  }
+  if (path.startsWith('tool/') ||
+      path.startsWith('benchmark/') ||
+      path.startsWith('web/')) {
+    return FileRole.auxiliary;
+  }
+  return FileRole.other;
 }
