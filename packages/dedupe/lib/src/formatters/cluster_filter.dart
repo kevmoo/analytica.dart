@@ -12,12 +12,12 @@ mixin ClusterFilterMixin {
   List<DuplicateCluster> filterClusters(List<DuplicateCluster> clusters) {
     var result = clusters;
     if (categoryFilter != 'all') {
-      result =
-          result.where((c) => c.category.jsonValue == categoryFilter).toList();
+      result = result
+          .where((c) => c.category.jsonValue == categoryFilter)
+          .toList();
     }
     if (bucketFilter != 'all') {
-      result =
-          result.where((c) => c.bucket.jsonValue == bucketFilter).toList();
+      result = result.where((c) => c.bucket.jsonValue == bucketFilter).toList();
     }
     if (topCount > 0 && result.length > topCount) {
       result = result.sublist(0, topCount);

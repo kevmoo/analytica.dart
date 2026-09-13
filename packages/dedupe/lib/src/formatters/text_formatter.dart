@@ -56,7 +56,6 @@ class TextFormatter with ClusterFilterMixin {
     buffer.writeln('-' * 60);
   }
 
-
   static void _writeClusters(
     StringBuffer buffer,
     List<DuplicateCluster> clusters,
