@@ -4,8 +4,6 @@
   `--[no-]ignore-generated` file filtering.
 - Add `ensure_cli_readme_test.dart` to verify CLI `--help` documentation in
   `README.md`.
-- Decompose `UndeadEngine.analyze` and `RootHarvester.harvestTopology` into
-  focused helper methods, reducing cognitive complexity to <= 14.
 
 ## 0.1.1
 
