@@ -1,6 +1,7 @@
 name: _analytica_tool
 description: Helper tools for managing and validating skills.
 version: 1.0.0
+publish_to: none
 environment:
   sdk: '^3.12.0'
 resolution: workspace
