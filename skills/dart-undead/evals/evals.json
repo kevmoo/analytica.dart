@@ -1,0 +1,36 @@
+{
+  "repo_criteria": [
+    "evals/code_quality_rubric.json"
+  ],
+  "evals": [
+    {
+      "id": "undead_triage_audit",
+      "prompt": "Run dart-undead to detect dead code and unused declarations across the package.",
+      "expected_chat_output": [
+        "A high-level summary of unused declarations is pre-rendered in visible chat.",
+        "A clickable link to 'undead_triage_report.md' is provided in visible chat.",
+        "The interactive confirmation gate ('ask_question') explicitly references 'undead_triage_report.md' in its question prompt.",
+        "The agent does not invoke 'ask_question' blindly before rendering the summary and creating the artifact."
+      ],
+      "expected_repo_state": [
+        "The artifact 'undead_triage_report.md' is created on disk with target summary, findings table, and safety annotations.",
+        "No source declarations are deleted prior to user selection in Stage 2."
+      ],
+      "agent_config": "bare-agent"
+    },
+    {
+      "id": "undead_safety_check",
+      "prompt": "Audit dead declarations with dart-undead in a library package with public exports and sealed classes.",
+      "expected_chat_output": [
+        "Highlights safety annotations (sealed subtypes, public exports) in the chat summary.",
+        "Points to the full 'undead_triage_report.md' artifact.",
+        "Presents options to remove primary unused declaration, clean up file, or stop at audit."
+      ],
+      "expected_repo_state": [
+        "The artifact 'undead_triage_report.md' is generated on disk.",
+        "No files are modified without user confirmation."
+      ],
+      "agent_config": "bare-agent"
+    }
+  ]
+}
