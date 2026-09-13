@@ -1,9 +1,13 @@
 import '../models.dart';
+import 'cluster_filter.dart';
 
 /// Formatter that outputs [DedupeReport] as clean GitHub-Flavored Markdown.
-class MarkdownFormatter {
+class MarkdownFormatter with ClusterFilterMixin {
+  @override
   final int topCount;
+  @override
   final String categoryFilter;
+  @override
   final String bucketFilter;
   final bool includeFileTable;
   final bool includeClusters;
@@ -94,7 +98,7 @@ class MarkdownFormatter {
   }
 
   void _writeClusters(StringBuffer buffer, DedupeReport report) {
-    final clusters = _filterClusters(report.clusters);
+    final clusters = filterClusters(report.clusters);
 
     if (clusters.isEmpty) {
       if (report.clusters.isEmpty) {
@@ -116,22 +120,6 @@ class MarkdownFormatter {
     for (final cluster in clusters) {
       _writeSingleCluster(buffer, cluster);
     }
-  }
-
-  List<DuplicateCluster> _filterClusters(List<DuplicateCluster> clusters) {
-    var result = clusters;
-    if (categoryFilter != 'all') {
-      result = result
-          .where((c) => c.category.jsonValue == categoryFilter)
-          .toList();
-    }
-    if (bucketFilter != 'all') {
-      result = result.where((c) => c.bucket.jsonValue == bucketFilter).toList();
-    }
-    if (topCount > 0 && result.length > topCount) {
-      result = result.sublist(0, topCount);
-    }
-    return result;
   }
 
   static void _writeSingleCluster(

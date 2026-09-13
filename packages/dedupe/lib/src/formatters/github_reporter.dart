@@ -3,16 +3,20 @@ import 'dart:io';
 import 'package:analytica/analytica.dart';
 
 import '../models.dart';
+import 'cluster_filter.dart';
 import 'markdown_formatter.dart';
 
 /// Formatter that outputs GitHub Actions workflow commands (annotations) and
 /// appends rich Markdown step summaries to `$GITHUB_STEP_SUMMARY`.
-class DedupeGitHubReporter {
+class DedupeGitHubReporter with ClusterFilterMixin {
   final StringSink stdoutSink;
   final File? summaryFile;
   final DedupeOptions? options;
+  @override
   final int topCount;
+  @override
   final String categoryFilter;
+  @override
   final String bucketFilter;
   final bool includeFileTable;
   final bool includeClusters;
@@ -38,7 +42,7 @@ class DedupeGitHubReporter {
     // 1. Emit GitHub Actions workflow warning annotations for duplicate
     // instances
     if (includeClusters) {
-      final clusters = _filterClusters(report.clusters);
+      final clusters = filterClusters(report.clusters);
       for (final cluster in clusters) {
         for (final instance in cluster.instances) {
           final categoryName = cluster.category.displayName;
@@ -73,21 +77,5 @@ class DedupeGitHubReporter {
         // Non-fatal if step summary cannot be written
       }
     }
-  }
-
-  List<DuplicateCluster> _filterClusters(List<DuplicateCluster> clusters) {
-    var result = clusters;
-    if (categoryFilter != 'all') {
-      result = result
-          .where((c) => c.category.jsonValue == categoryFilter)
-          .toList();
-    }
-    if (bucketFilter != 'all') {
-      result = result.where((c) => c.bucket.jsonValue == bucketFilter).toList();
-    }
-    if (topCount > 0 && result.length > topCount) {
-      result = result.sublist(0, topCount);
-    }
-    return result;
   }
 }

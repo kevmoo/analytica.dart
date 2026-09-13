@@ -4,6 +4,7 @@ library;
 
 export 'src/delta_service.dart';
 export 'src/engine.dart';
+export 'src/formatters/cluster_filter.dart';
 export 'src/formatters/github_reporter.dart';
 export 'src/formatters/json_formatter.dart';
 export 'src/formatters/markdown_formatter.dart';
