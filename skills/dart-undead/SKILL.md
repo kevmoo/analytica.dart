@@ -228,9 +228,9 @@ follow this strict 2-stage workflow:
 
 Run `dart run undead@^0.1.1 --format=markdown` (or `--format=json`).
 
-**Mandatory Persistent Artifact**:
-You MUST create a structured Markdown artifact named `undead_triage_report.md`
-in `<appDataDir>/brain/<conversation-id>/`. The artifact must include:
+**Mandatory Persistent Artifact**: You MUST create a structured Markdown
+artifact named `undead_triage_report.md` in
+`<appDataDir>/brain/<conversation-id>/`. The artifact must include:
 
 1. **Target Summary**: Package name, analysis mode (`library` vs `closed-app`),
    and total undead declarations detected.
@@ -240,9 +240,9 @@ in `<appDataDir>/brain/<conversation-id>/`. The artifact must include:
 3. **Safety Annotations**: Highlight any `sealed` subtypes, co-invoked test
    hazards, or public exports.
 
-**Visible Chat Pre-Render**:
-You MUST render a high-level summary and a direct clickable link to the triage
-report artifact in visible chat BEFORE invoking the confirmation gate.
+**Visible Chat Pre-Render**: You MUST render a high-level summary and a direct
+clickable link to the triage report artifact in visible chat BEFORE invoking the
+confirmation gate.
 
 ### Stage 2: Interactive User Confirmation Gate
 

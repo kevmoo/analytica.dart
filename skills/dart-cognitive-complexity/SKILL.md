@@ -117,10 +117,9 @@ and preserve historical code stability, adhere to a strict 2-stage workflow:
 
 When threshold breaches are detected, **do not mutate code immediately**.
 
-**Mandatory Persistent Artifact**:
-You MUST create a structured Markdown artifact named
-`complexity_triage_report.md` in `<appDataDir>/brain/<conversation-id>/`.
-The artifact must include:
+**Mandatory Persistent Artifact**: You MUST create a structured Markdown
+artifact named `complexity_triage_report.md` in
+`<appDataDir>/brain/<conversation-id>/`. The artifact must include:
 
 - Flagged function name and clickable file local path. Must include code
   snippets.
@@ -129,9 +128,9 @@ The artifact must include:
 - Recommended refactoring strategy (Pattern A, B, D, E, or a Pattern C tier) and
   unit test status.
 
-**Visible Chat Pre-Render**:
-You MUST render a high-level summary and a direct clickable link to the triage
-report artifact in visible chat BEFORE invoking the confirmation gate.
+**Visible Chat Pre-Render**: You MUST render a high-level summary and a direct
+clickable link to the triage report artifact in visible chat BEFORE invoking the
+confirmation gate.
 
 ### Invariant: Outlier-First Mandate
 
