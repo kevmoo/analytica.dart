@@ -228,16 +228,29 @@ follow this strict 2-stage workflow:
 
 Run `dart run undead@^0.1.1 --format=markdown` (or `--format=json`).
 
-Output a ranked **Dead Code Triage Report** containing:
+**Mandatory Persistent Artifact**:
+You MUST create a structured Markdown artifact named `undead_triage_report.md`
+in `<appDataDir>/brain/<conversation-id>/`. The artifact must include:
 
 1. **Target Summary**: Package name, analysis mode (`library` vs `closed-app`),
    and total undead declarations detected.
 2. **Actionable Findings Table**: Clickable file link, line number, declaration
-   type (`class`, `function`, `method`, `variable`), and name.
+   type (`class`, `function`, `method`, `variable`), and name. Must include code
+   snippets.
 3. **Safety Annotations**: Highlight any `sealed` subtypes, co-invoked test
    hazards, or public exports.
 
+**Visible Chat Pre-Render**:
+You MUST render a high-level summary and a direct clickable link to the triage
+report artifact in visible chat BEFORE invoking the confirmation gate.
+
 ### Stage 2: Interactive User Confirmation Gate
+
+**Anti-Blind-Modal Invariant**: Strictly FORBID calling `ask_question` in the
+same step as an unrendered report without the report already existing on disk
+and in chat. The question prompt in `ask_question` should explicitly reference
+the generated triage artifact (e.g., "Based on the findings in
+[undead_triage_report.md](...)...").
 
 Pause execution and prompt the user (via interactive choice or chat) to select
 the desired remediation scope:
