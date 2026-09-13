@@ -115,15 +115,22 @@ and preserve historical code stability, adhere to a strict 2-stage workflow:
 
 ### Stage 1: Read-Only Audit & Reporting (Mandatory Stop)
 
-When threshold breaches are detected, **do not mutate code immediately**. Output
-a ranked Markdown **Complexity Triage Report** directly in chat (or to an
-artifact for extensive findings) containing:
+When threshold breaches are detected, **do not mutate code immediately**.
 
-- Flagged function name and clickable file local path.
+**Mandatory Persistent Artifact**: You MUST create a structured Markdown
+artifact named `complexity_triage_report.md` in
+`<appDataDir>/brain/<conversation-id>/`. The artifact must include:
+
+- Flagged function name and clickable file local path. Must include code
+  snippets.
 - Current complexity score versus operational ceiling (sorted descending by
   score).
 - Recommended refactoring strategy (Pattern A, B, D, E, or a Pattern C tier) and
   unit test status.
+
+**Visible Chat Pre-Render**: You MUST render a high-level summary and a direct
+clickable link to the triage report artifact in visible chat BEFORE invoking the
+confirmation gate.
 
 ### Invariant: Outlier-First Mandate
 
@@ -139,6 +146,12 @@ artifact for extensive findings) containing:
   limits.
 
 ### Stage 2: Interactive User Selection (Confirmation Gate)
+
+**Anti-Blind-Modal Invariant**: Strictly FORBID calling `ask_question` in the
+same step as an unrendered report without the report already existing on disk
+and in chat. The question prompt in `ask_question` should explicitly reference
+the generated triage artifact (e.g., "Based on the findings in
+[complexity_triage_report.md](...)...").
 
 Pause execution and prompt the user (via interactive choice or chat) to select
 the desired sequencing:

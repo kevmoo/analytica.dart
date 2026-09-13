@@ -1,0 +1,36 @@
+{
+  "repo_criteria": [
+    "evals/code_quality_rubric.json"
+  ],
+  "evals": [
+    {
+      "id": "dedupe_triage_audit",
+      "prompt": "Audit the codebase for duplicate code using dart-dedupe and propose remediation options.",
+      "expected_chat_output": [
+        "A high-level summary of duplicate clusters and metrics is pre-rendered directly in visible chat.",
+        "A clickable link to the generated artifact 'dedupe_triage_report.md' is included in visible chat.",
+        "The 'ask_question' interactive confirmation gate explicitly references 'dedupe_triage_report.md' in its prompt.",
+        "The agent does not invoke 'ask_question' blindly before rendering the summary and creating the artifact."
+      ],
+      "expected_repo_state": [
+        "The artifact 'dedupe_triage_report.md' is created on disk with target summary, duplicate clusters, and actionability annotations.",
+        "No source files are modified prior to user selection in Stage 2."
+      ],
+      "agent_config": "bare-agent"
+    },
+    {
+      "id": "dedupe_read_only_stop",
+      "prompt": "Scan packages/dedupe with dart-dedupe in read-only audit mode without applying any refactorings.",
+      "expected_chat_output": [
+        "Outputs a ranked Duplication Triage Report summary in visible chat.",
+        "References the generated 'dedupe_triage_report.md' artifact.",
+        "Does not mutate code when user requests an audit-only sweep."
+      ],
+      "expected_repo_state": [
+        "The artifact 'dedupe_triage_report.md' exists on disk.",
+        "No codebase files are modified or deleted."
+      ],
+      "agent_config": "bare-agent"
+    }
+  ]
+}

@@ -1,0 +1,36 @@
+{
+  "repo_criteria": [
+    "evals/code_quality_rubric.json"
+  ],
+  "evals": [
+    {
+      "id": "complexity_triage_audit",
+      "prompt": "Run dart-cognitive-complexity across the package to check for methods exceeding complexity ceiling 15.",
+      "expected_chat_output": [
+        "A high-level summary of complexity outliers is pre-rendered in visible chat.",
+        "A clickable link to 'complexity_triage_report.md' is rendered in visible chat.",
+        "The confirmation gate ('ask_question') explicitly references 'complexity_triage_report.md' in its question prompt.",
+        "The agent does not call 'ask_question' blindly before generating the report artifact and visible summary."
+      ],
+      "expected_repo_state": [
+        "The artifact 'complexity_triage_report.md' is created on disk with flagged functions, scores, and refactoring strategies.",
+        "No source code is refactored before the user selects a remediation option."
+      ],
+      "agent_config": "bare-agent"
+    },
+    {
+      "id": "complexity_outlier_first",
+      "prompt": "Audit cognitive complexity on the codebase and recommend remediation sequencing for multiple outliers.",
+      "expected_chat_output": [
+        "Recommends targeting the single primary outlier first (sorted descending by complexity score).",
+        "Links to 'complexity_triage_report.md' in chat.",
+        "Includes '(Recommended) Refactor Primary Outlier First' in confirmation gate options."
+      ],
+      "expected_repo_state": [
+        "The artifact 'complexity_triage_report.md' is created on disk.",
+        "No source files are edited prior to user confirmation."
+      ],
+      "agent_config": "bare-agent"
+    }
+  ]
+}

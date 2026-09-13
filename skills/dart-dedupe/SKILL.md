@@ -189,19 +189,32 @@ strict 2-stage workflow:
 
 Run `dart run dedupe@^0.1.0 --format=markdown` (or `--format=json`).
 
-Output a ranked **Duplication Triage Report** containing:
+**Mandatory Persistent Artifact**: You MUST create a structured Markdown
+artifact named `dedupe_triage_report.md` in
+`<appDataDir>/brain/<conversation-id>/`. The artifact must include:
 
 1. **Target Summary**: Files analyzed, total lines, duplication percentage, and
    estimated lines saved.
 2. **Top Duplicate Clusters**: Clickable file links, line ranges, token counts,
    clone classification category (`logic`, `data`, `boilerplate`), and bucket
-   (`identical`, `structural`, `parameterized`, `gapped`).
+   (`identical`, `structural`, `parameterized`, `gapped`). Must include code
+   snippets.
 3. **Actionability Annotations**: Highlight recommended extraction strategy or
    mark as "Necessary Duplication (Preserve)".
 4. **Prioritization**: Rank by highest token volume and widest file footprint
    first.
 
+**Visible Chat Pre-Render**: You MUST render a high-level summary and a direct
+clickable link to the triage report artifact in visible chat BEFORE invoking the
+confirmation gate.
+
 ### Stage 2: Interactive User Confirmation Gate
+
+**Anti-Blind-Modal Invariant**: Strictly FORBID calling `ask_question` in the
+same step as an unrendered report without the report already existing on disk
+and in chat. The question prompt in `ask_question` should explicitly reference
+the generated triage artifact (e.g., "Based on the findings in
+[dedupe_triage_report.md](...)...").
 
 Pause execution and prompt the user (via interactive choice or chat) to select
 the desired remediation scope:
