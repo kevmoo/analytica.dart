@@ -177,17 +177,19 @@ To suppress intentional dead code or API placeholders without deleting:
 
 Static AST analysis (`pkg:undead`) only traces typed Dart import trees. It
 cannot see declarations referenced through runtime meta-programming:
+
 - Dynamic isolate spawners (`dart.runInIsolate`, `Isolate.spawnUri`)
 - Code-generation string templates (`'''import "package:.../foo.dart";'''`)
 - JS / WASM compilation targets and runtime asset bootstrap runners
 - Build hooks and `build.yaml` references
 
 **The Pre-Deletion Check Protocol:**
+
 1. Before deleting any candidate file or top-level declaration in `lib/src/`,
    perform a literal string search (`grep_search "<filename_or_symbol>"`) across
    the repository.
-2. If text matches exist outside the target file itself, **inspect and understand
-   the match context** before deleting:
+2. If text matches exist outside the target file itself, **inspect and
+   understand the match context** before deleting:
    - **KEEP**: The match is an active runtime string template, dynamic isolate
      entrypoint, or compilation target. Protect it with `// undead:ignore`.
    - **PRUNE**: The match is merely a doc comment, obsolete README reference, or
@@ -197,6 +199,7 @@ cannot see declarations referenced through runtime meta-programming:
 
 In multi-package workspaces where internal implementation libraries export
 entrypoints consumed by sibling CLI wrappers or test runners:
+
 - Include sibling packages and root integration test folders using
   `--extra-roots` or enable `--workspace-discovery`.
 - If an unexported function is an intended external entrypoint, protect it with
@@ -207,6 +210,7 @@ entrypoints consumed by sibling CLI wrappers or test runners:
 
 When pruning dead code, avoid partial or purely cosmetic deletions that leave
 larger unreferenced subsystems intact:
+
 - Delete all verified unreferenced internal classes, functions, and files in
   `lib/src/` (e.g., unreferenced listener classes, unused event sinks, obsolete
   scaffold runners) in one cohesive pass.
@@ -248,12 +252,12 @@ the desired remediation scope:
 4. **Report-Only / Exit**: Acknowledge findings without code mutations.
 
 > **Explicit Bypass & Non-Interactive Fallback**:
+>
 > - **Direct Directives**: Skip Stage 1 pause if given explicit remediation
 >   instructions (e.g., "Prune dead code in `pkgs/foo` using `dart-undead`").
 > - **Non-Interactive Execution**: In unattended or automated evaluation
 >   workflows (e.g. `evalin` or subagents), proceed with Option 1 (Prune All
->   Verified Dead Subsystems) automatically after verifying baseline tests
->   pass.
+>   Verified Dead Subsystems) automatically after verifying baseline tests pass.
 
 ---
 
@@ -261,7 +265,7 @@ the desired remediation scope:
 
 Always wrap code deletions in a strict test and analysis sandwich:
 
-1. **Pre-Flight Baseline**: 
+1. **Pre-Flight Baseline**:
    - Check `pubspec.yaml`: if `sdk: flutter` is declared, run `flutter test`;
      otherwise run `dart test`.
    - Confirm test suite is 100% green before touching code.
@@ -318,6 +322,7 @@ To reproduce or re-run this reachability audit locally:
 
 Determine the package version dynamically:
 
-- Check `pubspec.lock` in the workspace or run `dart run undead@^0.1.1 --version`.
+- Check `pubspec.lock` in the workspace or run
+  `dart run undead@^0.1.1 --version`.
 - If invoked with a specific version constraint (e.g. `undead@^0.1.1`), use that
   exact version.

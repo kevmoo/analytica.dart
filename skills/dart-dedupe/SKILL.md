@@ -163,12 +163,13 @@ Evaluate each candidate cluster before modifying code:
 
 ### Invariant: Exhaustive Cluster Adoption
 
-When extracting a shared helper, mixin, or base class for an actionable duplicate
-cluster:
+When extracting a shared helper, mixin, or base class for an actionable
+duplicate cluster:
+
 - **Mandatory Full-Cluster Scope**: Within a target package or subsystem, you
   MUST apply the shared abstraction across **ALL participating files** in that
-  cluster in the same refactoring pass. Do not refactor only 1 file while leaving
-  the remaining N - 1 files with duplicate logic.
+  cluster in the same refactoring pass. Do not refactor only 1 file while
+  leaving the remaining N - 1 files with duplicate logic.
 - **Subsystem Consolidation**: If multiple sibling classes share multiple
   duplicate clusters (e.g. description formatting, error handling, or stream
   lifecycle), design a unified shared base class or mixin consolidating all
@@ -213,12 +214,14 @@ the desired remediation scope:
 3. **Report-Only / Exit**: Acknowledge findings without code mutations.
 
 > **Explicit Bypass & Non-Interactive Fallback**:
+>
 > - **Direct Directives**: Skip Stage 1 pause if given explicit remediation
->   instructions (e.g., "Deduplicate clusters in `pkgs/foo` using `dart-dedupe`").
+>   instructions (e.g., "Deduplicate clusters in `pkgs/foo` using
+>   `dart-dedupe`").
 > - **Non-Interactive Execution**: In unattended or automated evaluation
->   workflows (e.g. `evalin` or subagents), proceed with Option 1 (Refactor
->   Top Actionable Cluster Across All Files) automatically after verifying
->   baseline tests pass.
+>   workflows (e.g. `evalin` or subagents), proceed with Option 1 (Refactor Top
+>   Actionable Cluster Across All Files) automatically after verifying baseline
+>   tests pass.
 
 ---
 
@@ -226,7 +229,7 @@ the desired remediation scope:
 
 Wrap all deduplication refactoring in a strict verification sandwich:
 
-1. **Pre-Flight Baseline**: 
+1. **Pre-Flight Baseline**:
    - Check `pubspec.yaml`: if `sdk: flutter` is declared, run `flutter test`;
      otherwise run `dart test`.
    - Confirm test suite is 100% green before touching code.

@@ -128,14 +128,15 @@ artifact for extensive findings) containing:
 ### Invariant: Outlier-First Mandate
 
 - **Target the Primary Outlier**: When remediating complexity, prioritize the
-  highest-scoring declaration in the report (e.g. Score >= 25 or top outlier)
-  to achieve the highest measurable reduction.
+  highest-scoring declaration in the report (e.g. Score >= 25 or top outlier) to
+  achieve the highest measurable reduction.
 - **Prioritize High-Impact Reductions**: Avoid selecting only minor
   sub-threshold helpers while leaving severe complexity outliers unaddressed.
 - **Decomposition Target**: Apply Dart 3 pattern matching, guard clauses, and
   method decomposition targeting a post-refactoring score of `<= 15`. For
   massive legacy functions (score > 60), safe phased decomposition across
-  isolated PRs is permitted if a single pass would exceed reviewable diff limits.
+  isolated PRs is permitted if a single pass would exceed reviewable diff
+  limits.
 
 ### Stage 2: Interactive User Selection (Confirmation Gate)
 
@@ -150,6 +151,7 @@ the desired sequencing:
 3. **Report-Only / Exit**: Acknowledge complexity scores without code mutation.
 
 > **Explicit Bypass & Non-Interactive Fallback**:
+>
 > - **Direct Directives**: Skip Stage 1 triage if given an explicit remediation
 >   directive upfront (e.g., "Refactor `processOrder` in `lib/src/order.dart` to
 >   fix complexity" or "Refactor the top complexity outlier").
@@ -292,7 +294,8 @@ synthesized Dart 3 record signature) selects the tier:
 1. **Tier 1 — Pure Functional Decomposition (First Choice)**:
    - **Selection**: Cleanly extractable slice with 2+ live outputs.
    - **Idiom**: Extract a static or top-level function returning the synthesized
-     Dart 3 named record signature verbatim (`final (:data, :errors) = _stepOne(input);`).
+     Dart 3 named record signature verbatim
+     (`final (:data, :errors) = _stepOne(input);`).
    - **Dataclass Boundary**: Private, file-local slices use named records at ANY
      output count—do not create single-use `_XxxResult` dataclasses for them.
      Reserve dedicated dataclasses only for values that cross public API
@@ -320,9 +323,9 @@ synthesized Dart 3 record signature) selects the tier:
      least two distinct candidate slices show that the intersection of their
      `mutations` variable names contains 3 or more entries (the same mutable
      variables thread through every candidate extraction).
-   - **Mechanics**: Read [references/method-object.md](references/method-object.md)
-     for extraction mechanics and mandatory idioms. Do not load or apply it
-     speculatively.
+   - **Mechanics**: Read
+     [references/method-object.md](references/method-object.md) for extraction
+     mechanics and mandatory idioms. Do not load or apply it speculatively.
 
 **Domain-Modeling Exit**: When the same tightly coupled mutable state keeps
 resurfacing across a function (a parser's `buffer` + `cursor`, a traversal's
