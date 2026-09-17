@@ -9,7 +9,6 @@ import 'package:analyzer/source/line_info.dart';
 import 'package:path/path.dart' as p;
 
 import 'adapters/adapters.dart';
-import 'ast_visitor.dart';
 import 'comment_parser.dart';
 import 'models.dart';
 import 'root_harvester.dart';

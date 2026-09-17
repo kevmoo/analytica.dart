@@ -19,6 +19,14 @@ inputs:
     description: 'Exit with non-zero status if any function score exceeds this ceiling.'
     required: false
     default: '15'
+  max-file-lines:
+    description: 'Opt-in maximum physical lines per source file (empty or 0 = disabled by default).'
+    required: false
+    default: ''
+  max-function-lines:
+    description: 'Opt-in maximum lines per function/method declaration (empty or 0 = disabled by default).'
+    required: false
+    default: ''
   diff-base:
     description: 'Git ref (e.g. origin/main) to compare against. Auto-detects PR base by default.'
     required: false
@@ -70,6 +78,8 @@ runs:
       env:
         INPUT_THRESHOLD: ${{ inputs.threshold }}
         INPUT_FAIL_THRESHOLD: ${{ inputs.fail-threshold }}
+        INPUT_MAX_FILE_LINES: ${{ inputs.max-file-lines }}
+        INPUT_MAX_FUNCTION_LINES: ${{ inputs.max-function-lines }}
         INPUT_FAIL_ON_INCREASE: ${{ inputs.fail-on-increase }}
         INPUT_FORMAT: ${{ inputs.format }}
         INPUT_TARGETS: ${{ inputs.targets }}
@@ -83,6 +93,14 @@ runs:
         fail_inc_arg=""
         if [ "$INPUT_FAIL_ON_INCREASE" = "true" ]; then
           fail_inc_arg="--fail-on-increase"
+        fi
+
+        line_args=()
+        if [ -n "$INPUT_MAX_FILE_LINES" ] && [ "${INPUT_MAX_FILE_LINES:-0}" -gt 0 ] 2>/dev/null; then
+          line_args+=(--max-file-lines="$INPUT_MAX_FILE_LINES")
+        fi
+        if [ -n "$INPUT_MAX_FUNCTION_LINES" ] && [ "${INPUT_MAX_FUNCTION_LINES:-0}" -gt 0 ] 2>/dev/null; then
+          line_args+=(--max-function-lines="$INPUT_MAX_FUNCTION_LINES")
         fi
 
         case "${INPUT_MAX_COMMENT_ROWS:-0}" in
@@ -130,6 +148,7 @@ runs:
           --format="$INPUT_FORMAT" \
           $DIFF_ARG \
           $fail_inc_arg \
+          "${line_args[@]}" \
           "${comment_args[@]}" \
           $targets
         exit_code=$?

@@ -1,5 +1,14 @@
 ## 0.2.5-wip
 
+- Add opt-in `--max-file-lines` and `--max-function-lines` CLI flags and GitHub
+  Action inputs (`max-file-lines`, `max-function-lines`) with `--git-diff`
+  pragmatic ratchet support (`FileLineMetric`, `FileLineDelta`). Disabled (`null`)
+  by default to preserve full backward compatibility.
+- Add `file_split` CLI (`dart run cognitive_complexity:file_split`) and
+  `FileSplitAnalyzer` to compute acyclic file decomposition cuts using Tarjan's
+  SCC condensation, topological depth layering, LCOM4 connected components,
+  `sealed` subtype hard-pinning, single-dominator `_private` helper absorption,
+  and zero-churn `export ... show` barrel generation.
 - Skip writing the `--comment-output` file entirely when a run has zero
   violations and zero complexity increases, so the GitHub Action stays quiet on
   the PR thread instead of posting an all-zeroes summary comment. The full

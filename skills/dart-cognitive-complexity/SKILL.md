@@ -419,6 +419,26 @@ alone is the hotspot.
 
 ---
 
+### Pattern F: Acyclic File Decomposition (`file_split`)
+
+When a Dart file grows beyond the optimal agent context window (`> 400` lines;
+enforceable via opt-in `--max-file-lines 400` and `--max-function-lines 60` on
+`cognitive_complexity`), do not guess where to split the file or create circular
+imports. Run the deterministic intra-file dependency graph advisor:
+
+```bash
+dart run cognitive_complexity:file_split lib/src/large_file.dart --target-lines 300
+```
+
+`file_split` builds the resolved top-level symbol dependency graph, contracts
+`sealed` subtype hierarchies, runs Tarjan's Strongly Connected Components (SCC)
+and topological layering, absorbs single-dominator `_private` helpers into their
+sole caller cluster, and outputs ranked cuts with zero-churn
+`export '<cut>.dart' show ...;` directives so external callers require zero
+import modifications.
+
+---
+
 ## 7. Verification Guardrails
 
 Run these verification commands before committing refactored code:

@@ -4,5 +4,6 @@ library;
 export 'src/analyzer/ast_helpers.dart';
 export 'src/analyzer/comment_parser.dart';
 export 'src/analyzer/context_helper.dart';
+export 'src/analyzer/element_reference_extractor.dart';
 export 'src/analyzer/glob_matcher.dart';
 export 'src/analyzer/path_filter.dart';

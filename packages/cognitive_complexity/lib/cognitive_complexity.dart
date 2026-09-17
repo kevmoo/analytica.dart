@@ -11,3 +11,5 @@ export 'src/complexity/complexity_analyzer.dart';
 export 'src/complexity/delta_analyzer.dart';
 export 'src/complexity/git_diff_service.dart';
 export 'src/complexity/github_reporter.dart';
+export 'src/file_split/file_split_analyzer.dart';
+export 'src/file_split/models.dart';
