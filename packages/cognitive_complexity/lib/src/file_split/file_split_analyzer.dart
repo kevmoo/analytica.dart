@@ -369,13 +369,16 @@ class _ExtractionCutPlanner {
     List<DeclarationUnit> decls,
   ) {
     if (isIsland) {
-      return 'Disconnected component (LCOM4 island) with 0 edges to surviving symbols.';
+      return 'Disconnected component (LCOM4 island) '
+          'with 0 edges to surviving symbols.';
     }
     if (tier == SplitTier.tier3PartDirective) {
-      return 'Mutually recursive SCC / sealed group or >= 3 cross-class private member accesses.';
+      return 'Mutually recursive SCC / sealed group or >= 3 cross-class '
+          'private member accesses.';
     }
     return 'DAG Layer-$depth extraction (${decls.length} declaration(s)); '
-        'surviving higher-layer symbols depend downward on this cluster with 0 circular imports.';
+        'surviving higher-layer symbols depend downward on this cluster '
+        'with 0 circular imports.';
   }
 
   String _suggestFileName(List<DeclarationUnit> decls, int depth) {

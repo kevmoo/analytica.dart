@@ -2,8 +2,8 @@
 
 - Add opt-in `--max-file-lines` and `--max-function-lines` CLI flags and GitHub
   Action inputs (`max-file-lines`, `max-function-lines`) with `--git-diff`
-  pragmatic ratchet support (`FileLineMetric`, `FileLineDelta`). Disabled (`null`)
-  by default to preserve full backward compatibility.
+  pragmatic ratchet support (`FileLineMetric`, `FileLineDelta`). Disabled
+  (`null`) by default to preserve full backward compatibility.
 - Add `file_split` CLI (`dart run cognitive_complexity:file_split`) and
   `FileSplitAnalyzer` to compute acyclic file decomposition cuts using Tarjan's
   SCC condensation, topological depth layering, LCOM4 connected components,

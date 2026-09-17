@@ -36,6 +36,7 @@ _(Requires Dart SDK **3.12.0 or greater**)_.
 ### `cognitive_complexity` CLI Options
 
 <!-- CLI_README_START cognitive_complexity -->
+
 ```console
 $ cognitive_complexity --help
 Dart & Flutter Cognitive Complexity Calculator
@@ -60,6 +61,7 @@ Options:
     --[no-]ignore-generated         Exclude generated files (*.g.dart, *.freezed.dart, *.mocks.dart, etc.).
                                     (defaults to on)
 ```
+
 <!-- CLI_README_END cognitive_complexity -->
 
 ### `data_flow` CLI Options
@@ -101,6 +103,7 @@ Options:
 ### `file_split` CLI Options
 
 <!-- CLI_README_START file_split -->
+
 ```console
 $ file_split --help
 Dart File Decomposition & Acyclic Dependency Cut Advisor (file_split)
@@ -117,6 +120,7 @@ Options:
                                    [text (default), json]
     --sdk-path                     Path to the Dart SDK root (overrides auto-discovery).
 ```
+
 <!-- CLI_README_END file_split -->
 
 ### Library API

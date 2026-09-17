@@ -218,7 +218,8 @@ class FileSplitReport {
   String formatText() {
     final buf = StringBuffer()
       ..writeln(
-        'File: $filePath ($totalLines lines, $declarationCount top-level declarations)',
+        'File: $filePath '
+        '($totalLines lines, $declarationCount top-level declarations)',
       )
       ..writeln(
         'Graph Topology: LCOM4 = $lcom4Islands island(s), '
@@ -228,7 +229,8 @@ class FileSplitReport {
 
     if (clusters.isEmpty) {
       buf.writeln(
-        'No clean extraction cuts recommended (file is already cohesive or below target size).',
+        'No clean extraction cuts recommended '
+        '(file is already cohesive or below target size).',
       );
       return buf.toString();
     }
@@ -256,7 +258,8 @@ class FileSplitReport {
     for (final d in survivingDeclarations) {
       final note = d.lineCount > targetLines
           ? ' [Note: single ${d.kind} exceeds target $targetLines lines — '
-                'consider extracting cohesive methods into a helper or extension]'
+                'consider extracting cohesive methods into a helper '
+                'or extension]'
           : '';
       buf.writeln(
         '  - ${d.kind} ${d.name} '

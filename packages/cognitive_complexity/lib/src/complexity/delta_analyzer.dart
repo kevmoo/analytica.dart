@@ -36,8 +36,10 @@ class FileLineDelta {
   /// When [maxFileLines] is enabled, a file is a violation if:
   /// 1. It is newly added (`oldLines == null || oldLines == 0`) and exceeds
   ///    [maxFileLines].
-  /// 2. It crossed [maxFileLines] (`oldLines! <= maxFileLines && newLines! > maxFileLines`).
-  /// 3. It was already above [maxFileLines] and grew in line count (`newLines! > oldLines!`).
+  /// 2. It crossed [maxFileLines]
+  ///    (`oldLines! <= maxFileLines && newLines! > maxFileLines`).
+  /// 3. It was already above [maxFileLines] and grew in line count
+  ///    (`newLines! > oldLines!`).
   bool isViolation({int? maxFileLines, bool failOnIncrease = false}) {
     if (maxFileLines == null || maxFileLines <= 0) return false;
     final current = newLines;

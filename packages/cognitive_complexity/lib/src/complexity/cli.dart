@@ -371,8 +371,10 @@ int _handleRegularMode({
 }
 
 String _formatRegularError(int? failThreshold) => failThreshold != null
-    ? '\nError: One or more functions exceeded the failure threshold ($failThreshold).'
-    : '\nError: One or more declarations or files exceeded the configured line limit.';
+    ? '\nError: One or more functions exceeded the failure threshold '
+          '($failThreshold).'
+    : '\nError: One or more declarations or files exceeded the configured '
+          'line limit.';
 
 void _printUsage(ArgParser parser, StringSink sink) {
   sink.writeln('Dart & Flutter Cognitive Complexity Calculator');

@@ -71,7 +71,8 @@ Future<int> _executeFileSplit(
 ) async {
   if (argResults.rest.isEmpty) {
     throw const FormatException(
-      'Missing target file. Usage: dart run cognitive_complexity:file_split <file.dart>',
+      'Missing target file. '
+      'Usage: dart run cognitive_complexity:file_split <file.dart>',
     );
   }
 

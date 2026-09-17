@@ -170,7 +170,7 @@ String _formatMetric() {
 }
 ''');
 
-        final analyzer = FileSplitAnalyzer();
+        const analyzer = FileSplitAnalyzer();
         final report = await analyzer.analyzeFile(
           file.path,
           targetLines: 35,
@@ -213,7 +213,7 @@ $pad
 }
 ''');
 
-      final analyzer = FileSplitAnalyzer();
+      const analyzer = FileSplitAnalyzer();
       final report = await analyzer.analyzeFile(
         file.path,
         targetLines: 40,

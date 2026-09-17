@@ -186,9 +186,9 @@ class ElementReferenceExtractor extends RecursiveAstVisitor<void> {
       final availableNames = Map<String, Element?>.from(
         exportedLibrary.exportNamespace.definedNames2,
       );
-      node.combinators.forEach(
-        (c) => _applyExportCombinator(c, availableNames),
-      );
+      for (final combinator in node.combinators) {
+        _applyExportCombinator(combinator, availableNames);
+      }
       availableNames.values.forEach(_checkElement);
     }
 
