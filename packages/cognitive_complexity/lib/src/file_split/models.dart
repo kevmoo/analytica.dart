@@ -30,6 +30,8 @@ class DeclarationUnit {
   final int endLine;
   final bool isPublic;
   final bool isSealed;
+  final int staticMethodCount;
+  final int staticMethodLines;
   final Set<String> outgoingIntraFileRefs;
   final Map<String, Set<String>> privateMemberAccessesByTarget;
   final Set<String> requiredImportDirectives;
@@ -42,6 +44,8 @@ class DeclarationUnit {
     required this.endLine,
     required this.isPublic,
     required this.isSealed,
+    this.staticMethodCount = 0,
+    this.staticMethodLines = 0,
     required this.outgoingIntraFileRefs,
     required this.privateMemberAccessesByTarget,
     required this.requiredImportDirectives,
@@ -58,6 +62,8 @@ class DeclarationUnit {
     'lines': lineCount,
     'is_public': isPublic,
     'is_sealed': isSealed,
+    if (staticMethodCount > 0) 'static_method_count': staticMethodCount,
+    if (staticMethodLines > 0) 'static_method_lines': staticMethodLines,
     'outgoing_refs': outgoingIntraFileRefs.toList()..sort(),
     if (privateMemberAccessesByTarget.isNotEmpty)
       'private_member_accesses': {
@@ -289,15 +295,20 @@ class FileSplitReport {
   }
 
   String _oversizedDeclNote(DeclarationUnit d) {
+    final staticHint = d.staticMethodCount > 0
+        ? 'contains ${d.staticMethodCount} static method(s) '
+              '(~${d.staticMethodLines} lines) that can be promoted to '
+              'top-level functions to unlock standalone library extraction; '
+        : '';
     if (useParts == false) {
       return ' [Note: single ${d.kind} exceeds target $targetLines lines — '
-          'consider extracting cohesive methods into a helper or extension '
-          '(--no-use-parts active)]';
+          '${staticHint}consider extracting cohesive methods into a helper '
+          'or extension (--no-use-parts active)]';
     }
     return ' [Note: single ${d.kind} exceeds target $targetLines lines — '
-        'consider extracting cohesive methods into a helper or extension, '
-        'or splitting with `part` / `part of` (--use-parts) to preserve '
-        'private `_field` access. Agent Directive: '
+        '${staticHint}consider extracting cohesive methods into a helper or '
+        'extension, or splitting with `part` / `part of` (--use-parts) to '
+        'preserve private `_field` access. Agent Directive: '
         '$kAskUserPartsPreferenceDirective]';
   }
 }

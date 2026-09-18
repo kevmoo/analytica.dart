@@ -324,7 +324,8 @@ class _ExtractionCutPlanner {
       survivingChildren,
       coneNodes,
     );
-    while (_tryMergeOneCrossingPair(groups)) {}
+    while (_tryMergeOneCrossingPair(groups, requireReduction: true)) {}
+    while (_tryMergeOneCrossingPair(groups, requireReduction: false)) {}
     return groups;
   }
 
@@ -349,25 +350,45 @@ class _ExtractionCutPlanner {
     Set<int> closed,
     Map<int, Set<int>> closures,
   ) {
-    final allPrivate = closed.every(
-      (idx) => sccs[idx].every((n) => !(declsByName[n]?.isPublic ?? true)),
-    );
-    if (!allPrivate) return false;
+    if (!_isAllPrivateGroup(closed)) return false;
     return closures.entries.any(
       (e) => e.key != child && e.value.containsAll(closed),
     );
   }
 
-  bool _tryMergeOneCrossingPair(List<Set<int>> groups) {
+  bool _isAllPrivateGroup(Set<int> group) => group.every(
+    (idx) => sccs[idx].every((n) => !(declsByName[n]?.isPublic ?? true)),
+  );
+
+  bool _tryMergeOneCrossingPair(
+    List<Set<int>> groups, {
+    required bool requireReduction,
+  }) {
     for (var i = 0; i < groups.length; i++) {
       for (var j = i + 1; j < groups.length; j++) {
-        if (_mergeIfReducesCrossings(groups, i, j)) return true;
+        if (_mergePairIfEligible(
+          groups,
+          i,
+          j,
+          requireReduction: requireReduction,
+        )) {
+          return true;
+        }
       }
     }
     return false;
   }
 
-  bool _mergeIfReducesCrossings(List<Set<int>> groups, int i, int j) {
+  bool _mergePairIfEligible(
+    List<Set<int>> groups,
+    int i,
+    int j, {
+    required bool requireReduction,
+  }) {
+    if (!requireReduction &&
+        (!_isAllPrivateGroup(groups[i]) || !_isAllPrivateGroup(groups[j]))) {
+      return false;
+    }
     final candidate = <int>{...groups[i], ...groups[j]};
     if (_setLines(candidate) > targetLines ||
         !_isValidDownwardClosedCut(candidate)) {
@@ -375,7 +396,11 @@ class _ExtractionCutPlanner {
     }
     final crossBefore =
         _countBoundaryCrossings(groups[i]) + _countBoundaryCrossings(groups[j]);
-    if (_countBoundaryCrossings(candidate) >= crossBefore) return false;
+    final crossAfter = _countBoundaryCrossings(candidate);
+    final worse = requireReduction
+        ? crossAfter >= crossBefore
+        : crossAfter > crossBefore;
+    if (worse) return false;
 
     final removedA = groups[i];
     final removedB = groups[j];
@@ -606,16 +631,25 @@ class _ExtractionCutPlanner {
   }
 
   String _suggestFileName(List<DeclarationUnit> decls, int depth) {
+    final hasPublic = decls.any((d) => d.isPublic);
+    if (!hasPublic && decls.length >= 5) {
+      return _deduplicateFileName('${stem}_helpers.dart');
+    }
     final primary = decls.firstWhere((d) => d.isPublic, orElse: () => decls[0]);
     final clean = primary.name.replaceFirst(RegExp('^_+'), '');
     final snake = clean
         .replaceAllMapped(RegExp('([a-z0-9])([A-Z])'), (m) => '${m[1]}_${m[2]}')
         .toLowerCase();
 
-    var candidate = snake == stem ? '${stem}_layer_$depth.dart' : '$snake.dart';
+    final base = snake == stem ? '${stem}_layer_$depth.dart' : '$snake.dart';
+    return _deduplicateFileName(base);
+  }
+
+  String _deduplicateFileName(String initial) {
+    var candidate = initial;
     var counter = 2;
     while (!usedFileNames.add(candidate)) {
-      candidate = '${p.basenameWithoutExtension(candidate)}_$counter.dart';
+      candidate = '${p.basenameWithoutExtension(initial)}_$counter.dart';
       counter++;
     }
     return candidate;

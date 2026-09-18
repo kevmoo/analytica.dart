@@ -300,5 +300,37 @@ $pad
       check(noPartsReport.clusters).isEmpty();
       check(noPartsReport.formatText()).contains('--no-use-parts active');
     });
+
+    test('Advises promoting static methods inside oversized classes to '
+        'top-level functions', () async {
+      final file = File(p.join(tempDir.path, 'static_monolith.dart'));
+      final pad = List.generate(20, (i) => '    final v$i = $i;').join('\n');
+      file.writeAsStringSync('''
+class StaticMonolith {
+  void execute() {
+    _helperOne();
+    _helperTwo();
+  }
+
+  static void _helperOne() {
+$pad
+  }
+
+  static void _helperTwo() {
+$pad
+  }
+}
+''');
+
+      const analyzer = FileSplitAnalyzer();
+      final report = await analyzer.analyzeFile(file.path, targetLines: 30);
+      final decl = report.survivingDeclarations.single;
+      check(decl.staticMethodCount).equals(2);
+      check(decl.staticMethodLines).isGreaterThan(40);
+      check(report.formatText()).contains(
+        'contains 2 static method(s) (~${decl.staticMethodLines} lines) '
+        'that can be promoted to top-level functions',
+      );
+    });
   });
 }
