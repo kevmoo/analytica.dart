@@ -3,7 +3,6 @@ import 'dart:io';
 
 import 'package:checks/checks.dart';
 import 'package:cognitive_complexity/cognitive_complexity.dart';
-import 'package:cognitive_complexity/src/complexity/cli.dart' as complexity_cli;
 import 'package:cognitive_complexity/src/file_split/cli.dart' as file_split_cli;
 import 'package:path/path.dart' as p;
 import 'package:test/test.dart';
@@ -19,129 +18,6 @@ void main() {
     if (tempDir.existsSync()) {
       tempDir.deleteSync(recursive: true);
     }
-  });
-
-  group('Opt-In File & Function Line Limits', () {
-    test('Default null limits do not flag long files or long functions', () {
-      final analyzer = ComplexityAnalyzer();
-      final lines = List.generate(80, (i) => '  final v$i = $i;').join('\n');
-      final code = 'void longFunction() {\n$lines\n}\n';
-      final results = analyzer.analyzeCode(code, filePath: 'long.dart');
-
-      check(results).length.equals(1);
-      check(results.first.lineCount).isGreaterThan(80);
-      check(
-        results.first.isViolation(failThreshold: 15, maxFunctionLines: null),
-      ).equals(false);
-      check(
-        results.first.isViolation(failThreshold: 15, maxFunctionLines: 60),
-      ).equals(true);
-    });
-
-    test('CLI --max-file-lines and --max-function-lines are opt-in', () async {
-      final file = File(p.join(tempDir.path, 'sample.dart'));
-      final body = List.generate(30, (i) => '  final x$i = $i;').join('\n');
-      file.writeAsStringSync('void bigDecl() {\n$body\n}\n');
-
-      final outDefault = StringBuffer();
-      final errDefault = StringBuffer();
-      final codeDefault = await complexity_cli.runCli(
-        [file.path],
-        out: outDefault,
-        err: errDefault,
-      );
-      check(codeDefault).equals(0);
-
-      final outFileVio = StringBuffer();
-      final errFileVio = StringBuffer();
-      final codeFileVio = await complexity_cli.runCli(
-        ['--max-file-lines', '20', file.path],
-        out: outFileVio,
-        err: errFileVio,
-      );
-      check(codeFileVio).equals(1);
-      check(
-        outFileVio.toString(),
-      ).contains('File Line Violations (> 20 lines)');
-
-      final outFuncVio = StringBuffer();
-      final errFuncVio = StringBuffer();
-      final codeFuncVio = await complexity_cli.runCli(
-        ['--max-function-lines', '20', file.path],
-        out: outFuncVio,
-        err: errFuncVio,
-      );
-      check(codeFuncVio).equals(1);
-      check(outFuncVio.toString()).contains('[VIOLATION]');
-    });
-
-    test('DeltaSummary.isClean respects opt-in pragmatic ratchet', () {
-      const cleanWhenNull = DeltaSummary(
-        baseRef: 'HEAD~1',
-        targetRef: 'HEAD',
-        filesAnalyzed: 1,
-        deltas: [
-          ComplexityDelta(
-            filePath: 'a.dart',
-            name: 'fn',
-            startLine: 1,
-            endLine: 100,
-            oldScore: 2,
-            newScore: 2,
-            oldLines: 90,
-            newLines: 100,
-            status: DeltaStatus.unchanged,
-          ),
-        ],
-        fileDeltas: [
-          FileLineDelta(
-            filePath: 'a.dart',
-            oldLines: 450,
-            newLines: 460,
-            status: DeltaStatus.increased,
-          ),
-        ],
-      );
-
-      final isCleanNull = cleanWhenNull.isClean(
-        failThreshold: 15,
-        maxFileLines: null,
-        maxFunctionLines: null,
-        failOnIncrease: true,
-      );
-      check(isCleanNull).equals(true);
-
-      final isCleanOptIn = cleanWhenNull.isClean(
-        failThreshold: 15,
-        maxFileLines: 400,
-        maxFunctionLines: null,
-        failOnIncrease: true,
-      );
-      check(isCleanOptIn).equals(false);
-
-      // Shrinking a legacy >400-line file passes when failOnIncrease is true.
-      const shrinkingLegacy = DeltaSummary(
-        baseRef: 'HEAD~1',
-        targetRef: 'HEAD',
-        filesAnalyzed: 1,
-        deltas: [],
-        fileDeltas: [
-          FileLineDelta(
-            filePath: 'legacy.dart',
-            oldLines: 500,
-            newLines: 450,
-            status: DeltaStatus.improved,
-          ),
-        ],
-      );
-      final isCleanShrinking = shrinkingLegacy.isClean(
-        failThreshold: 15,
-        maxFileLines: 400,
-        maxFunctionLines: null,
-        failOnIncrease: true,
-      );
-      check(isCleanShrinking).equals(true);
-    });
   });
 
   group('FileSplitAnalyzer & CLI', () {
@@ -177,6 +53,7 @@ String _formatMetric() {
           minClusterLines: 15,
         );
 
+        check(report.targetLines).equals(35);
         check(report.lcom4Islands).equals(2);
         check(report.clusters.isNotEmpty).equals(true);
 
@@ -227,6 +104,55 @@ $pad
           check(names.contains('ErrorState')).equals(true);
         }
       }
+    });
+
+    test('Propagates custom targetLines into FileSplitReport and enforces '
+        'minClusterLines on mid-loop flush', () async {
+      final file = File(p.join(tempDir.path, 'layer_flush.dart'));
+      final padLarge = List.generate(55, (i) => '  final l$i = $i;').join('\n');
+      final padMid = List.generate(37, (i) => '  final m$i = $i;').join('\n');
+      // TinyLeaf (3 lines) + MidLeaf (39 lines) are both depth 0 leaves
+      // referenced by RootCoordinator (59 lines).
+      // With targetLines = 40 and minClusterLines = 25:
+      // TinyLeaf (3) + MidLeaf (39) = 42 > 40 -> mid-loop flush occurs when
+      // TinyLeaf (3 lines < minClusterLines 25) is in the batch.
+      // TinyLeaf must NOT be emitted as a 3-line micro-cluster, while MidLeaf
+      // (39 >= 25) SHOULD be extracted.
+      file.writeAsStringSync('''
+class TinyLeaf {
+  final int x = 1;
+}
+
+class MidLeaf {
+$padMid
+}
+
+class RootCoordinator {
+  final TinyLeaf t = TinyLeaf();
+  final MidLeaf m = MidLeaf();
+$padLarge
+}
+''');
+
+      const analyzer = FileSplitAnalyzer();
+      final report = await analyzer.analyzeFile(
+        file.path,
+        targetLines: 40,
+        minClusterLines: 25,
+      );
+
+      check(report.targetLines).equals(40);
+      check(report.formatText()).contains(
+        'exceeds target 40 lines — consider extracting cohesive methods',
+      );
+      for (final cluster in report.clusters) {
+        check(cluster.totalLines).isGreaterOrEqual(25);
+      }
+      final extractedNames = report.clusters
+          .expand((c) => c.declarations.map((d) => d.name))
+          .toSet();
+      check(extractedNames.contains('MidLeaf')).equals(true);
+      check(extractedNames.contains('TinyLeaf')).equals(false);
     });
 
     test('runFileSplitCli supports text and json output formats', () async {

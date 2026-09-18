@@ -140,6 +140,17 @@ void main() {
 }
 ```
 
+### Suppressing Findings
+
+Use comment directives (shared across `package:analytica` tools) to suppress
+complexity or line-limit checks for irreducible state machines, generated lookup
+tables, or individual functions:
+
+- **File-level suppression**: Place `// cognitive_complexity:ignore_for_file`
+  anywhere in the file.
+- **Declaration-level suppression**: Place `// cognitive_complexity:ignore` on
+  the line immediately preceding a function, method, or constructor.
+
 ### GitHub Actions
 
 Add automated complexity audits to `.github/workflows/complexity.yml`:
@@ -178,15 +189,17 @@ jobs:
 
 <!-- mdformat off(prevent table wrapping) -->
 
-| Input              | Default  | Description                                                                      |
-| :----------------- | :------: | :------------------------------------------------------------------------------- |
-| `targets`          |  `lib`   | Space-separated list of directories or files to scan.                            |
-| `threshold`        |   `0`    | Minimum score required to include a declaration in summary tables.               |
-| `fail-threshold`   |   `15`   | Maximum complexity ceiling allowed before failing the build.                     |
-| `diff-base`        |  _Auto_  | Git ref to compare against (e.g. `origin/main`). Auto-detects PR base.           |
-| `fail-on-increase` | `false`  | When `true`, blocks PR merge on complexity increases exceeding `fail-threshold`. |
-| `format`           | `github` | Output format: `github` (annotations + step summary), `text`, or `json`.         |
-| `max-comment-rows` |   `0`    | Maximum table rows in the sticky PR comment (0 = unlimited).                     |
+| Input                | Default  | Description                                                                      |
+| :------------------- | :------: | :------------------------------------------------------------------------------- |
+| `targets`            |  `lib`   | Space-separated list of directories or files to scan.                            |
+| `threshold`          |   `0`    | Minimum score required to include a declaration in summary tables.               |
+| `fail-threshold`     |   `15`   | Maximum complexity ceiling allowed before failing the build.                     |
+| `max-file-lines`     |   `0`    | Opt-in maximum physical line count per source file (`0` = disabled).             |
+| `max-function-lines` |   `0`    | Opt-in maximum line span per function/method declaration (`0` = disabled).       |
+| `diff-base`          |  _Auto_  | Git ref to compare against (e.g. `origin/main`). Auto-detects PR base.           |
+| `fail-on-increase`   | `false`  | When `true`, blocks PR merge on complexity increases exceeding `fail-threshold`. |
+| `format`             | `github` | Output format: `github` (annotations + step summary), `text`, or `json`.         |
+| `max-comment-rows`   |   `0`    | Maximum table rows in the sticky PR comment (0 = unlimited).                     |
 
 <!-- mdformat on -->
 

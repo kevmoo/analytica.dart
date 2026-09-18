@@ -325,7 +325,20 @@ int _handleRegularMode({
       .toList();
 
   if (format == 'json') {
-    out.writeln(jsonEncode(displayed.map((e) => e.toJson()).toList()));
+    final declarationsJson = displayed.map((e) => e.toJson()).toList();
+    out.writeln(
+      jsonEncode(
+        maxFileLines == null
+            ? declarationsJson
+            : {
+                'declarations': declarationsJson,
+                'files': fileMetrics
+                    .where((f) => f.isViolation(maxFileLines: maxFileLines))
+                    .map((f) => f.toJson(maxFileLines: maxFileLines))
+                    .toList(),
+              },
+      ),
+    );
   } else if (format == 'github') {
     final reporter = GitHubReporter(
       stdoutSink: out,
@@ -471,19 +484,11 @@ void _printDeltaTextReport(
   final deltas = summary.deltas.where(
     (d) =>
         d.status != DeltaStatus.unchanged ||
-        d.isFunctionLineViolation(
-          maxFunctionLines: maxFunctionLines,
-          failOnIncrease: failOnIncrease,
-        ),
+        d.isFunctionLineViolation(maxFunctionLines: maxFunctionLines),
   );
   final violatedFiles = maxFileLines != null
       ? summary.fileDeltas
-            .where(
-              (f) => f.isViolation(
-                maxFileLines: maxFileLines,
-                failOnIncrease: failOnIncrease,
-              ),
-            )
+            .where((f) => f.isViolation(maxFileLines: maxFileLines))
             .toList()
       : const <FileLineDelta>[];
 
@@ -553,6 +558,7 @@ void _printDeltaFileViolations(
   int maxFileLines,
   StringSink sink,
 ) {
+  sink.writeln();
   sink.writeln('File Line Violations (> $maxFileLines lines):');
   for (final f in violatedFiles) {
     final deltaStr = (f.delta > 0 ? '+${f.delta}' : '${f.delta}').padLeft(6);

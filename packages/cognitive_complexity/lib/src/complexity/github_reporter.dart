@@ -264,15 +264,10 @@ class GitHubReporter {
       commentBuf,
     );
 
-    final changed = _filterChangedDeltas(
-      summary.deltas,
-      maxFunctionLines,
-      failOnIncrease,
-    );
+    final changed = _filterChangedDeltas(summary.deltas, maxFunctionLines);
     final violatedFiles = _filterViolatedFileDeltas(
       summary.fileDeltas,
       maxFileLines,
-      failOnIncrease,
     );
 
     _emitAllDeltaAnnotations(
@@ -334,31 +329,21 @@ class GitHubReporter {
   List<ComplexityDelta> _filterChangedDeltas(
     List<ComplexityDelta> deltas,
     int? maxFunctionLines,
-    bool failOnIncrease,
   ) => deltas
       .where(
         (d) =>
             d.status != DeltaStatus.unchanged ||
-            d.isFunctionLineViolation(
-              maxFunctionLines: maxFunctionLines,
-              failOnIncrease: failOnIncrease,
-            ),
+            d.isFunctionLineViolation(maxFunctionLines: maxFunctionLines),
       )
       .toList();
 
   List<FileLineDelta> _filterViolatedFileDeltas(
     List<FileLineDelta> fileDeltas,
     int? maxFileLines,
-    bool failOnIncrease,
   ) {
     if (maxFileLines == null || maxFileLines <= 0) return const [];
     return fileDeltas
-        .where(
-          (f) => f.isViolation(
-            maxFileLines: maxFileLines,
-            failOnIncrease: failOnIncrease,
-          ),
-        )
+        .where((f) => f.isViolation(maxFileLines: maxFileLines))
         .toList();
   }
 
@@ -566,10 +551,7 @@ class GitHubReporter {
       );
     }
 
-    if (d.isFunctionLineViolation(
-          maxFunctionLines: maxFunctionLines,
-          failOnIncrease: failInc,
-        ) &&
+    if (d.isFunctionLineViolation(maxFunctionLines: maxFunctionLines) &&
         d.newLines != null) {
       _stdoutSink.writeln(
         '::error file=${d.filePath},line=${d.startLine},'

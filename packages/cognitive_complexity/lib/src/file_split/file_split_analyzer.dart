@@ -61,6 +61,7 @@ class FileSplitAnalyzer {
         maxTopologicalDepth: 0,
         clusters: const [],
         survivingDeclarations: populated.values.toList(),
+        targetLines: targetLines,
       );
     }
 
@@ -91,6 +92,7 @@ class FileSplitAnalyzer {
       maxTopologicalDepth: maxDepth,
       clusters: clusters,
       survivingDeclarations: surviving,
+      targetLines: targetLines,
     );
   }
 }
@@ -160,7 +162,7 @@ class _ExtractionCutPlanner {
       final candidates = [
         for (var i = 0; i < sccs.length; i++)
           if (!extractedSccs.contains(i) && i != anchorScc && depths[i] == d) i,
-      ];
+      ]..sort((a, b) => _sccLines(a).compareTo(_sccLines(b)));
       _batchAndCommitLayer(candidates);
     }
   }
@@ -185,7 +187,9 @@ class _ExtractionCutPlanner {
     for (final idx in candidates) {
       final lines = _sccLines(idx);
       if (batchLines > 0 && batchLines + lines > targetLines) {
-        _commitCluster(Set.of(batch), isDisjointIsland: false);
+        if (batchLines >= minClusterLines) {
+          _commitCluster(Set.of(batch), isDisjointIsland: false);
+        }
         batch.clear();
         batchLines = 0;
       }

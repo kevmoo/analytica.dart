@@ -4,6 +4,9 @@
   Action inputs (`max-file-lines`, `max-function-lines`) with `--git-diff`
   pragmatic ratchet support (`FileLineMetric`, `FileLineDelta`). Disabled
   (`null`) by default to preserve full backward compatibility.
+- Support `// cognitive_complexity:ignore` (per-declaration) and
+  `// cognitive_complexity:ignore_for_file` (file-wide) suppression comment
+  directives via `CommentDirectiveParser`.
 - Add `file_split` CLI (`dart run cognitive_complexity:file_split`) and
   `FileSplitAnalyzer` to compute acyclic file decomposition cuts using Tarjan's
   SCC condensation, topological depth layering, LCOM4 connected components,

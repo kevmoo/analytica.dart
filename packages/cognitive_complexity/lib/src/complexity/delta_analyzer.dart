@@ -40,7 +40,7 @@ class FileLineDelta {
   ///    (`oldLines! <= maxFileLines && newLines! > maxFileLines`).
   /// 3. It was already above [maxFileLines] and grew in line count
   ///    (`newLines! > oldLines!`).
-  bool isViolation({int? maxFileLines, bool failOnIncrease = false}) {
+  bool isViolation({int? maxFileLines}) {
     if (maxFileLines == null || maxFileLines <= 0) return false;
     final current = newLines;
     if (current == null || current <= maxFileLines) return false;
@@ -50,19 +50,13 @@ class FileLineDelta {
     return current > previous;
   }
 
-  Map<String, dynamic> toJson({
-    int? maxFileLines,
-    bool failOnIncrease = false,
-  }) => {
+  Map<String, dynamic> toJson({int? maxFileLines}) => {
     'file': filePath,
     'old_lines': oldLines,
     'new_lines': newLines,
     'delta': delta,
     'status': status.name,
-    'violation': isViolation(
-      maxFileLines: maxFileLines,
-      failOnIncrease: failOnIncrease,
-    ),
+    'violation': isViolation(maxFileLines: maxFileLines),
   };
 }
 
@@ -109,10 +103,7 @@ class ComplexityDelta {
     return false;
   }
 
-  bool isFunctionLineViolation({
-    int? maxFunctionLines,
-    bool failOnIncrease = false,
-  }) {
+  bool isFunctionLineViolation({int? maxFunctionLines}) {
     if (maxFunctionLines == null || maxFunctionLines <= 0) return false;
     final current = newLines;
     if (current == null || current <= maxFunctionLines) return false;
@@ -131,10 +122,7 @@ class ComplexityDelta {
         failThreshold: failThreshold,
         failOnIncrease: failOnIncrease,
       ) ||
-      isFunctionLineViolation(
-        maxFunctionLines: maxFunctionLines,
-        failOnIncrease: failOnIncrease,
-      );
+      isFunctionLineViolation(maxFunctionLines: maxFunctionLines);
 
   Map<String, dynamic> toJson({
     int? failThreshold,
@@ -187,15 +175,8 @@ class DeltaSummary {
   int get countImproved =>
       deltas.where((d) => d.status == DeltaStatus.improved).length;
 
-  int countFileViolations({int? maxFileLines, bool failOnIncrease = false}) =>
-      fileDeltas
-          .where(
-            (f) => f.isViolation(
-              maxFileLines: maxFileLines,
-              failOnIncrease: failOnIncrease,
-            ),
-          )
-          .length;
+  int countFileViolations({int? maxFileLines}) =>
+      fileDeltas.where((f) => f.isViolation(maxFileLines: maxFileLines)).length;
 
   int countViolations({
     int? failThreshold,
@@ -212,10 +193,7 @@ class DeltaSummary {
             ),
           )
           .length +
-      countFileViolations(
-        maxFileLines: maxFileLines,
-        failOnIncrease: failOnIncrease,
-      );
+      countFileViolations(maxFileLines: maxFileLines);
 
   /// Whether this diff is quiet enough to skip a PR comment.
   ///
@@ -248,19 +226,11 @@ class DeltaSummary {
         .where(
           (d) =>
               d.status != DeltaStatus.unchanged ||
-              d.isFunctionLineViolation(
-                maxFunctionLines: maxFunctionLines,
-                failOnIncrease: failOnIncrease,
-              ),
+              d.isFunctionLineViolation(maxFunctionLines: maxFunctionLines),
         )
         .toList();
     final violatedFiles = fileDeltas
-        .where(
-          (f) => f.isViolation(
-            maxFileLines: maxFileLines,
-            failOnIncrease: failOnIncrease,
-          ),
-        )
+        .where((f) => f.isViolation(maxFileLines: maxFileLines))
         .toList();
     return {
       'base_ref': baseRef,
@@ -293,12 +263,7 @@ class DeltaSummary {
       if (maxFileLines != null && maxFileLines > 0)
         'file_deltas': fileDeltas
             .where((f) => f.status != DeltaStatus.unchanged)
-            .map(
-              (f) => f.toJson(
-                maxFileLines: maxFileLines,
-                failOnIncrease: failOnIncrease,
-              ),
-            )
+            .map((f) => f.toJson(maxFileLines: maxFileLines))
             .toList(),
     };
   }
@@ -450,23 +415,7 @@ class DeltaAnalyzer {
         status = DeltaStatus.increased;
       } else if (newDecl.score < oldDecl.score) {
         status = DeltaStatus.improved;
-      } else if (newDecl.lineCount != oldDecl.lineCount) {
-        status = newDecl.lineCount > oldDecl.lineCount
-            ? DeltaStatus.increased
-            : DeltaStatus.improved;
       } else {
-        status = DeltaStatus.unchanged;
-      }
-
-      // Note: If only lines changed (and score is identical), preserve
-      // DeltaStatus.unchanged for complexity score unless lineCount grew!
-      // Wait: if maxFunctionLines is not enabled, an unchanged score must stay
-      // DeltaStatus.unchanged so existing tests and Quiet-on-Clean are 100%
-      // untouched! Let's keep `status` strictly tied to `score` changes, and
-      // check `oldLines`/`newLines` directly in `isFunctionLineViolation`!
-      if (oldDecl != null &&
-          newDecl != null &&
-          newDecl.score == oldDecl.score) {
         status = DeltaStatus.unchanged;
       }
 
