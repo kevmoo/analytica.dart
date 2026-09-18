@@ -190,24 +190,14 @@ $pad
       check((decoded['clusters'] as List).isNotEmpty).equals(true);
     });
 
-    test(
-      'Merges sibling cones sharing private helpers to eliminate @internal crossings within budget',
-      () async {
-        final file = File(p.join(tempDir.path, 'gh_view_sim.dart'));
-        final padOrch = List.generate(
-          25,
-          (i) => '  final o$i = $i;',
-        ).join('\n');
-        final padMd = List.generate(25, (i) => '  final m$i = $i;').join('\n');
-        final padTerm = List.generate(
-          25,
-          (i) => '  final t$i = $i;',
-        ).join('\n');
-        final padFetch = List.generate(
-          35,
-          (i) => '  final f$i = $i;',
-        ).join('\n');
-        file.writeAsStringSync('''
+    test('Merges sibling cones sharing private helpers to eliminate '
+        '@internal crossings within budget', () async {
+      final file = File(p.join(tempDir.path, 'gh_view_sim.dart'));
+      final padOrch = List.generate(25, (i) => '  final o$i = $i;').join('\n');
+      final padMd = List.generate(25, (i) => '  final m$i = $i;').join('\n');
+      final padTerm = List.generate(25, (i) => '  final t$i = $i;').join('\n');
+      final padFetch = List.generate(35, (i) => '  final f$i = $i;').join('\n');
+      file.writeAsStringSync('''
 class Orchestrator {
   void run() {
     DataFetcher().fetch();
@@ -242,76 +232,73 @@ String _statusLabel() {
 }
 ''');
 
-        const analyzer = FileSplitAnalyzer();
-        final report = await analyzer.analyzeFile(
-          file.path,
-          targetLines: 80,
-          minClusterLines: 20,
-        );
+      const analyzer = FileSplitAnalyzer();
+      final report = await analyzer.analyzeFile(
+        file.path,
+        targetLines: 80,
+        minClusterLines: 20,
+      );
 
-        final rendererCluster = report.clusters.firstWhere(
-          (c) => c.declarations.any((d) => d.name == 'MarkdownRenderer'),
-        );
-        final rendererDeclNames = rendererCluster.declarations
-            .map((d) => d.name)
-            .toSet();
-        check(rendererDeclNames.contains('TerminalRenderer')).equals(true);
-        check(rendererDeclNames.contains('_statusLabel')).equals(true);
-        check(rendererCluster.tier).equals(SplitTier.tier1CleanLibrary);
-        check(rendererCluster.privateTopLevelsToWiden).isEmpty();
-        check(
-          rendererCluster.absorbedPrivateHelpers.contains('_statusLabel'),
-        ).equals(true);
-      },
-    );
+      final rendererCluster = report.clusters.firstWhere(
+        (c) => c.declarations.any((d) => d.name == 'MarkdownRenderer'),
+      );
+      final rendererDeclNames = rendererCluster.declarations
+          .map((d) => d.name)
+          .toSet();
+      check(rendererDeclNames.contains('TerminalRenderer')).equals(true);
+      check(rendererDeclNames.contains('_statusLabel')).equals(true);
+      check(rendererCluster.tier).equals(SplitTier.tier1CleanLibrary);
+      check(rendererCluster.privateTopLevelsToWiden).isEmpty();
+      check(
+        rendererCluster.absorbedPrivateHelpers.contains('_statusLabel'),
+      ).equals(true);
+    });
 
-    test(
-      'Supports --use-parts, --no-use-parts, and default agent ask-user directive',
-      () async {
-        final file = File(p.join(tempDir.path, 'monolith_engine.dart'));
-        final pad = List.generate(50, (i) => '  final x$i = $i;').join('\n');
-        file.writeAsStringSync('''
+    test('Supports --use-parts, --no-use-parts, and default agent '
+        'ask-user directive', () async {
+      final file = File(p.join(tempDir.path, 'monolith_engine.dart'));
+      final pad = List.generate(50, (i) => '  final x$i = $i;').join('\n');
+      file.writeAsStringSync('''
 class MonolithEngine {
 $pad
 }
 ''');
 
-        const analyzer = FileSplitAnalyzer();
+      const analyzer = FileSplitAnalyzer();
 
-        // 1. Default (useParts: null): advises part/part of AND instructs agent to ask user
-        final defaultReport = await analyzer.analyzeFile(
-          file.path,
-          targetLines: 30,
-        );
-        check(defaultReport.clusters).isEmpty();
-        check(
-          defaultReport.formatText(),
-        ).contains('Explicitly ASK the user whether they prefer');
+      // 1. Default (useParts: null): advises part/part of + ask-user prompt
+      final defaultReport = await analyzer.analyzeFile(
+        file.path,
+        targetLines: 30,
+      );
+      check(defaultReport.clusters).isEmpty();
+      check(
+        defaultReport.formatText(),
+      ).contains('Explicitly ASK the user whether they prefer');
 
-        // 2. Explicit --use-parts (useParts: true): emits Tier 3 part cluster without prompt
-        final partsReport = await analyzer.analyzeFile(
-          file.path,
-          targetLines: 30,
-          useParts: true,
-        );
-        check(partsReport.clusters.length).equals(1);
-        check(
-          partsReport.clusters.first.tier,
-        ).equals(SplitTier.tier3PartDirective);
-        check(partsReport.clusters.first.agentDirective).isNull();
-        check(
-          partsReport.clusters.first.zeroChurnExportDirective,
-        ).equals("part '${partsReport.clusters.first.suggestedFileName}';");
+      // 2. Explicit --use-parts (useParts: true): emits Tier 3 part cluster
+      final partsReport = await analyzer.analyzeFile(
+        file.path,
+        targetLines: 30,
+        useParts: true,
+      );
+      check(partsReport.clusters.length).equals(1);
+      check(
+        partsReport.clusters.first.tier,
+      ).equals(SplitTier.tier3PartDirective);
+      check(partsReport.clusters.first.agentDirective).isNull();
+      check(
+        partsReport.clusters.first.zeroChurnExportDirective,
+      ).equals("part '${partsReport.clusters.first.suggestedFileName}';");
 
-        // 3. Explicit --no-use-parts (useParts: false): suppresses part/part of
-        final noPartsReport = await analyzer.analyzeFile(
-          file.path,
-          targetLines: 30,
-          useParts: false,
-        );
-        check(noPartsReport.clusters).isEmpty();
-        check(noPartsReport.formatText()).contains('--no-use-parts active');
-      },
-    );
+      // 3. Explicit --no-use-parts (useParts: false): suppresses part/part of
+      final noPartsReport = await analyzer.analyzeFile(
+        file.path,
+        targetLines: 30,
+        useParts: false,
+      );
+      check(noPartsReport.clusters).isEmpty();
+      check(noPartsReport.formatText()).contains('--no-use-parts active');
+    });
   });
 }
