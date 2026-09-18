@@ -4,7 +4,9 @@ import 'dart:io';
 import 'package:analytica/analytica.dart';
 import 'package:args/args.dart';
 
+import '../complexity/complexity_analyzer.dart';
 import 'file_split_analyzer.dart';
+import 'models.dart';
 
 /// Executes the `file_split` CLI advisor with [args] and returns the exit code.
 Future<int> runFileSplitCli(
@@ -79,20 +81,16 @@ Future<int> _executeFileSplit(
 ) async {
   if (argResults.rest.isEmpty) {
     throw const FormatException(
-      'Missing target file. '
-      'Usage: dart run cognitive_complexity:file_split <file.dart>',
+      'Missing target file or directory. '
+      'Usage: dart run cognitive_complexity:file_split <file_or_dir>...',
     );
   }
 
-  final targetFile = argResults.rest.first;
-  if (!File(targetFile).existsSync()) {
-    throw FileSystemException('Target file does not exist', targetFile);
-  }
-
-  final targetLines = parseNonNegativeInt(
+  final rawTarget = parseNonNegativeInt(
     argResults['target-lines'] as String,
     'target-lines',
   );
+  final targetLines = rawTarget == 0 ? 800 : rawTarget;
   final minClusterLines = parseNonNegativeInt(
     argResults['min-cluster-lines'] as String,
     'min-cluster-lines',
@@ -103,23 +101,64 @@ Future<int> _executeFileSplit(
   final format = argResults['format'] as String;
   final sdkPath = argResults['sdk-path'] as String?;
 
+  final targetFiles = _expandTargetFiles(argResults.rest, targetLines);
   final analyzer = FileSplitAnalyzer(sdkPath: sdkPath);
-  final report = await analyzer.analyzeFile(
-    targetFile,
-    targetLines: targetLines == 0 ? 800 : targetLines,
+  final reports = await analyzer.analyzeFiles(
+    targetFiles,
+    targetLines: targetLines,
     minClusterLines: minClusterLines,
     useParts: useParts,
   );
 
-  if (format == 'json') {
-    stdoutSink.writeln(
-      const JsonEncoder.withIndent('  ').convert(report.toJson()),
-    );
-  } else {
-    stdoutSink.write(report.formatText());
-  }
-
+  _writeReports(reports, format, targetLines, stdoutSink);
   return ExitCode.success.code;
+}
+
+List<String> _expandTargetFiles(List<String> inputs, int targetLines) {
+  final resolved = <String>[];
+  for (final input in inputs) {
+    if (FileSystemEntity.isDirectorySync(input)) {
+      resolved.addAll(
+        _findOversizedDartFilesInDir(Directory(input), targetLines),
+      );
+    } else if (File(input).existsSync()) {
+      resolved.add(input);
+    } else {
+      throw FileSystemException('Target file does not exist', input);
+    }
+  }
+  return resolved;
+}
+
+List<String> _findOversizedDartFilesInDir(Directory dir, int targetLines) {
+  final metrics = ComplexityAnalyzer().analyzePathFileLines(dir.path);
+  return [
+    for (final m in metrics)
+      if (m.lineCount > targetLines) m.filePath,
+  ];
+}
+
+void _writeReports(
+  List<FileSplitReport> reports,
+  String format,
+  int targetLines,
+  StringSink stdoutSink,
+) {
+  if (format == 'json') {
+    final payload = reports.length == 1
+        ? reports.single.toJson()
+        : [for (final r in reports) r.toJson()];
+    stdoutSink.writeln(const JsonEncoder.withIndent('  ').convert(payload));
+    return;
+  }
+  if (reports.isEmpty) {
+    stdoutSink.writeln('No files exceeding $targetLines lines found.');
+    return;
+  }
+  for (var i = 0; i < reports.length; i++) {
+    if (i > 0) stdoutSink.writeln('=' * 42);
+    stdoutSink.write(reports[i].formatText());
+  }
 }
 
 void _printUsage(ArgParser parser, StringSink sink) {
@@ -128,7 +167,8 @@ void _printUsage(ArgParser parser, StringSink sink) {
   );
   sink.writeln();
   sink.writeln(
-    'Usage: dart run cognitive_complexity:file_split [options] <file.dart>',
+    'Usage: dart run cognitive_complexity:file_split '
+    '[options] <file_or_dir>...',
   );
   sink.writeln();
   sink.writeln('Options:');

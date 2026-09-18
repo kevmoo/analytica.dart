@@ -8,11 +8,14 @@
   `// cognitive_complexity:ignore_for_file` (file-wide) suppression comment
   directives via `CommentDirectiveParser`.
 - Add `file_split` CLI (`dart run cognitive_complexity:file_split`) and
-  `FileSplitAnalyzer` to compute acyclic file decomposition cuts targeting
-  coarse `<= 800`-line subsystems using Tarjan's SCC condensation, immediate
-  dominator cone absorption, zero-crossing sibling cone coalescing, `static`
-  method promotion detection for oversized classes, `--[no-]use-parts` support,
-  and zero-churn `export ... show` barrel generation.
+  `FileSplitAnalyzer` (`analyzeFile` / `analyzeFiles`) to compute acyclic file
+  decomposition cuts targeting coarse `<= 800`-line subsystems using Tarjan's
+  SCC condensation, immediate dominator cone absorption, dynamic shared-tail
+  diamond re-evaluation, one-shot sufficiency & surplus small-cut re-absorption,
+  zero-crossing sibling cone coalescing, `static` method promotion and embedded
+  string/asset literal (`>75%`) detection for oversized classes, multi-file and
+  directory batch execution, `--[no-]use-parts` support, and zero-churn
+  `export ... show` barrel generation.
 - Skip writing the `--comment-output` file entirely when a run has zero
   violations and zero complexity increases, so the GitHub Action stays quiet on
   the PR thread instead of posting an all-zeroes summary comment. The full

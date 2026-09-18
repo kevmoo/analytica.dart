@@ -39,7 +39,7 @@ _extractInitialUnits(CompilationUnit unit, LineInfo lineInfo) {
 
     final startLoc = lineInfo.getLocation(member.offset);
     final endLoc = lineInfo.getLocation(member.end);
-    final staticMetrics = _measureStaticMethods(member, lineInfo);
+    final metrics = _measureDeclarationMetrics(member, lineInfo);
     units[info.name] = DeclarationUnit(
       name: info.name,
       kind: info.kind,
@@ -47,8 +47,9 @@ _extractInitialUnits(CompilationUnit unit, LineInfo lineInfo) {
       endLine: endLoc.lineNumber,
       isPublic: !info.name.startsWith('_'),
       isSealed: info.isSealed,
-      staticMethodCount: staticMetrics.count,
-      staticMethodLines: staticMetrics.lines,
+      staticMethodCount: metrics.staticCount,
+      staticMethodLines: metrics.staticLines,
+      stringLiteralLines: metrics.stringLines,
       outgoingIntraFileRefs: const {},
       privateMemberAccessesByTarget: const {},
       requiredImportDirectives: const {},
@@ -62,31 +63,58 @@ _extractInitialUnits(CompilationUnit unit, LineInfo lineInfo) {
   return (units: units, elementToDeclName: elementToDeclName);
 }
 
-({int count, int lines}) _measureStaticMethods(
-  CompilationUnitMember member,
-  LineInfo lineInfo,
-) {
-  final visitor = _StaticMethodCounter(lineInfo);
+({int staticCount, int staticLines, int stringLines})
+_measureDeclarationMetrics(CompilationUnitMember member, LineInfo lineInfo) {
+  final visitor = _DeclarationMetricsVisitor(lineInfo);
   member.accept(visitor);
-  return (count: visitor.count, lines: visitor.lines);
+  return (
+    staticCount: visitor.staticCount,
+    staticLines: visitor.staticLines,
+    stringLines: visitor.stringLines,
+  );
 }
 
-class _StaticMethodCounter extends RecursiveAstVisitor<void> {
+class _DeclarationMetricsVisitor extends RecursiveAstVisitor<void> {
   final LineInfo lineInfo;
-  int count = 0;
-  int lines = 0;
+  int staticCount = 0;
+  int staticLines = 0;
+  int stringLines = 0;
 
-  _StaticMethodCounter(this.lineInfo);
+  _DeclarationMetricsVisitor(this.lineInfo);
 
   @override
   void visitMethodDeclaration(MethodDeclaration node) {
     if (node.isStatic) {
-      count++;
+      staticCount++;
       final start = lineInfo.getLocation(node.offset).lineNumber;
       final end = lineInfo.getLocation(node.end).lineNumber;
-      lines += end >= start ? end - start + 1 : 0;
+      staticLines += end >= start ? end - start + 1 : 0;
     }
     super.visitMethodDeclaration(node);
+  }
+
+  @override
+  void visitAdjacentStrings(AdjacentStrings node) {
+    _recordStringSpan(node);
+  }
+
+  @override
+  void visitSimpleStringLiteral(SimpleStringLiteral node) {
+    _recordStringSpan(node);
+  }
+
+  @override
+  void visitStringInterpolation(StringInterpolation node) {
+    _recordStringSpan(node);
+  }
+
+  void _recordStringSpan(AstNode node) {
+    final start = lineInfo.getLocation(node.offset).lineNumber;
+    final end = lineInfo.getLocation(node.end).lineNumber;
+    final span = end - start + 1;
+    if (span >= 5) {
+      stringLines += span;
+    }
   }
 }
 
@@ -243,6 +271,7 @@ DeclarationUnit _mergeUnitWithRefs(
   isSealed: base.isSealed,
   staticMethodCount: base.staticMethodCount,
   staticMethodLines: base.staticMethodLines,
+  stringLiteralLines: base.stringLiteralLines,
   outgoingIntraFileRefs: refs?.outgoing ?? const {},
   privateMemberAccessesByTarget: refs?.privAccess ?? const {},
   requiredImportDirectives: refs?.reqImports ?? const {},
