@@ -25,8 +25,11 @@ class GitHubReporter {
   /// on a large diff silently fails.
   void printReport({
     List<FunctionComplexity>? regularResults,
+    List<FileLineMetric>? fileMetrics,
     DeltaSummary? deltaSummary,
     int? failThreshold,
+    int? maxFileLines,
+    int? maxFunctionLines,
     bool failOnIncrease = false,
   }) {
     final summaryBuf = _newBuffer();
@@ -38,6 +41,8 @@ class GitHubReporter {
       // written either way.
       if (deltaSummary.isClean(
         failThreshold: failThreshold,
+        maxFileLines: maxFileLines,
+        maxFunctionLines: maxFunctionLines,
         failOnIncrease: failOnIncrease,
       )) {
         commentBuf = null;
@@ -45,6 +50,8 @@ class GitHubReporter {
       _reportDelta(
         deltaSummary,
         failThreshold,
+        maxFileLines,
+        maxFunctionLines,
         failOnIncrease,
         summaryBuf,
         commentBuf,
@@ -52,7 +59,14 @@ class GitHubReporter {
     } else if (regularResults != null) {
       // Regular (non-delta) mode never configures a comment file, so
       // commentBuf is already null here.
-      _reportRegular(regularResults, failThreshold, summaryBuf);
+      _reportRegular(
+        regularResults,
+        fileMetrics,
+        failThreshold,
+        maxFileLines,
+        maxFunctionLines,
+        summaryBuf,
+      );
     }
 
     _write(_summaryFile, summaryBuf, 'step summary', append: true);
@@ -85,42 +99,210 @@ class GitHubReporter {
 
   void _reportRegular(
     List<FunctionComplexity> results,
+    List<FileLineMetric>? fileMetrics,
     int? failThreshold,
+    int? maxFileLines,
+    int? maxFunctionLines,
     StringBuffer summaryBuf,
   ) {
-    if (results.isEmpty) {
+    final violatedFiles = _filterViolatedFiles(fileMetrics, maxFileLines);
+    if (results.isEmpty && violatedFiles.isEmpty) {
       summaryBuf.writeln('No Dart declarations analyzed.');
       return;
     }
 
-    summaryBuf.writeln('| Status | Declaration | Location | Score |');
-    summaryBuf.writeln('| :---: | :--- | :--- | :---: |');
+    if (results.isNotEmpty) {
+      _renderRegularDeclarationsTable(
+        results,
+        failThreshold,
+        maxFunctionLines,
+        summaryBuf,
+      );
+    }
+    if (violatedFiles.isNotEmpty) {
+      _renderRegularFileViolations(violatedFiles, maxFileLines!, summaryBuf);
+    }
+  }
+
+  List<FileLineMetric> _filterViolatedFiles(
+    List<FileLineMetric>? fileMetrics,
+    int? maxFileLines,
+  ) {
+    if (maxFileLines == null || maxFileLines <= 0 || fileMetrics == null) {
+      return const [];
+    }
+    return fileMetrics
+        .where((f) => f.isViolation(maxFileLines: maxFileLines))
+        .toList();
+  }
+
+  void _renderRegularDeclarationsTable(
+    List<FunctionComplexity> results,
+    int? failThreshold,
+    int? maxFunctionLines,
+    StringBuffer summaryBuf,
+  ) {
+    final showLines = maxFunctionLines != null && maxFunctionLines > 0;
+    if (showLines) {
+      summaryBuf.writeln('| Status | Declaration | Location | Lines | Score |');
+      summaryBuf.writeln('| :---: | :--- | :--- | :---: | :---: |');
+    } else {
+      summaryBuf.writeln('| Status | Declaration | Location | Score |');
+      summaryBuf.writeln('| :---: | :--- | :--- | :---: |');
+    }
 
     for (final res in results) {
-      final isViolation = failThreshold != null && res.score > failThreshold;
-      final statusIcon = isViolation ? '🔴' : '🟢';
-      final loc = '${res.filePath}:L${res.startLine}-${res.endLine}';
+      _writeRegularDeclarationRow(
+        res,
+        failThreshold,
+        maxFunctionLines,
+        showLines,
+        summaryBuf,
+      );
+    }
+  }
+
+  void _writeRegularDeclarationRow(
+    FunctionComplexity res,
+    int? failThreshold,
+    int? maxFunctionLines,
+    bool showLines,
+    StringBuffer summaryBuf,
+  ) {
+    final isScoreVio = failThreshold != null && res.score > failThreshold;
+    final isLineVio =
+        maxFunctionLines != null &&
+        maxFunctionLines > 0 &&
+        res.lineCount > maxFunctionLines;
+    final statusIcon = (isScoreVio || isLineVio) ? '🔴' : '🟢';
+    final loc = '${res.filePath}:L${res.startLine}-${res.endLine}';
+    if (showLines) {
+      summaryBuf.writeln(
+        '| $statusIcon | `${res.name}` | `$loc` '
+        '| ${res.lineCount} | **${res.score}** |',
+      );
+    } else {
       summaryBuf.writeln(
         '| $statusIcon | `${res.name}` | `$loc` | **${res.score}** |',
       );
+    }
+    _emitRegularDeclarationAnnotations(
+      res,
+      failThreshold,
+      maxFunctionLines,
+      isScoreVio,
+      isLineVio,
+    );
+  }
 
-      if (isViolation) {
-        // Anchor only the declaration line: GitHub renders annotations below
-        // the last line of the range, so a whole-body range would place the
-        // message after the closing brace instead of under the signature.
-        _stdoutSink.writeln(
-          '::error file=${res.filePath},line=${res.startLine},'
-          'title=High Cognitive Complexity '
-          '(${res.score} > $failThreshold)::${res.name} has score '
-          '${res.score} which exceeds failure threshold of $failThreshold.',
-        );
-      }
+  void _emitRegularDeclarationAnnotations(
+    FunctionComplexity res,
+    int? failThreshold,
+    int? maxFunctionLines,
+    bool isScoreVio,
+    bool isLineVio,
+  ) {
+    if (isScoreVio) {
+      _stdoutSink.writeln(
+        '::error file=${res.filePath},line=${res.startLine},'
+        'title=High Cognitive Complexity '
+        '(${res.score} > $failThreshold)::${res.name} has score '
+        '${res.score} which exceeds failure threshold of $failThreshold.',
+      );
+    }
+    if (isLineVio) {
+      _stdoutSink.writeln(
+        '::error file=${res.filePath},line=${res.startLine},'
+        'title=Declaration Line Limit Exceeded '
+        '(${res.lineCount} > $maxFunctionLines)::${res.name} spans '
+        '${res.lineCount} lines which exceeds max-function-lines of '
+        '$maxFunctionLines.',
+      );
+    }
+  }
+
+  void _renderRegularFileViolations(
+    List<FileLineMetric> violatedFiles,
+    int maxFileLines,
+    StringBuffer summaryBuf,
+  ) {
+    summaryBuf
+      ..writeln()
+      ..writeln('## 📏 File Line Limit Violations')
+      ..writeln()
+      ..writeln('| Status | File | Lines | Limit |')
+      ..writeln('| :---: | :--- | :---: | :---: |');
+    for (final f in violatedFiles) {
+      summaryBuf.writeln(
+        '| 🔴 | `${f.filePath}` | **${f.lineCount}** | $maxFileLines |',
+      );
+      _stdoutSink.writeln(
+        '::error file=${f.filePath},line=1,'
+        'title=File Line Limit Exceeded '
+        '(${f.lineCount} > $maxFileLines)::${f.filePath} has ${f.lineCount} '
+        'lines which exceeds max-file-lines of $maxFileLines.',
+      );
     }
   }
 
   void _reportDelta(
     DeltaSummary summary,
     int? failThreshold,
+    int? maxFileLines,
+    int? maxFunctionLines,
+    bool failOnIncrease,
+    StringBuffer summaryBuf,
+    StringBuffer? commentBuf,
+  ) {
+    _writeDeltaHeader(
+      summary,
+      failThreshold,
+      maxFileLines,
+      maxFunctionLines,
+      failOnIncrease,
+      summaryBuf,
+      commentBuf,
+    );
+
+    final changed = _filterChangedDeltas(summary.deltas, maxFunctionLines);
+    final violatedFiles = _filterViolatedFileDeltas(
+      summary.fileDeltas,
+      maxFileLines,
+    );
+
+    _emitAllDeltaAnnotations(
+      changed,
+      violatedFiles,
+      failThreshold,
+      maxFileLines,
+      maxFunctionLines,
+      failOnIncrease,
+    );
+
+    if (summary.deltas.isEmpty && violatedFiles.isEmpty) {
+      for (final buf in [summaryBuf, ?commentBuf]) {
+        buf.writeln('No modified Dart declarations detected.');
+      }
+      return;
+    }
+
+    _writeDeltaBodies(
+      changed,
+      violatedFiles,
+      failThreshold,
+      maxFileLines,
+      maxFunctionLines,
+      failOnIncrease,
+      summaryBuf,
+      commentBuf,
+    );
+  }
+
+  void _writeDeltaHeader(
+    DeltaSummary summary,
+    int? failThreshold,
+    int? maxFileLines,
+    int? maxFunctionLines,
     bool failOnIncrease,
     StringBuffer summaryBuf,
     StringBuffer? commentBuf,
@@ -129,6 +311,8 @@ class GitHubReporter {
     final sign = net > 0 ? '+' : '';
     final violations = summary.countViolations(
       failThreshold: failThreshold,
+      maxFileLines: maxFileLines,
+      maxFunctionLines: maxFunctionLines,
       failOnIncrease: failOnIncrease,
     );
     final header =
@@ -140,29 +324,106 @@ class GitHubReporter {
         ..writeln(header)
         ..writeln();
     }
+  }
 
-    final changed = summary.deltas
-        .where((d) => d.status != DeltaStatus.unchanged)
+  List<ComplexityDelta> _filterChangedDeltas(
+    List<ComplexityDelta> deltas,
+    int? maxFunctionLines,
+  ) => deltas
+      .where(
+        (d) =>
+            d.status != DeltaStatus.unchanged ||
+            d.isFunctionLineViolation(maxFunctionLines: maxFunctionLines),
+      )
+      .toList();
+
+  List<FileLineDelta> _filterViolatedFileDeltas(
+    List<FileLineDelta> fileDeltas,
+    int? maxFileLines,
+  ) {
+    if (maxFileLines == null || maxFileLines <= 0) return const [];
+    return fileDeltas
+        .where((f) => f.isViolation(maxFileLines: maxFileLines))
         .toList();
+  }
 
-    // Annotations are emitted once for every changed declaration, independent
-    // of how many rows each table renders. Capping the comment must not hide
-    // an inline error from the Files-changed view.
+  void _emitAllDeltaAnnotations(
+    List<ComplexityDelta> changed,
+    List<FileLineDelta> violatedFiles,
+    int? failThreshold,
+    int? maxFileLines,
+    int? maxFunctionLines,
+    bool failOnIncrease,
+  ) {
     for (final d in changed) {
-      _emitDiagnostic(d, failThreshold, failOnIncrease);
+      _emitDiagnostic(d, failThreshold, maxFunctionLines, failOnIncrease);
     }
-
-    if (summary.deltas.isEmpty) {
-      for (final buf in [summaryBuf, ?commentBuf]) {
-        buf.writeln('No modified Dart declarations detected.');
-      }
-      return;
+    for (final f in violatedFiles) {
+      _stdoutSink.writeln(
+        '::error file=${f.filePath},line=1,'
+        'title=File Line Limit Violation::'
+        '${f.filePath} grew to ${f.newLines} lines (limit: $maxFileLines).',
+      );
     }
+  }
 
-    _renderDeltaTable(changed, failThreshold, failOnIncrease, summaryBuf);
-
+  void _writeDeltaBodies(
+    List<ComplexityDelta> changed,
+    List<FileLineDelta> violatedFiles,
+    int? failThreshold,
+    int? maxFileLines,
+    int? maxFunctionLines,
+    bool failOnIncrease,
+    StringBuffer summaryBuf,
+    StringBuffer? commentBuf,
+  ) {
+    if (changed.isNotEmpty) {
+      _renderDeltaTable(
+        changed,
+        failThreshold,
+        maxFunctionLines,
+        failOnIncrease,
+        summaryBuf,
+      );
+    }
+    if (violatedFiles.isNotEmpty) {
+      _renderFileDeltaTable(violatedFiles, maxFileLines!, summaryBuf);
+    }
     if (commentBuf != null) {
-      _renderCappedComment(changed, failThreshold, failOnIncrease, commentBuf);
+      if (changed.isNotEmpty) {
+        _renderCappedComment(
+          changed,
+          failThreshold,
+          maxFunctionLines,
+          failOnIncrease,
+          commentBuf,
+        );
+      }
+      if (violatedFiles.isNotEmpty) {
+        _renderFileDeltaTable(violatedFiles, maxFileLines!, commentBuf);
+      }
+    }
+  }
+
+  void _renderFileDeltaTable(
+    List<FileLineDelta> violatedFiles,
+    int maxFileLines,
+    StringBuffer buf,
+  ) {
+    buf
+      ..writeln()
+      ..writeln('## 📏 File Line Limit Violations')
+      ..writeln()
+      ..writeln('| Status | File | Delta | Lines | Limit |')
+      ..writeln('| :---: | :--- | :---: | :---: | :---: |');
+    for (final f in violatedFiles) {
+      final deltaStr = f.delta > 0 ? '+${f.delta}' : '${f.delta}';
+      final linesStr = f.oldLines != null
+          ? '${f.oldLines} -> **${f.newLines}**'
+          : '**${f.newLines}**';
+      buf.writeln(
+        '| 🔴 | `${f.filePath}` | `$deltaStr` | $linesStr | $maxFileLines |',
+      );
     }
   }
 
@@ -172,6 +433,7 @@ class GitHubReporter {
   void _renderCappedComment(
     List<ComplexityDelta> changed,
     int? failThreshold,
+    int? maxFunctionLines,
     bool failOnIncrease,
     StringBuffer commentBuf,
   ) {
@@ -180,8 +442,9 @@ class GitHubReporter {
         final byRank = _rank(
           b,
           failThreshold,
+          maxFunctionLines,
           failOnIncrease,
-        ).compareTo(_rank(a, failThreshold, failOnIncrease));
+        ).compareTo(_rank(a, failThreshold, maxFunctionLines, failOnIncrease));
         if (byRank != 0) return byRank;
         return (b.newScore ?? 0).compareTo(a.newScore ?? 0);
       });
@@ -190,7 +453,13 @@ class GitHubReporter {
         ? ranked.sublist(0, _maxCommentRows)
         : ranked;
 
-    _renderDeltaTable(capped, failThreshold, failOnIncrease, commentBuf);
+    _renderDeltaTable(
+      capped,
+      failThreshold,
+      maxFunctionLines,
+      failOnIncrease,
+      commentBuf,
+    );
 
     if (capped.length < ranked.length) {
       commentBuf
@@ -205,9 +474,15 @@ class GitHubReporter {
 
   /// Display priority for the capped comment: violations, then regressions,
   /// then additions, then everything else.
-  int _rank(ComplexityDelta d, int? failThreshold, bool failOnIncrease) {
+  int _rank(
+    ComplexityDelta d,
+    int? failThreshold,
+    int? maxFunctionLines,
+    bool failOnIncrease,
+  ) {
     if (d.isViolation(
       failThreshold: failThreshold,
+      maxFunctionLines: maxFunctionLines,
       failOnIncrease: failOnIncrease,
     )) {
       return 3;
@@ -220,6 +495,7 @@ class GitHubReporter {
   void _renderDeltaTable(
     List<ComplexityDelta> deltas,
     int? failThreshold,
+    int? maxFunctionLines,
     bool failOnIncrease,
     StringBuffer buf,
   ) {
@@ -229,6 +505,7 @@ class GitHubReporter {
     for (final d in deltas) {
       final isVio = d.isViolation(
         failThreshold: failThreshold,
+        maxFunctionLines: maxFunctionLines,
         failOnIncrease: failOnIncrease,
       );
       final icon = _getDeltaIcon(d, isVio);
@@ -253,13 +530,17 @@ class GitHubReporter {
   /// Anchors annotations to the declaration line only: GitHub renders them
   /// below the last line of the range, so a whole-body range would place the
   /// message after the closing brace instead of under the signature.
-  void _emitDiagnostic(ComplexityDelta d, int? failThreshold, bool failInc) {
-    final isVio = d.isViolation(
-      failThreshold: failThreshold,
-      failOnIncrease: failInc,
-    );
-
-    if (isVio && d.newScore != null) {
+  void _emitDiagnostic(
+    ComplexityDelta d,
+    int? failThreshold,
+    int? maxFunctionLines,
+    bool failInc,
+  ) {
+    if (d.isScoreViolation(
+          failThreshold: failThreshold,
+          failOnIncrease: failInc,
+        ) &&
+        d.newScore != null) {
       final reason = d.status == DeltaStatus.added
           ? 'newly introduced with high complexity'
           : 'increased in complexity (+${d.delta} points)';
@@ -267,6 +548,15 @@ class GitHubReporter {
         '::error file=${d.filePath},line=${d.startLine},'
         'title=Cognitive Complexity Violation::'
         '${d.name} was $reason to score ${d.newScore}.',
+      );
+    }
+
+    if (d.isFunctionLineViolation(maxFunctionLines: maxFunctionLines) &&
+        d.newLines != null) {
+      _stdoutSink.writeln(
+        '::error file=${d.filePath},line=${d.startLine},'
+        'title=Declaration Line Limit Violation::'
+        '${d.name} spans ${d.newLines} lines (limit: $maxFunctionLines).',
       );
     }
   }

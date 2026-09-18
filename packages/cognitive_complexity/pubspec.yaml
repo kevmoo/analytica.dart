@@ -21,6 +21,7 @@ environment:
 executables:
   cognitive_complexity:
   data_flow:
+  file_split:
 
 # Add regular dependencies here.
 dependencies:

@@ -209,6 +209,126 @@ void main() {
         check(second.status).equals(DeltaStatus.improved);
       },
     );
+
+    test('computes file line deltas and respects opt-in ratchet and '
+        'ignore directives', () async {
+      final analyzer = ComplexityAnalyzer();
+      final lines = List.generate(80, (i) => '  final v$i = $i;').join('\n');
+      final code = 'void longFunction() {\n$lines\n}\n';
+      final results = analyzer.analyzeCode(code, filePath: 'long.dart');
+
+      check(results).length.equals(1);
+      check(results.first.lineCount).isGreaterThan(80);
+      check(
+        results.first.isViolation(failThreshold: 15, maxFunctionLines: null),
+      ).isFalse();
+      check(
+        results.first.isViolation(failThreshold: 15, maxFunctionLines: 60),
+      ).isTrue();
+
+      // File-level and declaration-level ignore directives
+      const ignoredFileCode = '''
+// cognitive_complexity:ignore_for_file
+void complexFunc(bool a, bool b) {
+  if (a) {
+    if (b) {}
+  }
+}
+''';
+      check(analyzer.analyzeCode(ignoredFileCode)).isEmpty();
+      check(analyzer.analyzeCodeLineCount(ignoredFileCode)).isNull();
+
+      const ignoredDeclCode = '''
+// cognitive_complexity:ignore
+void ignoredFunc(bool a, bool b) {
+  if (a) {
+    if (b) {}
+  }
+}
+
+void activeFunc(bool a) {
+  if (a) {}
+}
+''';
+      final partial = analyzer.analyzeCode(ignoredDeclCode);
+      check(partial).length.equals(1);
+      check(partial.first.name).equals('activeFunc');
+
+      const summary = DeltaSummary(
+        baseRef: 'HEAD~1',
+        targetRef: 'HEAD',
+        filesAnalyzed: 2,
+        deltas: [
+          ComplexityDelta(
+            filePath: 'a.dart',
+            name: 'fn',
+            startLine: 1,
+            endLine: 100,
+            oldScore: 2,
+            newScore: 2,
+            oldLines: 90,
+            newLines: 100,
+            status: DeltaStatus.unchanged,
+          ),
+        ],
+        fileDeltas: [
+          FileLineDelta(
+            filePath: 'a.dart',
+            oldLines: 450,
+            newLines: 460,
+            status: DeltaStatus.increased,
+          ),
+          FileLineDelta(
+            filePath: 'legacy.dart',
+            oldLines: 500,
+            newLines: 450,
+            status: DeltaStatus.improved,
+          ),
+        ],
+      );
+
+      check(
+        summary.isClean(
+          failThreshold: 15,
+          maxFileLines: null,
+          maxFunctionLines: null,
+          failOnIncrease: true,
+        ),
+      ).isTrue();
+
+      check(
+        summary.isClean(
+          failThreshold: 15,
+          maxFileLines: 400,
+          maxFunctionLines: null,
+          failOnIncrease: true,
+        ),
+      ).isFalse();
+
+      final json = summary.toJson(
+        failThreshold: 15,
+        maxFileLines: 400,
+        maxFunctionLines: 80,
+      );
+      final summaryMap = json['summary'] as Map<String, dynamic>;
+      check(summaryMap['file_line_violations']).equals(1);
+      check((json['file_deltas'] as List).length).equals(2);
+
+      // GitHubReporter renders file and declaration line limit violations
+      final ghOut = StringBuffer();
+      final reporter = GitHubReporter(stdoutSink: ghOut);
+      reporter.printReport(
+        deltaSummary: summary,
+        failThreshold: 15,
+        maxFileLines: 400,
+        maxFunctionLines: 80,
+      );
+      check(ghOut.toString())
+        ..contains('title=File Line Limit Violation::a.dart grew to 460')
+        ..contains(
+          'title=Declaration Line Limit Violation::fn spans 100 lines',
+        );
+    });
   });
 }
 

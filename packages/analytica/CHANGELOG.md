@@ -1,5 +1,8 @@
 ## 0.1.2-wip
 
+- Add `ElementReferenceExtractor` in `package:analytica/analyzer.dart` for
+  resolved AST symbol reference, private member access, and library URI
+  extraction across `undead` and `cognitive_complexity:file_split`.
 - Add `PathFilter` in `package:analytica/analyzer.dart` for centralized path
   exclusion matching and generated Dart code filtering.
 - Add `addPathFilterOptions` and `parsePathFilter` CLI utilities in

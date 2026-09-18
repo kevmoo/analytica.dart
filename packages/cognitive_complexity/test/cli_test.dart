@@ -110,5 +110,60 @@ void complexFunc(int a) {
       ).emitsThrough((s) => s.contains('exceeded the failure threshold (2)'));
       await process.shouldExit(1);
     });
+
+    test('Supports opt-in --max-file-lines and --max-function-lines across '
+        'text, json, and github formats', () async {
+      final generatedBody = List.generate(
+        25,
+        (i) => '  final x$i = $i;',
+      ).join('\n');
+      await d.dir('project_lines', [
+        d.dir('lib', [
+          d.file('long_file.dart', 'void bigDecl() {\n$generatedBody\n}\n'),
+        ]),
+      ]).create();
+
+      final target = '${d.sandbox}/project_lines/lib/long_file.dart';
+
+      // 1. Default run (limits disabled) exits 0 and JSON is a bare list
+      final defaultJsonProc = await TestProcess.start(
+        Platform.resolvedExecutable,
+        [binPath, '--format', 'json', target],
+      );
+      final defaultJsonLine = await defaultJsonProc.stdout.next;
+      check(defaultJsonLine.startsWith('[')).isTrue();
+      await defaultJsonProc.shouldExit(0);
+
+      // 2. --max-file-lines in JSON format emits declarations + files object
+      final fileJsonProc = await TestProcess.start(
+        Platform.resolvedExecutable,
+        [binPath, '--max-file-lines', '15', '--format', 'json', target],
+      );
+      final fileJsonLine = await fileJsonProc.stdout.next;
+      check(fileJsonLine)
+        ..contains('"declarations":')
+        ..contains('"files":')
+        ..contains('"violation":true');
+      await fileJsonProc.shouldExit(1);
+
+      // 3. --max-file-lines and --max-function-lines in github format
+      final ghProc = await TestProcess.start(Platform.resolvedExecutable, [
+        binPath,
+        '--max-file-lines',
+        '15',
+        '--max-function-lines',
+        '15',
+        '--format',
+        'github',
+        target,
+      ]);
+      await check(ghProc.stdout).emitsThrough(
+        (s) => s.contains('title=Declaration Line Limit Exceeded'),
+      );
+      await check(
+        ghProc.stdout,
+      ).emitsThrough((s) => s.contains('title=File Line Limit Exceeded'));
+      await ghProc.shouldExit(1);
+    });
   });
 }
