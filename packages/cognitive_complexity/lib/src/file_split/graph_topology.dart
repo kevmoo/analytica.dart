@@ -199,3 +199,100 @@ Set<int> _bfsIsland(
   }
   return comp;
 }
+
+/// Computes the immediate dominator (`idom`) for each node in a DAG.
+/// Returns a map from a node index to its immediate dominator index.
+Map<int, int> computeImmediateDominators(int count, Map<int, Set<int>> dag) {
+  final (:inDegree, :preds, :roots) = _buildPredecessorGraph(count, dag);
+  final topo = _topologicalSortDag(count, inDegree, roots, dag);
+  final doms = _computeDominatorSets(count, preds, topo);
+  return _extractImmediateDominators(count, doms);
+}
+
+({List<int> inDegree, Map<int, List<int>> preds, List<int> roots})
+_buildPredecessorGraph(int count, Map<int, Set<int>> dag) {
+  final inDegree = List<int>.filled(count, 0);
+  final preds = <int, List<int>>{for (var i = 0; i < count; i++) i: []};
+  for (final entry in dag.entries) {
+    for (final target in entry.value) {
+      inDegree[target]++;
+      preds[target]!.add(entry.key);
+    }
+  }
+  final roots = <int>[
+    for (var i = 0; i < count; i++)
+      if (inDegree[i] == 0) i,
+  ];
+  for (final root in roots) {
+    preds[root]!.add(-1);
+  }
+  return (inDegree: inDegree, preds: preds, roots: roots);
+}
+
+List<int> _topologicalSortDag(
+  int count,
+  List<int> inDegree,
+  List<int> roots,
+  Map<int, Set<int>> dag,
+) {
+  final queue = List<int>.from(roots);
+  final topo = <int>[];
+  final remainingIn = List<int>.from(inDegree);
+  while (queue.isNotEmpty) {
+    final curr = queue.removeLast();
+    topo.add(curr);
+    for (final next in dag[curr] ?? const <int>{}) {
+      remainingIn[next]--;
+      if (remainingIn[next] == 0) queue.add(next);
+    }
+  }
+  return topo;
+}
+
+Map<int, Set<int>> _computeDominatorSets(
+  int count,
+  Map<int, List<int>> preds,
+  List<int> topo,
+) {
+  final allNodes = Set<int>.from(Iterable<int>.generate(count))..add(-1);
+  final doms = <int, Set<int>>{
+    -1: {-1},
+    for (var i = 0; i < count; i++) i: allNodes,
+  };
+  for (final node in topo) {
+    final nodePreds = preds[node]!;
+    if (nodePreds.isEmpty) {
+      doms[node] = {node};
+      continue;
+    }
+    var intersection = Set<int>.from(doms[nodePreds.first]!);
+    for (final p in nodePreds.skip(1)) {
+      intersection = intersection.intersection(doms[p]!);
+    }
+    intersection.add(node);
+    doms[node] = intersection;
+  }
+  return doms;
+}
+
+Map<int, int> _extractImmediateDominators(int count, Map<int, Set<int>> doms) {
+  final idom = <int, int>{};
+  for (var i = 0; i < count; i++) {
+    final best = _findClosestDominator(doms[i]!.difference({i, -1}), doms);
+    if (best != null) idom[i] = best;
+  }
+  return idom;
+}
+
+int? _findClosestDominator(Set<int> strictDoms, Map<int, Set<int>> doms) {
+  int? best;
+  var maxDomSize = -1;
+  for (final d in strictDoms) {
+    final size = doms[d]!.length;
+    if (size > maxDomSize) {
+      maxDomSize = size;
+      best = d;
+    }
+  }
+  return best;
+}

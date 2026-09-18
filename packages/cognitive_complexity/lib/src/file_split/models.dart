@@ -30,6 +30,8 @@ class DeclarationUnit {
   final int endLine;
   final bool isPublic;
   final bool isSealed;
+  final int staticMethodCount;
+  final int staticMethodLines;
   final Set<String> outgoingIntraFileRefs;
   final Map<String, Set<String>> privateMemberAccessesByTarget;
   final Set<String> requiredImportDirectives;
@@ -42,6 +44,8 @@ class DeclarationUnit {
     required this.endLine,
     required this.isPublic,
     required this.isSealed,
+    this.staticMethodCount = 0,
+    this.staticMethodLines = 0,
     required this.outgoingIntraFileRefs,
     required this.privateMemberAccessesByTarget,
     required this.requiredImportDirectives,
@@ -58,6 +62,8 @@ class DeclarationUnit {
     'lines': lineCount,
     'is_public': isPublic,
     'is_sealed': isSealed,
+    if (staticMethodCount > 0) 'static_method_count': staticMethodCount,
+    if (staticMethodLines > 0) 'static_method_lines': staticMethodLines,
     'outgoing_refs': outgoingIntraFileRefs.toList()..sort(),
     if (privateMemberAccessesByTarget.isNotEmpty)
       'private_member_accesses': {
@@ -80,6 +86,7 @@ class SplitCluster {
   final List<String> requiredImports;
   final List<String> exportedPublicSymbols;
   final String rationale;
+  final String? agentDirective;
 
   const SplitCluster({
     required this.suggestedFileName,
@@ -93,6 +100,7 @@ class SplitCluster {
     required this.requiredImports,
     required this.exportedPublicSymbols,
     required this.rationale,
+    this.agentDirective,
   });
 
   int get totalLines => declarations.fold(0, (sum, d) => sum + d.lineCount);
@@ -114,6 +122,7 @@ class SplitCluster {
     'is_disjoint_island': isDisjointIsland,
     'total_lines': totalLines,
     'rationale': rationale,
+    if (agentDirective != null) 'agent_directive': agentDirective,
     'declarations': declarations.map((d) => d.toJson()).toList(),
     'absorbed_private_helpers': absorbedPrivateHelpers,
     'private_top_levels_to_widen': privateTopLevelsToWiden,
@@ -128,8 +137,11 @@ class SplitCluster {
       ..writeln()
       ..writeln('[Cut $cutIndex - ${tier.label}]')
       ..writeln('  Suggested File: $suggestedFileName (~$totalLines lines)')
-      ..writeln('  Rationale: $rationale')
-      ..writeln('  Move Declarations (${declarations.length}):');
+      ..writeln('  Rationale: $rationale');
+    if (agentDirective != null) {
+      buf.writeln('  Agent Directive: $agentDirective');
+    }
+    buf.writeln('  Move Declarations (${declarations.length}):');
     for (final d in declarations) {
       final absorbed = absorbedPrivateHelpers.contains(d.name)
           ? ' [private — single-dominator absorbed]'
@@ -148,10 +160,14 @@ class SplitCluster {
     }
     final bridge = zeroChurnExportDirective;
     if (bridge != null) {
-      buf
-        ..writeln('  Zero-Churn Bridge for $originalFilePath:')
-        ..writeln("    + import '$suggestedFileName';")
-        ..writeln('    + $bridge');
+      buf.writeln('  Zero-Churn Bridge for $originalFilePath:');
+      if (tier == SplitTier.tier3PartDirective) {
+        buf.writeln('    + $bridge');
+      } else {
+        buf
+          ..writeln("    + import '$suggestedFileName';")
+          ..writeln('    + $bridge');
+      }
     }
   }
 
@@ -171,11 +187,21 @@ class SplitCluster {
   }
 }
 
+/// Default instruction surfaced when `part` / `part of` is auto-recommended
+/// (`useParts == null`) for an oversized class or tightly coupled SCC.
+const kAskUserPartsPreferenceDirective =
+    'Explicitly ASK the user whether they prefer '
+    '(1) splitting with `part` / `part of` directives (`--use-parts`) to '
+    'preserve private `_field` access on `this`, or '
+    '(2) extracting cohesive methods into a standalone helper class/library '
+    '(`--no-use-parts`).';
+
 /// Complete decomposition report for an analyzed Dart file.
 class FileSplitReport {
   final String filePath;
   final int totalLines;
   final int targetLines;
+  final bool? useParts;
   final int declarationCount;
   final int lcom4Islands;
   final int sccCount;
@@ -186,7 +212,8 @@ class FileSplitReport {
   const FileSplitReport({
     required this.filePath,
     required this.totalLines,
-    this.targetLines = 300,
+    this.targetLines = 800,
+    this.useParts,
     required this.declarationCount,
     required this.lcom4Islands,
     required this.sccCount,
@@ -203,6 +230,8 @@ class FileSplitReport {
   Map<String, dynamic> toJson() => {
     'file': filePath,
     'total_lines': totalLines,
+    'target_lines': targetLines,
+    'use_parts': useParts,
     'declaration_count': declarationCount,
     'lcom4_islands': lcom4Islands,
     'scc_count': sccCount,
@@ -232,6 +261,7 @@ class FileSplitReport {
         'No clean extraction cuts recommended '
         '(file is already cohesive or below target size).',
       );
+      _writeSurviving(buf);
       return buf.toString();
     }
 
@@ -256,15 +286,29 @@ class FileSplitReport {
         '${survivingDeclarations.length} declaration(s)):',
       );
     for (final d in survivingDeclarations) {
-      final note = d.lineCount > targetLines
-          ? ' [Note: single ${d.kind} exceeds target $targetLines lines — '
-                'consider extracting cohesive methods into a helper '
-                'or extension]'
-          : '';
+      final note = d.lineCount > targetLines ? _oversizedDeclNote(d) : '';
       buf.writeln(
         '  - ${d.kind} ${d.name} '
         '(L${d.startLine}-${d.endLine}, ${d.lineCount} lines)$note',
       );
     }
+  }
+
+  String _oversizedDeclNote(DeclarationUnit d) {
+    final staticHint = d.staticMethodCount > 0
+        ? 'contains ${d.staticMethodCount} static method(s) '
+              '(~${d.staticMethodLines} lines) that can be promoted to '
+              'top-level functions to unlock standalone library extraction; '
+        : '';
+    if (useParts == false) {
+      return ' [Note: single ${d.kind} exceeds target $targetLines lines — '
+          '${staticHint}consider extracting cohesive methods into a helper '
+          'or extension (--no-use-parts active)]';
+    }
+    return ' [Note: single ${d.kind} exceeds target $targetLines lines — '
+        '${staticHint}consider extracting cohesive methods into a helper or '
+        'extension, or splitting with `part` / `part of` (--use-parts) to '
+        'preserve private `_field` access. Agent Directive: '
+        '$kAskUserPartsPreferenceDirective]';
   }
 }

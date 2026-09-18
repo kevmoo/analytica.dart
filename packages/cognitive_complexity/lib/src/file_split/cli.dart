@@ -45,7 +45,7 @@ ArgParser _buildArgParser() => ArgParser()
   )
   ..addOption(
     'target-lines',
-    defaultsTo: '300',
+    defaultsTo: '800',
     valueHelp: 'lines',
     help: 'Target maximum line count per extracted file cluster.',
   )
@@ -56,6 +56,14 @@ ArgParser _buildArgParser() => ArgParser()
     help:
         'Minimum line count for a standalone extracted cluster '
         '(prevents micro-fragmentation).',
+  )
+  ..addFlag(
+    'use-parts',
+    defaultsTo: null,
+    help:
+        'Allow or prefer `part` / `part of` directives when decomposing '
+        'oversized classes or tightly coupled SCCs (defaults to auto-detect '
+        'with user confirmation prompt).',
   )
   ..addOption(
     'format',
@@ -89,14 +97,18 @@ Future<int> _executeFileSplit(
     argResults['min-cluster-lines'] as String,
     'min-cluster-lines',
   );
+  final useParts = argResults.wasParsed('use-parts')
+      ? argResults['use-parts'] as bool
+      : null;
   final format = argResults['format'] as String;
   final sdkPath = argResults['sdk-path'] as String?;
 
   final analyzer = FileSplitAnalyzer(sdkPath: sdkPath);
   final report = await analyzer.analyzeFile(
     targetFile,
-    targetLines: targetLines == 0 ? 300 : targetLines,
+    targetLines: targetLines == 0 ? 800 : targetLines,
     minClusterLines: minClusterLines,
+    useParts: useParts,
   );
 
   if (format == 'json') {

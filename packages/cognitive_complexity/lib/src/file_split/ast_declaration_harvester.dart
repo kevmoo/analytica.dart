@@ -1,5 +1,6 @@
 import 'package:analytica/analyzer.dart';
 import 'package:analyzer/dart/ast/ast.dart';
+import 'package:analyzer/dart/ast/visitor.dart';
 import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/source/line_info.dart';
 
@@ -38,6 +39,7 @@ _extractInitialUnits(CompilationUnit unit, LineInfo lineInfo) {
 
     final startLoc = lineInfo.getLocation(member.offset);
     final endLoc = lineInfo.getLocation(member.end);
+    final staticMetrics = _measureStaticMethods(member, lineInfo);
     units[info.name] = DeclarationUnit(
       name: info.name,
       kind: info.kind,
@@ -45,6 +47,8 @@ _extractInitialUnits(CompilationUnit unit, LineInfo lineInfo) {
       endLine: endLoc.lineNumber,
       isPublic: !info.name.startsWith('_'),
       isSealed: info.isSealed,
+      staticMethodCount: staticMetrics.count,
+      staticMethodLines: staticMetrics.lines,
       outgoingIntraFileRefs: const {},
       privateMemberAccessesByTarget: const {},
       requiredImportDirectives: const {},
@@ -56,6 +60,34 @@ _extractInitialUnits(CompilationUnit unit, LineInfo lineInfo) {
     }
   }
   return (units: units, elementToDeclName: elementToDeclName);
+}
+
+({int count, int lines}) _measureStaticMethods(
+  CompilationUnitMember member,
+  LineInfo lineInfo,
+) {
+  final visitor = _StaticMethodCounter(lineInfo);
+  member.accept(visitor);
+  return (count: visitor.count, lines: visitor.lines);
+}
+
+class _StaticMethodCounter extends RecursiveAstVisitor<void> {
+  final LineInfo lineInfo;
+  int count = 0;
+  int lines = 0;
+
+  _StaticMethodCounter(this.lineInfo);
+
+  @override
+  void visitMethodDeclaration(MethodDeclaration node) {
+    if (node.isStatic) {
+      count++;
+      final start = lineInfo.getLocation(node.offset).lineNumber;
+      final end = lineInfo.getLocation(node.end).lineNumber;
+      lines += end >= start ? end - start + 1 : 0;
+    }
+    super.visitMethodDeclaration(node);
+  }
 }
 
 ({String name, String kind, bool isSealed, List<Element> elements})?
@@ -209,6 +241,8 @@ DeclarationUnit _mergeUnitWithRefs(
   endLine: base.endLine,
   isPublic: base.isPublic,
   isSealed: base.isSealed,
+  staticMethodCount: base.staticMethodCount,
+  staticMethodLines: base.staticMethodLines,
   outgoingIntraFileRefs: refs?.outgoing ?? const {},
   privateMemberAccessesByTarget: refs?.privAccess ?? const {},
   requiredImportDirectives: refs?.reqImports ?? const {},
