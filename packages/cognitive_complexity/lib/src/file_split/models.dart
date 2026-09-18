@@ -232,6 +232,7 @@ class FileSplitReport {
         'No clean extraction cuts recommended '
         '(file is already cohesive or below target size).',
       );
+      _writeSurviving(buf);
       return buf.toString();
     }
 

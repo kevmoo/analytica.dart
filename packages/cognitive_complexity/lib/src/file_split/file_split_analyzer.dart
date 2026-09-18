@@ -78,6 +78,7 @@ class FileSplitAnalyzer {
       minClusterLines: minClusterLines,
       declsByName: populated,
       sccs: sccs,
+      dag: sccDag,
       depths: depths,
       islands: islands,
     );
@@ -103,6 +104,7 @@ class _ExtractionCutPlanner {
   final int minClusterLines;
   final Map<String, DeclarationUnit> declsByName;
   final List<List<String>> sccs;
+  final Map<int, Set<int>> dag;
   final Map<int, int> depths;
   final List<Set<int>> islands;
 
@@ -117,6 +119,7 @@ class _ExtractionCutPlanner {
     required this.minClusterLines,
     required this.declsByName,
     required this.sccs,
+    required this.dag,
     required this.depths,
     required this.islands,
   }) : stem = p.basenameWithoutExtension(filePath),
@@ -130,7 +133,7 @@ class _ExtractionCutPlanner {
 
   ({List<SplitCluster> clusters, List<DeclarationUnit> surviving}) plan() {
     _extractDisjointIslands();
-    _extractTopologicalLayers();
+    _extractDominatorCones();
     _extractOversizedSccFallbacks();
 
     final surviving = <DeclarationUnit>[
@@ -154,50 +157,68 @@ class _ExtractionCutPlanner {
     }
   }
 
-  void _extractTopologicalLayers() {
-    final anchorScc = _findPrimaryAnchorScc();
-    final maxDepth = depths.values.fold(0, math.max);
-    for (var d = 0; d < maxDepth; d++) {
-      if (_remainingLines() <= targetLines) break;
-      final candidates = [
-        for (var i = 0; i < sccs.length; i++)
-          if (!extractedSccs.contains(i) && i != anchorScc && depths[i] == d) i,
-      ]..sort((a, b) => _sccLines(a).compareTo(_sccLines(b)));
-      _batchAndCommitLayer(candidates);
-    }
-  }
-
-  int? _findPrimaryAnchorScc() {
-    final totalDeclLines = _setLines(Iterable<int>.generate(sccs.length));
-    var bestIdx = -1;
-    var bestLines = 0;
+  void _extractDominatorCones() {
+    final idom = computeImmediateDominators(sccs.length, dag);
+    // Build dominator tree
+    final domTree = <int, List<int>>{
+      for (var i = 0; i < sccs.length; i++) i: [],
+    };
     for (var i = 0; i < sccs.length; i++) {
-      final lines = _sccLines(i);
-      if (lines > bestLines) {
-        bestLines = lines;
-        bestIdx = i;
+      final parent = idom[i];
+      if (parent != null) {
+        domTree[parent]!.add(i);
       }
     }
-    return bestLines * 2 >= totalDeclLines ? bestIdx : null;
-  }
 
-  void _batchAndCommitLayer(List<int> candidates) {
-    final batch = <int>{};
-    var batchLines = 0;
-    for (final idx in candidates) {
-      final lines = _sccLines(idx);
-      if (batchLines > 0 && batchLines + lines > targetLines) {
-        if (batchLines >= minClusterLines) {
-          _commitCluster(Set.of(batch), isDisjointIsland: false);
-        }
-        batch.clear();
-        batchLines = 0;
+    final coneSizes = <int, int>{};
+    final coneNodes = <int, Set<int>>{};
+
+    void extractGreedyCones(int node) {
+      for (final child in domTree[node]!) {
+        extractGreedyCones(child);
       }
-      batch.add(idx);
-      batchLines += lines;
+
+      if (extractedSccs.contains(node)) return;
+
+      int currentSize = _sccLines(node);
+      final currentNodes = <int>{node};
+      final survivingChildren = <int>[];
+      for (final child in domTree[node]!) {
+        if (!extractedSccs.contains(child)) {
+          survivingChildren.add(child);
+        }
+      }
+
+      // Sort surviving children largest to smallest to prune largest cones first
+      survivingChildren.sort((a, b) => coneSizes[b]!.compareTo(coneSizes[a]!));
+
+      for (final child in survivingChildren) {
+        // Only absorb if it doesn't blow the budget, OR if the child is too small to exist on its own
+        if (currentSize + coneSizes[child]! > targetLines &&
+            coneSizes[child]! >= minClusterLines) {
+          _commitCluster(coneNodes[child]!, isDisjointIsland: false);
+        } else {
+          currentSize += coneSizes[child]!;
+          currentNodes.addAll(coneNodes[child]!);
+        }
+      }
+
+      coneSizes[node] = currentSize;
+      coneNodes[node] = currentNodes;
+
+      // If we are a root, and the remaining cone is big enough, extract it
+      // BUT do not extract it if it's just the entire remaining file (a 1-cluster no-op).
+      if (!idom.containsKey(node)) {
+        if (currentSize >= minClusterLines && currentSize < _remainingLines()) {
+          _commitCluster(currentNodes, isDisjointIsland: false);
+        }
+      }
     }
-    if (batchLines >= minClusterLines) {
-      _commitCluster(Set.of(batch), isDisjointIsland: false);
+
+    for (var i = 0; i < sccs.length; i++) {
+      if (!idom.containsKey(i)) {
+        extractGreedyCones(i);
+      }
     }
   }
 

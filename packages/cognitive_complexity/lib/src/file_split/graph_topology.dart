@@ -199,3 +199,95 @@ Set<int> _bfsIsland(
   }
   return comp;
 }
+
+/// Computes the immediate dominator (idom) for each node in a DAG.
+/// Returns a map from a node to its immediate dominator. If a node has no idom (it is a root), it maps to itself or is missing.
+Map<int, int> computeImmediateDominators(int count, Map<int, Set<int>> dag) {
+  // DAG can be sorted topologically.
+  // In-degree array
+  final inDegree = List<int>.filled(count, 0);
+  final preds = <int, List<int>>{for (var i = 0; i < count; i++) i: []};
+  for (final node in dag.keys) {
+    for (final target in dag[node]!) {
+      inDegree[target]++;
+      preds[target]!.add(node);
+    }
+  }
+
+  // Find natural roots (in-degree == 0).
+  final roots = <int>[];
+  for (var i = 0; i < count; i++) {
+    if (inDegree[i] == 0) roots.add(i);
+  }
+
+  // To combine multiple roots for a single dominator tree, we use a virtual root `-1`.
+  // doms maps node -> Set of dominators.
+  final doms = <int, Set<int>>{};
+  final allNodes = Set<int>.from(Iterable.generate(count))..add(-1);
+
+  // Initialize: dom(root) = {root}, dom(other) = all_nodes
+  doms[-1] = {-1};
+  for (var i = 0; i < count; ++i) {
+    doms[i] = allNodes;
+  }
+  for (final root in roots) {
+    preds[root]!.add(-1);
+  }
+
+  // Topo sort
+  final queue = List<int>.from(roots);
+  final topo = <int>[];
+  final inDegreeMutable = List<int>.from(inDegree);
+  while (queue.isNotEmpty) {
+    final curr = queue.removeLast();
+    topo.add(curr);
+    for (final next in dag[curr] ?? const <int>{}) {
+      inDegreeMutable[next]--;
+      if (inDegreeMutable[next] == 0) {
+        queue.add(next);
+      }
+    }
+  }
+
+  // Forward pass to compute doms
+  for (final node in topo) {
+    if (preds[node]!.isEmpty) {
+      doms[node] = {node};
+    } else {
+      var d = Set<int>.from(doms[preds[node]!.first]!);
+      for (final p in preds[node]!.skip(1)) {
+        d = d.intersection(doms[p]!);
+      }
+      d.add(node);
+      doms[node] = d;
+    }
+  }
+
+  // From dom sets, compute idom.
+  // idom(n) is the unique dominator of n strictly dominating n, that is dominated by all other strict dominators of n.
+  // In our dom set, idom(n) is the dominator of n (other than n) with the maximum |dom| size!
+  final idom = <int, int>{};
+  for (var i = 0; i < count; i++) {
+    final strictDoms = doms[i]!.difference({i});
+    if (strictDoms.isEmpty ||
+        (strictDoms.length == 1 && strictDoms.first == -1)) {
+      // no idom other than virtual root
+      continue;
+    }
+    // Find the strict dom with the largest number of dominators
+    var best = -1;
+    var maxDomSize = -1;
+    for (final d in strictDoms) {
+      if (d == -1) continue;
+      final size = doms[d]!.length;
+      if (size > maxDomSize) {
+        maxDomSize = size;
+        best = d;
+      }
+    }
+    if (best != -1) {
+      idom[i] = best;
+    }
+  }
+  return idom;
+}

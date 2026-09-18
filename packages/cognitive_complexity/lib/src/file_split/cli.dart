@@ -45,7 +45,7 @@ ArgParser _buildArgParser() => ArgParser()
   )
   ..addOption(
     'target-lines',
-    defaultsTo: '300',
+    defaultsTo: '800',
     valueHelp: 'lines',
     help: 'Target maximum line count per extracted file cluster.',
   )
@@ -95,7 +95,7 @@ Future<int> _executeFileSplit(
   final analyzer = FileSplitAnalyzer(sdkPath: sdkPath);
   final report = await analyzer.analyzeFile(
     targetFile,
-    targetLines: targetLines == 0 ? 300 : targetLines,
+    targetLines: targetLines == 0 ? 800 : targetLines,
     minClusterLines: minClusterLines,
   );
 
