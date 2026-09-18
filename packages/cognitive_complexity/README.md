@@ -103,6 +103,7 @@ Options:
 ### `file_split` CLI Options
 
 <!-- CLI_README_START file_split -->
+
 ```console
 $ file_split --help
 Dart File Decomposition & Acyclic Dependency Cut Advisor (file_split)
@@ -120,6 +121,7 @@ Options:
                                    [text (default), json]
     --sdk-path                     Path to the Dart SDK root (overrides auto-discovery).
 ```
+
 <!-- CLI_README_END file_split -->
 
 ### Library API
