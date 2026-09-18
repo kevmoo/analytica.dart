@@ -25,18 +25,50 @@ class FileSplitAnalyzer {
     int minClusterLines = 40,
     bool? useParts,
   }) async {
-    final absPath = p.canonicalize(File(filePath).absolute.path);
-    final unitResult = await AnalysisContextHelper.resolveFile(
-      absPath,
-      sdkPath: sdkPath,
-    );
-    return analyzeResolvedUnit(
-      unitResult,
-      displayPath: filePath,
+    final reports = await analyzeFiles(
+      [filePath],
       targetLines: targetLines,
       minClusterLines: minClusterLines,
       useParts: useParts,
     );
+    return reports.single;
+  }
+
+  /// Resolves and analyzes multiple [filePaths] in a single shared
+  /// [AnalysisContextHelper] to amortize analyzer initialization.
+  Future<List<FileSplitReport>> analyzeFiles(
+    List<String> filePaths, {
+    int targetLines = 800,
+    int minClusterLines = 40,
+    bool? useParts,
+  }) async {
+    if (filePaths.isEmpty) return const [];
+    final absPaths = [
+      for (final path in filePaths) p.canonicalize(File(path).absolute.path),
+    ];
+    for (var i = 0; i < filePaths.length; i++) {
+      if (!File(absPaths[i]).existsSync()) {
+        throw FileSystemException('Target file does not exist', filePaths[i]);
+      }
+    }
+    final helper = AnalysisContextHelper(
+      includedPaths: absPaths,
+      sdkPath: sdkPath,
+    );
+    final reports = <FileSplitReport>[];
+    for (var i = 0; i < filePaths.length; i++) {
+      final unitResult = await helper.getRequiredResolvedUnit(absPaths[i]);
+      reports.add(
+        analyzeResolvedUnit(
+          unitResult,
+          displayPath: filePaths[i],
+          targetLines: targetLines,
+          minClusterLines: minClusterLines,
+          useParts: useParts,
+        ),
+      );
+    }
+    return reports;
   }
 
   /// Analyzes an already-resolved [unitResult].
@@ -143,6 +175,7 @@ class _ExtractionCutPlanner {
     _extractDisjointIslands();
     _extractDominatorCones();
     _extractOversizedSccFallbacks();
+    _reabsorbSurplusSmallCuts();
 
     final surviving = <DeclarationUnit>[
       for (var i = 0; i < sccs.length; i++)
@@ -159,6 +192,7 @@ class _ExtractionCutPlanner {
       ..sort((a, b) => _setLines(b).compareTo(_setLines(a)));
 
     for (final island in sortedIslands.skip(1)) {
+      if (_remainingLines() <= targetLines) break;
       if (_setLines(island) >= minClusterLines) {
         _commitCluster(island, isDisjointIsland: true);
       }
@@ -170,10 +204,39 @@ class _ExtractionCutPlanner {
     final domTree = _buildDomTree(idom);
     final coneSizes = <int, int>{};
     final coneNodes = <int, Set<int>>{};
+    final roots = <int>[];
 
     for (var i = 0; i < sccs.length; i++) {
       if (!idom.containsKey(i)) {
+        roots.add(i);
         _extractNodeCone(i, idom, domTree, coneSizes, coneNodes);
+      }
+    }
+
+    _commitRemainingRootCones(roots, coneNodes);
+  }
+
+  void _commitRemainingRootCones(
+    List<int> roots,
+    Map<int, Set<int>> coneNodes,
+  ) {
+    final survivingRoots = [
+      for (final r in roots)
+        if (!extractedSccs.contains(r) && coneNodes.containsKey(r)) r,
+    ];
+    if (survivingRoots.isEmpty || _remainingLines() <= targetLines) return;
+
+    final mergedGroups = _mergeChildConesToMinimizeCrossings(
+      survivingRoots,
+      coneNodes,
+    );
+    while (_remainingLines() > targetLines) {
+      if (!_extractNextEligibleGroup(
+        mergedGroups,
+        _remainingLines,
+        requireSmallerThanRemaining: true,
+      )) {
+        break;
       }
     }
   }
@@ -222,10 +285,6 @@ class _ExtractionCutPlanner {
       coneSizes[node] = _setLines(currentNodes);
       coneNodes[node] = currentNodes;
     }
-
-    if (!idom.containsKey(node)) {
-      _maybeCommitRootCone(coneNodes[node]!, coneSizes[node]!);
-    }
   }
 
   Set<int> _pruneOversizedNodeChildren(
@@ -237,67 +296,65 @@ class _ExtractionCutPlanner {
       survivingChildren,
       coneNodes,
     );
-    final (:extractable, :kept) = _partitionExtractableGroups(groups);
-    var remainingInNode = _setLines({
+    final allNodeSccs = <int>{
       node,
       for (final c in survivingChildren) ...coneNodes[c]!,
-    });
+    };
 
-    for (final g in extractable) {
-      final unextractedG = g.difference(extractedSccs);
-      if (_shouldExtractChildGroup(unextractedG, remainingInNode)) {
-        _commitCluster(unextractedG, isDisjointIsland: false);
-        remainingInNode = _setLines(
-          {
-            node,
-            for (final c in survivingChildren) ...coneNodes[c]!,
-          }.difference(extractedSccs),
-        );
-      } else if (unextractedG.isNotEmpty) {
-        kept.add(unextractedG);
+    while (_setLines(allNodeSccs.difference(extractedSccs)) > targetLines) {
+      if (!_extractNextEligibleGroup(
+        groups,
+        () => _setLines(allNodeSccs.difference(extractedSccs)),
+        requireSmallerThanRemaining: false,
+      )) {
+        break;
       }
     }
-    return <int>{node, for (final g in kept) ...g}.difference(extractedSccs);
+    return allNodeSccs.difference(extractedSccs);
   }
 
-  ({List<Set<int>> extractable, List<Set<int>> kept})
-  _partitionExtractableGroups(List<Set<int>> groups) {
-    final extractable = <Set<int>>[];
-    final kept = <Set<int>>[];
+  bool _extractNextEligibleGroup(
+    List<Set<int>> groups,
+    int Function() currentRemainingLines, {
+    required bool requireSmallerThanRemaining,
+  }) {
+    final remLines = currentRemainingLines();
+    if (remLines <= targetLines) return false;
+
+    final neededLines = remLines - targetLines;
+    final eligible = <Set<int>>[];
     for (final g in groups) {
-      final lines = _setLines(g);
+      final unextracted = _unextractedDownwardClosure(g);
+      final lines = _setLines(unextracted);
+      final withinRem = !requireSmallerThanRemaining || lines < remLines;
       if (lines >= minClusterLines &&
           lines <= targetLines &&
-          _isValidDownwardClosedCut(g)) {
-        extractable.add(g);
-      } else {
-        kept.add(g);
+          withinRem &&
+          _isValidDownwardClosedCut(unextracted)) {
+        eligible.add(unextracted);
       }
     }
-    extractable.sort(_compareCandidateCones);
-    return (extractable: extractable, kept: kept);
+    if (eligible.isEmpty) return false;
+    eligible.sort((a, b) => _compareCandidateCones(a, b, neededLines));
+    _commitCluster(eligible.first, isDisjointIsland: false);
+    return true;
   }
 
-  int _compareCandidateCones(Set<int> a, Set<int> b) {
+  int _compareCandidateCones(Set<int> a, Set<int> b, int neededLines) {
+    final aLines = _setLines(a);
+    final bLines = _setLines(b);
+    final aSufficient = aLines >= neededLines;
+    final bSufficient = bLines >= neededLines;
+    if (aSufficient != bSufficient) {
+      return aSufficient ? -1 : 1;
+    }
     final crossCmp = _countBoundaryCrossings(
       a,
     ).compareTo(_countBoundaryCrossings(b));
-    return crossCmp != 0 ? crossCmp : _setLines(b).compareTo(_setLines(a));
-  }
-
-  bool _shouldExtractChildGroup(Set<int> group, int remainingInNode) =>
-      remainingInNode > targetLines &&
-      _setLines(group) >= minClusterLines &&
-      _isValidDownwardClosedCut(group);
-
-  void _maybeCommitRootCone(Set<int> nodes, int size) {
-    if (_remainingLines() > targetLines &&
-        size >= minClusterLines &&
-        size <= targetLines &&
-        size < _remainingLines() &&
-        _isValidDownwardClosedCut(nodes)) {
-      _commitCluster(nodes, isDisjointIsland: false);
+    if (aSufficient && bSufficient) {
+      return crossCmp != 0 ? crossCmp : aLines.compareTo(bLines);
     }
+    return bLines != aLines ? bLines.compareTo(aLines) : crossCmp;
   }
 
   Set<int> _unextractedDownwardClosure(Iterable<int> seeds) {
@@ -385,18 +442,26 @@ class _ExtractionCutPlanner {
     int j, {
     required bool requireReduction,
   }) {
-    if (!requireReduction &&
-        (!_isAllPrivateGroup(groups[i]) || !_isAllPrivateGroup(groups[j]))) {
-      return false;
-    }
     final candidate = <int>{...groups[i], ...groups[j]};
-    if (_setLines(candidate) > targetLines ||
-        !_isValidDownwardClosedCut(candidate)) {
+    final candLines = _setLines(candidate);
+    if (candLines > targetLines || !_isValidDownwardClosedCut(candidate)) {
       return false;
     }
     final crossBefore =
         _countBoundaryCrossings(groups[i]) + _countBoundaryCrossings(groups[j]);
     final crossAfter = _countBoundaryCrossings(candidate);
+
+    if (!requireReduction) {
+      final bothPrivate =
+          _isAllPrivateGroup(groups[i]) && _isAllPrivateGroup(groups[j]);
+      final smallZeroCrossingPair =
+          targetLines >= 200 &&
+          crossBefore == 0 &&
+          crossAfter == 0 &&
+          candLines <= targetLines ~/ 2;
+      if (!bothPrivate && !smallZeroCrossingPair) return false;
+    }
+
     final worse = requireReduction
         ? crossAfter >= crossBefore
         : crossAfter > crossBefore;
@@ -409,6 +474,54 @@ class _ExtractionCutPlanner {
       ..remove(removedB)
       ..add(candidate);
     return true;
+  }
+
+  void _reabsorbSurplusSmallCuts() {
+    if (clusters.length <= 1) return;
+    var changed = true;
+    while (changed && clusters.length > 1) {
+      changed = _tryReabsorbOneSmallCut();
+    }
+  }
+
+  bool _tryReabsorbOneSmallCut() {
+    final sortedIndices = Iterable<int>.generate(clusters.length).toList()
+      ..sort(
+        (a, b) => clusters[a].totalLines.compareTo(clusters[b].totalLines),
+      );
+    for (final idx in sortedIndices) {
+      final c = clusters[idx];
+      if (_remainingLines() + c.totalLines <= targetLines &&
+          !_isDependedOnByOtherExtractedClusters(idx)) {
+        _removeClusterAt(idx);
+        return true;
+      }
+    }
+    return false;
+  }
+
+  bool _isDependedOnByOtherExtractedClusters(int clusterIdx) {
+    final targetNames = clusters[clusterIdx].declarations
+        .map((d) => d.name)
+        .toSet();
+    for (var i = 0; i < clusters.length; i++) {
+      if (i == clusterIdx) continue;
+      final depends = clusters[i].declarations.any(
+        (d) => d.outgoingIntraFileRefs.any(targetNames.contains),
+      );
+      if (depends) return true;
+    }
+    return false;
+  }
+
+  void _removeClusterAt(int clusterIdx) {
+    final removed = clusters.removeAt(clusterIdx);
+    final removedNames = removed.declarations.map((d) => d.name).toSet();
+    for (var i = 0; i < sccs.length; i++) {
+      if (sccs[i].any(removedNames.contains)) {
+        extractedSccs.remove(i);
+      }
+    }
   }
 
   bool _isValidDownwardClosedCut(Set<int> candidate) {

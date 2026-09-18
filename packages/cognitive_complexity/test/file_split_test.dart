@@ -332,5 +332,151 @@ $pad
         'that can be promoted to top-level functions',
       );
     });
+
+    test('Dynamically re-evaluates shared-tail diamond cones so surviving '
+        'file drops below targetLines', () async {
+      final file = File(p.join(tempDir.path, 'diamond_harvester.dart'));
+      final padRunner = List.generate(
+        25,
+        (i) => '  final r$i = $i;',
+      ).join('\n');
+      final padSubA = List.generate(25, (i) => '  final a$i = $i;').join('\n');
+      final padSubB = List.generate(30, (i) => '  final b$i = $i;').join('\n');
+      final padShared = List.generate(
+        20,
+        (i) => '  final s$i = $i;',
+      ).join('\n');
+      file.writeAsStringSync('''
+class HarvestRunner {
+  void run() {
+    _scanCalendar();
+    _scanTranscripts();
+$padRunner
+  }
+}
+
+void _scanCalendar() {
+  _sharedClassifier();
+$padSubA
+}
+
+void _scanTranscripts() {
+  _sharedClassifier();
+$padSubB
+}
+
+void _sharedClassifier() {
+$padShared
+}
+''');
+
+      const analyzer = FileSplitAnalyzer();
+      final report = await analyzer.analyzeFile(
+        file.path,
+        targetLines: 55,
+        minClusterLines: 20,
+      );
+
+      check(report.clusters.length).equals(2);
+      check(report.estimatedRemainingLines).isLessOrEqual(55);
+    });
+
+    test('Re-absorbs surplus small cuts when larger cuts already satisfy '
+        'targetLines', () async {
+      final file = File(p.join(tempDir.path, 'email_cmd_sim.dart'));
+      final padMain = List.generate(28, (i) => '  final m$i = $i;').join('\n');
+      final padLeaf = List.generate(18, (i) => '  final l$i = $i;').join('\n');
+      final padBig = List.generate(42, (i) => '  final b$i = $i;').join('\n');
+      file.writeAsStringSync('''
+class MainEmailCommand {
+  void run() {
+    smallHelper();
+    HeavyCleanupCommand().cleanup();
+$padMain
+  }
+}
+
+void smallHelper() {
+$padLeaf
+}
+
+class HeavyCleanupCommand {
+  void cleanup() {
+    _cleanupStep();
+$padBig
+  }
+}
+
+void _cleanupStep() {
+  final c = 1;
+}
+''');
+
+      const analyzer = FileSplitAnalyzer();
+      final report = await analyzer.analyzeFile(
+        file.path,
+        targetLines: 60,
+        minClusterLines: 15,
+      );
+
+      // Extracting HeavyCleanupCommand (~52L) alone brings total (~105L) down
+      // to ~53L (<= 60L), so smallHelper (~21L) is re-absorbed into surviving!
+      check(report.clusters.length).equals(1);
+      final survivingNames = report.survivingDeclarations
+          .map((d) => d.name)
+          .toSet();
+      check(survivingNames.contains('smallHelper')).equals(true);
+      check(report.estimatedRemainingLines).isLessOrEqual(60);
+    });
+
+    test('Detects embedded string/asset literals (>75% of declaration) '
+        'and supports multi-file CLI batch execution', () async {
+      final assetFile = File(p.join(tempDir.path, 'dashboard_js.dart'));
+      final rawLines = List.generate(
+        40,
+        (i) => 'const line$i = $i;',
+      ).join('\n');
+      assetFile.writeAsStringSync("""
+class DashboardJs {
+  static const String script = r'''
+$rawLines
+''';
+}
+""");
+
+      final secondFile = File(p.join(tempDir.path, 'second_target.dart'));
+      final pad = List.generate(25, (i) => '  final x$i = $i;').join('\n');
+      secondFile.writeAsStringSync('''
+class Alpha {
+  final Beta b = Beta();
+$pad
+}
+class Beta {
+$pad
+}
+''');
+
+      final out = StringBuffer();
+      final err = StringBuffer();
+      final code = await file_split_cli.runFileSplitCli(
+        [
+          '--target-lines',
+          '30',
+          '--min-cluster-lines',
+          '15',
+          assetFile.path,
+          secondFile.path,
+        ],
+        out: out,
+        err: err,
+      );
+
+      check(code).equals(0);
+      final text = out.toString();
+      check(
+        text,
+      ).contains('embedded string/asset literals (>75% of declaration)');
+      check(text).contains('second_target.dart');
+    });
   });
 }

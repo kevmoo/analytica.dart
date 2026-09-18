@@ -32,6 +32,7 @@ class DeclarationUnit {
   final bool isSealed;
   final int staticMethodCount;
   final int staticMethodLines;
+  final int stringLiteralLines;
   final Set<String> outgoingIntraFileRefs;
   final Map<String, Set<String>> privateMemberAccessesByTarget;
   final Set<String> requiredImportDirectives;
@@ -46,6 +47,7 @@ class DeclarationUnit {
     required this.isSealed,
     this.staticMethodCount = 0,
     this.staticMethodLines = 0,
+    this.stringLiteralLines = 0,
     required this.outgoingIntraFileRefs,
     required this.privateMemberAccessesByTarget,
     required this.requiredImportDirectives,
@@ -64,6 +66,7 @@ class DeclarationUnit {
     'is_sealed': isSealed,
     if (staticMethodCount > 0) 'static_method_count': staticMethodCount,
     if (staticMethodLines > 0) 'static_method_lines': staticMethodLines,
+    if (stringLiteralLines > 0) 'string_literal_lines': stringLiteralLines,
     'outgoing_refs': outgoingIntraFileRefs.toList()..sort(),
     if (privateMemberAccessesByTarget.isNotEmpty)
       'private_member_accesses': {
@@ -190,11 +193,12 @@ class SplitCluster {
 /// Default instruction surfaced when `part` / `part of` is auto-recommended
 /// (`useParts == null`) for an oversized class or tightly coupled SCC.
 const kAskUserPartsPreferenceDirective =
+    '(Non-interactive CLI note for AI agent — no stdin input required) '
     'Explicitly ASK the user whether they prefer '
-    '(1) splitting with `part` / `part of` directives (`--use-parts`) to '
-    'preserve private `_field` access on `this`, or '
-    '(2) extracting cohesive methods into a standalone helper class/library '
-    '(`--no-use-parts`).';
+    '`--use-parts` (`part` / `part of` directives to preserve private '
+    '`_field` access on `this`) or '
+    '`--no-use-parts` (extracting cohesive methods into a standalone helper '
+    'class/library).';
 
 /// Complete decomposition report for an analyzed Dart file.
 class FileSplitReport {
@@ -295,6 +299,13 @@ class FileSplitReport {
   }
 
   String _oversizedDeclNote(DeclarationUnit d) {
+    final isEmbeddedAsset = d.stringLiteralLines >= (d.lineCount * 3) ~/ 4;
+    if (isEmbeddedAsset) {
+      return ' [Note: single ${d.kind} exceeds target $targetLines lines — '
+          'contains ~${d.stringLiteralLines} lines of embedded string/asset '
+          'literals (>75% of declaration); consider moving raw string or '
+          'template assets to a separate file rather than splitting methods]';
+    }
     final staticHint = d.staticMethodCount > 0
         ? 'contains ${d.staticMethodCount} static method(s) '
               '(~${d.staticMethodLines} lines) that can be promoted to '

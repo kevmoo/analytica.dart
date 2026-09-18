@@ -5,6 +5,7 @@ import 'package:analytica/analytica.dart';
 import 'package:args/args.dart';
 
 import 'file_split_analyzer.dart';
+import 'models.dart';
 
 /// Executes the `file_split` CLI advisor with [args] and returns the exit code.
 Future<int> runFileSplitCli(
@@ -84,15 +85,11 @@ Future<int> _executeFileSplit(
     );
   }
 
-  final targetFile = argResults.rest.first;
-  if (!File(targetFile).existsSync()) {
-    throw FileSystemException('Target file does not exist', targetFile);
-  }
-
-  final targetLines = parseNonNegativeInt(
+  final rawTarget = parseNonNegativeInt(
     argResults['target-lines'] as String,
     'target-lines',
   );
+  final targetLines = rawTarget == 0 ? 800 : rawTarget;
   final minClusterLines = parseNonNegativeInt(
     argResults['min-cluster-lines'] as String,
     'min-cluster-lines',
@@ -103,23 +100,65 @@ Future<int> _executeFileSplit(
   final format = argResults['format'] as String;
   final sdkPath = argResults['sdk-path'] as String?;
 
+  final targetFiles = _expandTargetFiles(argResults.rest, targetLines);
   final analyzer = FileSplitAnalyzer(sdkPath: sdkPath);
-  final report = await analyzer.analyzeFile(
-    targetFile,
-    targetLines: targetLines == 0 ? 800 : targetLines,
+  final reports = await analyzer.analyzeFiles(
+    targetFiles,
+    targetLines: targetLines,
     minClusterLines: minClusterLines,
     useParts: useParts,
   );
 
-  if (format == 'json') {
-    stdoutSink.writeln(
-      const JsonEncoder.withIndent('  ').convert(report.toJson()),
-    );
-  } else {
-    stdoutSink.write(report.formatText());
-  }
-
+  _writeReports(reports, format, stdoutSink);
   return ExitCode.success.code;
+}
+
+List<String> _expandTargetFiles(List<String> inputs, int targetLines) {
+  final resolved = <String>[];
+  for (final input in inputs) {
+    if (FileSystemEntity.isDirectorySync(input)) {
+      resolved.addAll(
+        _findOversizedDartFilesInDir(Directory(input), targetLines),
+      );
+    } else if (File(input).existsSync()) {
+      resolved.add(input);
+    } else {
+      throw FileSystemException('Target file does not exist', input);
+    }
+  }
+  return resolved;
+}
+
+List<String> _findOversizedDartFilesInDir(Directory dir, int targetLines) {
+  final matches = <({String path, int lines})>[];
+  for (final entity in dir.listSync(recursive: true, followLinks: false)) {
+    if (entity is File && entity.path.endsWith('.dart')) {
+      final lineCount = entity.readAsLinesSync().length;
+      if (lineCount > targetLines) {
+        matches.add((path: entity.path, lines: lineCount));
+      }
+    }
+  }
+  matches.sort((a, b) => b.lines.compareTo(a.lines));
+  return [for (final m in matches) m.path];
+}
+
+void _writeReports(
+  List<FileSplitReport> reports,
+  String format,
+  StringSink stdoutSink,
+) {
+  if (format == 'json') {
+    final payload = reports.length == 1
+        ? reports.single.toJson()
+        : [for (final r in reports) r.toJson()];
+    stdoutSink.writeln(const JsonEncoder.withIndent('  ').convert(payload));
+    return;
+  }
+  for (var i = 0; i < reports.length; i++) {
+    if (i > 0) stdoutSink.writeln('=' * 42);
+    stdoutSink.write(reports[i].formatText());
+  }
 }
 
 void _printUsage(ArgParser parser, StringSink sink) {
