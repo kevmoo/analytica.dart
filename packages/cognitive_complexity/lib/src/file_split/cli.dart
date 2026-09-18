@@ -57,6 +57,14 @@ ArgParser _buildArgParser() => ArgParser()
         'Minimum line count for a standalone extracted cluster '
         '(prevents micro-fragmentation).',
   )
+  ..addFlag(
+    'use-parts',
+    defaultsTo: null,
+    help:
+        'Allow or prefer `part` / `part of` directives when decomposing '
+        'oversized classes or tightly coupled SCCs (defaults to auto-detect '
+        'with user confirmation prompt).',
+  )
   ..addOption(
     'format',
     defaultsTo: 'text',
@@ -89,6 +97,9 @@ Future<int> _executeFileSplit(
     argResults['min-cluster-lines'] as String,
     'min-cluster-lines',
   );
+  final useParts = argResults.wasParsed('use-parts')
+      ? argResults['use-parts'] as bool
+      : null;
   final format = argResults['format'] as String;
   final sdkPath = argResults['sdk-path'] as String?;
 
@@ -97,6 +108,7 @@ Future<int> _executeFileSplit(
     targetFile,
     targetLines: targetLines == 0 ? 800 : targetLines,
     minClusterLines: minClusterLines,
+    useParts: useParts,
   );
 
   if (format == 'json') {

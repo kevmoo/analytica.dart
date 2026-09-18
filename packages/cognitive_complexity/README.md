@@ -115,6 +115,7 @@ Options:
                                    (defaults to "800")
     --min-cluster-lines=<lines>    Minimum line count for a standalone extracted cluster (prevents micro-fragmentation).
                                    (defaults to "40")
+    --[no-]use-parts               Allow or prefer `part` / `part of` directives when decomposing oversized classes or tightly coupled SCCs (defaults to auto-detect with user confirmation prompt).
     --format                       Output format (text or json).
                                    [text (default), json]
     --sdk-path                     Path to the Dart SDK root (overrides auto-discovery).
