@@ -108,7 +108,7 @@ Options:
 $ file_split --help
 Dart File Decomposition & Acyclic Dependency Cut Advisor (file_split)
 
-Usage: dart run cognitive_complexity:file_split [options] <file.dart>
+Usage: dart run cognitive_complexity:file_split [options] <file_or_dir>...
 
 Options:
 -h, --help                         Print this usage information.

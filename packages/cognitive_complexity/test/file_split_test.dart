@@ -432,17 +432,20 @@ void _cleanupStep() {
     test('Detects embedded string/asset literals (>75% of declaration) '
         'and supports multi-file CLI batch execution', () async {
       final assetFile = File(p.join(tempDir.path, 'dashboard_js.dart'));
-      final rawLines = List.generate(
+      final adjacentLines = List.generate(
         40,
-        (i) => 'const line$i = $i;',
+        (i) => "    'const line$i = $i;\\n'",
       ).join('\n');
-      assetFile.writeAsStringSync("""
+      assetFile.writeAsStringSync('''
 class DashboardJs {
-  static const String script = r'''
-$rawLines
-''';
+  static const String script =
+$adjacentLines;
 }
-""");
+''');
+
+      final generatedFile = File(p.join(tempDir.path, 'big.g.dart'));
+      final genLines = List.generate(50, (i) => 'final g$i = $i;').join('\n');
+      generatedFile.writeAsStringSync(genLines);
 
       final secondFile = File(p.join(tempDir.path, 'second_target.dart'));
       final pad = List.generate(25, (i) => '  final x$i = $i;').join('\n');
@@ -459,14 +462,7 @@ $pad
       final out = StringBuffer();
       final err = StringBuffer();
       final code = await file_split_cli.runFileSplitCli(
-        [
-          '--target-lines',
-          '30',
-          '--min-cluster-lines',
-          '15',
-          assetFile.path,
-          secondFile.path,
-        ],
+        ['--target-lines', '30', '--min-cluster-lines', '15', tempDir.path],
         out: out,
         err: err,
       );
@@ -477,6 +473,17 @@ $pad
         text,
       ).contains('embedded string/asset literals (>75% of declaration)');
       check(text).contains('second_target.dart');
+      check(text.contains('big.g.dart')).equals(false);
+
+      final emptyOut = StringBuffer();
+      await file_split_cli.runFileSplitCli(
+        ['--target-lines', '5000', tempDir.path],
+        out: emptyOut,
+        err: err,
+      );
+      check(
+        emptyOut.toString(),
+      ).contains('No files exceeding 5000 lines found.');
     });
   });
 }

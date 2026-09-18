@@ -94,15 +94,18 @@ class _DeclarationMetricsVisitor extends RecursiveAstVisitor<void> {
   }
 
   @override
+  void visitAdjacentStrings(AdjacentStrings node) {
+    _recordStringSpan(node);
+  }
+
+  @override
   void visitSimpleStringLiteral(SimpleStringLiteral node) {
     _recordStringSpan(node);
-    super.visitSimpleStringLiteral(node);
   }
 
   @override
   void visitStringInterpolation(StringInterpolation node) {
     _recordStringSpan(node);
-    super.visitStringInterpolation(node);
   }
 
   void _recordStringSpan(AstNode node) {

@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:analytica/analytica.dart';
 import 'package:args/args.dart';
 
+import '../complexity/complexity_analyzer.dart';
 import 'file_split_analyzer.dart';
 import 'models.dart';
 
@@ -80,8 +81,8 @@ Future<int> _executeFileSplit(
 ) async {
   if (argResults.rest.isEmpty) {
     throw const FormatException(
-      'Missing target file. '
-      'Usage: dart run cognitive_complexity:file_split <file.dart>',
+      'Missing target file or directory. '
+      'Usage: dart run cognitive_complexity:file_split <file_or_dir>...',
     );
   }
 
@@ -109,7 +110,7 @@ Future<int> _executeFileSplit(
     useParts: useParts,
   );
 
-  _writeReports(reports, format, stdoutSink);
+  _writeReports(reports, format, targetLines, stdoutSink);
   return ExitCode.success.code;
 }
 
@@ -130,22 +131,17 @@ List<String> _expandTargetFiles(List<String> inputs, int targetLines) {
 }
 
 List<String> _findOversizedDartFilesInDir(Directory dir, int targetLines) {
-  final matches = <({String path, int lines})>[];
-  for (final entity in dir.listSync(recursive: true, followLinks: false)) {
-    if (entity is File && entity.path.endsWith('.dart')) {
-      final lineCount = entity.readAsLinesSync().length;
-      if (lineCount > targetLines) {
-        matches.add((path: entity.path, lines: lineCount));
-      }
-    }
-  }
-  matches.sort((a, b) => b.lines.compareTo(a.lines));
-  return [for (final m in matches) m.path];
+  final metrics = ComplexityAnalyzer().analyzePathFileLines(dir.path);
+  return [
+    for (final m in metrics)
+      if (m.lineCount > targetLines) m.filePath,
+  ];
 }
 
 void _writeReports(
   List<FileSplitReport> reports,
   String format,
+  int targetLines,
   StringSink stdoutSink,
 ) {
   if (format == 'json') {
@@ -153,6 +149,10 @@ void _writeReports(
         ? reports.single.toJson()
         : [for (final r in reports) r.toJson()];
     stdoutSink.writeln(const JsonEncoder.withIndent('  ').convert(payload));
+    return;
+  }
+  if (reports.isEmpty) {
+    stdoutSink.writeln('No files exceeding $targetLines lines found.');
     return;
   }
   for (var i = 0; i < reports.length; i++) {
@@ -167,7 +167,8 @@ void _printUsage(ArgParser parser, StringSink sink) {
   );
   sink.writeln();
   sink.writeln(
-    'Usage: dart run cognitive_complexity:file_split [options] <file.dart>',
+    'Usage: dart run cognitive_complexity:file_split '
+    '[options] <file_or_dir>...',
   );
   sink.writeln();
   sink.writeln('Options:');
