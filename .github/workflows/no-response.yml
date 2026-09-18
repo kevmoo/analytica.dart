@@ -16,7 +16,7 @@ jobs:
     runs-on: ubuntu-latest
     if: ${{ github.repository_owner == 'kevmoo' }}
     steps:
-      - uses: actions/stale@v9
+      - uses: actions/stale@v11
         with:
           days-before-stale: -1
           days-before-close: 14
