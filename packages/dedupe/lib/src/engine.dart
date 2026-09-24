@@ -161,11 +161,7 @@ class DedupeEngine {
       if (parent == current) break;
       current = parent;
     }
-    final targetDartTool = Directory(p.join(targetDirPath, '.dart_tool'));
-    if (targetDartTool.existsSync()) {
-      return p.join(targetDirPath, '.dart_tool', 'dedupe');
-    }
-    return p.join(targetDirPath, '.dedupe_cache');
+    return p.join(targetDirPath, '.dart_tool', 'dedupe');
   }
 
   Future<
