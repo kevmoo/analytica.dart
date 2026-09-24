@@ -1,5 +1,8 @@
 ## 0.1.2-wip
 
+- Fix false-positive `testedUndead` findings on private helpers and `typedef`s
+  transitively referenced by active `@visibleForTesting` / test-support
+  declarations.
 - Adopt centralized `PathFilter` in `UndeadOptions` and CLI for `--exclude` and
   `--[no-]ignore-generated` file filtering.
 - Add `ensure_cli_readme_test.dart` to verify CLI `--help` documentation in
