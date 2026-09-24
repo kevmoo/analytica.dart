@@ -69,12 +69,30 @@ class UndeadEngine {
       sealedSubtypes: data.sealedSubtypes,
     );
 
+    // Step 4.5: Identify active test-support roots and compute testSupportLive.
+    final activeTestSupportRoots = data.allNodes
+        .where(
+          (n) =>
+              testReachable.contains(n.id) &&
+              (n.isTestSupport ||
+                  WildcardPattern.anyMatch(_testSupportWildcards, n.name)),
+        )
+        .map((n) => n.id)
+        .toSet();
+
+    final testSupportLive = runBfs(
+      startIds: activeTestSupportRoots,
+      idToNode: data.idToNode,
+      sealedSubtypes: data.sealedSubtypes,
+    );
+
     // Step 5: Candidate Classification and Hazard Detection.
     final classification = _classifyFindings(
       allNodes: data.allNodes,
       topology: topology,
       productionLive: productionLive,
       testReachable: testReachable,
+      testSupportLive: testSupportLive,
       nodeDirectSuperElements: data.nodeDirectSuperElements,
       elementToNode: data.elementToNode,
       testSites: data.testSites,
@@ -482,6 +500,7 @@ class UndeadEngine {
     required PackageTopology topology,
     required Set<String> productionLive,
     required Set<String> testReachable,
+    required Set<String> testSupportLive,
     required Map<DeclarationNode, List<Element>> nodeDirectSuperElements,
     required Map<Element, DeclarationNode> elementToNode,
     required List<TestBlockSite> testSites,
@@ -510,6 +529,7 @@ class UndeadEngine {
           node,
           testSites: testSites,
           productionLive: productionLive,
+          testSupportLive: testSupportLive,
         );
         if (finding == null) continue;
         if (isHazard) {
@@ -570,11 +590,9 @@ class UndeadEngine {
     DeclarationNode node, {
     required List<TestBlockSite> testSites,
     required Set<String> productionLive,
+    required Set<String> testSupportLive,
   }) {
-    final isTestHook =
-        node.isTestSupport ||
-        WildcardPattern.anyMatch(_testSupportWildcards, node.name);
-    if (isTestHook) return (null, false);
+    if (testSupportLive.contains(node.id)) return (null, false);
 
     final matchingSites = testSites
         .where((site) => site.referencedDeclarationIds.contains(node.id))

@@ -2179,5 +2179,73 @@ void main() {
         check(report.undead).isEmpty();
       });
     });
+
+    test('BFS testSupport dependencies are pureUndead when unreferenced, '
+        'exempt when called', () async {
+      await d.dir('test_support_bfs', [
+        packageConfig('test_support_bfs'),
+        d.file('pubspec.yaml', '''
+name: test_support_bfs
+environment:
+  sdk: '^3.5.0'
+dependencies:
+  meta: ^1.11.0
+'''),
+        d.dir('lib', [
+          d.file('test_support_bfs.dart', '\n'),
+          d.dir('src', [
+            d.file('live.dart', '''
+import 'package:meta/meta.dart';
+
+typedef MyCallback = void Function(String warning);
+
+void _privateHelper() {}
+
+@visibleForTesting
+void doTestThings(MyCallback cb) {
+  _privateHelper();
+  cb('warn');
+}
+'''),
+          ]),
+        ]),
+        d.dir('test', [
+          d.file('active_test.dart', '''
+import 'package:test_support_bfs/src/live.dart';
+
+void main() {
+  doTestThings((w) {});
+}
+'''),
+        ]),
+      ]).create();
+
+      // Run 1: Test reaches doTestThings which reaches
+      // _privateHelper and MyCallback
+      final report1 = await analyzePackage(d.path('test_support_bfs'));
+
+      // They should all be exempted (no dead code found)
+      check(report1.pureUndeadFound).equals(0);
+      check(report1.testedUndeadFound).equals(0);
+
+      // Run 2: Test does NOT reach `doTestThings`. We simulate this
+      // by replacing `active_test.dart` with an empty test.
+      await d.dir('test_support_bfs', [
+        d.dir('test', [d.file('active_test.dart', 'void main() {}')]),
+      ]).create();
+
+      final report2 = await analyzePackage(d.path('test_support_bfs'));
+
+      // doTestThings, MyCallback, and _privateHelper should all be reported
+      // as pureUndead since doTestThings is effectively unreferenced.
+      check(report2.pureUndeadFound).equals(3);
+      check(report2.testedUndeadFound).equals(0);
+
+      final pureUndeadIds = report2.undead.map((e) => e.name).toList();
+      check(pureUndeadIds)
+        ..contains('MyCallback')
+        ..contains('_privateHelper')
+        ..contains('doTestThings');
+    });
   });
 }
