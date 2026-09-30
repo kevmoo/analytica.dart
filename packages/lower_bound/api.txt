@@ -1,0 +1,62 @@
+environment:
+  sdk: ^3.12.0
+executables:
+  lower_bound
+package:lower_bound/lower_bound.dart:
+  validatePackageLowerBounds (function: Future<LowerBoundValidationResult> Function({bool allowLocalSiblings, Directory? baseTempDir, StringSink? errSink, bool keepTemp, Map<String, LocalSibling>? localSiblings, required String packagePath, Version? sdkOverride, List<String> targets}))
+  DependencyFloor (class extends Object):
+    new (const constructor: DependencyFloor Function({required VersionConstraint declaredConstraint, bool isLocalPathOverride, bool isNonHosted, String? localPath, String? localVersion, required Version? lowerBound, required String name}))
+    declaredConstraint (getter: VersionConstraint)
+    isLocalPathOverride (getter: bool)
+    isNonHosted (getter: bool)
+    localPath (getter: String?)
+    localVersion (getter: String?)
+    lowerBound (getter: Version?)
+    name (getter: String)
+    toJson (method: Map<String, Object?> Function())
+    toString (method: String Function())
+  LowerBoundDiagnostic (class extends Object):
+    new (const constructor: LowerBoundDiagnostic Function({int? column, String? file, int? line, required String message, required String severity}))
+    column (getter: int?)
+    file (getter: String?)
+    isError (getter: bool)
+    isWarning (getter: bool)
+    line (getter: int?)
+    message (getter: String)
+    severity (getter: String)
+    toJson (method: Map<String, Object?> Function())
+    toString (method: String Function())
+  LowerBoundValidationResult (class extends Object):
+    new (const constructor: LowerBoundValidationResult Function({required bool analyzeSuccess, required List<DependencyFloor> dependencies, List<LowerBoundDiagnostic> diagnostics, required Version minSdk, required String packageName, required String packagePath, String? pubGetError, required bool pubGetSuccess, required Map<String, Version> resolvedVersions, List<String> warnings}))
+    analyzeSuccess (getter: bool)
+    analyzerErrors (getter: List<String>)
+    analyzerWarnings (getter: List<String>)
+    dependencies (getter: List<DependencyFloor>)
+    diagnostics (getter: List<LowerBoundDiagnostic>)
+    isClean (getter: bool)
+    minSdk (getter: Version)
+    packageName (getter: String)
+    packagePath (getter: String)
+    pubGetError (getter: String?)
+    pubGetSuccess (getter: bool)
+    resolvedVersions (getter: Map<String, Version>)
+    warnings (getter: List<String>)
+    toJson (method: Map<String, Object?> Function())
+package:lower_bound/src/pubspec_helper.dart:
+  LocalSibling (non-public)
+dart:async:
+  Future (referenced)
+dart:core:
+  List (referenced)
+  Map (referenced)
+  Object (referenced)
+  String (referenced)
+  StringSink (referenced)
+  bool (referenced)
+  int (referenced)
+dart:io:
+  Directory (referenced)
+package:pub_semver/src/version.dart:
+  Version (referenced)
+package:pub_semver/src/version_constraint.dart:
+  VersionConstraint (referenced)

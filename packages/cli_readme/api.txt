@@ -1,0 +1,54 @@
+environment:
+  sdk: ^3.12.0
+executables:
+  cli_readme
+package:cli_readme/cli_readme.dart:
+  expectReadmeHelpClean (function: Future<void> Function({String? packageRelativeDirectory, String? readmePath, List<CliTarget>? targets}))
+  formatCodeFence (function: String Function({required String content, String? header, String language}))
+  normalizeText (function: String Function(String))
+  CliReadmeSync (class extends Object):
+    new (constructor: CliReadmeSync Function({required String readmePath, required List<CliTarget> targets, required String workingDirectory}))
+    discover (constructor: CliReadmeSync Function({String? packageRelativeDirectory, String? readmePath, List<CliTarget>? targets, String? workingDir}))
+    readmePath (getter: String)
+    targets (getter: List<CliTarget>)
+    workingDirectory (getter: String)
+    evaluate (method: Future<SyncResult> Function())
+    update (method: Future<SyncResult> Function({bool dryRun}))
+    verify (method: Future<SyncResult> Function())
+  CliTarget (class extends Object):
+    new (const constructor: CliTarget Function({ArgParser? argParser, List<String> args, String codeFenceLanguage, required String commandName, String? description, String? executablePath, String? header, String id}))
+    executable (constructor: CliTarget Function({List<String> args, String codeFenceLanguage, String? commandName, required String executablePath, String? header, String id}))
+    parser (constructor: CliTarget Function({required ArgParser argParser, List<String> args, String codeFenceLanguage, required String commandName, String? description, String? header, String id}))
+    argParser (getter: ArgParser?)
+    args (getter: List<String>)
+    codeFenceLanguage (getter: String)
+    commandName (getter: String)
+    description (getter: String?)
+    executablePath (getter: String?)
+    header (getter: String?)
+    id (getter: String)
+  SyncResult (class extends Object):
+    new (const constructor: SyncResult Function({required bool hasModifications, required String readmePath, required List<TargetResult> targetResults, String? updatedReadmeContent}))
+    hasModifications (getter: bool)
+    isClean (getter: bool)
+    readmePath (getter: String)
+    staleTargets (getter: List<TargetResult>)
+    targetResults (getter: List<TargetResult>)
+    updatedReadmeContent (getter: String?)
+  TargetResult (class extends Object):
+    new (const constructor: TargetResult Function({String? actualOutputInReadme, String? diff, String? errorMessage, required String expectedOutput, required bool isClean, required CliTarget target}))
+    actualOutputInReadme (getter: String?)
+    diff (getter: String?)
+    errorMessage (getter: String?)
+    expectedOutput (getter: String)
+    isClean (getter: bool)
+    target (getter: CliTarget)
+dart:async:
+  Future (referenced)
+dart:core:
+  List (referenced)
+  Object (referenced)
+  String (referenced)
+  bool (referenced)
+package:args/src/arg_parser.dart:
+  ArgParser (referenced)
