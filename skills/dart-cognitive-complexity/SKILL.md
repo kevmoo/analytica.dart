@@ -2,516 +2,190 @@
 name: dart-cognitive-complexity
 description: >-
   Evaluates and reduces Cognitive Complexity in Dart and Flutter code using
-  deterministic CLI tooling and architectural refactoring patterns (exhaustive
-  pattern matching, guard clauses, method decomposition). Use when reviewing
-  codebase readability, remediating high-complexity warnings, or analyzing
-  structural code health. Don't use for general code formatting, simple
-  syntactic lints, or non-Dart/Flutter repositories.
+  deterministic CLI tooling, Ousterhout Deep Module boundaries, and
+  architectural refactoring patterns (exhaustive pattern matching, guard
+  clauses, pure functional decomposition). Use when reviewing codebase
+  readability, remediating high-complexity warnings, or analyzing structural
+  code health. Don't use for general code formatting, simple syntactic lints, or
+  non-Dart/Flutter repositories.
 license: Apache-2.0
 key_features:
   - Automated CLI evaluation
   - Scoped execution matrix (targeted / delta / full)
   - Interactive refactoring triage
-  - Dart 3 pattern matching refactorings
-  - Reproducible PR provenance reporting
+  - Deep Modules & pure internal decomposition
+  - Public API surface verification (api_summary)
 ---
 
-## 1. When to Use This Skill
+## 1. When to Use This Skill & Threshold Calibration
 
-Use this skill when analyzing Dart and Flutter codebase maintainability,
-evaluating function readability, or remediating high-complexity findings during
-code review or static analysis audits.
+Use this skill when analyzing Dart and Flutter maintainability, evaluating
+function readability, or remediating high-complexity findings during code
+review. Cognitive Complexity measures human mental friction rather than flat
+branch counts.
 
-Unlike Cyclomatic Complexity (which linearly counts control flow branching paths
-and punishes declarative table switches), Cognitive Complexity measures the
-mental friction required for a human engineer to read and simulate control flow.
-Rely on deterministic evaluation to target structures matching these indicators:
-
-- **Deeply Nested Control Flow**: Functions exhibiting multiple layers of
-  enclosing conditionals (`if`, `for`, `while`), where horizontal indentation
-  obscures logic.
-- **Convoluted Conditional Trees**: Functions employing verbose `if-else` or
-  `else if` chains instead of modern Dart 3 exhaustive pattern matching or
-  table-driven switch expressions.
-- **Monolithic Method Bodies**: Functions breaching operational threshold
-  ceilings.
-- **God Classes**: Logic classes exceeding structural line-count targets
-  (excluding declarative Flutter `build` methods).
+- **Production Logic Functions**: Target score `<= 15`. Functions exceeding 15
+  points mandate architectural refactoring.
+- **Test Methods (`_test.dart`)**: Target score `<= 40`.
+- **Class & File Size Ceilings**: Logic classes should remain `<= 150`
+  non-comment lines; source files should remain `<= 400` lines.
+- **Flutter UI Calibration**: Do not enforce the 150 LOC ceiling on declarative
+  Flutter `build` methods; instead, enforce a **Widget Tree Nesting Ceiling** of
+  at most 5 horizontal indentation levels before extracting helper widgets.
 
 ---
 
 ## 2. Automated Execution & Scope Resolution
 
-Execute the official package CLI directly in the terminal to retrieve exact
-complexity scores deterministically without LLM arithmetic or AST
-interpretation.
+Run the CLI directly (requires Dart SDK **3.12.0+**, verify via
+`dart --version`):
 
-> **SDK Compatibility Note**: Executing `dart run cognitive_complexity@^0.2.4`
-> requires Dart SDK version **3.12.0 or greater** installed in the host
-> environment. Verify compatibility via `dart --version` before initiating
-> scans.
-
-Select the execution scope based on the user's task instructions:
-
-### Scope 1: Targeted (Specific File, Directory, or Class)
-
-When the user references a discrete component (e.g., "check complexity in
-`lib/src/auth/`" or "audit `order_service.dart`"), pass explicit targets:
-
-```bash
-dart run cognitive_complexity@^0.2.4 --threshold 15 lib/src/auth/
-```
-
-### Scope 2: Delta (Pull Request, Branch, or Pre-flight Audit)
-
-When reviewing a feature branch, active commit stack, or PR, avoid full-project
-scanning. Isolate evaluation strictly to modified declarations against trunk:
-
-```bash
-dart run cognitive_complexity@^0.2.4 --git-diff origin/main --fail-threshold 15 --fail-on-increase
-```
-
-With both flags set, only increases that exceed the threshold fail — healthy
-sub-threshold increases (e.g. added error handling) are reported without
-blocking. Omit `--fail-threshold` only when a strict any-increase ratchet is
-explicitly desired.
-
-### Scope 3: Whole-Project (Default Naked Invocation)
-
-When invoked without targeting parameters ("scan my project for complexity" or
-`/cognitive-complexity`), audit the standard source and test roots:
-
-```bash
-# Production logic target (threshold 15)
-dart run cognitive_complexity@^0.2.4 --threshold 15 lib/
-
-# Test harness target (threshold 40)
-dart run cognitive_complexity@^0.2.4 --threshold 40 test/
-```
+- **Scope 1 — Targeted (Specific File or Directory)**:
+  ```bash
+  dart run cognitive_complexity@^0.2.4 --threshold 15 lib/src/auth/
+  ```
+- **Scope 2 — Delta (PR, Branch, or Pre-Flight Audit)**:
+  ```bash
+  dart run cognitive_complexity@^0.2.4 --git-diff origin/main --fail-threshold 15 --fail-on-increase
+  ```
+- **Scope 3 — Whole-Project (Default Naked Invocation)**:
+  ```bash
+  dart run cognitive_complexity@^0.2.4 --threshold 15 lib/
+  dart run cognitive_complexity@^0.2.4 --threshold 40 test/
+  ```
 
 ---
 
-## 3. Actionable Thresholds & Calibration
+## 3. The Triage & Confirmation Protocol (Audit Before Action)
 
-- **Production Logic Functions**: Target score `<= 15`. Functions exceeding 15
-  points mandate architectural refactoring.
-- **Test Methods (`_test.dart`)**: Target score `<= 40`. Test suites tolerate
-  higher setup sequences before decomposition is required.
-- **Class Size Ceiling**: Logic classes (services, domain objects, controllers)
-  should remain `<= 150` non-comment lines.
-- **Flutter UI Calibration**: Do not enforce the 150 LOC class ceiling on
-  declarative Flutter `build` methods, as widget wrappers consume vertical space
-  without increasing cognitive logic load. Instead, enforce a **Widget Tree
-  Nesting Ceiling** of maximum 5 horizontal indentation levels before extracting
-  discrete helper widget classes.
-
----
-
-## 4. The Triage & Confirmation Protocol (Audit Before Action)
-
-Discovering high-complexity functions during an audit does not grant permission
-to autonomously refactor the entire repository. To prevent unwanted diff bloat
-and preserve historical code stability, adhere to a strict 2-stage workflow:
+When threshold breaches are detected, **do not mutate code immediately** unless
+given an explicit upfront remediation directive or running in an unattended
+automated harness (`evalin` / subagent).
 
 ### Stage 1: Read-Only Audit & Reporting (Mandatory Stop)
 
-When threshold breaches are detected, **do not mutate code immediately**.
-
-**Mandatory Persistent Artifact**: You MUST create a structured Markdown
-artifact named `complexity_triage_report.md` in
-`<appDataDir>/brain/<conversation-id>/`. The artifact must include:
-
-- Flagged function name and clickable file local path. Must include code
-  snippets.
-- Current complexity score versus operational ceiling (sorted descending by
-  score).
-- Recommended refactoring strategy (Pattern A, B, D, E, or a Pattern C tier) and
-  unit test status.
-
-**Visible Chat Pre-Render**: You MUST render a high-level summary and a direct
-clickable link to the triage report artifact in visible chat BEFORE invoking the
-confirmation gate.
-
-### Invariant: Outlier-First Mandate
-
-- **Target the Primary Outlier**: When remediating complexity, prioritize the
-  highest-scoring declaration in the report (e.g. Score >= 25 or top outlier) to
-  achieve the highest measurable reduction.
-- **Prioritize High-Impact Reductions**: Avoid selecting only minor
-  sub-threshold helpers while leaving severe complexity outliers unaddressed.
-- **Decomposition Target**: Apply Dart 3 pattern matching, guard clauses, and
-  method decomposition targeting a post-refactoring score of `<= 15`. For
-  massive legacy functions (score > 60), safe phased decomposition across
-  isolated PRs is permitted if a single pass would exceed reviewable diff
-  limits.
+1. **Mandatory Persistent Artifact**: Create `complexity_triage_report.md` in
+   `<appDataDir>/brain/<conversation-id>/` listing each flagged function,
+   clickable file path with code snippets, current score vs. ceiling (sorted
+   descending by score), recommended pattern (A–F), and unit test status.
+2. **Visible Chat Pre-Render**: Render a high-level summary and a clickable link
+   to `complexity_triage_report.md` in visible chat BEFORE invoking the
+   confirmation gate.
+3. **Outlier-First Mandate**: Prioritize the highest-scoring declaration in the
+   report (`Score >= 25` or top outlier) targeting a post-refactoring score of
+   `<= 15`.
 
 ### Stage 2: Interactive User Selection (Confirmation Gate)
 
-**Anti-Blind-Modal Invariant**: Strictly FORBID calling `ask_question` in the
-same step as an unrendered report without the report already existing on disk
-and in chat. The question prompt in `ask_question` should explicitly reference
-the generated triage artifact (e.g., "Based on the findings in
-[complexity_triage_report.md](...)...").
-
-Pause execution and prompt the user (via interactive choice or chat) to select
-the desired sequencing:
+Never call `ask_question` before `complexity_triage_report.md` is written and
+linked in chat. Reference `[complexity_triage_report.md](...)` in the prompt and
+offer:
 
 1. **(Recommended) Refactor Primary Outlier First**: Target the single
-   highest-scoring declaration in the report, decompose towards score <= 15,
-   verify via unit tests, and present diffs cleanly.
+   highest-scoring declaration, decompose to `<= 15`, verify tests, and show
+   diffs.
 2. **Selective Batch Refactor**: Remediate the top N highest-scoring functions
    in descending order.
-3. **Report-Only / Exit**: Acknowledge complexity scores without code mutation.
-
-> **Explicit Bypass & Non-Interactive Fallback**:
->
-> - **Direct Directives**: Skip Stage 1 triage if given an explicit remediation
->   directive upfront (e.g., "Refactor `processOrder` in `lib/src/order.dart` to
->   fix complexity" or "Refactor the top complexity outlier").
-> - **Non-Interactive Execution**: In unattended or automated evaluation
->   workflows (e.g. `evalin` or subagents), proceed with Option 1 (Refactor
->   Primary Outlier) automatically after verifying baseline tests pass.
+3. **Report-Only / Exit**: Acknowledge scores without code mutation.
 
 ---
 
-## 5. Pre-Refactoring Assessment & Test Coverage Gate
+## 4. Pre-Refactoring Assessment, Coverage & Public API Baseline
 
-High cognitive complexity strongly correlates with brittle, untested legacy
-logic. Before undertaking structural refactoring on flagged functions, enforce
-this verification baseline:
-
-1. **Test Harness Mapping**: Confirm an accompanying unit test file exists for
-   the target declaration (e.g., `lib/src/foo.dart` -> `test/foo_test.dart`).
-2. **Coverage Audit & Execution**:
-   - If the **`dart-collect-coverage`** companion skill is available in your
-     agent runtime, invoke it to check line and branch coverage on the targeted
-     declarations.
-   - At minimum, execute the relevant test suite (`dart test test/foo_test.dart`
-     or `flutter test test/foo_test.dart`) to confirm a passing green regression
-     baseline before touching code.
-3. **Low-Coverage Safety Gate**: If tests are missing or coverage around the
-   flagged function is inadequate:
-   - **Interactive Sessions**: Pause execution and warn the user. Offer options
-     to (1) write unit tests first, or (2) proceed with surgical refactoring.
-   - **Automated Task Execution**: Log a low-coverage warning and author a
-     minimal regression test before modifying complex logic.
+1. **Test Baseline**: Confirm a unit test exists (`lib/src/foo.dart` ->
+   `test/foo_test.dart`), check coverage via `dart-collect-coverage` if
+   available, and run `dart test` (or `flutter test`) to verify a green baseline
+   before editing. If coverage is missing, warn the user (or add a minimal
+   regression test in unattended runs).
+2. **Public API Surface Baseline (`api_summary`)**: Whenever a complexity or
+   file-split refactor extracts helpers across files or touches `lib/` exports
+   in a Dart package, capture the pre-refactor public surface first:
+   ```bash
+   dart run api_summary@^1.1.0 > /tmp/api_before.txt
+   ```
 
 ---
 
-## 6. Dart Refactoring Patterns
+## 5. Deep Modules & Refactoring Patterns
 
-When remediation is required for declarations flagged by the scanner, apply
-these Dart-specific architectural refactorings:
+See [`references/refactoring_recipes.md`](references/refactoring_recipes.md) for
+complete before/after code examples across Patterns A–F and the PR provenance
+template.
 
-### Pattern A: Replace Nested If-Else with Dart 3 Switch Expression
+### 5.1 Deep Externally, Pure Internally (No Stateful `_Populator` / `_Runner` Classes)
 
-In Dart 3, an entire exhaustive switch expression incurs a single base penalty,
-regardless of how many pattern arms it contains. Converting deeply nested
-`if-else` trees into declarative tables removes repeated branching penalties and
-flattens nesting.
+- **Forbid Single-Use Stateful Helper Classes**: Never decompose complex
+  functions by creating single-use stateful private helper classes
+  (`_FooPopulator`, `_BarBuilder`, `_BazRunner`) that hold mutable fields across
+  methods or mutate caller collections in-place.
+- **Require Pure Top-Level / Static Helpers**: Extract **pure file-private
+  top-level functions** (`_validateItem(...)`, `_parseHeader(...)`) or `static`
+  methods on existing domain types with explicit inputs and immutable return
+  values (Dart 3 named records or value types).
 
-#### Before: Nested Conditional Ladders (Score: 11)
+### 5.2 Deterministic 3-Tier Decomposition (`data_flow`) & Pattern Summary
 
-```dart
-int resolveTimeout(String protocol, bool isSecure, int retryCount) {
-  if (protocol == 'http') {
-    if (isSecure) {
-      if (retryCount > 3) {
-        return 5000;
-      } else {
-        return 3000;
-      }
-    } else {
-      return 1000;
-    }
-  } else if (protocol == 'ftp') {
-    return isSecure ? 10000 : 2000;
-  }
-  return 0;
-}
-```
-
-#### After: Table-Driven Switch Expression (Score: 1)
-
-```dart
-int resolveTimeout(String protocol, bool isSecure, int retryCount) =>
-    switch ((protocol, isSecure, retryCount)) {
-      ('http', true, > 3) => 5000,
-      ('http', true, _) => 3000,
-      ('http', false, _) => 1000,
-      ('ftp', true, _) => 10000,
-      ('ftp', false, _) => 2000,
-      _ => 0,
-    };
-```
-
----
-
-### Pattern B: Guard Clause Inversion (Flattening Nesting Depth)
-
-Invert conditional checks into early guard return statements
-(`if (!condition) return;`). Every early exit strips away a layer of nesting
-multiplication from subsequent downstream logic.
-
-#### Before: Pyramid of Nesting (Score: 11)
-
-```dart
-Future<void> syncPayload(User? user, Payload? data) async {
-  if (user != null) {
-    if (user.hasPermission) {
-      if (data != null && data.isValid) {
-        for (final item in data.items) {
-          await repository.save(item);
-        }
-      }
-    }
-  }
-}
-```
-
-#### After: Early Exit Guard Clauses (Score: 5)
-
-```dart
-Future<void> syncPayload(User? user, Payload? data) async {
-  if (user == null || !user.hasPermission) return;
-  if (data == null || !data.isValid) return;
-
-  for (final item in data.items) {
-    await repository.save(item);
-  }
-}
-```
-
----
-
-### Pattern C: The 3-Tier Decomposition Rubric (Anti-Goodhart)
-
-**Anti-Goodhart Guardrail**: Do NOT blindly wrap monolithic functions in
-single-use runner classes with mutable instance variables just to bring scores
-below 15. Reducing the metric must never sacrifice transparent data flow or hide
-bugs.
-
-#### Deterministic 3-Tier Selection via `data_flow`
-
-Do not manually estimate or guess which tier a candidate slice belongs to. Run
-the companion statement-level data-flow analyzer (on-demand form; same SDK
-3.12.0+ requirement as the scanner) on each line slice you intend to extract:
+Run the statement-level data-flow analyzer on candidate line slices:
 
 ```bash
 dart run cognitive_complexity:data_flow@^0.2.4 lib/src/my_file.dart:45-80
 ```
 
-Its report (`inputs`, `mutations`, live `outputs`, control-flow escapes, and a
-synthesized Dart 3 record signature) selects the tier:
-
-1. **Tier 1 — Pure Functional Decomposition (First Choice)**:
-   - **Selection**: Cleanly extractable slice with 2+ live outputs.
-   - **Idiom**: Extract a static or top-level function returning the synthesized
-     Dart 3 named record signature verbatim
-     (`final (:data, :errors) = _stepOne(input);`).
-   - **Dataclass Boundary**: Private, file-local slices use named records at ANY
-     output count—do not create single-use `_XxxResult` dataclasses for them.
-     Reserve dedicated dataclasses only for values that cross public API
-     boundaries or require specialized invariants/methods.
-   - **State Scoping**: If the helper does not read or mutate class instance
-     state (`this`), declare it as a private top-level function (or static
-     method) to guarantee referential transparency.
-
-2. **Tier 2 — Standard Helper Extraction (Second Choice)**:
-   - **Selection**: Cleanly extractable slice with <= 1 live output and <= 3
-     inputs.
-   - **Idiom**: Extract a standard private helper method or private top-level
-     function returning that single value.
-
-3. **Control-Flow Escapes & Loop Bodies**:
-   - Apply natural seams: enlarge the slice to include the entire enclosing loop
-     or state machine and re-run `data_flow`.
-   - If the loop body itself is the hotspot, extract it with an explicit signal
-     return (Pattern E)—never a `shouldBreak` boolean flag.
-   - Use guard-clause inversion (Pattern B) when the escape exists only to skip
-     nested conditions.
-
-4. **Tier 3 — Encapsulated Method Object (Last Resort)**:
-   - **Mutation-Web Check Gate**: Permitted ONLY if `data_flow` reports on at
-     least two distinct candidate slices show that the intersection of their
-     `mutations` variable names contains 3 or more entries (the same mutable
-     variables thread through every candidate extraction).
-   - **Mechanics**: Read
-     [references/method-object.md](references/method-object.md) for extraction
-     mechanics and mandatory idioms. Do not load or apply it speculatively.
-
-**Domain-Modeling Exit**: When the same tightly coupled mutable state keeps
-resurfacing across a function (a parser's `buffer` + `cursor`, a traversal's
-`queue` + `visited`), the code may be asking to become a real, cohesively
-_named_ domain class (`Parser`, `GraphTraversal`) with a public, unit-tested
-API. To qualify for the exit, the class MUST have cohesive entity state, more
-than one public behavior, and its own dedicated test suite. Single-use private
-facades with one `run()` method remain subject to the Tier 3 gate.
+- **Pattern A (Dart 3 Switch Expressions)**: Replace nested `if-else` ladders
+  with exhaustive table-driven `switch` expressions (single base penalty).
+- **Pattern B (Guard Clause Inversion)**: Invert nested preconditions into early
+  returns (`if (!cond) return;`).
+- **Pattern C (3-Tier `data_flow` Extraction)**:
+  1. **Tier 1 — Pure Functional Decomposition (First Choice)**: For slices with
+     `2+` live outputs, extract a pure private top-level or `static` function
+     returning the synthesized Dart 3 named record
+     (`final (:data, :errors) = _step(input);`). Never create single-use
+     `_XxxResult` dataclasses for private slices.
+  2. **Tier 2 — Standard Helper Extraction (Second Choice)**: For slices with
+     `<= 1` output and `<= 3` inputs, extract a pure private top-level or static
+     helper.
+  3. **Tier 3 — Encapsulated Method Object (Last Resort)**: Permitted ONLY when
+     `data_flow` on 2+ candidate slices shows `>= 3` intersecting `mutations`
+     variables—read [`references/method-object.md`](references/method-object.md)
+     before applying. If coupled state represents a cohesive domain concept with
+     multiple public behaviors and dedicated tests, promote it to a real public
+     domain class instead.
+- **Pattern D (Fast-Fail Type Matching)**: Never silently drop malformed items
+  with `if (raw case final Map<String, dynamic> m)`; use
+  `if (raw is! Map) { ...; continue; }`.
+- **Pattern E (Loop-Body Signal Returns)**: Return an explicit `_Action` enum or
+  `sealed class` from extracted loop bodies rather than `shouldBreak` boolean
+  flags.
+- **Pattern F (Acyclic File Decomposition & Load-Bearing Library Boundaries)**:
+  Run
+  `dart run cognitive_complexity:file_split lib/src/large_file.dart --target-lines 300`
+  for files `> 400` lines and select the library boundary tier:
+  - **Tier 1 (Default — Standalone `lib/src/<topic>.dart`)**: Use when extracted
+    helpers form a genuine sub-domain with narrow parameter lists (`<= 3` args)
+    and do **not** need private `_` members or library-scoped modifiers of the
+    parent class/library.
+  - **Tier 2 (`part` / `part of`)**: Use when splitting one cohesive domain
+    where helpers share private `_` fields, private constructors (`._()`),
+    `sealed`/`final`/`interface`/`base` modifiers, or internal invariants, OR
+    when standalone `lib/src/` files would require widening visibility and risk
+    leaking internal types via unscoped `export 'src/...';` directives.
 
 ---
 
-### Pattern D: Fast-Fail Type Matching & Silent Data Swallowing
-
-When refactoring loops and type checks to reduce branching, **never** replace
-explicit type casts with pattern matching that silently drops data.
-
-**Flawed Structure (Silent Failure):**
-
-```dart
-for (final raw in rawTasks) {
-  // SILENTLY DROPS malformed data if raw is not a Map
-  if (raw case final Map<String, dynamic> taskMap) {
-    _applyTask(taskMap);
-  }
-}
-```
-
-**Correct Structure (Fast-Fail Preservation):**
-
-```dart
-for (final raw in rawTasks) {
-  if (raw is! Map<String, dynamic>) {
-    errors.add('Malformed task item (expected Map, got ${raw.runtimeType}): $raw');
-    continue;
-  }
-  _applyTask(raw);
-}
-```
-
----
-
-### Pattern E: Loop-Body Extraction with Signal Returns
-
-When a loop body must be extracted but contains `break`/`continue` targeting the
-loop, never smuggle the control flow through boolean flags (`shouldBreak` soup)
-— that raises cognitive load and hides termination conditions. Return an
-explicit signal and keep the loop keywords at the loop site:
-
-```dart
-enum _ScanAction { proceed, skip, halt }
-
-// Pure, independently testable helper.
-_ScanAction _classify(Entry entry, Set<String> seen) {
-  if (seen.contains(entry.id)) return _ScanAction.skip;
-  if (entry.isTerminal) return _ScanAction.halt;
-  return _ScanAction.proceed;
-}
-
-outer:
-for (final entry in entries) {
-  switch (_classify(entry, seen)) {
-    case _ScanAction.skip:
-      continue;
-    case _ScanAction.halt:
-      break outer;
-    case _ScanAction.proceed:
-      process(entry);
-  }
-}
-```
-
-Use a sealed class instead of an enum when the signal must carry a payload.
-Asynchronous classification works identically:
-`switch (await _classify(entry, seen))`. The exhaustive `switch` keeps every
-termination path visible at the loop site. Prefer extracting the _entire loop_
-when `data_flow` shows it forms a natural seam; use Pattern E when the loop body
-alone is the hotspot.
-
----
-
-### Pattern F: Acyclic File Decomposition (`file_split`)
-
-When a Dart file grows beyond the optimal agent context window (`> 400` lines;
-enforceable via opt-in `--max-file-lines 400` and `--max-function-lines 60` on
-`cognitive_complexity`), do not guess where to split the file or create circular
-imports. Run the deterministic intra-file dependency graph advisor:
-
-```bash
-dart run cognitive_complexity:file_split lib/src/large_file.dart --target-lines 300
-```
-
-`file_split` builds the resolved top-level symbol dependency graph, contracts
-`sealed` subtype hierarchies, runs Tarjan's Strongly Connected Components (SCC)
-and topological layering, absorbs single-dominator `_private` helpers into their
-sole caller cluster, and outputs ranked cuts with zero-churn
-`export '<cut>.dart' show ...;` directives so external callers require zero
-import modifications.
-
----
-
-## 7. Verification Guardrails
-
-Run these verification commands before committing refactored code:
+## 6. Verification & Public API Surface Guardrails
 
 1. **Complexity Audit**: Run
-   `dart run cognitive_complexity@^0.2.4 --fail-threshold 15 <refactored files>`
-   scoped to the files you touched. Pre-existing breaches elsewhere in the
-   project do not invalidate the refactor.
-2. **Code Presentation**: Run `dart format .` (or `flutter format .`) to
-   maintain uniform syntactic styling.
-3. **Static Analysis**: Run `dart analyze` (or `flutter analyze`) to ensure zero
-   static warnings, lint violations, or un-awaited asynchronous gaps.
-4. **Test Fidelity**:
-   - Check `pubspec.yaml`: if `sdk: flutter` is declared, run `flutter test`;
-     otherwise run `dart test`.
-   - In multi-package workspaces, run tests across all dependent packages.
-
----
-
-## 8. Pull Request & Commit Provenance Protocol
-
-When staging refactored code and preparing a commit message or Pull Request:
-
-### 1. User Confirmation Gate
-
-- **Interactive Sessions**: Before writing the PR description or commit body,
-  explicitly prompt the user in chat or via the harness confirmation tool (e.g.
-  `ask_question`) whether to include a **Tool Provenance & Complexity Delta
-  block**.
-- **User Prompt Inclusion**: When the user explicitly requests inclusion (or
-  confirms via prompt), append the standardized markdown block below. In
-  unattended or automated workflows, output the summary to chat or step
-  summaries rather than modifying commit bodies without user confirmation.
-
-### 2. Standardized Provenance Block Format
-
-When confirmed by the user, include the following markdown block in the PR
-description or commit body so reviewers understand where the changes originated,
-see the quantified readability improvements, and can rerun the audit locally:
-
-````markdown
-### 🤖 Tool Provenance & Complexity Delta
-
-This refactoring was guided by
-[`cognitive_complexity`](https://pub.dev/packages/cognitive_complexity)
-(`v{version}`).
-
-<!-- mdformat off(prevent table wrapping) -->
-
-| Target Declaration                   |   Pre-Score   |   Post-Score   | Operational Ceiling |
-| :----------------------------------- | :-----------: | :------------: | :-----------------: |
-| `{declaration_name}` (`{file_path}`) | `{pre_score}` | `{post_score}` |   `<={threshold}`   |
-
-<!-- mdformat on -->
-
-To reproduce or re-evaluate cognitive complexity scores:
-
-```bash
-{exact_command_line}
-```
-
-<!-- If statement data-flow analysis was used during decomposition: -->
-
-```bash
-dart run cognitive_complexity:data_flow@^0.2.4 {file}:{start_line}-{end_line}
-```
-````
-
-### 3. Version Resolution
-
-Determine the package version dynamically:
-
-- Check `pubspec.lock` in the workspace or run
-  `dart run cognitive_complexity@^0.2.4 --version`.
-- If invoked with a specific version constraint (e.g.
-  `cognitive_complexity@^0.2.4`), use that exact version.
+   `dart run cognitive_complexity@^0.2.4 --fail-threshold 15 <refactored files>`.
+2. **Mandatory `api_summary` Public API Surface Verification Gate**: Whenever a
+   refactor extracts helpers across files or touches `lib/` exports:
+   ```bash
+   dart run api_summary@^1.1.0 > /tmp/api_after.txt
+   diff -u /tmp/api_before.txt /tmp/api_after.txt
+   ```
+   Require zero unintended public symbol leaks (and if `api.txt` is tracked in
+   the repo, verify `git diff api.txt` is empty).
+3. **Format, Analyze & Test**: Run `dart format .`, `dart analyze`, and
+   `dart test` (or `flutter test`).
+4. **PR & Commit Provenance**: In interactive sessions, ask the user before
+   appending the standardized Tool Provenance & Complexity Delta block from
+   [`references/refactoring_recipes.md`](references/refactoring_recipes.md#3-pull-request--commit-provenance-template).
