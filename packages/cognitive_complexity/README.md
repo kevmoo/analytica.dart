@@ -219,8 +219,6 @@ jobs:
 
 #### Action Inputs Reference
 
-<!-- mdformat off(prevent table wrapping) -->
-
 | Input                | Default  | Description                                                                      |
 | :------------------- | :------: | :------------------------------------------------------------------------------- |
 | `targets`            |  `lib`   | Space-separated list of directories or files to scan.                            |
@@ -232,8 +230,6 @@ jobs:
 | `fail-on-increase`   | `false`  | When `true`, blocks PR merge on complexity increases exceeding `fail-threshold`. |
 | `format`             | `github` | Output format: `github` (annotations + step summary), `text`, or `json`.         |
 | `max-comment-rows`   |   `0`    | Maximum table rows in the sticky PR comment (0 = unlimited).                     |
-
-<!-- mdformat on -->
 
 ## 🧠 AI Agent Integration
 
