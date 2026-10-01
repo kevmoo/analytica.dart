@@ -607,6 +607,6 @@ void _printDeltaRows(
 
 String _formatDeltaMarker(ComplexityDelta d, bool isViolation) {
   if (isViolation) return ' [VIOLATION]';
-  if (d.delta < 0) return ' [IMPROVED]';
+  if (d.status == DeltaStatus.improved) return ' [IMPROVED]';
   return '';
 }

@@ -165,5 +165,91 @@ void complexFunc(int a) {
       ).emitsThrough((s) => s.contains('title=File Line Limit Exceeded'));
       await ghProc.shouldExit(1);
     });
+
+    test(
+      'Renders --git-diff text table with new/del transitions, '
+      '[IMPROVED] only on improved functions, and omits 0-score items',
+      () async {
+        await d.dir('git_project', [
+          d.dir('lib', [
+            d.file('app.dart', '''
+void zeroRemoved() {}
+
+int deletedComplex(int a) {
+  if (a > 0) {
+    if (a > 1) return 2;
+    return 1;
+  }
+  return 0;
+}
+
+int simplified(int a) {
+  if (a > 0) {
+    if (a > 1) return 2;
+    return 1;
+  }
+  return 0;
+}
+'''),
+          ]),
+        ]).create();
+
+        final repoDir = '${d.sandbox}/git_project';
+        Future<void> git(List<String> args) async {
+          final res = await Process.run('git', args, workingDirectory: repoDir);
+          check(res.exitCode).equals(0);
+        }
+
+        await git(['init', '-b', 'main']);
+        await git(['config', 'user.name', 'Tester']);
+        await git(['config', 'user.email', 'test@example.com']);
+        await git(['config', 'commit.gpgsign', 'false']);
+        await git(['add', '.']);
+        await git(['commit', '-m', 'Initial']);
+        await git(['checkout', '-b', 'feature']);
+
+        File('$repoDir/lib/app.dart').writeAsStringSync('''
+void zeroAdded() {}
+
+int addedComplex(int a) {
+  if (a > 0) return 1;
+  return 0;
+}
+
+int simplified(int a) {
+  if (a > 0) return 1;
+  return 0;
+}
+''');
+
+        final proc = await TestProcess.start(Platform.resolvedExecutable, [
+          binPath,
+          '--git-diff',
+          'main',
+        ], workingDirectory: repoDir);
+
+        final lines = <String>[];
+        while (await proc.stdout.hasNext) {
+          lines.add(await proc.stdout.next);
+        }
+        await proc.shouldExit(0);
+
+        final output = lines.join('\n');
+        check(output)
+          ..contains('new -> 1')
+          ..contains('addedComplex')
+          ..contains('3 -> del')
+          ..contains('deletedComplex  lib/app.dart')
+          ..not((s) => s.contains('deletedComplex  lib/app.dart [IMPROVED]'))
+          ..contains('3 -> 1')
+          ..contains('simplified      lib/app.dart:L8-11 [IMPROVED]')
+          ..not((s) => s.contains('zeroRemoved'))
+          ..not((s) => s.contains('zeroAdded'))
+          ..contains(
+            'Summary: 1 added, 0 increased, 1 improved, 1 removed '
+            '(Net Delta: -4 | Violations: 0)',
+          );
+      },
+    );
   });
 }
