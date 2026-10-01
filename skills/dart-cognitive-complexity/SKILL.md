@@ -99,9 +99,12 @@ offer:
    regression test in unattended runs).
 2. **Public API Surface Baseline (`api_summary`)**: Whenever a complexity or
    file-split refactor extracts helpers across files or touches `lib/` exports
-   in a Dart package, capture the pre-refactor public surface first:
+   in a Dart package, ensure `.dart_tool/package_config.json` exists and capture
+   a non-empty pre-refactor public surface (without `package_config.json`,
+   `api_summary` exits `0` with `0` `package:` symbols):
    ```bash
-   dart run api_summary@^1.1.0 > /tmp/api_before.txt
+   test -f .dart_tool/package_config.json || dart pub get
+   dart run api_summary@^1.1.0 > /tmp/api_before.txt && rg -q '^package:' /tmp/api_before.txt
    ```
 
 ---

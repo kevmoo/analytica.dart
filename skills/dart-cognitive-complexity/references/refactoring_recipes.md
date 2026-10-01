@@ -117,13 +117,17 @@ Whenever a complexity or file-split refactor extracts helpers across files or
 touches `lib/` exports in a Dart package, verify that the public API surface did
 not accidentally widen:
 
-1. **Capture baseline before refactoring**:
+1. **Ensure package resolution and capture a non-empty baseline before
+   refactoring** (without `.dart_tool/package_config.json`, `api_summary`
+   silently exits `0` with only the `environment:` header and `0` `package:`
+   entries, making a before/after diff tautologically empty):
    ```bash
-   dart run api_summary@^1.1.0 > /tmp/api_before.txt
+   test -f .dart_tool/package_config.json || dart pub get
+   dart run api_summary@^1.1.0 > /tmp/api_before.txt && rg -q '^package:' /tmp/api_before.txt
    ```
 2. **Capture post-refactor surface**:
    ```bash
-   dart run api_summary@^1.1.0 > /tmp/api_after.txt
+   dart run api_summary@^1.1.0 > /tmp/api_after.txt && rg -q '^package:' /tmp/api_after.txt
    ```
 3. **Verify zero unintended public symbol leaks**:
    ```bash
