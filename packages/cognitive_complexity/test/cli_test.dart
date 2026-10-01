@@ -222,11 +222,13 @@ int simplified(int a) {
 }
 ''');
 
-        final proc = await TestProcess.start(Platform.resolvedExecutable, [
-          binPath,
-          '--git-diff',
-          'main',
-        ], workingDirectory: repoDir);
+        final proc = await TestProcess.start(
+          Platform.resolvedExecutable,
+          [binPath, '--git-diff', 'main'],
+          workingDirectory: repoDir,
+          // runCli re-aligns Directory.current to GITHUB_WORKSPACE when set.
+          environment: {'GITHUB_WORKSPACE': repoDir},
+        );
 
         final lines = <String>[];
         while (await proc.stdout.hasNext) {
