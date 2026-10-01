@@ -27,7 +27,10 @@ import 'package:analyzer/dart/ast/visitor.dart';
 /// implementation, which omits it as well).
 class CognitiveComplexityVisitor extends RecursiveAstVisitor<void> {
   int _score = 0;
-  int _depth = 0;
+  int _depth;
+
+  /// Creates a [CognitiveComplexityVisitor] starting at [initialDepth].
+  CognitiveComplexityVisitor({int initialDepth = 0}) : _depth = initialDepth;
 
   /// Returns the accumulated cognitive complexity score.
   int get score => _score;
@@ -285,4 +288,48 @@ class CognitiveComplexityVisitor extends RecursiveAstVisitor<void> {
     }
     unparenthesized.accept(this);
   }
+}
+
+/// Computes the Cognitive Complexity score of [parts] starting at
+/// [initialDepth].
+int scoreAstParts(Iterable<AstNode?> parts, {int initialDepth = 0}) {
+  final visitor = CognitiveComplexityVisitor(initialDepth: initialDepth);
+  visitor.visitAll(parts);
+  return visitor.score;
+}
+
+/// Computes the Cognitive Complexity nesting depth of [node] relative to
+/// [enclosingDeclaration].
+int nestingDepthAt(AstNode node, AstNode enclosingDeclaration) {
+  var depth = 0;
+  AstNode? current = node;
+  while (current != null && !identical(current, enclosingDeclaration)) {
+    final parent = current.parent;
+    if (parent == null) break;
+    final increments = switch (parent) {
+      IfStatement(:final thenStatement, :final elseStatement) =>
+        identical(current, thenStatement) ||
+            (identical(current, elseStatement) && current is! IfStatement),
+      IfElement(:final thenElement, :final elseElement) =>
+        identical(current, thenElement) ||
+            (identical(current, elseElement) && current is! IfElement),
+      ForStatement(:final body) ||
+      WhileStatement(:final body) ||
+      DoStatement(:final body) => identical(current, body),
+      ForElement(:final body) => identical(current, body),
+      CatchClause(:final body) => identical(current, body),
+      SwitchStatement(:final members) => members.contains(current),
+      SwitchExpression(:final cases) => cases.contains(current),
+      ConditionalExpression(:final thenExpression, :final elseExpression) =>
+        identical(current, thenExpression) ||
+            identical(current, elseExpression),
+      FunctionExpression(:final body) =>
+        identical(current, body) &&
+            !identical(parent.parent, enclosingDeclaration),
+      _ => false,
+    };
+    if (increments) depth++;
+    current = parent;
+  }
+  return depth;
 }

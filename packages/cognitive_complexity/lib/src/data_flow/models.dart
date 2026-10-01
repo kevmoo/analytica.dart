@@ -81,6 +81,10 @@ class DataFlowResult {
   final List<ControlFlowEscape> escapes;
   final String suggestedSignature;
   final bool isCleanlyExtractable;
+  final int enclosingScore;
+  final int sliceScoreInPlace;
+  final int sliceScoreAtRoot;
+  final List<String> extractionWarnings;
 
   const DataFlowResult({
     required this.filePath,
@@ -93,7 +97,16 @@ class DataFlowResult {
     required this.escapes,
     required this.suggestedSignature,
     required this.isCleanlyExtractable,
+    this.enclosingScore = 0,
+    this.sliceScoreInPlace = 0,
+    this.sliceScoreAtRoot = 0,
+    this.extractionWarnings = const [],
   });
+
+  /// Estimated Cognitive Complexity score of the enclosing declaration after
+  /// extracting this slice.
+  int get estimatedEnclosingScoreAfter =>
+      (enclosingScore - sliceScoreInPlace).clamp(0, enclosingScore);
 
   Map<String, dynamic> toJson() => {
     'file': filePath,
@@ -101,10 +114,15 @@ class DataFlowResult {
     'endLine': endLine,
     'enclosing': enclosingDeclaration,
     'isCleanlyExtractable': isCleanlyExtractable,
+    'enclosingScore': enclosingScore,
+    'sliceScoreInPlace': sliceScoreInPlace,
+    'extractedHelperScore': sliceScoreAtRoot,
+    'estimatedEnclosingScoreAfter': estimatedEnclosingScoreAfter,
     'inputs': inputs.map((e) => e.toJson()).toList(),
     'mutations': mutations.map((e) => e.toJson()).toList(),
     'outputs': outputs.map((e) => e.toJson()).toList(),
     'escapes': escapes.map((e) => e.toJson()).toList(),
+    if (extractionWarnings.isNotEmpty) 'extractionWarnings': extractionWarnings,
     'suggestedSignature': suggestedSignature,
   };
 }
