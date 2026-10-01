@@ -1,5 +1,16 @@
 ## 0.2.5-wip
 
+- Add `shallow` CLI (`dart run cognitive_complexity:shallow`) and
+  `ShallowAnalyzer` (`ShallowReport`, `ShallowFinding`,
+  `ShallowClassification`) to detect single-caller shallow helpers
+  (`HIGH_ARITY`, `MICRO_HELPER`, `SIG_HEAVY`, `CROSS_FILE_SINGLE_CALLER`) and
+  simulate exact nesting-aware caller Cognitive Complexity after re-inlining
+  (`SAFE_INLINE`, `FLATTEN_AND_INLINE`, `LOAD_BEARING`).
+- Enhance `DataFlowAnalyzer` and `DataFlowResult` (`cognitive_complexity:data_flow`)
+  with nesting-aware complexity impact metrics (`enclosingScore`,
+  `sliceScoreInPlace`, `sliceScoreAtRoot`, `estimatedEnclosingScoreAfter`) and
+  `extractionWarnings` when a proposed slice requires `>= 5` input parameters
+  or provides low complexity payoff.
 - Add opt-in `--max-file-lines` and `--max-function-lines` CLI flags and GitHub
   Action inputs (`max-file-lines`, `max-function-lines`) with `--git-diff`
   pragmatic ratchet support (`FileLineMetric`, `FileLineDelta`). Disabled

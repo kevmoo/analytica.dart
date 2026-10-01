@@ -523,5 +523,40 @@ void testMethod(List<int> list) {
         result.outputs.map((o) => o.name).toList()..sort(),
       ).deepEquals(['a', 'b']);
     });
+
+    test('Computes nesting-aware complexity impact and warns on high-arity or '
+        'low-payoff slices', () async {
+      const code = '''
+void orchestrate(int a, int b, int c, int d, int e) {
+  if (a > 0) {
+    for (var i = 0; i < b; i++) {
+      // Target: Lines 5-7 (nested at depth 2)
+      if (c > d && e > 0) {
+        print(a + b + c + d + e + i);
+      }
+    }
+  }
+}
+''';
+      final result = await analyzer.analyzeSource(
+        sourceCode: code,
+        startLine: 5,
+        endLine: 7,
+      );
+      // Enclosing score: outer if (1) + for (2) + inner if at depth 2 (3)
+      // + && (1) = 7.
+      check(result.enclosingScore).equals(7);
+      // Inner if at depth 2 contributes (1 + 2) + 1 (&&) = 4 in place,
+      // vs (1 + 0) + 1 = 2 at root.
+      check(result.sliceScoreInPlace).equals(4);
+      check(result.sliceScoreAtRoot).equals(2);
+      check(result.estimatedEnclosingScoreAfter).equals(3);
+      check(result.inputs.length).equals(6);
+      check(
+        result.extractionWarnings.any(
+          (w) => w.contains('High parameter count (6 inputs)'),
+        ),
+      ).isTrue();
+    });
   });
 }

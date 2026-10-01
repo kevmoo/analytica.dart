@@ -13,3 +13,5 @@ export 'src/complexity/git_diff_service.dart';
 export 'src/complexity/github_reporter.dart';
 export 'src/file_split/file_split_analyzer.dart';
 export 'src/file_split/models.dart';
+export 'src/shallow/models.dart';
+export 'src/shallow/shallow_analyzer.dart';

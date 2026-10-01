@@ -7,6 +7,7 @@ import 'package:analyzer/dart/ast/visitor.dart';
 import 'package:analyzer/source/line_info.dart';
 import 'package:path/path.dart' as p;
 
+import '../complexity/cognitive_complexity_visitor.dart';
 import 'models.dart';
 import 'signature_synthesizer.dart';
 import 'visitors/in_block_visitor.dart';
@@ -81,6 +82,10 @@ class DataFlowAnalyzer {
         escapes: result.escapes,
         suggestedSignature: result.suggestedSignature,
         isCleanlyExtractable: result.isCleanlyExtractable,
+        enclosingScore: result.enclosingScore,
+        sliceScoreInPlace: result.sliceScoreInPlace,
+        sliceScoreAtRoot: result.sliceScoreAtRoot,
+        extractionWarnings: result.extractionWarnings,
       );
     } finally {
       if (tempDir.existsSync()) {
@@ -171,6 +176,15 @@ class DataFlowAnalyzer {
       isAsync: inBlockVisitor.hasAwait,
     );
 
+    final (:enclosingScore, :sliceScoreInPlace, :sliceScoreAtRoot) =
+        _computeComplexityImpact(enclosingNode, startOffset, endOffset);
+    final warnings = _buildExtractionWarnings(
+      inputCount: inputList.length,
+      sliceLineCount: endLine - startLine + 1,
+      enclosingScore: enclosingScore,
+      sliceScoreInPlace: sliceScoreInPlace,
+    );
+
     return DataFlowResult(
       filePath: filePath,
       startLine: startLine,
@@ -182,7 +196,87 @@ class DataFlowAnalyzer {
       escapes: escapes,
       suggestedSignature: signature,
       isCleanlyExtractable: escapes.isEmpty,
+      enclosingScore: enclosingScore,
+      sliceScoreInPlace: sliceScoreInPlace,
+      sliceScoreAtRoot: sliceScoreAtRoot,
+      extractionWarnings: warnings,
     );
+  }
+
+  ({int enclosingScore, int sliceScoreInPlace, int sliceScoreAtRoot})
+  _computeComplexityImpact(
+    AstNode enclosingNode,
+    int startOffset,
+    int endOffset,
+  ) {
+    final parts = switch (enclosingNode) {
+      FunctionDeclaration(:final functionExpression) => <AstNode?>[
+        functionExpression.parameters,
+        functionExpression.body,
+      ],
+      MethodDeclaration(:final parameters, :final body) => <AstNode?>[
+        parameters,
+        body,
+      ],
+      ConstructorDeclaration(
+        :final parameters,
+        :final initializers,
+        :final body,
+      ) =>
+        <AstNode?>[parameters, ...initializers, body],
+      _ => <AstNode?>[enclosingNode],
+    };
+    final enclosingScore = scoreAstParts(parts);
+    final sliceCollector = _OutermostSliceNodesCollector(
+      startOffset,
+      endOffset,
+    );
+    enclosingNode.accept(sliceCollector);
+
+    var inPlace = 0;
+    var atRoot = 0;
+    for (final sliceNode in sliceCollector.nodes) {
+      final depth = nestingDepthAt(sliceNode, enclosingNode);
+      inPlace += scoreAstParts([sliceNode], initialDepth: depth);
+      atRoot += scoreAstParts([sliceNode]);
+    }
+    return (
+      enclosingScore: enclosingScore,
+      sliceScoreInPlace: inPlace,
+      sliceScoreAtRoot: atRoot,
+    );
+  }
+
+  List<String> _buildExtractionWarnings({
+    required int inputCount,
+    required int sliceLineCount,
+    required int enclosingScore,
+    required int sliceScoreInPlace,
+  }) {
+    final warnings = <String>[];
+    if (inputCount >= 5) {
+      warnings.add(
+        'High parameter count ($inputCount inputs): extracting a '
+        '$inputCount-parameter helper creates a shallow pass-through '
+        'signature. Prefer keeping the slice inline if enclosing complexity '
+        '($enclosingScore) is <= 15, choosing a coarser boundary with <= 4 '
+        'inputs, or grouping cohesive state.',
+      );
+    }
+    if (sliceScoreInPlace <= 2 && sliceLineCount <= 6) {
+      warnings.add(
+        'Low complexity payoff (slice saves $sliceScoreInPlace CC across '
+        '$sliceLineCount lines): avoid extracting single-caller micro-helpers '
+        'unless reused across multiple call sites.',
+      );
+    } else if (inputCount >= 4 && sliceScoreInPlace <= 3) {
+      warnings.add(
+        'Shallow signature-to-complexity ratio ($inputCount inputs for '
+        '-$sliceScoreInPlace CC reduction): signature and call-site ceremony '
+        'may outweigh the complexity saved.',
+      );
+    }
+    return warnings;
   }
 
   List<String> _extractTypeParams(
@@ -228,6 +322,26 @@ class DataFlowAnalyzer {
     ConstructorDeclaration(:final name) => name?.lexeme ?? 'new',
     _ => 'unknown',
   };
+}
+
+class _OutermostSliceNodesCollector extends UnifyingAstVisitor<void> {
+  final int startOffset;
+  final int endOffset;
+  final List<AstNode> nodes = [];
+
+  _OutermostSliceNodesCollector(this.startOffset, this.endOffset);
+
+  @override
+  void visitNode(AstNode node) {
+    if (node.offset >= startOffset && node.end <= endOffset) {
+      nodes.add(node);
+      return;
+    }
+    if (node.end < startOffset || node.offset > endOffset) {
+      return;
+    }
+    super.visitNode(node);
+  }
 }
 
 /// Collects the source spans of loops that strictly enclose the slice; loops
