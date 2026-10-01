@@ -166,14 +166,19 @@ class DeltaSummary {
 
   int get netDelta => deltas.fold(0, (sum, d) => sum + d.delta);
 
-  int get countAdded =>
-      deltas.where((d) => d.status == DeltaStatus.added).length;
+  int get countAdded => deltas
+      .where((d) => d.status == DeltaStatus.added && (d.newScore ?? 0) > 0)
+      .length;
 
   int get countIncreased =>
       deltas.where((d) => d.status == DeltaStatus.increased).length;
 
   int get countImproved =>
       deltas.where((d) => d.status == DeltaStatus.improved).length;
+
+  int get countRemoved => deltas
+      .where((d) => d.status == DeltaStatus.removed && (d.oldScore ?? 0) > 0)
+      .length;
 
   int countFileViolations({int? maxFileLines}) =>
       fileDeltas.where((f) => f.isViolation(maxFileLines: maxFileLines)).length;
@@ -225,7 +230,7 @@ class DeltaSummary {
     final changedDeltas = deltas
         .where(
           (d) =>
-              d.status != DeltaStatus.unchanged ||
+              d.delta != 0 ||
               d.isFunctionLineViolation(maxFunctionLines: maxFunctionLines),
         )
         .toList();
@@ -241,6 +246,7 @@ class DeltaSummary {
         'added': countAdded,
         'increased': countIncreased,
         'improved': countImproved,
+        'removed': countRemoved,
         'net_delta': netDelta,
         'violations': countViolations(
           failThreshold: failThreshold,

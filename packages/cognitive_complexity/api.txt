@@ -71,6 +71,7 @@ package:cognitive_complexity/cognitive_complexity.dart:
     countAdded (getter: int)
     countImproved (getter: int)
     countIncreased (getter: int)
+    countRemoved (getter: int)
     deltas (getter: List<ComplexityDelta>)
     fileDeltas (getter: List<FileLineDelta>)
     filesAnalyzed (getter: int)

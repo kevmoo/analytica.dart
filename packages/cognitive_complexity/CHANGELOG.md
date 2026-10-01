@@ -1,5 +1,10 @@
 ## 0.2.5-wip
 
+- Omit zero-complexity (`delta == 0`, `score == 0`) added and removed
+  declarations from `--git-diff` Markdown, CLI, and JSON delta tables (unless
+  they trigger `--max-function-lines`), add `DeltaSummary.countRemoved` (`🗑️`),
+  and format added/removed `Score` cells as `_new_ -> **N**` and
+  `N -> _deleted_`.
 - Add `shallow` CLI (`dart run cognitive_complexity:shallow`) and
   `ShallowAnalyzer` (`ShallowReport`, `ShallowFinding`, `ShallowClassification`)
   to detect single-caller shallow helpers (`HIGH_ARITY`, `MICRO_HELPER`,
