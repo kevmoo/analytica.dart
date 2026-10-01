@@ -124,6 +124,37 @@ Options:
 
 <!-- CLI_README_END file_split -->
 
+### `shallow` CLI Options
+
+<!-- CLI_README_START shallow -->
+
+```console
+$ shallow --help
+Dart Single-Caller Shallow Helper & Inlining Advisor (shallow)
+
+Detects single-caller pass-through helpers, parameter clumps, and micro-helpers,
+and simulates exact caller Cognitive Complexity after re-inlining.
+
+Usage: dart run cognitive_complexity:shallow [options] [file_or_directory...]
+
+Options:
+-h, --help                     Print this usage information.
+    --max-caller-cc=<score>    Maximum allowed caller Cognitive Complexity score after inlining for a candidate to be classified as SAFE_INLINE.
+                               (defaults to "15")
+    --max-params=<count>       Parameter count threshold at or above which a single-caller function is flagged as HIGH_ARITY.
+                               (defaults to "5")
+    --only-safe                Only output SAFE_INLINE candidates where inlining keeps caller complexity <= --max-caller-cc.
+-d, --git-diff=<git-ref>       Git reference to compare against. Only reports shallow helpers in modified files.
+    --fail-on-safe-inline      Exit with non-zero code if any SAFE_INLINE single-caller shallow helper is found.
+    --format                   Output format (text or json).
+                               [text (default), json]
+    --exclude=<glob>           Glob patterns of files/directories to exclude (repeatable or comma-separated).
+    --[no-]ignore-generated    Exclude generated files (*.g.dart, *.freezed.dart, *.mocks.dart, etc.).
+                               (defaults to on)
+```
+
+<!-- CLI_README_END shallow -->
+
 ### Library API
 
 Add `cognitive_complexity` to your `pubspec.yaml`:
@@ -188,8 +219,6 @@ jobs:
 
 #### Action Inputs Reference
 
-<!-- mdformat off(prevent table wrapping) -->
-
 | Input                | Default  | Description                                                                      |
 | :------------------- | :------: | :------------------------------------------------------------------------------- |
 | `targets`            |  `lib`   | Space-separated list of directories or files to scan.                            |
@@ -201,8 +230,6 @@ jobs:
 | `fail-on-increase`   | `false`  | When `true`, blocks PR merge on complexity increases exceeding `fail-threshold`. |
 | `format`             | `github` | Output format: `github` (annotations + step summary), `text`, or `json`.         |
 | `max-comment-rows`   |   `0`    | Maximum table rows in the sticky PR comment (0 = unlimited).                     |
-
-<!-- mdformat on -->
 
 ## 🧠 AI Agent Integration
 

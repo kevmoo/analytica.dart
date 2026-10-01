@@ -175,13 +175,26 @@ void _printTextReport(DataFlowResult result, StringSink sink) {
     'Data-Flow Extraction Analysis: ${result.filePath} '
     '(Lines ${result.startLine}-${result.endLine})',
   );
-  sink.writeln('Enclosing: ${result.enclosingDeclaration}');
+  sink.writeln(
+    'Enclosing: ${result.enclosingDeclaration} '
+    '(Score: ${result.enclosingScore} -> '
+    '${result.estimatedEnclosingScoreAfter} after extraction | '
+    'Extracted Helper Score: ${result.sliceScoreAtRoot})',
+  );
   sink.writeln();
 
   _printInputs(sink, result);
   _printMutations(sink, result);
   _printOutputs(sink, result);
   _printEscapes(result, sink);
+
+  if (result.extractionWarnings.isNotEmpty) {
+    sink.writeln('⚠️ Shallow Extraction Warnings:');
+    for (final warning in result.extractionWarnings) {
+      sink.writeln('  • $warning');
+    }
+    sink.writeln();
+  }
 
   sink.writeln('Suggested Signature:');
   sink.writeln('  ${result.suggestedSignature}');

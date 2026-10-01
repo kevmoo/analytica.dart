@@ -22,6 +22,7 @@ executables:
   cognitive_complexity:
   data_flow:
   file_split:
+  shallow:
 
 # Add regular dependencies here.
 dependencies:
