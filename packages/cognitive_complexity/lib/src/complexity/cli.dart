@@ -483,7 +483,7 @@ void _printDeltaTextReport(
 ) {
   final deltas = summary.deltas.where(
     (d) =>
-        d.status != DeltaStatus.unchanged ||
+        d.delta != 0 ||
         d.isFunctionLineViolation(maxFunctionLines: maxFunctionLines),
   );
   final violatedFiles = maxFileLines != null
@@ -518,7 +518,8 @@ void _printDeltaTextReport(
   );
   sink.writeln(
     'Summary: ${summary.countAdded} added, ${summary.countIncreased} '
-    'increased, ${summary.countImproved} improved '
+    'increased, ${summary.countImproved} improved, '
+    '${summary.countRemoved} removed '
     '(Net Delta: ${summary.netDelta} | Violations: $violations)',
   );
 }
@@ -536,10 +537,10 @@ void _printDeltaTableSection(
   }
 
   final hdrDelta = 'Delta'.padLeft(6);
-  final hdrScore = 'Score'.padRight(10);
+  final hdrScore = 'Score'.padRight(12);
   final hdrName = 'Declaration'.padRight(maxName);
   sink.writeln('$hdrDelta  $hdrScore  $hdrName  Location');
-  sink.writeln('-' * (6 + 2 + 10 + 2 + maxName + 2 + 30));
+  sink.writeln('-' * (6 + 2 + 12 + 2 + maxName + 2 + 30));
 
   _printDeltaRows(
     deltas,
@@ -550,7 +551,7 @@ void _printDeltaTableSection(
     sink,
   );
 
-  sink.writeln('-' * (6 + 2 + 10 + 2 + maxName + 2 + 30));
+  sink.writeln('-' * (6 + 2 + 12 + 2 + maxName + 2 + 30));
 }
 
 void _printDeltaFileViolations(
@@ -578,14 +579,21 @@ void _printDeltaRows(
   StringSink sink,
 ) {
   for (final d in deltas) {
-    final deltaStr = d.delta > 0
-        ? '+${d.delta}'
-        : (d.oldScore == null ? '+New' : '${d.delta}');
-    final scoreStr = d.oldScore != null && d.newScore != null
-        ? '${d.oldScore} -> ${d.newScore}'.padRight(10)
-        : '${d.newScore ?? "Deleted"}'.padRight(10);
+    final deltaStr = d.delta > 0 ? '+${d.delta}' : '${d.delta}';
+    final (locStr, rawScore) = switch ((d.oldScore, d.newScore)) {
+      (final oldS?, final newS?) => (
+        '${d.filePath}:L${d.startLine}-${d.endLine}',
+        '$oldS -> $newS',
+      ),
+      (null, final newS?) => (
+        '${d.filePath}:L${d.startLine}-${d.endLine}',
+        'new -> $newS',
+      ),
+      (final oldS?, null) => (d.filePath, '$oldS -> del'),
+      (null, null) => (d.filePath, 'del'),
+    };
+    final scoreStr = rawScore.padRight(12);
     final nameStr = d.name.padRight(maxName);
-    final locStr = '${d.filePath}:L${d.startLine}-${d.endLine}';
     final isVio = d.isViolation(
       failThreshold: failThreshold,
       maxFunctionLines: maxFunctionLines,

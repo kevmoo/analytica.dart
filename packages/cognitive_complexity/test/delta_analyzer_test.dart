@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:checks/checks.dart';
 import 'package:cognitive_complexity/cognitive_complexity.dart';
 import 'package:test/scaffolding.dart';
@@ -172,6 +173,88 @@ void main() {
         'increased in complexity (+15 points) to score 25.',
       );
     });
+
+    test(
+      'Omits 0-score added/removed rows and renders _new_ and _deleted_ scores',
+      () {
+        final summaryFile = Directory.systemTemp.createTempSync('cc_test_');
+        addTearDown(() => summaryFile.deleteSync(recursive: true));
+        final mdFile = File('${summaryFile.path}/summary.md');
+        final reporter = GitHubReporter(summaryFile: mdFile);
+
+        const summary = DeltaSummary(
+          baseRef: 'origin/main',
+          targetRef: 'HEAD',
+          filesAnalyzed: 1,
+          deltas: [
+            ComplexityDelta(
+              filePath: 'lib/a.dart',
+              name: 'addedWithScore',
+              startLine: 1,
+              endLine: 10,
+              oldScore: null,
+              newScore: 5,
+              status: DeltaStatus.added,
+            ),
+            ComplexityDelta(
+              filePath: 'lib/a.dart',
+              name: 'addedZeroScore',
+              startLine: 12,
+              endLine: 15,
+              oldScore: null,
+              newScore: 0,
+              status: DeltaStatus.added,
+            ),
+            ComplexityDelta(
+              filePath: 'lib/a.dart',
+              name: 'deletedWithScore',
+              startLine: 20,
+              endLine: 30,
+              oldScore: 4,
+              newScore: null,
+              status: DeltaStatus.removed,
+            ),
+            ComplexityDelta(
+              filePath: 'lib/a.dart',
+              name: 'deletedZeroScore',
+              startLine: 32,
+              endLine: 35,
+              oldScore: 0,
+              newScore: null,
+              status: DeltaStatus.removed,
+            ),
+          ],
+        );
+
+        check(summary.countAdded).equals(1);
+        check(summary.countRemoved).equals(1);
+        check(summary.netDelta).equals(1);
+
+        final json = summary.toJson(failThreshold: 15);
+        final summaryJson = json['summary'] as Map<String, dynamic>;
+        check(summaryJson['added']).equals(1);
+        check(summaryJson['removed']).equals(1);
+        check(summaryJson['declarations_changed']).equals(2);
+
+        reporter.printReport(deltaSummary: summary, failThreshold: 15);
+        final rendered = mdFile.readAsStringSync();
+        check(rendered)
+          ..contains(
+            '**Net Delta**: +1 | **Added**: 1 | **Increased**: 0 | '
+            '**Improved**: 0 | **Removed**: 1 | **Violations**: 0',
+          )
+          ..contains(
+            '| 🔵 | `addedWithScore` | `lib/a.dart:L1-10` | `+5` | '
+            '_new_ -> **5** |',
+          )
+          ..contains(
+            '| 🗑️ | `deletedWithScore` | `lib/a.dart` | `-4` | '
+            '4 -> _deleted_ |',
+          )
+          ..not((s) => s.contains('addedZeroScore'))
+          ..not((s) => s.contains('deletedZeroScore'));
+      },
+    );
   });
 
   group('DeltaAnalyzer with Mocked GitDiffService', () {

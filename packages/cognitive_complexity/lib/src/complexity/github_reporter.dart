@@ -279,7 +279,7 @@ class GitHubReporter {
       failOnIncrease,
     );
 
-    if (summary.deltas.isEmpty && violatedFiles.isEmpty) {
+    if (changed.isEmpty && violatedFiles.isEmpty) {
       for (final buf in [summaryBuf, ?commentBuf]) {
         buf.writeln('No modified Dart declarations detected.');
       }
@@ -318,7 +318,8 @@ class GitHubReporter {
     final header =
         '**Net Delta**: $sign$net | **Added**: ${summary.countAdded} | '
         '**Increased**: ${summary.countIncreased} | '
-        '**Improved**: ${summary.countImproved} | **Violations**: $violations';
+        '**Improved**: ${summary.countImproved} | '
+        '**Removed**: ${summary.countRemoved} | **Violations**: $violations';
     for (final buf in [summaryBuf, ?commentBuf]) {
       buf
         ..writeln(header)
@@ -332,7 +333,7 @@ class GitHubReporter {
   ) => deltas
       .where(
         (d) =>
-            d.status != DeltaStatus.unchanged ||
+            d.delta != 0 ||
             d.isFunctionLineViolation(maxFunctionLines: maxFunctionLines),
       )
       .toList();
@@ -509,11 +510,19 @@ class GitHubReporter {
         failOnIncrease: failOnIncrease,
       );
       final icon = _getDeltaIcon(d, isVio);
-      final loc = '${d.filePath}:L${d.startLine}-${d.endLine}';
       final deltaStr = d.delta > 0 ? '+${d.delta}' : '${d.delta}';
-      final scoreStr = d.oldScore != null && d.newScore != null
-          ? '${d.oldScore} -> **${d.newScore}**'
-          : '**${d.newScore ?? "Deleted"}**';
+      final (loc, scoreStr) = switch ((d.oldScore, d.newScore)) {
+        (final oldS?, final newS?) => (
+          '${d.filePath}:L${d.startLine}-${d.endLine}',
+          '$oldS -> **$newS**',
+        ),
+        (null, final newS?) => (
+          '${d.filePath}:L${d.startLine}-${d.endLine}',
+          '_new_ -> **$newS**',
+        ),
+        (final oldS?, null) => (d.filePath, '$oldS -> _deleted_'),
+        (null, null) => (d.filePath, '_deleted_'),
+      };
 
       buf.writeln('| $icon | `${d.name}` | `$loc` | `$deltaStr` | $scoreStr |');
     }
@@ -521,10 +530,13 @@ class GitHubReporter {
 
   String _getDeltaIcon(ComplexityDelta d, bool isViolation) {
     if (isViolation) return '🔴';
-    if (d.status == DeltaStatus.increased) return '🟡';
-    if (d.status == DeltaStatus.improved) return '🟢';
-    if (d.status == DeltaStatus.added) return '🔵';
-    return '⚪';
+    return switch (d.status) {
+      DeltaStatus.increased => '🟡',
+      DeltaStatus.improved => '🟢',
+      DeltaStatus.added => '🔵',
+      DeltaStatus.removed => '🗑️',
+      DeltaStatus.unchanged => '⚪',
+    };
   }
 
   /// Anchors annotations to the declaration line only: GitHub renders them

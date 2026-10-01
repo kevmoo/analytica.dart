@@ -1,5 +1,10 @@
 ## 0.2.5-wip
 
+- Omit zero-complexity (`delta == 0`, `score == 0`) added and removed
+  declarations from `--git-diff` Markdown, CLI, and JSON delta tables (unless
+  they trigger `--max-function-lines`), add `DeltaSummary.countRemoved` (`🗑️`),
+  and format added/removed `Score` cells as `_new_ -> **N**` and
+  `N -> _deleted_`.
 - Add opt-in `--max-file-lines` and `--max-function-lines` CLI flags and GitHub
   Action inputs (`max-file-lines`, `max-function-lines`) with `--git-diff`
   pragmatic ratchet support (`FileLineMetric`, `FileLineDelta`). Disabled
