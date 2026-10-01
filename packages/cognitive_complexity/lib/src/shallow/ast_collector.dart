@@ -360,27 +360,41 @@ class ShallowFileCollector extends RecursiveAstVisitor<void> {
 
   bool _isTearOffContext(SimpleIdentifier node) {
     final parent = node.parent;
-    if (parent == null) return false;
-    if (parent is MethodInvocation && identical(parent.methodName, node)) {
-      return false;
+    if (parent == null || parent is Label) return false;
+    if (_isInvocationOrPrefixTarget(node, parent)) return false;
+    final expr = _unwrapQualifiedTearOff(node, parent);
+    final context = switch (expr.parent) {
+      NamedArgument(:final argumentExpression, :final parent)
+          when identical(argumentExpression, expr) =>
+        parent,
+      final p => p,
+    };
+    return switch (context) {
+      ArgumentList() ||
+      ReturnStatement() ||
+      ExpressionFunctionBody() ||
+      ListLiteral() ||
+      SetOrMapLiteral() ||
+      SwitchExpressionCase() => true,
+      VariableDeclaration(:final initializer) => identical(initializer, expr),
+      AssignmentExpression(:final rightHandSide) => identical(
+        rightHandSide,
+        expr,
+      ),
+      _ => false,
+    };
+  }
+
+  bool _isInvocationOrPrefixTarget(SimpleIdentifier node, AstNode parent) =>
+      (parent is MethodInvocation && identical(parent.methodName, node)) ||
+      (parent is PropertyAccess && identical(parent.target, node)) ||
+      (parent is PrefixedIdentifier && identical(parent.prefix, node));
+
+  AstNode _unwrapQualifiedTearOff(SimpleIdentifier node, AstNode parent) {
+    if ((parent is PrefixedIdentifier && identical(parent.identifier, node)) ||
+        (parent is PropertyAccess && identical(parent.propertyName, node))) {
+      return parent;
     }
-    if (parent is PropertyAccess && identical(parent.target, node)) {
-      return false;
-    }
-    if (parent is PrefixedIdentifier && identical(parent.prefix, node)) {
-      return false;
-    }
-    if (parent is Label) return false;
-    return parent is ArgumentList ||
-        parent.parent is ArgumentList ||
-        parent is ReturnStatement ||
-        parent is ExpressionFunctionBody ||
-        (parent is VariableDeclaration &&
-            identical(parent.initializer, node)) ||
-        (parent is AssignmentExpression &&
-            identical(parent.rightHandSide, node)) ||
-        parent is ListLiteral ||
-        parent is SetOrMapLiteral ||
-        parent is SwitchExpressionCase;
+    return node;
   }
 }

@@ -117,13 +117,15 @@ Future<int> _executeShallowScan(
     if (gitDiffBase.trim().isEmpty) {
       throw const FormatException('Git diff base reference cannot be empty.');
     }
-    final gitService = const GitDiffService();
-    final modified = await gitService.getModifiedDartFiles(
-      gitDiffBase,
-      targetPaths: targets,
-    );
+    const gitService = GitDiffService();
+    final repoRoot = await gitService.getRepoRoot();
+    final mergeBase = await gitService.getMergeBase(gitDiffBase);
+    final modified = await gitService.getModifiedDartFiles(mergeBase);
     modifiedFilesFilter = {
-      for (final f in modified) ...[p.normalize(f), p.normalize(p.absolute(f))],
+      for (final f in modified) ...[
+        p.normalize(p.join(repoRoot, f)),
+        p.normalize(p.relative(p.join(repoRoot, f))),
+      ],
     };
   }
 

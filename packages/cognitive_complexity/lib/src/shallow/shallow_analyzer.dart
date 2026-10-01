@@ -47,13 +47,13 @@ class ShallowAnalyzer {
       parsedUnits.add((entry: entry, parsed: parsed));
       collectConditionalDirectiveFiles(
         directives: parsed.unit.directives,
-        filePath: entry.displayPath,
+        filePath: entry.normalizedPath,
         conditionalFiles: conditionalFiles,
       );
       if (entry.isPublicEntryFile) {
         exportTracker.recordExportDirectives(
           directives: parsed.unit.directives,
-          filePath: entry.displayPath,
+          filePath: entry.normalizedPath,
         );
       }
     }
@@ -171,12 +171,16 @@ class ShallowAnalyzer {
 
     final allCalls = callsByName[decl.rawName] ?? const [];
     final sameNameDecls = declsByName[decl.rawName] ?? const [];
-    final matchingCalls = allCalls.where((c) {
-      if (sameNameDecls.length > 1 && decl.isPrivate) {
-        return c.normalizedFilePath == decl.normalizedFilePath;
-      }
-      return true;
-    }).toList();
+    final matchingCalls = decl.isPrivate
+        ? allCalls
+              .where(
+                (c) =>
+                    !c.isTestFile &&
+                    (sameNameDecls.length == 1 ||
+                        c.normalizedFilePath == decl.normalizedFilePath),
+              )
+              .toList()
+        : allCalls;
 
     final prodCalls = matchingCalls.where((c) => !c.isTestFile).toList();
     final testCalls = matchingCalls.where((c) => c.isTestFile).toList();
