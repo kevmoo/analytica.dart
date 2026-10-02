@@ -352,9 +352,6 @@ void _stepD(int a, int b, int c, int d, int e) {
 
         final byName = {for (final f in report.findings) f.name: f};
         check(
-          byName['_stepA']!.classification,
-        ).equals(ShallowClassification.safeInline);
-        check(
           byName['_stepB']!.classification,
         ).equals(ShallowClassification.safeInline);
         check(
@@ -362,6 +359,9 @@ void _stepD(int a, int b, int c, int d, int e) {
         ).equals(ShallowClassification.safeInline);
         check(
           byName['_stepD']!.classification,
+        ).equals(ShallowClassification.safeInline);
+        check(
+          byName['_stepA']!.classification,
         ).equals(ShallowClassification.flattenAndInline);
         check(
           byName['_reportDelta']!.classification,
