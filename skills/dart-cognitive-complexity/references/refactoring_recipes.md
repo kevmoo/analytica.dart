@@ -366,7 +366,7 @@ micro-helpers or high-arity bucket-brigade functions (`>= 5` parameters), run
 the AST shallow helper scanner:
 
 ```bash
-dart run cognitive_complexity:shallow@^0.2.4 lib/
+dart run cognitive_complexity:shallow lib/
 ```
 
 The scanner identifies non-exported helpers with `FanIn == 1` and
