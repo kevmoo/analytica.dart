@@ -349,7 +349,7 @@ When a Dart file grows beyond `400` lines (enforceable via opt-in
 run the deterministic intra-file dependency graph advisor:
 
 ```bash
-dart run cognitive_complexity:file_split lib/src/large_file.dart --target-lines 300
+dart run cognitive_complexity:file_split@^0.2.4 lib/src/large_file.dart --target-lines 300
 ```
 
 Apply the **Load-Bearing Library Boundary Rule** (Section 1.2) when selecting
