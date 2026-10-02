@@ -335,52 +335,28 @@ class DedupeEngine {
     final seqByPath = {for (final s in sequences) s.filePath: s};
 
     for (final cluster in clusters) {
-      _processClusterOccurrences(
-        cluster,
-        seqByPath,
-        fileDuplicateLines,
-        fileDuplicateTokens,
-        fileClusterCount,
-      );
-    }
+      final touchedFilesInCluster = <String>{};
 
-    return (fileDuplicateLines, fileDuplicateTokens, fileClusterCount);
-  }
+      for (final instance in cluster.instances) {
+        final filePath = instance.filePath;
+        touchedFilesInCluster.add(filePath);
 
-  static void _processClusterOccurrences(
-    DuplicateCluster cluster,
-    Map<String, TokenSequence> seqByPath,
-    Map<String, Set<int>> fileDuplicateLines,
-    Map<String, Set<int>> fileDuplicateTokens,
-    Map<String, int> fileClusterCount,
-  ) {
-    final touchedFilesInCluster = <String>{};
+        final lineSet = fileDuplicateLines.putIfAbsent(filePath, () => <int>{});
+        for (var l = instance.startLine; l <= instance.endLine; l++) {
+          lineSet.add(l);
+        }
+        final seq = seqByPath[filePath];
+        if (seq != null) {
+          _recordInstanceTokens(fileDuplicateTokens, filePath, instance, seq);
+        }
+      }
 
-    for (final instance in cluster.instances) {
-      final filePath = instance.filePath;
-      touchedFilesInCluster.add(filePath);
-
-      _recordInstanceLines(fileDuplicateLines, filePath, instance);
-      final seq = seqByPath[filePath];
-      if (seq != null) {
-        _recordInstanceTokens(fileDuplicateTokens, filePath, instance, seq);
+      for (final filePath in touchedFilesInCluster) {
+        fileClusterCount[filePath] = (fileClusterCount[filePath] ?? 0) + 1;
       }
     }
 
-    for (final filePath in touchedFilesInCluster) {
-      fileClusterCount[filePath] = (fileClusterCount[filePath] ?? 0) + 1;
-    }
-  }
-
-  static void _recordInstanceLines(
-    Map<String, Set<int>> fileDuplicateLines,
-    String filePath,
-    CloneInstance instance,
-  ) {
-    final lineSet = fileDuplicateLines.putIfAbsent(filePath, () => <int>{});
-    for (var l = instance.startLine; l <= instance.endLine; l++) {
-      lineSet.add(l);
-    }
+    return (fileDuplicateLines, fileDuplicateTokens, fileClusterCount);
   }
 
   static void _recordInstanceTokens(
@@ -438,27 +414,17 @@ class DedupeEngine {
         discovered.add(fullPath);
       }
     } else if (type == FileSystemEntityType.directory) {
-      _collectFromDirectory(
-        dir: Directory(fullPath),
-        rootDirPath: targetDir.path,
-        includes: includes,
-        pathFilter: pathFilter,
-        discovered: discovered,
-      );
-    }
-  }
-
-  static void _collectFromDirectory({
-    required Directory dir,
-    required String rootDirPath,
-    required List<WildcardPattern> includes,
-    required PathFilter pathFilter,
-    required Set<String> discovered,
-  }) {
-    for (final entity in dir.listSync(recursive: true, followLinks: false)) {
-      if (entity is File &&
-          _matchesFilters(entity.path, rootDirPath, includes, pathFilter)) {
-        discovered.add(entity.path);
+      final dir = Directory(fullPath);
+      for (final entity in dir.listSync(recursive: true, followLinks: false)) {
+        if (entity is File &&
+            _matchesFilters(
+              entity.path,
+              targetDir.path,
+              includes,
+              pathFilter,
+            )) {
+          discovered.add(entity.path);
+        }
       }
     }
   }

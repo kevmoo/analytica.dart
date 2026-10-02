@@ -51,20 +51,6 @@ void indexVariableElement({
   }
 }
 
-List<Element> extractSuperElements(Element? element) {
-  if (element is! InterfaceElement) return const [];
-  final superElements = <Element>[];
-  final supertype = element.supertype;
-  if (supertype != null) superElements.add(supertype.element);
-  for (final iface in element.interfaces) {
-    superElements.add(iface.element);
-  }
-  for (final mixinType in element.mixins) {
-    superElements.add(mixinType.element);
-  }
-  return superElements;
-}
-
 (Set<String>, Set<String>) connectReferenceEdges({
   required HarvestedData data,
   required PackageTopology topology,
@@ -77,13 +63,22 @@ List<Element> extractSuperElements(Element? element) {
         topology.roleOf(node.relativeFilePath) == FileRole.test ||
         topology.extraTestFiles.contains(node.relativeFilePath);
 
-    _connectNodeOutboundEdges(
-      node: node,
-      isTestNode: isTestNode,
-      data: data,
-      crossLibraryReferenced: crossLibraryReferenced,
-      testReferencedIds: testReferencedIds,
-    );
+    final outbound = data.nodeOutboundElements[node];
+    if (outbound != null) {
+      for (final refElem in outbound) {
+        final targetNode = data.resolveNodeForElement(refElem);
+        if (targetNode != null && targetNode.id != node.id) {
+          node.outgoingTargetIds.add(targetNode.id);
+          _trackEdge(
+            node,
+            targetNode,
+            isTestNode: isTestNode,
+            crossLibraryReferenced: crossLibraryReferenced,
+            testReferencedIds: testReferencedIds,
+          );
+        }
+      }
+    }
 
     _connectNodeSuperEdges(
       node: node,
@@ -106,30 +101,6 @@ List<Element> extractSuperElements(Element? element) {
   );
 
   return (crossLibraryReferenced, testReferencedIds);
-}
-
-void _connectNodeOutboundEdges({
-  required DeclarationNode node,
-  required bool isTestNode,
-  required HarvestedData data,
-  required Set<String> crossLibraryReferenced,
-  required Set<String> testReferencedIds,
-}) {
-  final outbound = data.nodeOutboundElements[node];
-  if (outbound == null) return;
-  for (final refElem in outbound) {
-    final targetNode = data.resolveNodeForElement(refElem);
-    if (targetNode != null && targetNode.id != node.id) {
-      node.outgoingTargetIds.add(targetNode.id);
-      _trackEdge(
-        node,
-        targetNode,
-        isTestNode: isTestNode,
-        crossLibraryReferenced: crossLibraryReferenced,
-        testReferencedIds: testReferencedIds,
-      );
-    }
-  }
 }
 
 void _connectNodeSuperEdges({
@@ -240,26 +211,6 @@ void addPublicNodesForFile(
   }
 }
 
-void harvestConditionalPublicTargets(
-  String relPath,
-  HarvestedData data,
-  Set<String> productionRoots,
-  Set<String> exportedNodeIds,
-  Set<String> crossLibraryReferenced,
-) {
-  final targets = data.conditionalTargets[relPath];
-  if (targets == null) return;
-  for (final targetRelPath in targets) {
-    addPublicNodesForFile(
-      targetRelPath,
-      data.allNodes,
-      productionRoots,
-      exportedNodeIds,
-      crossLibraryReferenced,
-    );
-  }
-}
-
 void _addPublicRoot(
   String id,
   Set<String> productionRoots,
@@ -270,66 +221,6 @@ void _addPublicRoot(
   exportedNodeIds.add(id);
   crossLibraryReferenced.add(id);
 }
-
-bool isExecutableRoot(DeclarationNode node, PackageTopology topology) {
-  final isBinMain =
-      topology.roleOf(node.relativeFilePath) == FileRole.executable &&
-      node.name == 'main';
-  final isFlutterMain =
-      PackageTopology.isFlutterEntrypoint(node.relativeFilePath) &&
-      node.name == 'main' &&
-      topology.frameworkRoots.contains('main');
-  return isBinMain || isFlutterMain;
-}
-
-bool isAuxiliaryRoot(DeclarationNode node, PackageTopology topology) =>
-    topology.roleOf(node.relativeFilePath) == FileRole.auxiliary &&
-    node.name == 'main';
-
-bool isConfigOrNativeRoot(DeclarationNode node, PackageTopology topology) {
-  if (node.isNativeRoot) return true;
-  if (!topology.frameworkRoots.contains(node.name)) return false;
-  return node.name != 'main' ||
-      PackageTopology.isFlutterEntrypoint(node.relativeFilePath);
-}
-
-bool isExtraProductionRoot(DeclarationNode node, PackageTopology topology) =>
-    topology.extraProductionFiles.contains(node.relativeFilePath);
-
-bool isTestRoot(DeclarationNode node, PackageTopology topology) =>
-    topology.roleOf(node.relativeFilePath) == FileRole.test;
-
-bool isDirectSubtypeOfLiveSealed(
-  DeclarationNode node, {
-  required Map<DeclarationNode, List<Element>> nodeDirectSuperElements,
-  required Map<Element, DeclarationNode> elementToNode,
-  required Set<String> productionLive,
-}) {
-  final superElems = nodeDirectSuperElements[node];
-  if (superElems == null) return false;
-  for (final superElem in superElems) {
-    final parentNode = elementToNode[superElem];
-    if (parentNode != null &&
-        parentNode.isSealed &&
-        productionLive.contains(parentNode.id)) {
-      return true;
-    }
-  }
-  return false;
-}
-
-UndeadFinding createPureUndeadFinding(DeclarationNode node) => UndeadFinding(
-  id: node.name,
-  name: node.name,
-  kind: node.kind,
-  file: node.relativeFilePath,
-  line: node.line,
-  column: node.column,
-  length: node.length,
-  classification: UndeadClassification.pureUndead,
-  suggestedAction: SuggestedAction.delete,
-  isExternalBinding: node.isExternalBinding,
-);
 
 int compareFindings(UndeadFinding a, UndeadFinding b) {
   final fileComp = a.file.compareTo(b.file);

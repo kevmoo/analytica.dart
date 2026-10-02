@@ -140,20 +140,21 @@ class ShallowAnalyzer {
       declsByName.putIfAbsent(d.rawName, () => []).add(d);
     }
 
-    final findings = <ShallowFinding>[];
+    final rawCandidates = <_RawCandidate>[];
     var scannedCount = 0;
     for (final decl in allDecls) {
       if (!decl.isInRequestedTargets) continue;
       scannedCount++;
-      final finding = _evaluateCandidate(
+      final candidate = _evaluateCandidate(
         decl: decl,
         callsByName: callsByName,
         declsByName: declsByName,
       );
-      if (finding != null) findings.add(finding);
+      if (candidate != null) rawCandidates.add(candidate);
     }
 
-    findings.sort(_compareFindings);
+    final findings = _resolveCumulativeCandidates(rawCandidates)
+      ..sort(_compareFindings);
     return ShallowReport(
       findings: findings,
       declarationsScanned: scannedCount,
@@ -162,7 +163,7 @@ class ShallowAnalyzer {
     );
   }
 
-  ShallowFinding? _evaluateCandidate({
+  _RawCandidate? _evaluateCandidate({
     required ShallowDeclNode decl,
     required Map<String, List<ShallowCallSite>> callsByName,
     required Map<String, List<ShallowDeclNode>> declsByName,
@@ -193,49 +194,103 @@ class ShallowAnalyzer {
     final call = prodCalls.single;
     final caller = call.caller;
     if (caller == null || identical(caller, decl)) return null;
-    if (caller.rawName == 'main' &&
-        p.split(caller.normalizedFilePath).contains('bin')) {
-      return null;
-    }
+    if (_isExemptCallerOrCrossFileFacade(decl, caller)) return null;
 
     final reasons = _computeShallowReasons(decl, caller);
     if (reasons.isEmpty) return null;
 
-    final deltaScore = scoreAstParts(
+    final baseDeltaScore = scoreAstParts(
       decl.ccParts,
       initialDepth: call.nestingDepth,
     );
-    final inlinedCallerScore = caller.score + deltaScore;
-    final classification = inlinedCallerScore <= maxCallerScore
-        ? ShallowClassification.safeInline
-        : (inlinedCallerScore <= maxCallerScore + 7
-              ? ShallowClassification.flattenAndInline
-              : ShallowClassification.loadBearing);
     final estLinesSaved =
         decl.signatureLines +
         (decl.parameterCount >= 3 ? decl.parameterCount + 1 : 2);
 
-    return ShallowFinding(
-      filePath: decl.filePath,
-      name: decl.qualifiedName,
-      startLine: decl.startLine,
-      endLine: decl.endLine,
-      parameterCount: decl.parameterCount,
-      namedParameterCount: decl.namedParameterCount,
-      signatureLines: decl.signatureLines,
-      bodyLines: decl.bodyLines,
-      score: decl.score,
-      callerFilePath: call.filePath,
-      callerName: caller.qualifiedName,
-      callLine: call.line,
-      callNestingDepth: call.nestingDepth,
-      callerScore: caller.score,
-      inlinedDeltaScore: deltaScore,
-      inlinedCallerScore: inlinedCallerScore,
+    return _RawCandidate(
+      decl: decl,
+      caller: caller,
+      call: call,
+      baseDeltaScore: baseDeltaScore,
       estimatedLinesSaved: estLinesSaved,
-      classification: classification,
       reasons: reasons,
     );
+  }
+
+  bool _isExemptCallerOrCrossFileFacade(
+    ShallowDeclNode decl,
+    ShallowDeclNode caller,
+  ) {
+    if (caller.rawName == 'main' &&
+        p.split(caller.normalizedFilePath).contains('bin')) {
+      return true;
+    }
+    return caller.normalizedFilePath != decl.normalizedFilePath &&
+        decl.referencedPrivateNames.isNotEmpty;
+  }
+
+  List<ShallowFinding> _resolveCumulativeCandidates(
+    List<_RawCandidate> rawCandidates,
+  ) {
+    final prioritized = List<_RawCandidate>.from(rawCandidates)
+      ..sort(_compareRawCandidates);
+    final ordered = _orderBottomUp(prioritized);
+    final effectiveScore = <ShallowDeclNode, int>{};
+    final absorbedChildren =
+        <ShallowDeclNode, List<({ShallowDeclNode decl, int relativeDepth})>>{};
+    final findings = <ShallowFinding>[];
+
+    for (final c in ordered) {
+      final children = absorbedChildren[c.decl] ?? const [];
+      var deltaScore = c.baseDeltaScore;
+      for (final sub in children) {
+        deltaScore += scoreAstParts(
+          sub.decl.ccParts,
+          initialDepth: c.call.nestingDepth + sub.relativeDepth,
+        );
+      }
+      final callerScore = effectiveScore[c.caller] ?? c.caller.score;
+      final inlinedCallerScore = callerScore + deltaScore;
+      final classification = _classifyInlinedScore(
+        inlinedCallerScore: inlinedCallerScore,
+        hasAbsorbedChildren: children.isNotEmpty,
+      );
+      if (classification == ShallowClassification.safeInline) {
+        effectiveScore[c.caller] = inlinedCallerScore;
+        final callerAbsorbed = absorbedChildren.putIfAbsent(
+          c.caller,
+          () => <({ShallowDeclNode decl, int relativeDepth})>[],
+        )..add((decl: c.decl, relativeDepth: c.call.nestingDepth));
+        for (final sub in children) {
+          callerAbsorbed.add((
+            decl: sub.decl,
+            relativeDepth: c.call.nestingDepth + sub.relativeDepth,
+          ));
+        }
+      }
+      findings.add(
+        c.toFinding(
+          callerScore: callerScore,
+          deltaScore: deltaScore,
+          inlinedCallerScore: inlinedCallerScore,
+          classification: classification,
+        ),
+      );
+    }
+    return findings;
+  }
+
+  ShallowClassification _classifyInlinedScore({
+    required int inlinedCallerScore,
+    required bool hasAbsorbedChildren,
+  }) {
+    if (inlinedCallerScore <= maxCallerScore) {
+      return ShallowClassification.safeInline;
+    }
+    if (inlinedCallerScore <= maxCallerScore + 7 && !hasAbsorbedChildren) {
+      return ShallowClassification.flattenAndInline;
+    }
+    return ShallowClassification.loadBearing;
   }
 
   List<String> _computeShallowReasons(
@@ -448,4 +503,82 @@ class _ScanFileEntry {
     isPublicEntryFile: isPublicEntryFile,
     isInRequestedTargets: true,
   );
+}
+
+class _RawCandidate {
+  final ShallowDeclNode decl;
+  final ShallowDeclNode caller;
+  final ShallowCallSite call;
+  final int baseDeltaScore;
+  final int estimatedLinesSaved;
+  final List<String> reasons;
+
+  const _RawCandidate({
+    required this.decl,
+    required this.caller,
+    required this.call,
+    required this.baseDeltaScore,
+    required this.estimatedLinesSaved,
+    required this.reasons,
+  });
+
+  ShallowFinding toFinding({
+    required int callerScore,
+    required int deltaScore,
+    required int inlinedCallerScore,
+    required ShallowClassification classification,
+  }) => ShallowFinding(
+    filePath: decl.filePath,
+    name: decl.qualifiedName,
+    startLine: decl.startLine,
+    endLine: decl.endLine,
+    parameterCount: decl.parameterCount,
+    namedParameterCount: decl.namedParameterCount,
+    signatureLines: decl.signatureLines,
+    bodyLines: decl.bodyLines,
+    score: decl.score,
+    callerFilePath: call.filePath,
+    callerName: caller.qualifiedName,
+    callLine: call.line,
+    callNestingDepth: call.nestingDepth,
+    callerScore: callerScore,
+    inlinedDeltaScore: deltaScore,
+    inlinedCallerScore: inlinedCallerScore,
+    estimatedLinesSaved: estimatedLinesSaved,
+    classification: classification,
+    reasons: reasons,
+  );
+}
+
+int _compareRawCandidates(_RawCandidate a, _RawCandidate b) {
+  final aStructural = a.estimatedLinesSaved > 6;
+  final bStructural = b.estimatedLinesSaved > 6;
+  if (aStructural != bStructural) return aStructural ? -1 : 1;
+  final deltaCmp = a.baseDeltaScore.compareTo(b.baseDeltaScore);
+  if (deltaCmp != 0) return deltaCmp;
+  final savedCmp = b.estimatedLinesSaved.compareTo(a.estimatedLinesSaved);
+  if (savedCmp != 0) return savedCmp;
+  final fileCmp = a.decl.filePath.compareTo(b.decl.filePath);
+  if (fileCmp != 0) return fileCmp;
+  return a.decl.startLine.compareTo(b.decl.startLine);
+}
+
+List<_RawCandidate> _orderBottomUp(List<_RawCandidate> candidates) {
+  final ordered = <_RawCandidate>[];
+  final visited = <_RawCandidate>{};
+
+  void visit(_RawCandidate current) {
+    if (!visited.add(current)) return;
+    for (final child in candidates) {
+      if (identical(child.caller, current.decl)) {
+        visit(child);
+      }
+    }
+    ordered.add(current);
+  }
+
+  for (final c in candidates) {
+    visit(c);
+  }
+  return ordered;
 }

@@ -3,19 +3,25 @@ name: validate_skills
 on:
   pull_request:
     paths:
-      - 'skills/**'
-      - 'tool/**'
-      - 'evals/**'
-      - '.github/workflows/validate_skills.yaml'
-      - 'pubspec.yaml'
+      - "AGENTS.md"
+      - "skills/**"
+      - "tool/**"
+      - "evals/**"
+      - "packages/*/pubspec.yaml"
+      - "packages/*/CHANGELOG.md"
+      - ".github/workflows/validate_skills.yaml"
+      - "pubspec.yaml"
   push:
-    branches: [ main ]
+    branches: [main]
     paths:
-      - 'skills/**'
-      - 'tool/**'
-      - 'evals/**'
-      - '.github/workflows/validate_skills.yaml'
-      - 'pubspec.yaml'
+      - "AGENTS.md"
+      - "skills/**"
+      - "tool/**"
+      - "evals/**"
+      - "packages/*/pubspec.yaml"
+      - "packages/*/CHANGELOG.md"
+      - ".github/workflows/validate_skills.yaml"
+      - "pubspec.yaml"
 
 jobs:
   validate:
@@ -23,7 +29,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        sdk: ['3.12', dev]
+        sdk: ["3.12", dev]
     defaults:
       run:
         working-directory: tool

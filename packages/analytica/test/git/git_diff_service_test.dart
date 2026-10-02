@@ -104,6 +104,36 @@ void main() {
       },
     );
 
+    test('getModifiedDartFiles resolves relative targetPaths from '
+        'subdirectory workingDirectory', () async {
+      await runGit(['checkout', '-b', 'feat/subpkg']);
+      final subpkgDir = p.join(repoPath, 'packages', 'pkg_a');
+      await File(
+        p.join(subpkgDir, 'lib', 'pkg_a.dart'),
+      ).create(recursive: true);
+      await File(
+        p.join(subpkgDir, 'lib', 'pkg_a.dart'),
+      ).writeAsString('void pkgA() {}\n');
+      await File(
+        p.join(repoPath, 'packages', 'pkg_b', 'lib', 'pkg_b.dart'),
+      ).create(recursive: true);
+      await File(
+        p.join(repoPath, 'packages', 'pkg_b', 'lib', 'pkg_b.dart'),
+      ).writeAsString('void pkgB() {}\n');
+
+      await runGit(['add', '.']);
+      await runGit(['commit', '-m', 'Subpkg commit']);
+
+      final git = GitDiffService(workingDirectory: subpkgDir);
+      final mergeBase = await git.getMergeBase('main');
+      final modifiedFiles = await git.getModifiedDartFiles(
+        mergeBase,
+        targetPaths: ['lib'],
+      );
+
+      check(modifiedFiles).deepEquals(['packages/pkg_a/lib/pkg_a.dart']);
+    });
+
     test(
       'getHistoricalFileContent and getCurrentFileContent read versions',
       () async {

@@ -542,42 +542,6 @@ void _printDeltaTableSection(
   sink.writeln('$hdrDelta  $hdrScore  $hdrName  Location');
   sink.writeln('-' * (6 + 2 + 12 + 2 + maxName + 2 + 30));
 
-  _printDeltaRows(
-    deltas,
-    maxName,
-    failThreshold,
-    maxFunctionLines,
-    failOnIncrease,
-    sink,
-  );
-
-  sink.writeln('-' * (6 + 2 + 12 + 2 + maxName + 2 + 30));
-}
-
-void _printDeltaFileViolations(
-  List<FileLineDelta> violatedFiles,
-  int maxFileLines,
-  StringSink sink,
-) {
-  sink.writeln();
-  sink.writeln('File Line Violations (> $maxFileLines lines):');
-  for (final f in violatedFiles) {
-    final deltaStr = (f.delta > 0 ? '+${f.delta}' : '${f.delta}').padLeft(6);
-    final oldL = f.oldLines ?? 0;
-    sink.writeln(
-      '  $deltaStr  $oldL -> ${f.newLines} lines  ${f.filePath} [VIOLATION]',
-    );
-  }
-}
-
-void _printDeltaRows(
-  Iterable<ComplexityDelta> deltas,
-  int maxName,
-  int? failThreshold,
-  int? maxFunctionLines,
-  bool failOnIncrease,
-  StringSink sink,
-) {
   for (final d in deltas) {
     final deltaStr = d.delta > 0 ? '+${d.delta}' : '${d.delta}';
     final (locStr, rawScore) = switch ((d.oldScore, d.newScore)) {
@@ -599,14 +563,28 @@ void _printDeltaRows(
       maxFunctionLines: maxFunctionLines,
       failOnIncrease: failOnIncrease,
     );
-    final marker = _formatDeltaMarker(d, isVio);
+    final marker = isVio
+        ? ' [VIOLATION]'
+        : (d.status == DeltaStatus.improved ? ' [IMPROVED]' : '');
 
     sink.writeln('${deltaStr.padLeft(6)}  $scoreStr  $nameStr  $locStr$marker');
   }
+
+  sink.writeln('-' * (6 + 2 + 12 + 2 + maxName + 2 + 30));
 }
 
-String _formatDeltaMarker(ComplexityDelta d, bool isViolation) {
-  if (isViolation) return ' [VIOLATION]';
-  if (d.status == DeltaStatus.improved) return ' [IMPROVED]';
-  return '';
+void _printDeltaFileViolations(
+  List<FileLineDelta> violatedFiles,
+  int maxFileLines,
+  StringSink sink,
+) {
+  sink.writeln();
+  sink.writeln('File Line Violations (> $maxFileLines lines):');
+  for (final f in violatedFiles) {
+    final deltaStr = (f.delta > 0 ? '+${f.delta}' : '${f.delta}').padLeft(6);
+    final oldL = f.oldLines ?? 0;
+    sink.writeln(
+      '  $deltaStr  $oldL -> ${f.newLines} lines  ${f.filePath} [VIOLATION]',
+    );
+  }
 }

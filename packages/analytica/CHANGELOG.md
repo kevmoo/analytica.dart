@@ -10,6 +10,9 @@
 - Add `package:analytica/testing.dart` with `resolvePackageDirectory`,
   `resolvePackageFile`, `resolvePackageExecutable`, and `capturePrints` test
   helpers.
+- Fix `GitDiffService.getModifiedDartFiles` to resolve relative `targetPaths`
+  against `workingDirectory` as well as `repoRoot` when invoked from a workspace
+  subpackage directory.
 
 ## 0.1.1
 

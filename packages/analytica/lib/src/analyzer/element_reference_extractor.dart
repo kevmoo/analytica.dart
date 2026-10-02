@@ -42,7 +42,9 @@ class ElementReferenceExtractor extends RecursiveAstVisitor<void> {
     }
 
     _recordLibraryUri(elem.library);
-    final sourcePath = _resolveElementSourcePath(elem);
+    final sourcePath =
+        elem.library?.firstFragment.source.fullName ??
+        elem.firstFragment.libraryFragment?.source.fullName;
     if (sourcePath == null || !_isPathInScope(sourcePath)) return;
 
     final topLevel = getTopLevelElement(elem);
@@ -58,10 +60,6 @@ class ElementReferenceExtractor extends RecursiveAstVisitor<void> {
       referencedLibraryUris.add(uriStr);
     }
   }
-
-  String? _resolveElementSourcePath(Element elem) =>
-      elem.library?.firstFragment.source.fullName ??
-      elem.firstFragment.libraryFragment?.source.fullName;
 
   bool _isPathInScope(String sourcePath) {
     final root = packageRoot;
