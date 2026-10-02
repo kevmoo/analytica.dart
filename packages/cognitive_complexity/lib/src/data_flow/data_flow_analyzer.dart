@@ -43,64 +43,6 @@ class DataFlowAnalyzer {
     );
     final unitResult = await helper.getRequiredResolvedUnit(absPath);
 
-    return _analyzeResolvedUnit(
-      unitResult: unitResult,
-      filePath: filePath,
-      startLine: startLine,
-      endLine: endLine,
-      methodName: methodName,
-    );
-  }
-
-  /// In-memory analysis for unit testing and IDE integration.
-  Future<DataFlowResult> analyzeSource({
-    required String sourceCode,
-    required int startLine,
-    required int endLine,
-    String methodName = '_extracted',
-  }) async {
-    final tempDir = await Directory.systemTemp.createTemp('data_flow_test_');
-    try {
-      final tempFile = File(p.join(tempDir.path, 'snippet.dart'));
-      await tempFile.writeAsString(sourceCode);
-
-      final result = await analyzeFile(
-        filePath: tempFile.path,
-        startLine: startLine,
-        endLine: endLine,
-        methodName: methodName,
-      );
-
-      return DataFlowResult(
-        filePath: 'snippet.dart',
-        startLine: result.startLine,
-        endLine: result.endLine,
-        enclosingDeclaration: result.enclosingDeclaration,
-        inputs: result.inputs,
-        mutations: result.mutations,
-        outputs: result.outputs,
-        escapes: result.escapes,
-        suggestedSignature: result.suggestedSignature,
-        isCleanlyExtractable: result.isCleanlyExtractable,
-        enclosingScore: result.enclosingScore,
-        sliceScoreInPlace: result.sliceScoreInPlace,
-        sliceScoreAtRoot: result.sliceScoreAtRoot,
-        extractionWarnings: result.extractionWarnings,
-      );
-    } finally {
-      if (tempDir.existsSync()) {
-        await tempDir.delete(recursive: true);
-      }
-    }
-  }
-
-  DataFlowResult _analyzeResolvedUnit({
-    required ResolvedUnitResult unitResult,
-    required String filePath,
-    required int startLine,
-    required int endLine,
-    required String methodName,
-  }) {
     final lineInfo = unitResult.lineInfo;
     if (startLine < 1 || endLine < startLine) {
       throw FormatException(
@@ -136,7 +78,12 @@ class DataFlowAnalyzer {
       );
     }
 
-    final enclosingName = _getDeclarationName(enclosingNode);
+    final enclosingName = switch (enclosingNode) {
+      FunctionDeclaration(:final name) ||
+      MethodDeclaration(:final name) => name.lexeme,
+      ConstructorDeclaration(:final name) => name?.lexeme ?? 'new',
+      _ => 'unknown',
+    };
 
     // 1. Traverse within slice for inputs, mutations, escapes, and async
     final inBlockVisitor = InBlockVisitor(
@@ -147,17 +94,15 @@ class DataFlowAnalyzer {
     enclosingNode.accept(inBlockVisitor);
 
     // 2. Traverse after slice for liveness analysis (outputs)
+    final loopCollector = _EnclosingLoopCollector(startOffset, endOffset);
+    enclosingNode.accept(loopCollector);
     final postBlockVisitor = PostBlockVisitor(
       sliceStartOffset: startOffset,
       sliceEndOffset: endOffset,
       lineInfo: lineInfo,
       internalDeclarations: inBlockVisitor.internalDeclarations,
       mutations: inBlockVisitor.mutations,
-      enclosingLoopSpans: _collectEnclosingLoopSpans(
-        enclosingNode,
-        startOffset,
-        endOffset,
-      ),
+      enclosingLoopSpans: loopCollector.spans,
     );
     enclosingNode.accept(postBlockVisitor);
 
@@ -201,6 +146,48 @@ class DataFlowAnalyzer {
       sliceScoreAtRoot: sliceScoreAtRoot,
       extractionWarnings: warnings,
     );
+  }
+
+  /// In-memory analysis for unit testing and IDE integration.
+  Future<DataFlowResult> analyzeSource({
+    required String sourceCode,
+    required int startLine,
+    required int endLine,
+    String methodName = '_extracted',
+  }) async {
+    final tempDir = await Directory.systemTemp.createTemp('data_flow_test_');
+    try {
+      final tempFile = File(p.join(tempDir.path, 'snippet.dart'));
+      await tempFile.writeAsString(sourceCode);
+
+      final result = await analyzeFile(
+        filePath: tempFile.path,
+        startLine: startLine,
+        endLine: endLine,
+        methodName: methodName,
+      );
+
+      return DataFlowResult(
+        filePath: 'snippet.dart',
+        startLine: result.startLine,
+        endLine: result.endLine,
+        enclosingDeclaration: result.enclosingDeclaration,
+        inputs: result.inputs,
+        mutations: result.mutations,
+        outputs: result.outputs,
+        escapes: result.escapes,
+        suggestedSignature: result.suggestedSignature,
+        isCleanlyExtractable: result.isCleanlyExtractable,
+        enclosingScore: result.enclosingScore,
+        sliceScoreInPlace: result.sliceScoreInPlace,
+        sliceScoreAtRoot: result.sliceScoreAtRoot,
+        extractionWarnings: result.extractionWarnings,
+      );
+    } finally {
+      if (tempDir.existsSync()) {
+        await tempDir.delete(recursive: true);
+      }
+    }
   }
 
   ({int enclosingScore, int sliceScoreInPlace, int sliceScoreAtRoot})
@@ -305,23 +292,6 @@ class DataFlowAnalyzer {
     }
     return typeParams;
   }
-
-  List<({int offset, int end, int carryBoundary})> _collectEnclosingLoopSpans(
-    AstNode enclosingNode,
-    int sliceStartOffset,
-    int sliceEndOffset,
-  ) {
-    final collector = _EnclosingLoopCollector(sliceStartOffset, sliceEndOffset);
-    enclosingNode.accept(collector);
-    return collector.spans;
-  }
-
-  String _getDeclarationName(AstNode node) => switch (node) {
-    FunctionDeclaration(:final name) ||
-    MethodDeclaration(:final name) => name.lexeme,
-    ConstructorDeclaration(:final name) => name?.lexeme ?? 'new',
-    _ => 'unknown',
-  };
 }
 
 class _OutermostSliceNodesCollector extends UnifyingAstVisitor<void> {

@@ -13,25 +13,20 @@ class SignatureSynthesizer {
     bool isAsync = false,
   }) {
     final returnType = _buildReturnType(outputs, isAsync: isAsync);
-    final params = _buildParameters(inputs);
+    final params = inputs.isEmpty
+        ? ''
+        : inputs.map((i) => '${i.type} ${i.name}').join(', ');
     final asyncSuffix = isAsync ? ' async' : '';
-    final typeParamsStr = _buildTypeParamsStr(typeParameters);
+    final typeParamsStr = typeParameters.isNotEmpty
+        ? '<${typeParameters.join(', ')}>'
+        : '';
 
     return '$returnType $methodName$typeParamsStr($params)$asyncSuffix';
   }
 
-  String _buildTypeParamsStr(List<String> typeParameters) {
-    return typeParameters.isNotEmpty ? '<${typeParameters.join(', ')}>' : '';
-  }
-
-  String _sanitizeRecordFieldName(String name) {
-    var sanitized = name.replaceFirst(RegExp(r'^_+'), '');
-    if (sanitized.isEmpty) sanitized = 'result';
-    return sanitized;
-  }
-
   String _uniqueFieldName(String name, Set<String> usedNames) {
-    final base = _sanitizeRecordFieldName(name);
+    var base = name.replaceFirst(RegExp(r'^_+'), '');
+    if (base.isEmpty) base = 'result';
     if (usedNames.add(base)) return base;
     var suffix = 2;
     while (!usedNames.add('$base$suffix')) {
@@ -65,10 +60,5 @@ class SignatureSynthesizer {
     }
 
     return baseType;
-  }
-
-  String _buildParameters(List<VariableUsage> inputs) {
-    if (inputs.isEmpty) return '';
-    return inputs.map((i) => '${i.type} ${i.name}').join(', ');
   }
 }

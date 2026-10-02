@@ -166,7 +166,10 @@ class DedupeCliRunner {
     }
 
     if (results.flag('help')) return _handleHelp();
-    if (results.flag('version')) return _handleVersion();
+    if (results.flag('version')) {
+      outSink.writeln('dedupe version: $dedupeVersion');
+      return ExitCode.success.code;
+    }
 
     final targetPath = results.rest.isNotEmpty ? results.rest.first : '.';
     final normalizedPath = p.normalize(p.absolute(targetPath));
@@ -207,11 +210,6 @@ class DedupeCliRunner {
     outSink.writeln('Usage: dedupe [options] [target_path]');
     outSink.writeln();
     outSink.writeln(parser.usage);
-    return ExitCode.success.code;
-  }
-
-  int _handleVersion() {
-    outSink.writeln('dedupe version: $dedupeVersion');
     return ExitCode.success.code;
   }
 

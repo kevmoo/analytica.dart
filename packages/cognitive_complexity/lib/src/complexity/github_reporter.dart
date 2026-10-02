@@ -59,14 +59,21 @@ class GitHubReporter {
     } else if (regularResults != null) {
       // Regular (non-delta) mode never configures a comment file, so
       // commentBuf is already null here.
-      _reportRegular(
-        regularResults,
-        fileMetrics,
-        failThreshold,
-        maxFileLines,
-        maxFunctionLines,
-        summaryBuf,
-      );
+      final violatedFiles = _filterViolatedFiles(fileMetrics, maxFileLines);
+      if (regularResults.isEmpty && violatedFiles.isEmpty) {
+        summaryBuf.writeln('No Dart declarations analyzed.');
+      }
+      if (regularResults.isNotEmpty) {
+        _renderRegularDeclarationsTable(
+          regularResults,
+          failThreshold,
+          maxFunctionLines,
+          summaryBuf,
+        );
+      }
+      if (violatedFiles.isNotEmpty) {
+        _renderRegularFileViolations(violatedFiles, maxFileLines!, summaryBuf);
+      }
     }
 
     _write(_summaryFile, summaryBuf, 'step summary', append: true);
@@ -94,33 +101,6 @@ class GitHubReporter {
       );
     } catch (e) {
       stderr.writeln('Warning: Failed to write to $label file: $e');
-    }
-  }
-
-  void _reportRegular(
-    List<FunctionComplexity> results,
-    List<FileLineMetric>? fileMetrics,
-    int? failThreshold,
-    int? maxFileLines,
-    int? maxFunctionLines,
-    StringBuffer summaryBuf,
-  ) {
-    final violatedFiles = _filterViolatedFiles(fileMetrics, maxFileLines);
-    if (results.isEmpty && violatedFiles.isEmpty) {
-      summaryBuf.writeln('No Dart declarations analyzed.');
-      return;
-    }
-
-    if (results.isNotEmpty) {
-      _renderRegularDeclarationsTable(
-        results,
-        failThreshold,
-        maxFunctionLines,
-        summaryBuf,
-      );
-    }
-    if (violatedFiles.isNotEmpty) {
-      _renderRegularFileViolations(violatedFiles, maxFileLines!, summaryBuf);
     }
   }
 
@@ -186,22 +166,6 @@ class GitHubReporter {
         '| $statusIcon | `${res.name}` | `$loc` | **${res.score}** |',
       );
     }
-    _emitRegularDeclarationAnnotations(
-      res,
-      failThreshold,
-      maxFunctionLines,
-      isScoreVio,
-      isLineVio,
-    );
-  }
-
-  void _emitRegularDeclarationAnnotations(
-    FunctionComplexity res,
-    int? failThreshold,
-    int? maxFunctionLines,
-    bool isScoreVio,
-    bool isLineVio,
-  ) {
     if (isScoreVio) {
       _stdoutSink.writeln(
         '::error file=${res.filePath},line=${res.startLine},'
@@ -254,59 +218,6 @@ class GitHubReporter {
     StringBuffer summaryBuf,
     StringBuffer? commentBuf,
   ) {
-    _writeDeltaHeader(
-      summary,
-      failThreshold,
-      maxFileLines,
-      maxFunctionLines,
-      failOnIncrease,
-      summaryBuf,
-      commentBuf,
-    );
-
-    final changed = _filterChangedDeltas(summary.deltas, maxFunctionLines);
-    final violatedFiles = _filterViolatedFileDeltas(
-      summary.fileDeltas,
-      maxFileLines,
-    );
-
-    _emitAllDeltaAnnotations(
-      changed,
-      violatedFiles,
-      failThreshold,
-      maxFileLines,
-      maxFunctionLines,
-      failOnIncrease,
-    );
-
-    if (changed.isEmpty && violatedFiles.isEmpty) {
-      for (final buf in [summaryBuf, ?commentBuf]) {
-        buf.writeln('No modified Dart declarations detected.');
-      }
-      return;
-    }
-
-    _writeDeltaBodies(
-      changed,
-      violatedFiles,
-      failThreshold,
-      maxFileLines,
-      maxFunctionLines,
-      failOnIncrease,
-      summaryBuf,
-      commentBuf,
-    );
-  }
-
-  void _writeDeltaHeader(
-    DeltaSummary summary,
-    int? failThreshold,
-    int? maxFileLines,
-    int? maxFunctionLines,
-    bool failOnIncrease,
-    StringBuffer summaryBuf,
-    StringBuffer? commentBuf,
-  ) {
     final net = summary.netDelta;
     final sign = net > 0 ? '+' : '';
     final violations = summary.countViolations(
@@ -325,37 +236,13 @@ class GitHubReporter {
         ..writeln(header)
         ..writeln();
     }
-  }
 
-  List<ComplexityDelta> _filterChangedDeltas(
-    List<ComplexityDelta> deltas,
-    int? maxFunctionLines,
-  ) => deltas
-      .where(
-        (d) =>
-            d.delta != 0 ||
-            d.isFunctionLineViolation(maxFunctionLines: maxFunctionLines),
-      )
-      .toList();
+    final changed = _filterChangedDeltas(summary.deltas, maxFunctionLines);
+    final violatedFiles = _filterViolatedFileDeltas(
+      summary.fileDeltas,
+      maxFileLines,
+    );
 
-  List<FileLineDelta> _filterViolatedFileDeltas(
-    List<FileLineDelta> fileDeltas,
-    int? maxFileLines,
-  ) {
-    if (maxFileLines == null || maxFileLines <= 0) return const [];
-    return fileDeltas
-        .where((f) => f.isViolation(maxFileLines: maxFileLines))
-        .toList();
-  }
-
-  void _emitAllDeltaAnnotations(
-    List<ComplexityDelta> changed,
-    List<FileLineDelta> violatedFiles,
-    int? failThreshold,
-    int? maxFileLines,
-    int? maxFunctionLines,
-    bool failOnIncrease,
-  ) {
     for (final d in changed) {
       _emitDiagnostic(d, failThreshold, maxFunctionLines, failOnIncrease);
     }
@@ -366,18 +253,14 @@ class GitHubReporter {
         '${f.filePath} grew to ${f.newLines} lines (limit: $maxFileLines).',
       );
     }
-  }
 
-  void _writeDeltaBodies(
-    List<ComplexityDelta> changed,
-    List<FileLineDelta> violatedFiles,
-    int? failThreshold,
-    int? maxFileLines,
-    int? maxFunctionLines,
-    bool failOnIncrease,
-    StringBuffer summaryBuf,
-    StringBuffer? commentBuf,
-  ) {
+    if (changed.isEmpty && violatedFiles.isEmpty) {
+      for (final buf in [summaryBuf, ?commentBuf]) {
+        buf.writeln('No modified Dart declarations detected.');
+      }
+      return;
+    }
+
     if (changed.isNotEmpty) {
       _renderDeltaTable(
         changed,
@@ -404,6 +287,27 @@ class GitHubReporter {
         _renderFileDeltaTable(violatedFiles, maxFileLines!, commentBuf);
       }
     }
+  }
+
+  List<ComplexityDelta> _filterChangedDeltas(
+    List<ComplexityDelta> deltas,
+    int? maxFunctionLines,
+  ) => deltas
+      .where(
+        (d) =>
+            d.delta != 0 ||
+            d.isFunctionLineViolation(maxFunctionLines: maxFunctionLines),
+      )
+      .toList();
+
+  List<FileLineDelta> _filterViolatedFileDeltas(
+    List<FileLineDelta> fileDeltas,
+    int? maxFileLines,
+  ) {
+    if (maxFileLines == null || maxFileLines <= 0) return const [];
+    return fileDeltas
+        .where((f) => f.isViolation(maxFileLines: maxFileLines))
+        .toList();
   }
 
   void _renderFileDeltaTable(

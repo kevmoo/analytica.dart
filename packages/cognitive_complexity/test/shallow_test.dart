@@ -240,6 +240,140 @@ void main() {
       },
     );
 
+    test(
+      'exempts cross-file single-caller functions that reference file-private declarations',
+      () async {
+        await d.dir('facade_pkg', [
+          d.file('pubspec.yaml', 'name: facade_pkg\n'),
+          d.dir('lib', [
+            d.dir('src', [
+              d.file('topology.dart', '''
+List<int> computeScc(List<int> nodes, Map<int, List<int>> edges) {
+  final state = _TarjanState(nodes);
+  return _runTarjan(state, edges);
+}
+
+class _TarjanState {
+  final List<int> nodes;
+  _TarjanState(this.nodes);
+}
+
+List<int> _runTarjan(_TarjanState state, Map<int, List<int>> edges) {
+  if (edges.isEmpty) return state.nodes;
+  return [for (final n in state.nodes) if (edges.containsKey(n)) n];
+}
+
+int leafCrossFileHelper(int a, int b, int c) {
+  return a + b + c;
+}
+'''),
+              d.file('planner.dart', '''
+import 'topology.dart';
+
+int planSplits(List<int> nodes, Map<int, List<int>> edges) {
+  final sccs = computeScc(nodes, edges);
+  return leafCrossFileHelper(sccs.length, nodes.length, edges.length);
+}
+'''),
+            ]),
+          ]),
+        ]).create();
+
+        final analyzer = ShallowAnalyzer();
+        final report = analyzer.analyzePath('${d.sandbox}/facade_pkg/lib');
+
+        final names = report.findings.map((f) => f.name).toList();
+        check(names).contains('leafCrossFileHelper');
+        check(names.contains('computeScc')).isFalse();
+      },
+    );
+
+    test(
+      'enforces cumulative caller CC budget and bottom-up chain propagation',
+      () {
+        const code = '''
+void printReport(int a, int b, int c, int d, int e, int f, int g) {
+  if (a > 0 && b > 0 && c > 0) {
+    if (d > 0) {
+      _reportDelta(a, b, c, d, e, f, g);
+      _reportRegular(a, b, c, d, e, f);
+    }
+  }
+}
+
+void _reportDelta(int a, int b, int c, int d, int e, int f, int g) {
+  if (a > 0 && b > 0) {
+    if (c > 0) {
+      print(a);
+    }
+  }
+  _stepA(a, b, c, d, e, f, g, a);
+  _stepB(a, b, c, d, e, f, g);
+  _stepC(a, b, c, d, e, f);
+  _stepD(a, b, c, d, e);
+}
+
+void _reportRegular(int a, int b, int c, int d, int e, int f) {
+  if (a > 0) {
+    if (b > 0) {
+      print(c + d + e + f);
+    }
+  }
+}
+
+void _stepA(int a, int b, int c, int d, int e, int f, int g, int h) {
+  if (a > 0 && b > 0) {
+    if (c > 0) {
+      if (d > 0) {
+        print(d + e + f + g + h);
+      }
+    }
+  }
+}
+
+void _stepB(int a, int b, int c, int d, int e, int f, int g) {
+  if (a > 0 && b > 0) {
+    print(c + d + e + f + g);
+  }
+}
+
+void _stepC(int a, int b, int c, int d, int e, int f) {
+  if (a > 0 && b > 0) {
+    print(c + d + e + f);
+  }
+}
+
+void _stepD(int a, int b, int c, int d, int e) {
+  if (a > 0 && b > 0) {
+    print(c + d + e);
+  }
+}
+''';
+        final analyzer = ShallowAnalyzer();
+        final report = analyzer.analyzeCode(code);
+
+        final byName = {for (final f in report.findings) f.name: f};
+        check(
+          byName['_stepA']!.classification,
+        ).equals(ShallowClassification.safeInline);
+        check(
+          byName['_stepB']!.classification,
+        ).equals(ShallowClassification.safeInline);
+        check(
+          byName['_stepC']!.classification,
+        ).equals(ShallowClassification.safeInline);
+        check(
+          byName['_stepD']!.classification,
+        ).equals(ShallowClassification.flattenAndInline);
+        check(
+          byName['_reportDelta']!.classification,
+        ).equals(ShallowClassification.loadBearing);
+        check(
+          byName['_reportRegular']!.classification,
+        ).equals(ShallowClassification.safeInline);
+      },
+    );
+
     test('CLI --git-diff filters modified files when run from a workspace '
         'subpackage directory', () async {
       await d.dir('ws_repo', [

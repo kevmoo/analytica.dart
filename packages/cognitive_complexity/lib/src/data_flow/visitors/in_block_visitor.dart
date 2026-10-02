@@ -165,7 +165,10 @@ class InBlockVisitor extends RecursiveAstVisitor<void> {
       return;
     }
 
-    _recordUsage(declOffset, node, element, isDeclaredInsideSlice);
+    if ((declOffset >= 0 && declOffset < sliceStartOffset) ||
+        (!isDeclaredInsideSlice && declOffset < sliceStartOffset)) {
+      _processValidUsage(declOffset, node, element);
+    }
 
     super.visitSimpleIdentifier(node);
   }
@@ -184,18 +187,6 @@ class InBlockVisitor extends RecursiveAstVisitor<void> {
       return true;
     }
     return false;
-  }
-
-  void _recordUsage(
-    int declOffset,
-    SimpleIdentifier node,
-    VariableElement element,
-    bool isDeclaredInsideSlice,
-  ) {
-    if ((declOffset >= 0 && declOffset < sliceStartOffset) ||
-        (!isDeclaredInsideSlice && declOffset < sliceStartOffset)) {
-      _processValidUsage(declOffset, node, element);
-    }
   }
 
   void _processValidUsage(
