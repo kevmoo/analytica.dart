@@ -60,8 +60,8 @@ Run the CLI directly (requires Dart SDK **3.12.0+**, verify via
   ```
 - **Scope 4 — Shallow Helper Audit (Over-Extraction & Re-Inlining)**:
   ```bash
-  dart run cognitive_complexity:shallow lib/
-  dart run cognitive_complexity:shallow --git-diff origin/main --fail-on-safe-inline
+  dart run cognitive_complexity:shallow@^0.2.4 lib/
+  dart run cognitive_complexity:shallow@^0.2.4 --git-diff origin/main --fail-on-safe-inline
   ```
 
 ---
@@ -188,7 +188,7 @@ flattening in place with Patterns A/B instead of extracting a shallow helper:
     when standalone `lib/src/` files would require widening visibility and risk
     leaking internal types via unscoped `export 'src/...';` directives.
 - **Pattern G (Re-Inlining Shallow Single-Caller Helpers — `shallow`)**: Run
-  `dart run cognitive_complexity:shallow lib/` to detect single-caller
+  `dart run cognitive_complexity:shallow@^0.2.4 lib/` to detect single-caller
   pass-through helpers (`HIGH_ARITY`, `MICRO_HELPER`, `SIG_HEAVY`,
   `CROSS_FILE_SINGLE_CALLER`). Re-inline `SAFE_INLINE` findings
   (`CallerCCAfter <= 15`) directly into their sole caller, and flatten + inline
@@ -201,7 +201,7 @@ flattening in place with Patterns A/B instead of extracting a shallow helper:
 1. **Complexity & Shallow-Helper Audit**: Run
    `dart run cognitive_complexity@^0.2.4 --fail-threshold 15 <refactored files>`
    and
-   `dart run cognitive_complexity:shallow --fail-on-safe-inline <refactored files>`.
+   `dart run cognitive_complexity:shallow@^0.2.4 --fail-on-safe-inline <refactored files>`.
 2. **Mandatory `api_summary` Public API Surface Verification Gate**: Whenever a
    refactor extracts helpers across files or touches `lib/` exports:
    ```bash
