@@ -161,7 +161,7 @@ dart run cognitive_complexity:data_flow@^0.2.4 lib/src/my_file.dart:45-80
   flags.
 - **Pattern F (Acyclic File Decomposition & Load-Bearing Library Boundaries)**:
   Run
-  `dart run cognitive_complexity:file_split lib/src/large_file.dart --target-lines 300`
+  `dart run cognitive_complexity:file_split@^0.2.4 lib/src/large_file.dart --target-lines 300`
   for files `> 400` lines and select the library boundary tier:
   - **Tier 1 (Default — Standalone `lib/src/<topic>.dart`)**: Use when extracted
     helpers form a genuine sub-domain with narrow parameter lists (`<= 3` args)
