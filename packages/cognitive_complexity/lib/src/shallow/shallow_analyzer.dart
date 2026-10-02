@@ -225,6 +225,13 @@ class ShallowAnalyzer {
         p.split(caller.normalizedFilePath).contains('bin')) {
       return true;
     }
+    final enclosingType = decl.enclosingType;
+    if (enclosingType != null &&
+        !enclosingType.startsWith('_') &&
+        !decl.isPrivate &&
+        caller.enclosingType != enclosingType) {
+      return true;
+    }
     return caller.normalizedFilePath != decl.normalizedFilePath &&
         decl.referencedPrivateNames.isNotEmpty;
   }
@@ -253,6 +260,8 @@ class ShallowAnalyzer {
       final inlinedCallerScore = callerScore + deltaScore;
       final classification = _classifyInlinedScore(
         inlinedCallerScore: inlinedCallerScore,
+        helperScore: c.decl.score,
+        callNestingDepth: c.call.nestingDepth,
         hasAbsorbedChildren: children.isNotEmpty,
       );
       if (classification == ShallowClassification.safeInline) {
@@ -282,12 +291,17 @@ class ShallowAnalyzer {
 
   ShallowClassification _classifyInlinedScore({
     required int inlinedCallerScore,
+    required int helperScore,
+    required int callNestingDepth,
     required bool hasAbsorbedChildren,
   }) {
     if (inlinedCallerScore <= maxCallerScore) {
       return ShallowClassification.safeInline;
     }
-    if (inlinedCallerScore <= maxCallerScore + 7 && !hasAbsorbedChildren) {
+    if (helperScore <= 4 &&
+        callNestingDepth > 0 &&
+        inlinedCallerScore <= maxCallerScore + 7 &&
+        !hasAbsorbedChildren) {
       return ShallowClassification.flattenAndInline;
     }
     return ShallowClassification.loadBearing;

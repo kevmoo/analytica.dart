@@ -24,8 +24,13 @@ function readability, or remediating high-complexity findings during code
 review. Cognitive Complexity measures human mental friction rather than flat
 branch counts.
 
-- **Production Logic Functions**: Target score `<= 15`. Functions exceeding 15
-  points mandate architectural refactoring.
+- **Production Logic Functions**: Target score `<= 15` (**Target Zone: `8–15`,
+  Not `0`**). Functions exceeding 15 points mandate architectural refactoring.
+  Once a function reaches `<= 15`, **stop decomposing**—never shred a `12`-point
+  function into single-caller pass-through micro-helpers just to chase `0`.
+- **Extracted Helper Depth & Parameter Cap**: Pure extracted helpers must take
+  `<= 4` parameters (`<= 3` preferred) and carry genuine internal depth
+  (`sliceScoreAtRoot >= 3` or reused across `2+` call sites).
 - **Test Methods (`_test.dart`)**: Target score `<= 40`.
 - **Class & File Size Ceilings**: Logic classes should remain `<= 150`
   non-comment lines; source files should remain `<= 400` lines.
@@ -42,16 +47,21 @@ Run the CLI directly (requires Dart SDK **3.12.0+**, verify via
 
 - **Scope 1 — Targeted (Specific File or Directory)**:
   ```bash
-  dart run cognitive_complexity@^0.2.4 --threshold 15 lib/src/auth/
+  dart run cognitive_complexity@^0.2.5 --threshold 15 lib/src/auth/
   ```
 - **Scope 2 — Delta (PR, Branch, or Pre-Flight Audit)**:
   ```bash
-  dart run cognitive_complexity@^0.2.4 --git-diff origin/main --fail-threshold 15 --fail-on-increase
+  dart run cognitive_complexity@^0.2.5 --git-diff origin/main --fail-threshold 15 --fail-on-increase
   ```
 - **Scope 3 — Whole-Project (Default Naked Invocation)**:
   ```bash
-  dart run cognitive_complexity@^0.2.4 --threshold 15 lib/
-  dart run cognitive_complexity@^0.2.4 --threshold 40 test/
+  dart run cognitive_complexity@^0.2.5 --threshold 15 lib/
+  dart run cognitive_complexity@^0.2.5 --threshold 40 test/
+  ```
+- **Scope 4 — Shallow Helper Audit (Over-Extraction & Re-Inlining)**:
+  ```bash
+  dart run cognitive_complexity:shallow@^0.2.5 lib/
+  dart run cognitive_complexity:shallow@^0.2.5 --git-diff origin/main --fail-on-safe-inline
   ```
 
 ---
@@ -131,8 +141,13 @@ template.
 Run the statement-level data-flow analyzer on candidate line slices:
 
 ```bash
-dart run cognitive_complexity:data_flow@^0.2.4 lib/src/my_file.dart:45-80
+dart run cognitive_complexity:data_flow@^0.2.5 lib/src/my_file.dart:45-80
 ```
+
+Inspect the complexity impact (`enclosingScore`, `sliceScoreInPlace`,
+`sliceScoreAtRoot`, `estimatedEnclosingScoreAfter`) and honor any
+`extractionWarnings` (`HIGH_ARITY` `>= 5` inputs or `LOW_COMPLEXITY_PAYOFF`) by
+flattening in place with Patterns A/B instead of extracting a shallow helper:
 
 - **Pattern A (Dart 3 Switch Expressions)**: Replace nested `if-else` ladders
   with exhaustive table-driven `switch` expressions (single base penalty).
@@ -140,13 +155,13 @@ dart run cognitive_complexity:data_flow@^0.2.4 lib/src/my_file.dart:45-80
   returns (`if (!cond) return;`).
 - **Pattern C (3-Tier `data_flow` Extraction)**:
   1. **Tier 1 — Pure Functional Decomposition (First Choice)**: For slices with
-     `2+` live outputs, extract a pure private top-level or `static` function
-     returning the synthesized Dart 3 named record
-     (`final (:data, :errors) = _step(input);`). Never create single-use
-     `_XxxResult` dataclasses for private slices.
+     `2+` live outputs, `<= 4` inputs, and `sliceScoreAtRoot >= 3`, extract a
+     pure private top-level or `static` function returning the synthesized Dart
+     3 named record (`final (:data, :errors) = _step(input);`). Never create
+     single-use `_XxxResult` dataclasses for private slices.
   2. **Tier 2 — Standard Helper Extraction (Second Choice)**: For slices with
-     `<= 1` output and `<= 3` inputs, extract a pure private top-level or static
-     helper.
+     `<= 1` output, `<= 3` inputs, and `sliceScoreAtRoot >= 3`, extract a pure
+     private top-level or static helper.
   3. **Tier 3 — Encapsulated Method Object (Last Resort)**: Permitted ONLY when
      `data_flow` on 2+ candidate slices shows `>= 3` intersecting `mutations`
      variables—read [`references/method-object.md`](references/method-object.md)
@@ -161,7 +176,7 @@ dart run cognitive_complexity:data_flow@^0.2.4 lib/src/my_file.dart:45-80
   flags.
 - **Pattern F (Acyclic File Decomposition & Load-Bearing Library Boundaries)**:
   Run
-  `dart run cognitive_complexity:file_split@^0.2.4 lib/src/large_file.dart --target-lines 300`
+  `dart run cognitive_complexity:file_split@^0.2.5 lib/src/large_file.dart --target-lines 300`
   for files `> 400` lines and select the library boundary tier:
   - **Tier 1 (Default — Standalone `lib/src/<topic>.dart`)**: Use when extracted
     helpers form a genuine sub-domain with narrow parameter lists (`<= 3` args)
@@ -172,13 +187,21 @@ dart run cognitive_complexity:data_flow@^0.2.4 lib/src/my_file.dart:45-80
     `sealed`/`final`/`interface`/`base` modifiers, or internal invariants, OR
     when standalone `lib/src/` files would require widening visibility and risk
     leaking internal types via unscoped `export 'src/...';` directives.
+- **Pattern G (Re-Inlining Shallow Single-Caller Helpers — `shallow`)**: Run
+  `dart run cognitive_complexity:shallow@^0.2.5 lib/` to detect single-caller
+  pass-through helpers (`HIGH_ARITY`, `MICRO_HELPER`, `SIG_HEAVY`,
+  `CROSS_FILE_SINGLE_CALLER`). Re-inline `SAFE_INLINE` findings
+  (`CallerCCAfter <= 15`) directly into their sole caller, and flatten + inline
+  `FLATTEN_AND_INLINE` findings using Patterns A/B.
 
 ---
 
 ## 6. Verification & Public API Surface Guardrails
 
-1. **Complexity Audit**: Run
-   `dart run cognitive_complexity@^0.2.4 --fail-threshold 15 <refactored files>`.
+1. **Complexity & Shallow-Helper Audit**: Run
+   `dart run cognitive_complexity@^0.2.5 --fail-threshold 15 <refactored files>`
+   and
+   `dart run cognitive_complexity:shallow@^0.2.5 --fail-on-safe-inline <refactored files>`.
 2. **Mandatory `api_summary` Public API Surface Verification Gate**: Whenever a
    refactor extracts helpers across files or touches `lib/` exports:
    ```bash

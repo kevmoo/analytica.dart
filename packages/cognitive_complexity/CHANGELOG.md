@@ -1,4 +1,4 @@
-## 0.2.5-wip
+## 0.2.5
 
 - Omit zero-complexity (`delta == 0`, `score == 0`) added and removed
   declarations from `--git-diff` Markdown, CLI, and JSON delta tables (unless

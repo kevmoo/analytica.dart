@@ -227,14 +227,19 @@ Run the companion statement-level data-flow analyzer on each candidate line
 slice before extracting:
 
 ```bash
-dart run cognitive_complexity:data_flow@^0.2.4 lib/src/my_file.dart:45-80
+dart run cognitive_complexity:data_flow@^0.2.5 lib/src/my_file.dart:45-80
 ```
 
-Its report (`inputs`, `mutations`, live `outputs`, control-flow escapes, and a
-synthesized Dart 3 record signature) selects the tier:
+Its report (`inputs`, `mutations`, live `outputs`, control-flow escapes,
+complexity impact `enclosingScore` / `sliceScoreInPlace` / `sliceScoreAtRoot` /
+`estimatedEnclosingScoreAfter`, `extractionWarnings`, and a synthesized Dart 3
+record signature) selects the tier. If `extractionWarnings` flags `HIGH_ARITY`
+(`>= 5` inputs) or `LOW_COMPLEXITY_PAYOFF`, flatten in place with Patterns A/B
+instead of extracting a shallow pass-through helper:
 
 1. **Tier 1 — Pure Functional Decomposition (First Choice)**:
-   - **Selection**: Cleanly extractable slice with 2+ live outputs.
+   - **Selection**: Cleanly extractable slice with 2+ live outputs, `<= 4`
+     inputs, and `sliceScoreAtRoot >= 3`.
    - **Idiom**: Extract a pure file-private top-level function (`_parseHeader`,
      `_validateItem`) or `static` method returning the synthesized Dart 3 named
      record signature verbatim (`final (:data, :errors) = _stepOne(input);`).
@@ -246,8 +251,8 @@ synthesized Dart 3 record signature) selects the tier:
      state (`this`), declare it as a private top-level function (or `static`
      method) to guarantee referential transparency.
 2. **Tier 2 — Standard Helper Extraction (Second Choice)**:
-   - **Selection**: Cleanly extractable slice with `<= 1` live output and `<= 3`
-     inputs.
+   - **Selection**: Cleanly extractable slice with `<= 1` live output, `<= 3`
+     inputs, and `sliceScoreAtRoot >= 3`.
    - **Idiom**: Extract a pure private top-level function or private helper
      method returning that single value.
 3. **Control-Flow Escapes & Loop Bodies**:
@@ -344,13 +349,38 @@ When a Dart file grows beyond `400` lines (enforceable via opt-in
 run the deterministic intra-file dependency graph advisor:
 
 ```bash
-dart run cognitive_complexity:file_split@^0.2.4 lib/src/large_file.dart --target-lines 300
+dart run cognitive_complexity:file_split@^0.2.5 lib/src/large_file.dart --target-lines 300
 ```
 
 Apply the **Load-Bearing Library Boundary Rule** (Section 1.2) when selecting
 between a standalone `lib/src/<topic>.dart` file (**Tier 1**) and `part` /
 `part of` (**Tier 2**), and always run the `api_summary` verification gate
 (Section 1.3) before and after splitting.
+
+---
+
+### Pattern G: Re-Inlining Shallow Single-Caller Helpers (`shallow`)
+
+When over-eager complexity decomposition leaves behind single-caller
+micro-helpers or high-arity bucket-brigade functions (`>= 5` parameters), run
+the AST shallow helper scanner:
+
+```bash
+dart run cognitive_complexity:shallow@^0.2.5 lib/
+```
+
+The scanner identifies non-exported helpers with `FanIn == 1` and
+`TestFanIn == 0` matching any of 4 structural tags (`HIGH_ARITY`,
+`MICRO_HELPER`, `SIG_HEAVY`, `CROSS_FILE_SINGLE_CALLER`) and simulates the exact
+caller Cognitive Complexity at the call-site nesting depth after re-inlining:
+
+- **`SAFE_INLINE` (`CallerCCAfter <= 15`)**: Re-inline the helper directly into
+  its sole caller and delete the helper declaration.
+- **`FLATTEN_AND_INLINE` (`HelperCC <= 4` and `CallerCCAfter > 15`)**: Flatten
+  nesting at the call site using Pattern A (`switch` expression) or Pattern B
+  (early guard clauses) and inline the helper.
+- **`LOAD_BEARING` (`HelperCC >= 5` and `CallerCCAfter > 15`)**: Keep extracted,
+  or narrow its parameter list if `HIGH_ARITY`.
 
 ---
 
@@ -377,6 +407,6 @@ To reproduce or re-evaluate cognitive complexity scores:
 ```
 
 ```bash
-dart run cognitive_complexity:data_flow@^0.2.4 {file}:{start_line}-{end_line}
+dart run cognitive_complexity:data_flow@^0.2.5 {file}:{start_line}-{end_line}
 ```
 ````

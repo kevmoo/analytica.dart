@@ -104,15 +104,62 @@ void _wideHelper(int a, int b, int c, int d, int e) {
         check(
           strictReport.findings.single.classification,
         ).equals(ShallowClassification.loadBearing);
+
+        // Helpers called at depth=0 (or with intrinsic CC >= 5) that push the
+        // caller above maxCallerScore have no call-site nesting inflation to
+        // flatten away, so they must be classified as LOAD_BEARING even when
+        // inlinedCallerScore <= maxCallerScore + 7.
+        const depthZeroCode = '''
+void rootCaller(int a, int b, int c, int d, int e) {
+  if (a > 0) {
+    if (b > 0) {
+      if (c > 0) {
+        if (d > 0) {
+          print(e);
+        }
+      }
+    }
+  }
+  _depthZeroHelper(a, b, c, d, e);
+}
+
+void _depthZeroHelper(int a, int b, int c, int d, int e) {
+  if (a == b) {
+    if (c == d) {
+      if (b == c) {
+        print(e);
+      }
+    }
+  }
+}
+''';
+        final depthZeroReport = analyzer.analyzeCode(depthZeroCode);
+        check(depthZeroReport.findings.length).equals(1);
+        final depthZeroFinding = depthZeroReport.findings.single;
+        check(depthZeroFinding.callNestingDepth).equals(0);
+        check(depthZeroFinding.score).equals(6);
+        check(depthZeroFinding.inlinedCallerScore).equals(16);
+        check(
+          depthZeroFinding.classification,
+        ).equals(ShallowClassification.loadBearing);
       },
     );
 
     test('Exempts multi-caller helpers, tear-offs (including qualified and '
-        'named-arg tear-offs), overrides, build methods, and ignored '
-        'declarations', () {
+        'named-arg tear-offs), cross-class public methods, overrides, build '
+        'methods, and ignored declarations', () {
       const code = '''
+class ShortcutManager {
+  final List<String> shortcuts = [];
+
+  void registerAll(List<String> items) {
+    shortcuts.addAll(items);
+  }
+}
+
 class MyWidget {
-  void run(List<int> items) {
+  void run(List<int> items, ShortcutManager manager) {
+    manager.registerAll(['ctrl+k']);
     _reused(1, 2);
     _reused(3, 4);
     final mapped = items.map(_tornOff).toList();
@@ -302,10 +349,9 @@ void printReport(int a, int b, int c, int d, int e, int f, int g) {
 void _reportDelta(int a, int b, int c, int d, int e, int f, int g) {
   if (a > 0 && b > 0) {
     if (c > 0) {
-      print(a);
+      _stepA(a, b, c, d, e, f, g, a);
     }
   }
-  _stepA(a, b, c, d, e, f, g, a);
   _stepB(a, b, c, d, e, f, g);
   _stepC(a, b, c, d, e, f);
   _stepD(a, b, c, d, e);
@@ -322,9 +368,7 @@ void _reportRegular(int a, int b, int c, int d, int e, int f) {
 void _stepA(int a, int b, int c, int d, int e, int f, int g, int h) {
   if (a > 0 && b > 0) {
     if (c > 0) {
-      if (d > 0) {
-        print(d + e + f + g + h);
-      }
+      print(d + e + f + g + h);
     }
   }
 }

@@ -36,11 +36,12 @@
       "expected_chat_output": [
         "Consults 'references/refactoring_recipes.md' for progressive-disclosure refactoring patterns.",
         "Applies the Load-Bearing Library Boundary Rule (Tier 1 standalone lib/src/ file vs. Tier 2 part/part of or in-file private helpers).",
-        "Runs or specifies 'dart run api_summary@^1.1.0' before and after refactoring to verify zero unintended public API leaks."
+        "Runs or specifies 'dart run api_summary@^1.1.0' before and after refactoring to verify zero unintended public API leaks.",
+        "Runs or specifies 'dart run cognitive_complexity:shallow@^0.2.5' to verify no single-caller SAFE_INLINE shallow helpers were introduced."
       ],
       "expected_repo_state": [
         "All modified functions score <= 15 on the cognitive complexity scanner.",
-        "Extracted helpers are pure file-private functions or static methods returning immutable values/records; no single-use stateful _Populator or _Runner classes are created.",
+        "Extracted helpers are pure file-private functions or static methods with <= 4 parameters returning immutable values/records; no single-use stateful _Populator or _Runner classes are created.",
         "The package's public API surface (api_summary / api.txt) has zero unintended symbol leaks."
       ],
       "agent_config": "bare-agent"
