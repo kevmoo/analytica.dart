@@ -145,6 +145,69 @@ dependencies:
       }
     });
 
+    test(
+      'links local sibling being prepared for release when consumer constraint '
+      'is still -wip',
+      () async {
+        await d.dir('release_prep_repo', [
+          d.dir('pkg_a', [
+            d.file('pubspec.yaml', '''
+name: pkg_a
+version: 0.1.2
+environment:
+  sdk: '^3.12.0'
+'''),
+            d.dir('lib', [d.file('pkg_a.dart', 'const a = 1;')]),
+          ]),
+          d.dir('pkg_b', [
+            d.file('pubspec.yaml', '''
+name: pkg_b
+version: 0.2.5-wip
+environment:
+  sdk: '^3.12.0'
+dependencies:
+  pkg_a: ^0.1.2-wip
+'''),
+            d.dir('lib', [
+              d.file('pkg_b.dart', 'import "package:pkg_a/pkg_a.dart";'),
+            ]),
+          ]),
+        ]).create();
+
+        final pkgBPath = p.join(d.sandbox, 'release_prep_repo', 'pkg_b');
+        final parsed = parsePubspec(pkgBPath);
+        final localSiblings = {
+          'pkg_a': LocalSibling(
+            name: 'pkg_a',
+            path: p.join(d.sandbox, 'release_prep_repo', 'pkg_a'),
+            version: Version(0, 1, 2),
+            rawVersion: '0.1.2',
+            isWip: false,
+            isPublishToNone: false,
+          ),
+        };
+
+        final staging = SyntheticStaging.create(
+          sourcePackagePath: pkgBPath,
+          pubspec: parsed,
+          localSiblings: localSiblings,
+        );
+
+        try {
+          staging.writePubspec(allowLocalSiblings: true);
+          final stagedPubspecContent = File(
+            p.join(staging.stagingDir.path, 'pubspec.yaml'),
+          ).readAsStringSync();
+
+          check(stagedPubspecContent).contains('dependency_overrides:');
+          check(stagedPubspecContent).contains('pkg_a:');
+          check(staging.warnings).length.equals(1);
+        } finally {
+          staging.dispose();
+        }
+      },
+    );
+
     test('reads resolved versions from package_config.json', () async {
       await d.dir('pkg_config_test', [
         d.file('pubspec.yaml', '''
