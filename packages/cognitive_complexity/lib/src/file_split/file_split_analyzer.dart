@@ -397,20 +397,12 @@ class _ExtractionCutPlanner {
     return [
       for (final c in survivingChildren)
         if (closures[c]!.isNotEmpty &&
-            !_isCoveredPrivateLeaf(c, closures[c]!, closures))
+            !(_isAllPrivateGroup(closures[c]!) &&
+                closures.entries.any(
+                  (e) => e.key != c && e.value.containsAll(closures[c]!),
+                )))
           closures[c]!,
     ];
-  }
-
-  bool _isCoveredPrivateLeaf(
-    int child,
-    Set<int> closed,
-    Map<int, Set<int>> closures,
-  ) {
-    if (!_isAllPrivateGroup(closed)) return false;
-    return closures.entries.any(
-      (e) => e.key != child && e.value.containsAll(closed),
-    );
   }
 
   bool _isAllPrivateGroup(Set<int> group) => group.every(
@@ -577,11 +569,12 @@ class _ExtractionCutPlanner {
     final (:absorbed, :privTopToWiden, :privMembersToWiden) =
         _classifyBoundaryCrossings(clusterNames, decls);
 
-    final tier = _determineTier(
-      forceTier3,
-      privTopToWiden.length,
-      privMembersToWiden.length,
-    );
+    final tier =
+        (useParts != false && (forceTier3 || privMembersToWiden.length >= 3))
+        ? SplitTier.tier3PartDirective
+        : (privTopToWiden.length + privMembersToWiden.length == 0
+              ? SplitTier.tier1CleanLibrary
+              : SplitTier.tier2InternalWidening);
     final clusterDepth = sccIndices
         .map((i) => depths[i] ?? 0)
         .fold(0, math.max);
@@ -630,31 +623,6 @@ class _ExtractionCutPlanner {
     final privTop = <String>{};
     final privMem = <String>{};
 
-    _classifyInClusterDecls(
-      decls,
-      clusterNames,
-      outsideDecls,
-      absorbed,
-      privTop,
-      privMem,
-    );
-    _classifyOutsideDecls(outsideDecls, clusterNames, privTop, privMem);
-
-    return (
-      absorbed: absorbed..sort(),
-      privTopToWiden: privTop.toList()..sort(),
-      privMembersToWiden: privMem.toList()..sort(),
-    );
-  }
-
-  void _classifyInClusterDecls(
-    List<DeclarationUnit> decls,
-    Set<String> clusterNames,
-    List<DeclarationUnit> outsideDecls,
-    List<String> absorbed,
-    Set<String> privTop,
-    Set<String> privMem,
-  ) {
     final outsideNames = outsideDecls.map((o) => o.name).toSet();
     for (final d in decls) {
       if (!d.isPublic) {
@@ -678,6 +646,13 @@ class _ExtractionCutPlanner {
         privMem,
       );
     }
+    _classifyOutsideDecls(outsideDecls, clusterNames, privTop, privMem);
+
+    return (
+      absorbed: absorbed..sort(),
+      privTopToWiden: privTop.toList()..sort(),
+      privMembersToWiden: privMem.toList()..sort(),
+    );
   }
 
   void _classifyOutsideDecls(
@@ -710,18 +685,6 @@ class _ExtractionCutPlanner {
         sink.addAll(entry.value.map((m) => '${entry.key}.$m'));
       }
     }
-  }
-
-  SplitTier _determineTier(
-    bool forceTier3,
-    int privTopCount,
-    int privMemCount,
-  ) {
-    if (useParts != false && (forceTier3 || privMemCount >= 3)) {
-      return SplitTier.tier3PartDirective;
-    }
-    if (privTopCount + privMemCount == 0) return SplitTier.tier1CleanLibrary;
-    return SplitTier.tier2InternalWidening;
   }
 
   String _buildRationale(

@@ -26,6 +26,7 @@ class ShallowDeclNode {
   final bool isInRequestedTargets;
   final AstNode node;
   final List<AstNode?> ccParts;
+  final Set<String> referencedPrivateNames = {};
   late final int score = scoreAstParts(ccParts);
 
   ShallowDeclNode({
@@ -330,7 +331,21 @@ class ShallowFileCollector extends RecursiveAstVisitor<void> {
   }
 
   @override
+  void visitNamedType(NamedType node) {
+    final cur = _currentDecl;
+    final typeName = node.name.lexeme;
+    if (cur != null && typeName.startsWith('_')) {
+      cur.referencedPrivateNames.add(typeName);
+    }
+    super.visitNamedType(node);
+  }
+
+  @override
   void visitSimpleIdentifier(SimpleIdentifier node) {
+    final cur = _currentDecl;
+    if (cur != null && node.name.startsWith('_') && node.name != cur.rawName) {
+      cur.referencedPrivateNames.add(node.name);
+    }
     if (_isTearOffContext(node)) {
       _recordCallSite(node, node.name, isTearOff: true);
     }

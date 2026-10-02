@@ -72,15 +72,19 @@ class CloneDetector {
     final k = math.max(5, minTokens);
     final basePow = _computeBasePow(k);
     final index = _buildKgramIndex(fileSequences, k, basePow);
-    _collectKgramMatches(
-      index: index,
-      fileSequences: fileSequences,
-      k: k,
-      minTokens: minTokens,
-      minLines: minLines,
-      seenPairs: seenKgramPairs,
-      outPairs: rawPairs,
-    );
+    for (final locations in index.values) {
+      if (locations.length < 2) continue;
+
+      _collectMatchesForBucket(
+        locations: locations,
+        fileSequences: fileSequences,
+        k: k,
+        minTokens: minTokens,
+        minLines: minLines,
+        seenPairs: seenKgramPairs,
+        outPairs: rawPairs,
+      );
+    }
 
     if (rawPairs.isEmpty) return const [];
 
@@ -210,55 +214,39 @@ void _matchMinHashCandidates({
 
   final candidatePairs = lshIndex.findCandidatePairs();
   for (final pair in candidatePairs) {
-    _tryAddMinHashCandidatePair(
-      c1: pair.item1,
-      c2: pair.item2,
-      fileSequences: fileSequences,
-      minJaccard: minJaccard,
-      seenPairs: seenPairs,
-      outPairs: outPairs,
+    final c1 = pair.item1;
+    final c2 = pair.item2;
+    if (c1.fileIndex == c2.fileIndex &&
+        (c1.startTokenIndex <= c2.endTokenIndex &&
+            c2.startTokenIndex <= c1.endTokenIndex)) {
+      continue;
+    }
+
+    final jaccard = MinHasher.exactJaccard(
+      c1.statementHashes,
+      c2.statementHashes,
     );
-  }
-}
+    if (jaccard < minJaccard) continue;
 
-void _tryAddMinHashCandidatePair({
-  required AstCandidateUnit c1,
-  required AstCandidateUnit c2,
-  required List<TokenSequence> fileSequences,
-  required double minJaccard,
-  required Set<(int, int, int, int)> seenPairs,
-  required List<MatchPair> outPairs,
-}) {
-  if (c1.fileIndex == c2.fileIndex &&
-      (c1.startTokenIndex <= c2.endTokenIndex &&
-          c2.startTokenIndex <= c1.endTokenIndex)) {
-    return;
-  }
+    if (!_verifyMinHashCandidateTokens(c1, c2, fileSequences, minJaccard)) {
+      continue;
+    }
 
-  final jaccard = MinHasher.exactJaccard(
-    c1.statementHashes,
-    c2.statementHashes,
-  );
-  if (jaccard < minJaccard) return;
+    final span1 = TokenSpan(
+      fileIndex: c1.fileIndex,
+      startTokenIndex: c1.startTokenIndex,
+      endTokenIndex: c1.endTokenIndex,
+    );
+    final span2 = TokenSpan(
+      fileIndex: c2.fileIndex,
+      startTokenIndex: c2.startTokenIndex,
+      endTokenIndex: c2.endTokenIndex,
+    );
 
-  if (!_verifyMinHashCandidateTokens(c1, c2, fileSequences, minJaccard)) {
-    return;
-  }
-
-  final span1 = TokenSpan(
-    fileIndex: c1.fileIndex,
-    startTokenIndex: c1.startTokenIndex,
-    endTokenIndex: c1.endTokenIndex,
-  );
-  final span2 = TokenSpan(
-    fileIndex: c2.fileIndex,
-    startTokenIndex: c2.startTokenIndex,
-    endTokenIndex: c2.endTokenIndex,
-  );
-
-  final pairKey = _computeSpanPairKey(span1, span2);
-  if (seenPairs.add(pairKey)) {
-    outPairs.add(MatchPair(span1, span2));
+    final pairKey = _computeSpanPairKey(span1, span2);
+    if (seenPairs.add(pairKey)) {
+      outPairs.add(MatchPair(span1, span2));
+    }
   }
 }
 
@@ -351,30 +339,6 @@ Map<int, List<_TokenLocation>> _buildKgramIndex(
   return index;
 }
 
-void _collectKgramMatches({
-  required Map<int, List<_TokenLocation>> index,
-  required List<TokenSequence> fileSequences,
-  required int k,
-  required int minTokens,
-  required int minLines,
-  required Set<(int, int, int, int)> seenPairs,
-  required List<MatchPair> outPairs,
-}) {
-  for (final locations in index.values) {
-    if (locations.length < 2) continue;
-
-    _collectMatchesForBucket(
-      locations: locations,
-      fileSequences: fileSequences,
-      k: k,
-      minTokens: minTokens,
-      minLines: minLines,
-      seenPairs: seenPairs,
-      outPairs: outPairs,
-    );
-  }
-}
-
 void _collectMatchesForBucket({
   required List<_TokenLocation> locations,
   required List<TokenSequence> fileSequences,
@@ -432,16 +396,44 @@ void _processLocationPair({
   final pairKey = _computeLocationPairKey(loc1, loc2);
   if (!seenPairs.add(pairKey)) return;
 
-  final pair = _tryMatchPair(
-    loc1: loc1,
-    loc2: loc2,
-    fileSequences: fileSequences,
-    k: k,
-    minTokens: minTokens,
-    minLines: minLines,
-  );
-  if (pair == null) return;
+  if (loc1.fileIndex == loc2.fileIndex &&
+      (loc1.tokenIndex - loc2.tokenIndex).abs() < k) {
+    return;
+  }
 
+  final tokens1 = fileSequences[loc1.fileIndex].tokens;
+  final tokens2 = fileSequences[loc2.fileIndex].tokens;
+
+  for (var m = 0; m < k; m++) {
+    if (tokens1[loc1.tokenIndex + m].normalizedLexeme !=
+        tokens2[loc2.tokenIndex + m].normalizedLexeme) {
+      return;
+    }
+  }
+
+  final start1 = _extendBackward(tokens1, loc1, tokens2, loc2, k);
+  final start2 = loc2.tokenIndex - (loc1.tokenIndex - start1);
+  final end1 = _extendForward(tokens1, loc1, tokens2, loc2, k, start2);
+  final end2 = loc2.tokenIndex + k - 1 + (end1 - (loc1.tokenIndex + k - 1));
+
+  final span1 = TokenSpan(
+    fileIndex: loc1.fileIndex,
+    startTokenIndex: start1,
+    endTokenIndex: end1,
+  );
+  final span2 = TokenSpan(
+    fileIndex: loc2.fileIndex,
+    startTokenIndex: start2,
+    endTokenIndex: end2,
+  );
+
+  if (span1.tokenCount < minTokens) return;
+
+  final lineCount1 = tokens1[end1].endLine - tokens1[start1].startLine + 1;
+  final lineCount2 = tokens2[end2].endLine - tokens2[start2].startLine + 1;
+  if (lineCount1 < minLines || lineCount2 < minLines) return;
+
+  final pair = MatchPair(span1, span2);
   outPairs.add(pair);
   _markSubSeedsAsSeen(pair, k, seenPairs);
 }
@@ -494,67 +486,6 @@ void _markSubSeedsAsSeen(
         : (file2, start2 + offset, file1, start1 + offset);
     seenPairs.add(subKey);
   }
-}
-
-MatchPair? _tryMatchPair({
-  required _TokenLocation loc1,
-  required _TokenLocation loc2,
-  required List<TokenSequence> fileSequences,
-  required int k,
-  required int minTokens,
-  required int minLines,
-}) {
-  if (loc1.fileIndex == loc2.fileIndex &&
-      (loc1.tokenIndex - loc2.tokenIndex).abs() < k) {
-    return null;
-  }
-
-  final tokens1 = fileSequences[loc1.fileIndex].tokens;
-  final tokens2 = fileSequences[loc2.fileIndex].tokens;
-
-  if (!_seedsMatch(tokens1, loc1.tokenIndex, tokens2, loc2.tokenIndex, k)) {
-    return null;
-  }
-
-  final start1 = _extendBackward(tokens1, loc1, tokens2, loc2, k);
-  final start2 = loc2.tokenIndex - (loc1.tokenIndex - start1);
-  final end1 = _extendForward(tokens1, loc1, tokens2, loc2, k, start2);
-  final end2 = loc2.tokenIndex + k - 1 + (end1 - (loc1.tokenIndex + k - 1));
-
-  final span1 = TokenSpan(
-    fileIndex: loc1.fileIndex,
-    startTokenIndex: start1,
-    endTokenIndex: end1,
-  );
-  final span2 = TokenSpan(
-    fileIndex: loc2.fileIndex,
-    startTokenIndex: start2,
-    endTokenIndex: end2,
-  );
-
-  if (span1.tokenCount < minTokens) return null;
-
-  final lineCount1 = tokens1[end1].endLine - tokens1[start1].startLine + 1;
-  final lineCount2 = tokens2[end2].endLine - tokens2[start2].startLine + 1;
-  if (lineCount1 < minLines || lineCount2 < minLines) return null;
-
-  return MatchPair(span1, span2);
-}
-
-bool _seedsMatch(
-  List<NormalizedToken> tokens1,
-  int idx1,
-  List<NormalizedToken> tokens2,
-  int idx2,
-  int k,
-) {
-  for (var m = 0; m < k; m++) {
-    if (tokens1[idx1 + m].normalizedLexeme !=
-        tokens2[idx2 + m].normalizedLexeme) {
-      return false;
-    }
-  }
-  return true;
 }
 
 int _extendBackward(

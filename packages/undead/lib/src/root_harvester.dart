@@ -220,7 +220,7 @@ class RootHarvester {
       if (entity is! File || !entity.path.endsWith('.dart')) continue;
 
       final relPath = p.relative(entity.path, from: options.packagePath);
-      if (_isExcluded(relPath)) continue;
+      if (options.pathFilter.isExcluded(relPath)) continue;
 
       final normalized = p.normalize(relPath);
       final role = _classifyPathPrefix(normalized.replaceAll(r'\', '/'));
@@ -333,9 +333,6 @@ class RootHarvester {
       onFile(p.normalize(relPath));
     }
   }
-
-  bool _isExcluded(String relativePath) =>
-      options.pathFilter.isExcluded(relativePath);
 
   bool _isExcludedFromExtraRoot(String relativePath) =>
       options.pathFilter.isExcluded(relativePath);

@@ -198,12 +198,16 @@ class DartTokenizer {
   }
 
   (String, int) _normalizeToken(Token token) {
-    if (ignoreLiterals && _isLiteral(token.type)) {
-      if (_isStringLiteral(token.type)) {
-        return ('<STR>', 0x535452); // '<STR>'.hashCode
-      }
-      if (_isNumericLiteral(token.type)) {
-        return ('<NUM>', 0x4E554D); // '<NUM>'.hashCode
+    if (ignoreLiterals) {
+      switch (token.type) {
+        case TokenType.STRING ||
+            TokenType.STRING_INTERPOLATION_IDENTIFIER ||
+            TokenType.STRING_INTERPOLATION_EXPRESSION:
+          return ('<STR>', 0x535452); // '<STR>'.hashCode
+        case TokenType.INT || TokenType.HEXADECIMAL || TokenType.DOUBLE:
+          return ('<NUM>', 0x4E554D); // '<NUM>'.hashCode
+        default:
+          break;
       }
     }
 
@@ -214,17 +218,4 @@ class DartTokenizer {
     final lexeme = token.lexeme;
     return (lexeme, lexeme.hashCode);
   }
-
-  static bool _isLiteral(TokenType type) =>
-      _isStringLiteral(type) || _isNumericLiteral(type);
-
-  static bool _isStringLiteral(TokenType type) =>
-      type == TokenType.STRING ||
-      type == TokenType.STRING_INTERPOLATION_IDENTIFIER ||
-      type == TokenType.STRING_INTERPOLATION_EXPRESSION;
-
-  static bool _isNumericLiteral(TokenType type) =>
-      type == TokenType.INT ||
-      type == TokenType.HEXADECIMAL ||
-      type == TokenType.DOUBLE;
 }

@@ -48,14 +48,24 @@ Future<int> runCli(
       return ExitCode.usage.code;
     }
 
-    await _executeAnalysis(
-      filePath: filePath,
-      linesString: linesString,
-      methodName: argResults['name'] as String,
-      format: argResults['format'] as String,
+    final (startLine, endLine) = parseLineBounds(linesString);
+    final analyzer = DataFlowAnalyzer(
       sdkPath: argResults['sdk-path'] as String?,
-      stdoutSink: stdoutSink,
     );
+    final result = await analyzer.analyzeFile(
+      filePath: filePath,
+      startLine: startLine,
+      endLine: endLine,
+      methodName: argResults['name'] as String,
+    );
+
+    if (argResults['format'] as String == 'json') {
+      stdoutSink.writeln(
+        const JsonEncoder.withIndent('  ').convert(result.toJson()),
+      );
+    } else {
+      _printTextReport(result, stdoutSink);
+    }
 
     return ExitCode.success.code;
   } on FormatException catch (e) {
@@ -102,32 +112,6 @@ ArgParser _buildParser() => ArgParser()
         'auto-discovery (running VM, DART_SDK environment variable, PATH, '
         'FLUTTER_ROOT).',
   );
-
-Future<void> _executeAnalysis({
-  required String filePath,
-  required String linesString,
-  required String methodName,
-  required String format,
-  required String? sdkPath,
-  required StringSink stdoutSink,
-}) async {
-  final (startLine, endLine) = parseLineBounds(linesString);
-  final analyzer = DataFlowAnalyzer(sdkPath: sdkPath);
-  final result = await analyzer.analyzeFile(
-    filePath: filePath,
-    startLine: startLine,
-    endLine: endLine,
-    methodName: methodName,
-  );
-
-  if (format == 'json') {
-    stdoutSink.writeln(
-      const JsonEncoder.withIndent('  ').convert(result.toJson()),
-    );
-  } else {
-    _printTextReport(result, stdoutSink);
-  }
-}
 
 void _printUsage(ArgParser parser, StringSink sink) {
   sink.writeln('Dart Data-Flow & Method Extraction Analyzer');

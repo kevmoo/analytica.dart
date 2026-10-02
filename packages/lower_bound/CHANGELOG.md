@@ -1,5 +1,8 @@
 ## 0.1.0-wip
 
+- Link local monorepo siblings via `path` `dependency_overrides` when the
+  consumer declares a `-wip` constraint even if the sibling's `pubspec.yaml` has
+  been bumped to a release version for pre-publish validation.
 - Skip writing the `--comment-output` file entirely when every validated package
   is clean, so the GitHub Action stays quiet on the PR thread instead of posting
   a zero-finding summary comment.

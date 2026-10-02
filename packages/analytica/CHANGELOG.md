@@ -1,4 +1,4 @@
-## 0.1.2-wip
+## 0.1.2
 
 - Add `ElementReferenceExtractor` in `package:analytica/analyzer.dart` for
   resolved AST symbol reference, private member access, and library URI
@@ -10,6 +10,9 @@
 - Add `package:analytica/testing.dart` with `resolvePackageDirectory`,
   `resolvePackageFile`, `resolvePackageExecutable`, and `capturePrints` test
   helpers.
+- Fix `GitDiffService.getModifiedDartFiles` to resolve relative `targetPaths`
+  against `workingDirectory` as well as `repoRoot` when invoked from a workspace
+  subpackage directory.
 
 ## 0.1.1
 

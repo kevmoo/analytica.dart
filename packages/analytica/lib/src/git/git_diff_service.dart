@@ -60,26 +60,29 @@ class GitDiffService {
       return [];
     }
 
+    final baseDir = workingDirectory ?? Directory.current.path;
+    final resolvedTargets = [
+      for (final t in targetPaths) ...[
+        p.normalize(p.join(baseDir, t)),
+        p.normalize(p.join(repoRoot, t)),
+      ],
+    ];
     final allChanged = output.split('\n').map((l) => l.trim()).toList();
     final results = <String>[];
 
     for (final relPath in allChanged) {
-      if (relPath.isEmpty || p.extension(relPath) != '.dart') {
-        continue;
-      }
-      if (isExcludedPath(relPath)) {
+      if (relPath.isEmpty ||
+          p.extension(relPath) != '.dart' ||
+          isExcludedPath(relPath)) {
         continue;
       }
 
-      final absPath = p.join(repoRoot, relPath);
-      if (targetPaths.isNotEmpty) {
-        final matches = targetPaths.any((t) {
-          final absTarget = p.join(repoRoot, t);
-          return p.isWithin(absTarget, absPath) || p.equals(absTarget, absPath);
-        });
-        if (!matches) {
-          continue;
-        }
+      final absPath = p.normalize(p.join(repoRoot, relPath));
+      if (resolvedTargets.isNotEmpty &&
+          !resolvedTargets.any(
+            (t) => p.isWithin(t, absPath) || p.equals(t, absPath),
+          )) {
+        continue;
       }
 
       results.add(relPath);

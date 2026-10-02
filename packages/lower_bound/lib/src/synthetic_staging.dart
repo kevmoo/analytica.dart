@@ -140,7 +140,7 @@ class SyntheticStaging {
 
     for (final dep in pubspec.dependencies) {
       final sibling = localSiblings[dep.name];
-      if (_isUnreleasedWipSibling(sibling)) {
+      if (_isUnreleasedWipSibling(dep, sibling)) {
         _handleWipSibling(dep, sibling!, pathOverrides);
       } else {
         resolvedFloorMetadata.add(dep);
@@ -157,8 +157,11 @@ class SyntheticStaging {
     }
   }
 
-  bool _isUnreleasedWipSibling(LocalSibling? sibling) {
-    return sibling != null && (sibling.isWip || sibling.isPublishToNone);
+  bool _isUnreleasedWipSibling(DependencyFloor dep, LocalSibling? sibling) {
+    if (sibling == null) return false;
+    if (sibling.isWip || sibling.isPublishToNone) return true;
+    final rawDep = pubspec.rawDependencies[dep.name] ?? '';
+    return rawDep.contains('-wip') || rawDep.contains('.wip');
   }
 
   void _handleWipSibling(

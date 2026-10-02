@@ -48,12 +48,50 @@ class UndeadEngine {
     );
 
     // Step 3: Identify roots for Production and Tests.
-    final (productionRoots, testRoots, exportedNodeIds) = await _identifyRoots(
-      contextHelper: contextHelper,
+    final productionRoots = <String>{};
+    final testRoots = <String>{};
+    final exportedNodeIds = <String>{};
+
+    if (options.mode == AnalysisMode.library) {
+      for (final relPath in topology.publicLibFiles) {
+        final absPath = p.join(absolutePackagePath, relPath);
+        final unitResult = await contextHelper.getResolvedUnit(absPath);
+        if (unitResult is ResolvedUnitResult) {
+          harvestExportedNamespace(
+            unitResult.libraryElement,
+            data,
+            productionRoots,
+            exportedNodeIds,
+            crossLibraryReferenced,
+          );
+        }
+
+        addPublicNodesForFile(
+          relPath,
+          data.allNodes,
+          productionRoots,
+          exportedNodeIds,
+          crossLibraryReferenced,
+        );
+
+        for (final targetRelPath
+            in data.conditionalTargets[relPath] ?? const <String>[]) {
+          addPublicNodesForFile(
+            targetRelPath,
+            data.allNodes,
+            productionRoots,
+            exportedNodeIds,
+            crossLibraryReferenced,
+          );
+        }
+      }
+    }
+
+    _harvestNonLibraryRoots(
+      allNodes: data.allNodes,
       topology: topology,
-      absolutePackagePath: absolutePackagePath,
-      data: data,
-      crossLibraryReferenced: crossLibraryReferenced,
+      productionRoots: productionRoots,
+      testRoots: testRoots,
     );
 
     // Step 4: Dual-Pass BFS Graph Traversal.
@@ -101,14 +139,32 @@ class UndeadEngine {
     final findings = classification.findings;
     var privateCandidates = 0;
     if (options.suggestPrivate) {
-      final candidates = _collectPrivateCandidates(
-        allNodes: data.allNodes,
-        topology: topology,
-        exportedNodeIds: exportedNodeIds,
-        productionLive: productionLive,
-        crossLibraryReferenced: crossLibraryReferenced,
-        testReferencedIds: testReferencedIds,
-      );
+      final candidates = data.allNodes
+          .where(
+            (node) => _isPrivateCandidate(
+              node,
+              topology: topology,
+              exportedNodeIds: exportedNodeIds,
+              productionLive: productionLive,
+              crossLibraryReferenced: crossLibraryReferenced,
+              testReferencedIds: testReferencedIds,
+            ),
+          )
+          .map(
+            (node) => UndeadFinding(
+              id: node.name,
+              name: node.name,
+              kind: node.kind,
+              file: node.relativeFilePath,
+              line: node.line,
+              column: node.column,
+              length: node.length,
+              classification: UndeadClassification.privateCandidate,
+              suggestedAction: SuggestedAction.makePrivate,
+              isExternalBinding: node.isExternalBinding,
+            ),
+          )
+          .toList();
       privateCandidates = candidates.length;
       findings.addAll(candidates);
     }
@@ -335,7 +391,17 @@ class UndeadEngine {
         isNativeOrEntryPoint(decl) ||
         options.frameworkAdapter.isFrameworkEntryPoint(decl, element);
 
-    final superElements = extractSuperElements(element);
+    final superElements = <Element>[];
+    if (element is InterfaceElement) {
+      final supertype = element.supertype;
+      if (supertype != null) superElements.add(supertype.element);
+      for (final iface in element.interfaces) {
+        superElements.add(iface.element);
+      }
+      for (final mixinType in element.mixins) {
+        superElements.add(mixinType.element);
+      }
+    }
 
     final node = DeclarationNode(
       id: id,
@@ -393,79 +459,6 @@ class UndeadEngine {
     }
   }
 
-  Future<(Set<String>, Set<String>, Set<String>)> _identifyRoots({
-    required AnalysisContextHelper contextHelper,
-    required PackageTopology topology,
-    required String absolutePackagePath,
-    required HarvestedData data,
-    required Set<String> crossLibraryReferenced,
-  }) async {
-    final productionRoots = <String>{};
-    final testRoots = <String>{};
-    final exportedNodeIds = <String>{};
-
-    await _harvestPublicApiRoots(
-      contextHelper: contextHelper,
-      topology: topology,
-      absolutePackagePath: absolutePackagePath,
-      data: data,
-      productionRoots: productionRoots,
-      exportedNodeIds: exportedNodeIds,
-      crossLibraryReferenced: crossLibraryReferenced,
-    );
-
-    _harvestNonLibraryRoots(
-      allNodes: data.allNodes,
-      topology: topology,
-      productionRoots: productionRoots,
-      testRoots: testRoots,
-    );
-
-    return (productionRoots, testRoots, exportedNodeIds);
-  }
-
-  Future<void> _harvestPublicApiRoots({
-    required AnalysisContextHelper contextHelper,
-    required PackageTopology topology,
-    required String absolutePackagePath,
-    required HarvestedData data,
-    required Set<String> productionRoots,
-    required Set<String> exportedNodeIds,
-    required Set<String> crossLibraryReferenced,
-  }) async {
-    if (options.mode != AnalysisMode.library) return;
-
-    for (final relPath in topology.publicLibFiles) {
-      final absPath = p.join(absolutePackagePath, relPath);
-      final unitResult = await contextHelper.getResolvedUnit(absPath);
-      if (unitResult is ResolvedUnitResult) {
-        harvestExportedNamespace(
-          unitResult.libraryElement,
-          data,
-          productionRoots,
-          exportedNodeIds,
-          crossLibraryReferenced,
-        );
-      }
-
-      addPublicNodesForFile(
-        relPath,
-        data.allNodes,
-        productionRoots,
-        exportedNodeIds,
-        crossLibraryReferenced,
-      );
-
-      harvestConditionalPublicTargets(
-        relPath,
-        data,
-        productionRoots,
-        exportedNodeIds,
-        crossLibraryReferenced,
-      );
-    }
-  }
-
   void _harvestNonLibraryRoots({
     required List<DeclarationNode> allNodes,
     required PackageTopology topology,
@@ -473,14 +466,28 @@ class UndeadEngine {
     required Set<String> testRoots,
   }) {
     for (final node in allNodes) {
-      if (isTestRoot(node, topology)) {
+      final role = topology.roleOf(node.relativeFilePath);
+      if (role == FileRole.test) {
         testRoots.add(node.id);
       }
-      if (isExecutableRoot(node, topology) ||
+      final isFlutterEntry = PackageTopology.isFlutterEntrypoint(
+        node.relativeFilePath,
+      );
+      final isExecRoot =
+          (role == FileRole.executable && node.name == 'main') ||
+          (isFlutterEntry &&
+              node.name == 'main' &&
+              topology.frameworkRoots.contains('main'));
+      final isAuxRoot = role == FileRole.auxiliary && node.name == 'main';
+      final isCfgOrNativeRoot =
+          node.isNativeRoot ||
+          (topology.frameworkRoots.contains(node.name) &&
+              (node.name != 'main' || isFlutterEntry));
+      if (isExecRoot ||
           _isDemonstrationRoot(node, topology) ||
-          isAuxiliaryRoot(node, topology) ||
-          isConfigOrNativeRoot(node, topology) ||
-          isExtraProductionRoot(node, topology)) {
+          isAuxRoot ||
+          isCfgOrNativeRoot ||
+          topology.extraProductionFiles.contains(node.relativeFilePath)) {
         productionRoots.add(node.id);
       }
     }
@@ -523,7 +530,20 @@ class UndeadEngine {
 
       if (!testReachable.contains(node.id)) {
         pureUndead++;
-        findings.add(createPureUndeadFinding(node));
+        findings.add(
+          UndeadFinding(
+            id: node.name,
+            name: node.name,
+            kind: node.kind,
+            file: node.relativeFilePath,
+            line: node.line,
+            column: node.column,
+            length: node.length,
+            classification: UndeadClassification.pureUndead,
+            suggestedAction: SuggestedAction.delete,
+            isExternalBinding: node.isExternalBinding,
+          ),
+        );
       } else {
         final (finding, isHazard) = _classifyTestedNode(
           node,
@@ -562,13 +582,16 @@ class UndeadEngine {
     if (options.ignoreExternalBindings && node.isExternalBinding) return false;
     if (WildcardPattern.anyMatch(_ignoreNameWildcards, node.name)) return false;
     if (productionLive.contains(node.id)) return false;
-    if (isDirectSubtypeOfLiveSealed(
-      node,
-      nodeDirectSuperElements: nodeDirectSuperElements,
-      elementToNode: elementToNode,
-      productionLive: productionLive,
-    )) {
-      return false;
+    final superElems = nodeDirectSuperElements[node];
+    if (superElems != null) {
+      for (final superElem in superElems) {
+        final parentNode = elementToNode[superElem];
+        if (parentNode != null &&
+            parentNode.isSealed &&
+            productionLive.contains(parentNode.id)) {
+          return false;
+        }
+      }
     }
     return true;
   }
@@ -675,40 +698,6 @@ class UndeadEngine {
     if (testReferencedIds.contains(node.id)) return false;
     return true;
   }
-
-  List<UndeadFinding> _collectPrivateCandidates({
-    required List<DeclarationNode> allNodes,
-    required PackageTopology topology,
-    required Set<String> exportedNodeIds,
-    required Set<String> productionLive,
-    required Set<String> crossLibraryReferenced,
-    required Set<String> testReferencedIds,
-  }) => allNodes
-      .where(
-        (node) => _isPrivateCandidate(
-          node,
-          topology: topology,
-          exportedNodeIds: exportedNodeIds,
-          productionLive: productionLive,
-          crossLibraryReferenced: crossLibraryReferenced,
-          testReferencedIds: testReferencedIds,
-        ),
-      )
-      .map(
-        (node) => UndeadFinding(
-          id: node.name,
-          name: node.name,
-          kind: node.kind,
-          file: node.relativeFilePath,
-          line: node.line,
-          column: node.column,
-          length: node.length,
-          classification: UndeadClassification.privateCandidate,
-          suggestedAction: SuggestedAction.makePrivate,
-          isExternalBinding: node.isExternalBinding,
-        ),
-      )
-      .toList();
 }
 
 /// Programmatic entrypoint function to analyze a package.

@@ -31,11 +31,9 @@ class PostBlockVisitor extends RecursiveAstVisitor<void> {
     this.enclosingLoopSpans = const [],
   });
 
-  bool _isAfterSlice(AstNode node) => node.offset > sliceEndOffset;
-
   @override
   void visitSimpleIdentifier(SimpleIdentifier node) {
-    if (!_isAfterSlice(node)) {
+    if (node.offset <= sliceEndOffset) {
       _maybeRecordLoopCarriedRead(node);
       super.visitSimpleIdentifier(node);
       return;
