@@ -1,4 +1,4 @@
-## 0.1.2-wip
+## 0.1.2
 
 - Add `ElementReferenceExtractor` in `package:analytica/analyzer.dart` for
   resolved AST symbol reference, private member access, and library URI
