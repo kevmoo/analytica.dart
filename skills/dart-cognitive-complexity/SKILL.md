@@ -47,21 +47,21 @@ Run the CLI directly (requires Dart SDK **3.12.0+**, verify via
 
 - **Scope 1 — Targeted (Specific File or Directory)**:
   ```bash
-  dart run cognitive_complexity@^0.2.4 --threshold 15 lib/src/auth/
+  dart run cognitive_complexity@^0.2.5 --threshold 15 lib/src/auth/
   ```
 - **Scope 2 — Delta (PR, Branch, or Pre-Flight Audit)**:
   ```bash
-  dart run cognitive_complexity@^0.2.4 --git-diff origin/main --fail-threshold 15 --fail-on-increase
+  dart run cognitive_complexity@^0.2.5 --git-diff origin/main --fail-threshold 15 --fail-on-increase
   ```
 - **Scope 3 — Whole-Project (Default Naked Invocation)**:
   ```bash
-  dart run cognitive_complexity@^0.2.4 --threshold 15 lib/
-  dart run cognitive_complexity@^0.2.4 --threshold 40 test/
+  dart run cognitive_complexity@^0.2.5 --threshold 15 lib/
+  dart run cognitive_complexity@^0.2.5 --threshold 40 test/
   ```
 - **Scope 4 — Shallow Helper Audit (Over-Extraction & Re-Inlining)**:
   ```bash
-  dart run cognitive_complexity:shallow@^0.2.4 lib/
-  dart run cognitive_complexity:shallow@^0.2.4 --git-diff origin/main --fail-on-safe-inline
+  dart run cognitive_complexity:shallow@^0.2.5 lib/
+  dart run cognitive_complexity:shallow@^0.2.5 --git-diff origin/main --fail-on-safe-inline
   ```
 
 ---
@@ -141,7 +141,7 @@ template.
 Run the statement-level data-flow analyzer on candidate line slices:
 
 ```bash
-dart run cognitive_complexity:data_flow@^0.2.4 lib/src/my_file.dart:45-80
+dart run cognitive_complexity:data_flow@^0.2.5 lib/src/my_file.dart:45-80
 ```
 
 Inspect the complexity impact (`enclosingScore`, `sliceScoreInPlace`,
@@ -176,7 +176,7 @@ flattening in place with Patterns A/B instead of extracting a shallow helper:
   flags.
 - **Pattern F (Acyclic File Decomposition & Load-Bearing Library Boundaries)**:
   Run
-  `dart run cognitive_complexity:file_split@^0.2.4 lib/src/large_file.dart --target-lines 300`
+  `dart run cognitive_complexity:file_split@^0.2.5 lib/src/large_file.dart --target-lines 300`
   for files `> 400` lines and select the library boundary tier:
   - **Tier 1 (Default — Standalone `lib/src/<topic>.dart`)**: Use when extracted
     helpers form a genuine sub-domain with narrow parameter lists (`<= 3` args)
@@ -188,7 +188,7 @@ flattening in place with Patterns A/B instead of extracting a shallow helper:
     when standalone `lib/src/` files would require widening visibility and risk
     leaking internal types via unscoped `export 'src/...';` directives.
 - **Pattern G (Re-Inlining Shallow Single-Caller Helpers — `shallow`)**: Run
-  `dart run cognitive_complexity:shallow@^0.2.4 lib/` to detect single-caller
+  `dart run cognitive_complexity:shallow@^0.2.5 lib/` to detect single-caller
   pass-through helpers (`HIGH_ARITY`, `MICRO_HELPER`, `SIG_HEAVY`,
   `CROSS_FILE_SINGLE_CALLER`). Re-inline `SAFE_INLINE` findings
   (`CallerCCAfter <= 15`) directly into their sole caller, and flatten + inline
@@ -199,9 +199,9 @@ flattening in place with Patterns A/B instead of extracting a shallow helper:
 ## 6. Verification & Public API Surface Guardrails
 
 1. **Complexity & Shallow-Helper Audit**: Run
-   `dart run cognitive_complexity@^0.2.4 --fail-threshold 15 <refactored files>`
+   `dart run cognitive_complexity@^0.2.5 --fail-threshold 15 <refactored files>`
    and
-   `dart run cognitive_complexity:shallow@^0.2.4 --fail-on-safe-inline <refactored files>`.
+   `dart run cognitive_complexity:shallow@^0.2.5 --fail-on-safe-inline <refactored files>`.
 2. **Mandatory `api_summary` Public API Surface Verification Gate**: Whenever a
    refactor extracts helpers across files or touches `lib/` exports:
    ```bash
