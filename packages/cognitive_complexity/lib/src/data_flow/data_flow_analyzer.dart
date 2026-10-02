@@ -1,7 +1,6 @@
 import 'dart:io';
 
 import 'package:analytica/analyzer.dart';
-import 'package:analyzer/dart/analysis/results.dart';
 import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/dart/ast/visitor.dart';
 import 'package:analyzer/source/line_info.dart';

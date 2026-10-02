@@ -240,14 +240,13 @@ void main() {
       },
     );
 
-    test(
-      'exempts cross-file single-caller functions that reference file-private declarations',
-      () async {
-        await d.dir('facade_pkg', [
-          d.file('pubspec.yaml', 'name: facade_pkg\n'),
-          d.dir('lib', [
-            d.dir('src', [
-              d.file('topology.dart', '''
+    test('exempts cross-file single-caller functions that reference '
+        'file-private declarations', () async {
+      await d.dir('facade_pkg', [
+        d.file('pubspec.yaml', 'name: facade_pkg\n'),
+        d.dir('lib', [
+          d.dir('src', [
+            d.file('topology.dart', '''
 List<int> computeScc(List<int> nodes, Map<int, List<int>> edges) {
   final state = _TarjanState(nodes);
   return _runTarjan(state, edges);
@@ -267,7 +266,7 @@ int leafCrossFileHelper(int a, int b, int c) {
   return a + b + c;
 }
 '''),
-              d.file('planner.dart', '''
+            d.file('planner.dart', '''
 import 'topology.dart';
 
 int planSplits(List<int> nodes, Map<int, List<int>> edges) {
@@ -275,18 +274,17 @@ int planSplits(List<int> nodes, Map<int, List<int>> edges) {
   return leafCrossFileHelper(sccs.length, nodes.length, edges.length);
 }
 '''),
-            ]),
           ]),
-        ]).create();
+        ]),
+      ]).create();
 
-        final analyzer = ShallowAnalyzer();
-        final report = analyzer.analyzePath('${d.sandbox}/facade_pkg/lib');
+      final analyzer = ShallowAnalyzer();
+      final report = analyzer.analyzePath('${d.sandbox}/facade_pkg/lib');
 
-        final names = report.findings.map((f) => f.name).toList();
-        check(names).contains('leafCrossFileHelper');
-        check(names.contains('computeScc')).isFalse();
-      },
-    );
+      final names = report.findings.map((f) => f.name).toList();
+      check(names).contains('leafCrossFileHelper');
+      check(names.contains('computeScc')).isFalse();
+    });
 
     test(
       'enforces cumulative caller CC budget and bottom-up chain propagation',
