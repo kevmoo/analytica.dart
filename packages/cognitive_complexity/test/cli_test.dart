@@ -180,11 +180,13 @@ int compute(int x) {
 ''';
 
       Future<String> runJson(String cwd) async {
-        final proc = await TestProcess.start(Platform.resolvedExecutable, [
-          binPath,
-          '--format',
-          'json',
-        ], workingDirectory: cwd);
+        final proc = await TestProcess.start(
+          Platform.resolvedExecutable,
+          [binPath, '--format', 'json'],
+          workingDirectory: cwd,
+          // runCli re-aligns Directory.current to GITHUB_WORKSPACE when set.
+          environment: {'GITHUB_WORKSPACE': cwd},
+        );
         final lines = <String>[];
         while (await proc.stdout.hasNext) {
           lines.add(await proc.stdout.next);
@@ -250,12 +252,12 @@ workspace:
           ]),
         ]).create();
 
-        final proc = await TestProcess.start(Platform.resolvedExecutable, [
-          binPath,
-          '--format',
-          'json',
-          'pkg_a/test',
-        ], workingDirectory: '${d.sandbox}/explicit');
+        final proc = await TestProcess.start(
+          Platform.resolvedExecutable,
+          [binPath, '--format', 'json', 'pkg_a/test'],
+          workingDirectory: '${d.sandbox}/explicit',
+          environment: {'GITHUB_WORKSPACE': '${d.sandbox}/explicit'},
+        );
         final lines = <String>[];
         while (await proc.stdout.hasNext) {
           lines.add(await proc.stdout.next);
