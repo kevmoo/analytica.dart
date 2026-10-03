@@ -14,6 +14,7 @@ key_features:
   - Co-invoked test hazard detection
   - Sealed class & framework entrypoint protection
   - Safe 2-stage triage & deletion protocol
+  - Deletion hygiene & dynamic-entrypoint heuristics
   - Reproducible PR provenance reporting
 ---
 
@@ -173,6 +174,25 @@ To suppress intentional dead code or API placeholders without deleting:
 - _(Note: The standard `// ignore: unreachable_from_main` is strictly for the
   built-in Dart analyzer lint rule; `pkg:undead` requires `// undead:ignore`)._
 
+**Placement Rules** (violations fail `dart analyze --fatal-infos` or style
+review):
+
+- **File-level**: Insert `// undead:ignore_for_file` **below** any copyright /
+  license header block and above the `library` directive or first `import`.
+  Never place it on line 1 above the copyright notice.
+- **Declaration-level**: Never insert `// undead:ignore` between an existing
+  `// ignore: <lint>` comment and its declaration. The analyzer only honors an
+  `// ignore:` comment on the line immediately preceding the declaration, so
+  detaching it produces `unnecessary_ignore` plus the original diagnostic (e.g.
+  `unreachable_from_main`). Place `// undead:ignore` **above** the `// ignore:`
+  line:
+
+  ```dart
+  // undead:ignore
+  // ignore: unreachable_from_main
+  Future<void> runTests(List<String> args) async { ... }
+  ```
+
 ### Invariant 5: Dynamic Invocation & Non-AST Reference Check
 
 Static AST analysis (`pkg:undead`) only traces typed Dart import trees. It
@@ -182,6 +202,24 @@ cannot see declarations referenced through runtime meta-programming:
 - Code-generation string templates (`'''import "package:.../foo.dart";'''`)
 - JS / WASM compilation targets and runtime asset bootstrap runners
 - Build hooks and `build.yaml` references
+- Framework extension hooks and plugin registries invoked by downstream runners
+  rather than by in-package call sites
+
+**Dynamic-Entrypoint Heuristics (Require Confirmation, Never Blind Delete):**
+
+Treat a zero-reference finding as a _suspected_ runtime entrypoint, not dead
+code, when it matches any of these patterns. Classify it as **KEEP** (protect
+with `// undead:ignore`) unless the user explicitly confirms removal:
+
+- **File names**: `*_run.dart`, `direct_run.dart`, `*_bootstrap.dart`,
+  `*_listener.dart`, `*_hook.dart`, `*_plugin.dart`.
+- **Declaration names**: `register*`, `initialize*`, `bootstrap*`, `plugin*`,
+  `custom*`, `install*`, `configure*` (e.g. `registerReporter`).
+- **Shape**: public top-level functions whose only parameters are callbacks or
+  factories, accepting a string key (`registerX(String name, Factory f)`), or
+  that spawn isolates / compile kernels / open ports.
+- **Context**: packages consumed as frameworks (test runners, build systems,
+  plugin hosts) where downstream packages are the real callers.
 
 **The Pre-Deletion Check Protocol:**
 
@@ -216,6 +254,23 @@ larger unreferenced subsystems intact:
   scaffold runners) in one cohesive pass.
 - Remove orphaned imports, associated dead private helpers, and obsolete test
   fixtures concurrently.
+
+### Invariant 8: Deletion Hygiene (Comments Travel With Declarations)
+
+A deletion range must cover the **entire** declaration, including everything
+attached above it, so that nothing is left orphaned:
+
+- **Doc comments**: Remove the full preceding `///` block (and any `/** */`
+  block). Orphaned doc comments trigger `dangling_library_doc_comments`, which
+  fails `dart analyze --fatal-infos`.
+- **Annotations and `// ignore:` comments**: Remove `@Deprecated(...)`,
+  `@visibleForTesting`, and any `// ignore: <lint>` lines that belonged to the
+  deleted declaration; a leftover `// ignore:` triggers `unnecessary_ignore`.
+- **Ignore comments on surviving neighbors**: When deleting one of several
+  adjacent declarations, do not leave two `// ignore:` lines stacked on the
+  survivor (`duplicate_ignore`).
+- **Blank lines**: Collapse the resulting double blank line so `dart format`
+  reports no changes.
 
 ---
 
@@ -282,11 +337,18 @@ Always wrap code deletions in a strict test and analysis sandwich:
    - Check `pubspec.yaml`: if `sdk: flutter` is declared, run `flutter test`;
      otherwise run `dart test`.
    - Confirm test suite is 100% green before touching code.
-2. **Surgical Deletion**: Remove the flagged declaration and any orphaned
-   imports associated with it.
+2. **Surgical Deletion**: Remove the flagged declaration together with its
+   attached doc comments, annotations, and `// ignore:` lines (Invariant 8),
+   plus any orphaned imports.
 3. **Post-Flight Verification**:
-   - Run `flutter analyze` or `dart analyze` to ensure zero compilation or
-     unresolved reference errors.
+   - Run `dart analyze --fatal-infos` (or `flutter analyze --fatal-infos`).
+     Plain `dart analyze` exits 0 on `info` diagnostics, but many ecosystem CI
+     pipelines (e.g. `dart-lang/test`) run with `--fatal-infos`, so
+     `dangling_library_doc_comments`, `unnecessary_ignore`, `duplicate_ignore`,
+     `unused_import`, and `directives_ordering` must all be resolved before
+     committing.
+   - Run `dart format --output=none --set-exit-if-changed .` to confirm no
+     formatting drift from collapsed deletion ranges.
    - Run `flutter test` or `dart test` to confirm all remaining tests pass.
    - **Monorepo Downstream Gate**: In multi-package repositories, run tests
      across all dependent workspace packages and root integration tests before

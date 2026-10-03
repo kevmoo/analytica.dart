@@ -210,8 +210,13 @@ flattening in place with Patterns A/B instead of extracting a shallow helper:
    ```
    Require zero unintended public symbol leaks (and if `api.txt` is tracked in
    the repo, verify `git diff api.txt` is empty).
-3. **Format, Analyze & Test**: Run `dart format .`, `dart analyze`, and
-   `dart test` (or `flutter test`).
+3. **Format, Analyze & Test**: Run `dart format .`,
+   `dart analyze --fatal-infos`, and `dart test` (or `flutter test`). Plain
+   `dart analyze` exits 0 on `info` diagnostics, but many ecosystem CI pipelines
+   run with `--fatal-infos`; extraction commonly leaves `duplicate_ignore` (an
+   `// ignore:` copied onto both the caller and the extracted helper),
+   `unused_import`, or `directives_ordering` behind, so resolve every info
+   before committing.
 4. **PR & Commit Provenance**: In interactive sessions, ask the user before
    appending the standardized Tool Provenance & Complexity Delta block from
    [`references/refactoring_recipes.md`](references/refactoring_recipes.md#3-pull-request--commit-provenance-template).
