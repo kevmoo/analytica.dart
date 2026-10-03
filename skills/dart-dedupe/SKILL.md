@@ -100,8 +100,6 @@ dart run dedupe@^0.1.0 --git-diff=origin/main --fail-threshold=5
 
 ### Common CLI Options Reference
 
-<!-- mdformat off(prevent table wrapping) -->
-
 | Option / Flag               | Purpose                                                                        | Default             |
 | :-------------------------- | :----------------------------------------------------------------------------- | :------------------ |
 | `-k, --min-tokens`          | Minimum token count for a reported duplicate block.                            | `40`                |
@@ -123,8 +121,6 @@ dart run dedupe@^0.1.0 --git-diff=origin/main --fail-threshold=5
 | `--[no-]clusters`           | Include duplicate clusters list in report.                                     | `true`              |
 | `--format`                  | Output format (`markdown`, `json`, `github`, `text`).                          | `markdown`          |
 | `--json-output`             | File path to write machine-readable JSON report.                               | None                |
-
-<!-- mdformat on -->
 
 ---
 

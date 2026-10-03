@@ -115,8 +115,6 @@ dart run undead@^0.1.1 --example-mode=demonstration
 
 ### Common CLI Options Reference
 
-<!-- mdformat off(prevent table wrapping) -->
-
 | Option / Flag                     | Purpose                                                           | Default         |
 | :-------------------------------- | :---------------------------------------------------------------- | :-------------- |
 | `-m, --mode`                      | Analysis mode (`library` or `closed-app`).                        | `library`       |
@@ -131,8 +129,6 @@ dart run undead@^0.1.1 --example-mode=demonstration
 | `--[no-]suggest-private`          | Identify top-level declarations that can be made library-private. | `false`         |
 | `--pub-get`                       | Auto-run `dart pub get` / `flutter pub get` if needed.            | `false`         |
 | `--fail-on-undead`                | Exit with non-zero code (1) on findings (useful for CI).          | `false`         |
-
-<!-- mdformat on -->
 
 ---
 
