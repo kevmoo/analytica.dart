@@ -65,7 +65,9 @@ reachability findings deterministically:
 dart run undead@^0.1.1 [options] [target_path]
 ```
 
-> [!NOTE] **Pre-Flight Package Resolution Gate**: `package:analyzer` requires
+> [!NOTE]
+>
+> **Pre-Flight Package Resolution Gate**: `package:analyzer` requires
 > `.dart_tool/package_config.json` to resolve `package:<name>/...` imports. If
 > packages are unresolved, pass `--pub-get` to automatically run `dart pub get`
 > or `flutter pub get`. If encountering `.dart_tool` atomic rename errors in
@@ -136,8 +138,10 @@ dart run undead@^0.1.1 --example-mode=demonstration
 
 ## 3. Critical Safety Guardrails & Deletion Invariants
 
-> [!CAUTION] **Audit Before Deleting**: Never delete declarations autonomously
-> without reviewing safety invariants and verifying against the test suite.
+> [!CAUTION]
+>
+> **Audit Before Deleting**: Never delete declarations autonomously without
+> reviewing safety invariants and verifying against the test suite.
 
 ### Invariant 1: Sealed Class Hierarchy Protection
 
