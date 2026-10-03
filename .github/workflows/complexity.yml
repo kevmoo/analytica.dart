@@ -25,4 +25,3 @@ jobs:
           diff-base: origin/${{ github.base_ref }}
           fail-threshold: 15
           fail-on-increase: true
-          targets: packages
