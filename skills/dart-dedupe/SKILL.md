@@ -100,8 +100,6 @@ dart run dedupe@^0.1.0 --git-diff=origin/main --fail-threshold=5
 
 ### Common CLI Options Reference
 
-<!-- mdformat off(prevent table wrapping) -->
-
 | Option / Flag               | Purpose                                                                        | Default             |
 | :-------------------------- | :----------------------------------------------------------------------------- | :------------------ |
 | `-k, --min-tokens`          | Minimum token count for a reported duplicate block.                            | `40`                |
@@ -123,8 +121,6 @@ dart run dedupe@^0.1.0 --git-diff=origin/main --fail-threshold=5
 | `--[no-]clusters`           | Include duplicate clusters list in report.                                     | `true`              |
 | `--format`                  | Output format (`markdown`, `json`, `github`, `text`).                          | `markdown`          |
 | `--json-output`             | File path to write machine-readable JSON report.                               | None                |
-
-<!-- mdformat on -->
 
 ---
 
@@ -249,7 +245,10 @@ Wrap all deduplication refactoring in a strict verification sandwich:
 2. **Surgical Modification**: Extract shared functions or helper classes under
    `lib/src/` cleanly.
 3. **Verify Post-Refactor Health**:
-   - Run `flutter analyze` or `dart analyze --fatal-infos`.
+   - Run `dart analyze --fatal-infos` (or `flutter analyze --fatal-infos`).
+     Plain `dart analyze` exits 0 on `info` diagnostics, but many ecosystem CI
+     pipelines run with `--fatal-infos`; resolve `unused_import`,
+     `directives_ordering`, and `duplicate_ignore` before committing.
    - Run `flutter test` or `dart test`.
    - **Monorepo Downstream Gate**: In multi-package workspaces, run tests across
      all dependent packages.
