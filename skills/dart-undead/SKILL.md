@@ -169,8 +169,10 @@ Ensure framework-specific roots are not falsely classified as dead:
 
 To suppress intentional dead code or API placeholders without deleting:
 
-- **Declaration Level**: `// undead:ignore` (placed directly above declaration).
-- **File Level**: `// undead:ignore_for_file` (placed at top of file).
+- **Declaration Level**: `// undead:ignore` (directly above the declaration; see
+  Placement Rules below).
+- **File Level**: `// undead:ignore_for_file` (below the copyright header; see
+  Placement Rules below).
 - _(Note: The standard `// ignore: unreachable_from_main` is strictly for the
   built-in Dart analyzer lint rule; `pkg:undead` requires `// undead:ignore`)._
 
@@ -242,7 +244,7 @@ entrypoints consumed by sibling CLI wrappers or test runners:
   `--extra-roots` or enable `--workspace-discovery`.
 - If an unexported function is an intended external entrypoint, protect it with
   `// undead:ignore` (and `// ignore: unreachable_from_main` if analyzer lint is
-  active).
+  active, ordered per the Invariant 4 Placement Rules).
 
 ### Invariant 7: Cohesive Subsystem Pruning
 
@@ -261,14 +263,17 @@ A deletion range must cover the **entire** declaration, including everything
 attached above it, so that nothing is left orphaned:
 
 - **Doc comments**: Remove the full preceding `///` block (and any `/** */`
-  block). Orphaned doc comments trigger `dangling_library_doc_comments`, which
-  fails `dart analyze --fatal-infos`.
+  block). An orphaned block at file head (before `library` / `import`
+  directives) triggers `dangling_library_doc_comments` under
+  `dart analyze --fatal-infos`, but an orphan stranded **between surviving
+  declarations produces no diagnostic at all** and silently re-attaches to the
+  next declaration — only a diff review catches it.
 - **Annotations and `// ignore:` comments**: Remove `@Deprecated(...)`,
   `@visibleForTesting`, and any `// ignore: <lint>` lines that belonged to the
   deleted declaration; a leftover `// ignore:` triggers `unnecessary_ignore`.
 - **Ignore comments on surviving neighbors**: When deleting one of several
   adjacent declarations, do not leave two `// ignore:` lines stacked on the
-  survivor (`duplicate_ignore`).
+  survivor (`unnecessary_ignore` / `duplicate_ignore`).
 - **Blank lines**: Collapse the resulting double blank line so `dart format`
   reports no changes.
 
@@ -355,8 +360,10 @@ Always wrap code deletions in a strict test and analysis sandwich:
      staging.
    - **Repository Policies**: If the repository enforces changelog tracking,
      update `CHANGELOG.md` alongside the change.
-4. **Clean Diff Staging**: Inspect modifications using `git diff --stat` to
-   ensure only intended declarations were removed.
+4. **Clean Diff Staging**: Inspect `git diff --stat` to ensure only intended
+   declarations were removed, then read the `git diff` hunks themselves for
+   stranded `///` doc comment, annotation, or `// ignore:` lines that the
+   analyzer cannot flag (Invariant 8).
 
 ---
 
