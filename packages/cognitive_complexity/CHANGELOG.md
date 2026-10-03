@@ -1,3 +1,11 @@
+## 0.2.6-wip
+
+- Auto-discover default targets when no positional paths are given: Pub
+  workspace members (`<member>/lib`), single-package `lib/`, or `packages/*/lib`
+  / `pkgs/*/lib` monorepo layouts. The GitHub Action `targets` input now
+  defaults to auto-discovery, so workspace and monorepo callers no longer need a
+  hardcoded target list (#137).
+
 ## 0.2.5
 
 - Omit zero-complexity (`delta == 0`, `score == 0`) added and removed

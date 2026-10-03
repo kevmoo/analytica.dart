@@ -41,7 +41,9 @@ _(Requires Dart SDK **3.12.0 or greater**)_.
 $ cognitive_complexity --help
 Dart & Flutter Cognitive Complexity Calculator
 
-Usage: dart run cognitive_complexity [options] <file_or_directory>
+Usage: dart run cognitive_complexity [options] [<file_or_directory>...]
+
+Without targets, scans lib/ (or every workspace member and packages/*/lib, pkgs/*/lib in monorepos).
 
 Options:
 -h, --help                          Print this usage information.
@@ -221,7 +223,7 @@ jobs:
 
 | Input                | Default  | Description                                                                      |
 | :------------------- | :------: | :------------------------------------------------------------------------------- |
-| `targets`            |  `lib`   | Space-separated list of directories or files to scan.                            |
+| `targets`            |  _Auto_  | Directories or files to scan. Auto-discovers `lib/` or workspace package libs.   |
 | `threshold`          |   `0`    | Minimum score required to include a declaration in summary tables.               |
 | `fail-threshold`     |   `15`   | Maximum complexity ceiling allowed before failing the build.                     |
 | `max-file-lines`     |   `0`    | Opt-in maximum physical line count per source file (`0` = disabled).             |

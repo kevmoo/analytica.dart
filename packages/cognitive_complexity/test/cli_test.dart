@@ -166,6 +166,107 @@ void complexFunc(int a) {
       await ghProc.shouldExit(1);
     });
 
+    group('default target discovery (no positional args)', () {
+      const complexFn = '''
+int compute(int x) {
+  if (x > 0) {
+    if (x > 10) {
+      return 2;
+    }
+    return 1;
+  }
+  return 0;
+}
+''';
+
+      Future<String> runJson(String cwd) async {
+        final proc = await TestProcess.start(Platform.resolvedExecutable, [
+          binPath,
+          '--format',
+          'json',
+        ], workingDirectory: cwd);
+        final lines = <String>[];
+        while (await proc.stdout.hasNext) {
+          lines.add(await proc.stdout.next);
+        }
+        await proc.shouldExit(0);
+        return lines.join('\n');
+      }
+
+      test('workspace root scans every member lib/', () async {
+        await d.dir('ws', [
+          d.file('pubspec.yaml', '''
+name: ws
+workspace:
+  - pkg_a
+  - pkg_b
+'''),
+          d.dir('pkg_a', [
+            d.file('pubspec.yaml', 'name: pkg_a\n'),
+            d.dir('lib', [d.file('a.dart', complexFn)]),
+            d.dir('test', [d.file('a_test.dart', complexFn)]),
+          ]),
+          d.dir('pkg_b', [
+            d.file('pubspec.yaml', 'name: pkg_b\n'),
+            d.dir('lib', [d.file('b.dart', complexFn)]),
+          ]),
+        ]).create();
+
+        final output = await runJson('${d.sandbox}/ws');
+        check(output)
+          ..contains('pkg_a/lib/a.dart')
+          ..contains('pkg_b/lib/b.dart')
+          ..not((s) => s.contains('pkg_a/test/a_test.dart'));
+      });
+
+      test('packages/* monorepo scans lib/ but not test/', () async {
+        await d.dir('mono', [
+          d.dir('packages', [
+            d.dir('one', [
+              d.file('pubspec.yaml', 'name: one\n'),
+              d.dir('lib', [d.file('one.dart', complexFn)]),
+              d.dir('test', [d.file('one_test.dart', complexFn)]),
+            ]),
+          ]),
+        ]).create();
+
+        final output = await runJson('${d.sandbox}/mono');
+        check(output)
+          ..contains('packages/one/lib/one.dart')
+          ..not((s) => s.contains('one_test.dart'));
+      });
+
+      test('explicit targets override discovery verbatim', () async {
+        await d.dir('explicit', [
+          d.file('pubspec.yaml', '''
+name: ws
+workspace:
+  - pkg_a
+'''),
+          d.dir('pkg_a', [
+            d.file('pubspec.yaml', 'name: pkg_a\n'),
+            d.dir('lib', [d.file('a.dart', complexFn)]),
+            d.dir('test', [d.file('a_test.dart', complexFn)]),
+          ]),
+        ]).create();
+
+        final proc = await TestProcess.start(Platform.resolvedExecutable, [
+          binPath,
+          '--format',
+          'json',
+          'pkg_a/test',
+        ], workingDirectory: '${d.sandbox}/explicit');
+        final lines = <String>[];
+        while (await proc.stdout.hasNext) {
+          lines.add(await proc.stdout.next);
+        }
+        await proc.shouldExit(0);
+        check(lines.join('\n'))
+          ..contains('pkg_a/test/a_test.dart')
+          ..not((s) => s.contains('pkg_a/lib/a.dart'));
+      });
+    });
+
     test(
       'Renders --git-diff text table with new/del transitions, '
       '[IMPROVED] only on improved functions, and omits 0-score items',
