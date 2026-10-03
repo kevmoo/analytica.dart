@@ -8,9 +8,12 @@ branding:
 
 inputs:
   targets:
-    description: 'Space-separated list of target files or directories to analyze.'
+    description: >-
+      Space-separated list of target files or directories to analyze. Empty
+      (default) auto-discovers lib/, or every workspace member and
+      packages/*/lib, pkgs/*/lib in monorepos.
     required: false
-    default: 'lib'
+    default: ''
   threshold:
     description: 'Minimum complexity score to display in reports.'
     required: false
@@ -124,12 +127,9 @@ runs:
           fi
         fi
 
-        # Auto-detect monorepos when default 'lib' target does not exist in caller workspace
+        # Empty targets lets the CLI auto-discover lib/ or workspace members.
         workspace="${GITHUB_WORKSPACE:-$PWD}"
         targets="$INPUT_TARGETS"
-        if [ "$targets" = "lib" ] && [ ! -d "$workspace/lib" ] && [ -d "$workspace/packages" ]; then
-          targets="packages"
-        fi
 
         # Resolve the scanner's dependencies inside the action checkout, but
         # run it from the caller's workspace.

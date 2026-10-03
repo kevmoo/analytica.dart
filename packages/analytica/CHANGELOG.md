@@ -1,3 +1,9 @@
+## 0.1.3-wip
+
+- Add `discoverDefaultTargets` in `package:analytica/cli.dart` to resolve
+  default `lib/` analysis targets across single-package, Pub workspace
+  (`workspace:`), and `packages/*` / `pkgs/*` monorepo layouts.
+
 ## 0.1.2
 
 - Add `ElementReferenceExtractor` in `package:analytica/analyzer.dart` for

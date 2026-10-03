@@ -5,6 +5,7 @@ package:analytica/analytica.dart:
   flutterExecutable (static getter: String)
   sdkPath (static getter: String)
   appendGitHubStepSummary (function: void Function(String, {StringSink? errSink, File? summaryFile}))
+  discoverDefaultTargets (function: List<String> Function({String? rootPath}))
   emitGitHubError (function: void Function(String, {int? col, int? endColumn, int? endLine, String? file, int? line, StringSink? sink, String? title}))
   emitGitHubNotice (function: void Function(String, {int? col, int? endColumn, int? endLine, String? file, int? line, StringSink? sink, String? title}))
   emitGitHubWarning (function: void Function(String, {int? col, int? endColumn, int? endLine, String? file, int? line, StringSink? sink, String? title}))
@@ -147,6 +148,7 @@ package:analytica/analyzer.dart:
     toString (method: String Function())
 package:analytica/cli.dart:
   appendGitHubStepSummary (see above)
+  discoverDefaultTargets (see above)
   emitGitHubError (see above)
   emitGitHubNotice (see above)
   emitGitHubWarning (see above)

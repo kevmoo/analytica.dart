@@ -105,7 +105,9 @@ Future<int> runCli(
       return ExitCode.success.code;
     }
 
-    final targets = argResults.rest.isEmpty ? ['lib'] : argResults.rest;
+    final targets = argResults.rest.isEmpty
+        ? discoverDefaultTargets()
+        : argResults.rest;
     final threshold = parseNonNegativeInt(
       argResults['threshold'] as String,
       'threshold',
@@ -393,7 +395,12 @@ void _printUsage(ArgParser parser, StringSink sink) {
   sink.writeln('Dart & Flutter Cognitive Complexity Calculator');
   sink.writeln();
   sink.writeln(
-    'Usage: dart run cognitive_complexity [options] <file_or_directory>',
+    'Usage: dart run cognitive_complexity [options] [<file_or_directory>...]',
+  );
+  sink.writeln();
+  sink.writeln(
+    'Without targets, scans lib/ (or every workspace member and '
+    'packages/*/lib, pkgs/*/lib in monorepos).',
   );
   sink.writeln();
   sink.writeln('Options:');
