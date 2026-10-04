@@ -227,7 +227,7 @@ Run the companion statement-level data-flow analyzer on each candidate line
 slice before extracting:
 
 ```bash
-dart run cognitive_complexity:data_flow@^0.2.5 lib/src/my_file.dart:45-80
+dart run cognitive_complexity:data_flow@^0.2.6 lib/src/my_file.dart:45-80
 ```
 
 Its report (`inputs`, `mutations`, live `outputs`, control-flow escapes,
@@ -349,7 +349,7 @@ When a Dart file grows beyond `400` lines (enforceable via opt-in
 run the deterministic intra-file dependency graph advisor:
 
 ```bash
-dart run cognitive_complexity:file_split@^0.2.5 lib/src/large_file.dart --target-lines 300
+dart run cognitive_complexity:file_split@^0.2.6 lib/src/large_file.dart --target-lines 300
 ```
 
 Apply the **Load-Bearing Library Boundary Rule** (Section 1.2) when selecting
@@ -366,7 +366,7 @@ micro-helpers or high-arity bucket-brigade functions (`>= 5` parameters), run
 the AST shallow helper scanner:
 
 ```bash
-dart run cognitive_complexity:shallow@^0.2.5 lib/
+dart run cognitive_complexity:shallow@^0.2.6 lib/
 ```
 
 The scanner identifies non-exported helpers with `FanIn == 1` and
@@ -407,6 +407,6 @@ To reproduce or re-evaluate cognitive complexity scores:
 ```
 
 ```bash
-dart run cognitive_complexity:data_flow@^0.2.5 {file}:{start_line}-{end_line}
+dart run cognitive_complexity:data_flow@^0.2.6 {file}:{start_line}-{end_line}
 ```
 ````

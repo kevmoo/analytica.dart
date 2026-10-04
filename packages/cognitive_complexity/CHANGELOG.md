@@ -1,4 +1,4 @@
-## 0.2.6-wip
+## 0.2.6
 
 - Auto-discover default targets when no positional paths are given: Pub
   workspace members (`<member>/lib`), single-package `lib/`, or `packages/*/lib`
