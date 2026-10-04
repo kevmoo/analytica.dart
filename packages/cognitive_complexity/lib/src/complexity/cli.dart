@@ -1,7 +1,9 @@
 import 'dart:convert';
 import 'dart:io';
+
 import 'package:analytica/analytica.dart';
 import 'package:args/args.dart';
+
 import 'complexity_analyzer.dart';
 import 'delta_analyzer.dart';
 import 'github_reporter.dart';
@@ -238,6 +240,9 @@ Future<int> _handleDiffMode({
   final summary = await deltaAnalyzer.computeDeltas(
     gitDiffBase,
     targetPaths: targets,
+    failThreshold: failThreshold,
+    maxFunctionLines: maxFunctionLines,
+    failOnIncrease: failOnIncrease,
   );
 
   if (format == 'json') {

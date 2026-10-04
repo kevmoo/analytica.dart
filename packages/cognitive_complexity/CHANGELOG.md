@@ -5,6 +5,12 @@
   / `pkgs/*/lib` monorepo layouts. The GitHub Action `targets` input now
   defaults to auto-discovery, so workspace and monorepo callers no longer need a
   hardcoded target list (#137).
+- Order `--git-diff` delta tables by review significance in every format (step
+  summary, PR comment, `text`, `json`): violations first, then new score
+  descending, then delta descending, then location.
+  `DeltaAnalyzer.computeDeltas` gains `failThreshold`, `maxFunctionLines`, and
+  `failOnIncrease` parameters and the comparator is exposed as
+  `compareBySignificance` (#53).
 
 ## 0.2.5
 

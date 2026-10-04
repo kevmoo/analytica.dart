@@ -4,6 +4,8 @@ import 'package:cognitive_complexity/cognitive_complexity.dart';
 import 'package:test/scaffolding.dart';
 
 void main() {
+  _compareBySignificanceTests();
+
   group('DeltaAnalyzer In-Memory Diffing', () {
     final analyzer = DeltaAnalyzer();
 
@@ -280,7 +282,7 @@ void main() {
         check(summary.filesAnalyzed).equals(2);
         check(summary.deltas).length.equals(2);
 
-        // Sorting order: delta descending (+3 first, then -2)
+        // Sorting order: new score descending (3 first, then 1)
         final first = summary.deltas[0];
         check(first.name).equals('run');
         check(first.delta).equals(3);
@@ -290,6 +292,50 @@ void main() {
         check(second.name).equals('main');
         check(second.delta).equals(-2);
         check(second.status).equals(DeltaStatus.improved);
+      },
+    );
+
+    test(
+      'ranks a small-delta violation above large-delta additions that pass',
+      () async {
+        // A nested chain of N `if`s scores 1 + 2 + ... + N.
+        String nested(String name, int depth) {
+          final open = List.generate(depth, (i) => 'if (a$i) {').join(' ');
+          final close = '}' * depth;
+          return 'void $name() { $open $close }';
+        }
+
+        final fakeGit = FakeGitDiffService(
+          modifiedFiles: ['lib/legacy.dart', 'lib/fresh.dart'],
+          historicalContent: {
+            // 1+2+3+4+5 = 15: sits exactly at the ceiling.
+            'lib/legacy.dart': nested('legacy', 5),
+            'lib/fresh.dart': '',
+          },
+          currentContent: {
+            // 15 -> 21: delta +6, but now a violation.
+            'lib/legacy.dart': nested('legacy', 6),
+            // Two brand-new functions at 10 (delta +10 each, no violation).
+            'lib/fresh.dart': '${nested('freshB', 4)}\n${nested('freshA', 4)}',
+          },
+        );
+
+        final analyzer = DeltaAnalyzer(gitService: fakeGit);
+        final summary = await analyzer.computeDeltas('main', failThreshold: 15);
+
+        check(summary.deltas.map((d) => d.name).toList()).deepEquals([
+          'legacy', // violation first despite the smaller delta
+          'freshA', // then by score, with path/name tie-breaks
+          'freshB',
+        ]);
+        check(summary.deltas.first.delta).equals(6);
+        check(summary.deltas[1].delta).equals(10);
+
+        // Without a threshold nothing is a violation, so score wins outright.
+        final unthresholded = await analyzer.computeDeltas('main');
+        check(
+          unthresholded.deltas.map((d) => d.name).toList(),
+        ).deepEquals(['legacy', 'freshA', 'freshB']);
       },
     );
 
@@ -411,6 +457,70 @@ void activeFunc(bool a) {
         ..contains(
           'title=Declaration Line Limit Violation::fn spans 100 lines',
         );
+    });
+  });
+}
+
+void _compareBySignificanceTests() {
+  ComplexityDelta delta(
+    String name, {
+    int? oldScore,
+    int? newScore,
+    String file = 'lib/a.dart',
+    int line = 1,
+    DeltaStatus status = DeltaStatus.increased,
+  }) => ComplexityDelta(
+    filePath: file,
+    name: name,
+    startLine: line,
+    endLine: line,
+    oldScore: oldScore,
+    newScore: newScore,
+    status: status,
+  );
+
+  group('compareBySignificance', () {
+    test('violation outranks a higher score that passes', () {
+      final violating = delta('v', oldScore: 20, newScore: 22);
+      final passing = delta(
+        'p',
+        oldScore: null,
+        newScore: 30,
+        status: DeltaStatus.improved,
+      );
+      // 30 is "improved"-status, so not a violation even though it is high.
+      check(
+        compareBySignificance(violating, passing, failThreshold: 15),
+      ).isLessThan(0);
+      // Without a threshold, raw score decides.
+      check(compareBySignificance(violating, passing)).isGreaterThan(0);
+    });
+
+    test('score beats delta, delta beats location', () {
+      final big = delta('big', oldScore: 10, newScore: 12);
+      final small = delta('small', oldScore: 0, newScore: 11);
+      check(compareBySignificance(big, small)).isLessThan(0);
+
+      final steep = delta('steep', oldScore: 0, newScore: 11);
+      final gentle = delta('gentle', oldScore: 9, newScore: 11);
+      check(compareBySignificance(steep, gentle)).isLessThan(0);
+
+      final earlier = delta('x', oldScore: 0, newScore: 5, line: 3);
+      final later = delta('x', oldScore: 0, newScore: 5, line: 9);
+      check(compareBySignificance(earlier, later)).isLessThan(0);
+      check(compareBySignificance(later, earlier)).isGreaterThan(0);
+      check(compareBySignificance(earlier, earlier)).equals(0);
+    });
+
+    test('removed declarations sink to the bottom', () {
+      final removed = delta(
+        'gone',
+        oldScore: 40,
+        newScore: null,
+        status: DeltaStatus.removed,
+      );
+      final tiny = delta('tiny', oldScore: 0, newScore: 1);
+      check(compareBySignificance(tiny, removed)).isLessThan(0);
     });
   });
 }
