@@ -7,6 +7,7 @@ executables:
   shallow
 package:cognitive_complexity/cognitive_complexity.dart:
   kAskUserPartsPreferenceDirective (static const getter: String)
+  compareBySignificance (function: int Function(ComplexityDelta, ComplexityDelta, {bool failOnIncrease, int? failThreshold, int? maxFunctionLines}))
   isExcludedPath (function: bool Function(String))
   ComplexityAnalyzer (class extends Object):
     new (constructor: ComplexityAnalyzer Function({PathFilter? pathFilter}))
@@ -55,7 +56,7 @@ package:cognitive_complexity/cognitive_complexity.dart:
     new (constructor: DeltaAnalyzer Function({ComplexityAnalyzer? analyzer, GitDiffService? gitService, PathFilter? pathFilter, String? workingDirectory}))
     pathFilter (getter: PathFilter)
     computeDeltaForCode (method: List<ComplexityDelta> Function(String, String, {String filePath}))
-    computeDeltas (method: Future<DeltaSummary> Function(String, {List<String> targetPaths}))
+    computeDeltas (method: Future<DeltaSummary> Function(String, {bool failOnIncrease, int? failThreshold, int? maxFunctionLines, List<String> targetPaths}))
     computeFileLineDeltaForCode (method: FileLineDelta? Function(String, String, {String filePath}))
   DeltaStatus (enum):
     added (enum constant: DeltaStatus)

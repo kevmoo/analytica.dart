@@ -1,4 +1,5 @@
 import 'package:pool/pool.dart';
+
 import 'complexity_analyzer.dart';
 import 'git_diff_service.dart';
 
@@ -145,6 +146,37 @@ class ComplexityDelta {
       failOnIncrease: failOnIncrease,
     ),
   };
+}
+
+/// Orders deltas for review: violations first, then new score descending,
+/// then delta descending, then file path, name, and start line so ties are
+/// deterministic.
+///
+/// A `20 -> 22` regression that breaches [failThreshold] therefore outranks a
+/// dozen brand-new `14`-point functions, even though their deltas are larger.
+int compareBySignificance(
+  ComplexityDelta a,
+  ComplexityDelta b, {
+  int? failThreshold,
+  int? maxFunctionLines,
+  bool failOnIncrease = false,
+}) {
+  bool violates(ComplexityDelta d) => d.isViolation(
+    failThreshold: failThreshold,
+    maxFunctionLines: maxFunctionLines,
+    failOnIncrease: failOnIncrease,
+  );
+  final byViolation = (violates(b) ? 1 : 0) - (violates(a) ? 1 : 0);
+  if (byViolation != 0) return byViolation;
+  final byScore = (b.newScore ?? 0).compareTo(a.newScore ?? 0);
+  if (byScore != 0) return byScore;
+  final byDelta = b.delta.compareTo(a.delta);
+  if (byDelta != 0) return byDelta;
+  final byPath = a.filePath.compareTo(b.filePath);
+  if (byPath != 0) return byPath;
+  final byName = a.name.compareTo(b.name);
+  if (byName != 0) return byName;
+  return a.startLine.compareTo(b.startLine);
 }
 
 /// Summarizes cognitive complexity delta metrics across a repository
@@ -295,9 +327,18 @@ class DeltaAnalyzer {
            gitService ?? GitDiffService(workingDirectory: workingDirectory);
 
   /// Computes complexity deltas between [baseRef] and current working tree.
+  ///
+  /// [DeltaSummary.deltas] is ordered by review significance: violations
+  /// (per [failThreshold], [maxFunctionLines], and [failOnIncrease]) first,
+  /// then by new score descending, then by delta descending, then by
+  /// location, so every report format shows the declarations closest to the
+  /// ceiling before a long tail of small additions.
   Future<DeltaSummary> computeDeltas(
     String baseRef, {
     List<String> targetPaths = const [],
+    int? failThreshold,
+    int? maxFunctionLines,
+    bool failOnIncrease = false,
   }) async {
     final mergeBase = await _gitService.getMergeBase(baseRef);
     final rawModFiles = await _gitService.getModifiedDartFiles(
@@ -341,12 +382,15 @@ class DeltaAnalyzer {
       }
     }
 
-    // Sort by delta descending (regression prioritization), then new score
-    allDeltas.sort((a, b) {
-      final comp = b.delta.compareTo(a.delta);
-      if (comp != 0) return comp;
-      return (b.newScore ?? 0).compareTo(a.newScore ?? 0);
-    });
+    allDeltas.sort(
+      (a, b) => compareBySignificance(
+        a,
+        b,
+        failThreshold: failThreshold,
+        maxFunctionLines: maxFunctionLines,
+        failOnIncrease: failOnIncrease,
+      ),
+    );
 
     allFileDeltas.sort((a, b) => (b.newLines ?? 0).compareTo(a.newLines ?? 0));
 

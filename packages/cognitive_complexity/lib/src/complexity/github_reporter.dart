@@ -1,4 +1,5 @@
 import 'dart:io';
+
 import 'complexity_analyzer.dart';
 import 'delta_analyzer.dart';
 
@@ -332,9 +333,11 @@ class GitHubReporter {
     }
   }
 
-  /// Renders the sticky-comment table: most significant rows first, capped at
-  /// [_maxCommentRows], with a footer pointing at the full step summary when
-  /// rows were omitted.
+  /// Renders the sticky-comment table, capped at [_maxCommentRows], with a
+  /// footer pointing at the full step summary when rows were omitted.
+  ///
+  /// [changed] arrives already ordered by significance from
+  /// [DeltaAnalyzer.computeDeltas], so the cap keeps the most important rows.
   void _renderCappedComment(
     List<ComplexityDelta> changed,
     int? failThreshold,
@@ -342,18 +345,7 @@ class GitHubReporter {
     bool failOnIncrease,
     StringBuffer commentBuf,
   ) {
-    final ranked = [...changed]
-      ..sort((a, b) {
-        final byRank = _rank(
-          b,
-          failThreshold,
-          maxFunctionLines,
-          failOnIncrease,
-        ).compareTo(_rank(a, failThreshold, maxFunctionLines, failOnIncrease));
-        if (byRank != 0) return byRank;
-        return (b.newScore ?? 0).compareTo(a.newScore ?? 0);
-      });
-
+    final ranked = changed;
     final capped = _maxCommentRows > 0 && ranked.length > _maxCommentRows
         ? ranked.sublist(0, _maxCommentRows)
         : ranked;
@@ -375,26 +367,6 @@ class GitHubReporter {
           'See the workflow Step Summary for the full table._',
         );
     }
-  }
-
-  /// Display priority for the capped comment: violations, then regressions,
-  /// then additions, then everything else.
-  int _rank(
-    ComplexityDelta d,
-    int? failThreshold,
-    int? maxFunctionLines,
-    bool failOnIncrease,
-  ) {
-    if (d.isViolation(
-      failThreshold: failThreshold,
-      maxFunctionLines: maxFunctionLines,
-      failOnIncrease: failOnIncrease,
-    )) {
-      return 3;
-    }
-    if (d.status == DeltaStatus.increased) return 2;
-    if (d.status == DeltaStatus.added) return 1;
-    return 0;
   }
 
   void _renderDeltaTable(
