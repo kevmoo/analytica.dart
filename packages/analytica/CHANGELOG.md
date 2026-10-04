@@ -1,4 +1,4 @@
-## 0.1.3-wip
+## 0.1.3
 
 - Add `discoverDefaultTargets` in `package:analytica/cli.dart` to resolve
   default `lib/` analysis targets across single-package, Pub workspace
