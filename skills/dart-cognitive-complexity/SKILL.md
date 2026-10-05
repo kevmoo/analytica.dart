@@ -53,14 +53,23 @@ Run the CLI directly (requires Dart SDK **3.12.0+**, verify via
   ```bash
   dart run cognitive_complexity@^0.3.0 --git-diff origin/main --fail-threshold 15 --fail-on-increase
   ```
-- **Scope 3 — Whole-Project (Default Naked Invocation)**:
+- **Scope 3 — Whole-Project (Default Naked Invocation)**: Invoking
+  `cognitive_complexity` with zero positional paths automatically discovers
+  package roots or workspace members and defaults to analyzing `lib/`:
   ```bash
-  dart run cognitive_complexity@^0.3.0 --threshold 15 lib/
+  dart run cognitive_complexity@^0.3.0 --threshold 15
   dart run cognitive_complexity@^0.3.0 --threshold 40 test/
   ```
+  > [!NOTE]
+  >
+  > **CLI Package Caveat (`lib/ bin/`)**: Zero-argument auto-discovery only
+  > inspects `lib/`. For CLI tools and applications with entrypoints in `bin/`
+  > (or `tool/`), pass target directories explicitly:
+  > `dart run cognitive_complexity@^0.3.0 --threshold 15 lib/ bin/`
 - **Scope 4 — Shallow Helper Audit (Over-Extraction & Re-Inlining)**:
   ```bash
   dart run cognitive_complexity:shallow@^0.3.0 lib/
+  dart run cognitive_complexity:shallow@^0.3.0 lib/ bin/
   dart run cognitive_complexity:shallow@^0.3.0 --git-diff origin/main --fail-on-safe-inline
   ```
 
@@ -75,11 +84,34 @@ automated harness (`evalin` / subagent).
 ### Stage 1: Read-Only Audit & Reporting (Mandatory Stop)
 
 1. **Mandatory Persistent Artifact**: Create `complexity_triage_report.md` in
-   `<appDataDir>/brain/<conversation-id>/` listing each flagged function,
-   clickable file path with code snippets, current score vs. ceiling (sorted
-   descending by score), recommended pattern (A–F), and unit test status.
-2. **Visible Chat Pre-Render**: Render a high-level summary and a clickable link
-   to `complexity_triage_report.md` in visible chat BEFORE invoking the
+   `<appDataDir>/brain/<conversation-id>/` containing two structured audit
+   tables:
+   - **Core Cognitive Complexity Outliers (`> 15` Prod / `> 40` Test)**: Listing
+     each flagged function, clickable file path with code snippets, current
+     score vs. ceiling (sorted descending by score), recommended pattern (A–F),
+     and unit test status.
+   - **Shallow Helpers (Pattern G — Over-Extracted Single-Caller Helpers)**:
+     Listing findings from `cognitive_complexity:shallow` (`SAFE_INLINE`,
+     `FLATTEN_AND_INLINE`, `LOAD_BEARING`):
+
+     | Classification    | Helper Declaration       | Sole Caller                         | Helper Metrics               | Caller CC (`Before -> After`) | Est. Saved | Recommended Remediation                                                                                             |
+     | :---------------- | :----------------------- | :---------------------------------- | :--------------------------- | :---------------------------: | :--------: | :------------------------------------------------------------------------------------------------------------------ |
+     | **`SAFE_INLINE`** | [`_helper`](file:///...) | [`caller`](file:///...) (`depth=0`) | `params=6`, `LOC=18`, `CC=2` |   `0 (base 0) -> 2` (`+2`)    |   `~12L`   | **Re-inline (Pattern G)**: Inlining eliminates pass-through plumbing while keeping caller in Target Zone (`<= 15`). |
+     - **Guidance on Choosing the Right Shallow Remediation**:
+       - **Re-inline (`SAFE_INLINE`)**: Re-inline single-caller helpers directly
+         into their sole caller when `CallerCCAfter <= 15` (especially
+         `MICRO_HELPER`s or `HIGH_ARITY` helpers where inlining deletes
+         parameter plumbing and restores localized reading flow).
+       - **Parameter Record**: For sibling helpers sharing high-arity parameter
+         clumps (`HIGH_ARITY`), synthesize a shared Dart 3 named record rather
+         than passing 5+ separate arguments or packing ad-hoc inline records.
+       - **Existing State Object**: If helper parameters are a subset of an
+         existing domain model or state object, pass that instance directly.
+       - **Flatten & Inline (`FLATTEN_AND_INLINE`)**: Flatten nested
+         conditionals in the helper using Patterns A/B before or while inlining.
+2. **Visible Chat Pre-Render**: Render a high-level summary (including shallow
+   helper counts and top complexity outliers) and a clickable link to
+   `complexity_triage_report.md` in visible chat BEFORE invoking the
    confirmation gate.
 3. **Outlier-First Mandate**: Prioritize the highest-scoring declaration in the
    report (`Score >= 25` or top outlier) targeting a post-refactoring score of
@@ -94,9 +126,12 @@ offer:
 1. **(Recommended) Refactor Primary Outlier First**: Target the single
    highest-scoring declaration, decompose to `<= 15`, verify tests, and show
    diffs.
-2. **Selective Batch Refactor**: Remediate the top N highest-scoring functions
+2. **Re-inline Safe Shallow Helpers**: Batch re-inline `SAFE_INLINE` helpers
+   into their sole callers (`Pattern G`), deleting pass-through signatures while
+   keeping all callers `<= 15`.
+3. **Selective Batch Refactor**: Remediate the top N highest-scoring functions
    in descending order.
-3. **Report-Only / Exit**: Acknowledge scores without code mutation.
+4. **Report-Only / Exit**: Acknowledge scores without code mutation.
 
 ---
 
