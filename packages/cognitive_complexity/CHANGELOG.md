@@ -1,8 +1,23 @@
-## 0.2.7
+## 0.3.0
 
-- Fix line violation presentation bugs in `--max-function-lines`.
-- Fix cumulative baseline emission bugs in the `shallow` single-caller helper
-  analyzer.
+- **Breaking**: `ShallowFinding` gains two required constructor parameters,
+  `callerBaseScore` and `callerCumulativeBefore`. Code that only reads findings
+  from `ShallowAnalyzer` is unaffected; code constructing `ShallowFinding`
+  directly must pass both.
+- `shallow`: when several single-caller helpers share one caller, the caller's
+  score was reported as a running cumulative total with no way to recover the
+  caller's real static score. Each finding now reports `caller_base_score` (the
+  caller's static score) alongside `caller_cumulative_before` (the simulated
+  score after earlier `SAFE_INLINE` siblings were absorbed). `caller_score` is
+  retained as an alias of `caller_cumulative_before`. Text output renders
+  `Caller CC: 6 (base 3) -> 9 after inline (+3)` whenever the two differ.
+- `cognitive_complexity`: with `--max-function-lines`, the text table and the
+  `--git-diff` text table now include a `Lines` column, and every violation
+  marker names its trigger, e.g. `[VIOLATION: score > 15]`,
+  `[VIOLATION: lines > 60]`, `[VIOLATION: score > 15, lines > 60]`, or
+  `[VIOLATION: increased]` under `--fail-on-increase`. Consumers matching the
+  bare `[VIOLATION]` token on stdout should match the `[VIOLATION` prefix
+  instead. JSON output is unchanged.
 
 ## 0.2.6
 

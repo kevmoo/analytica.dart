@@ -38,8 +38,18 @@ class ShallowFinding {
   final String callerName;
   final int callLine;
   final int callNestingDepth;
+
+  /// The caller's static Cognitive Complexity as written, independent of any
+  /// sibling helpers simulated before this one.
   final int callerBaseScore;
+
+  /// The caller's simulated Cognitive Complexity immediately before this
+  /// helper is inlined: [callerBaseScore] plus the deltas of every earlier
+  /// [ShallowClassification.safeInline] sibling absorbed into the same caller.
   final int callerCumulativeBefore;
+
+  /// Alias of [callerCumulativeBefore], retained for the `caller_score` JSON
+  /// key.
   final int callerScore;
   final int inlinedDeltaScore;
   final int inlinedCallerScore;
@@ -183,23 +193,15 @@ class ShallowReport {
           '(${f.callerFilePath}:L${f.callLine}, depth=${f.callNestingDepth})',
         );
 
-      if (f.callerCumulativeBefore != f.callerBaseScore) {
-        buf.writeln(
-          '  Caller CC: ${f.callerCumulativeBefore} (base '
-          '${f.callerBaseScore}) -> ${f.inlinedCallerScore} after '
-          'inline (+${f.inlinedDeltaScore}) | '
-          'Est. Saved: ~${f.estimatedLinesSaved}L | '
-          'Why: ${f.reasons.join(", ")}',
-        );
-      } else {
-        buf.writeln(
-          '  Caller CC: ${f.callerCumulativeBefore} -> '
-          '${f.inlinedCallerScore} after '
-          'inline (+${f.inlinedDeltaScore}) | '
-          'Est. Saved: ~${f.estimatedLinesSaved}L | '
-          'Why: ${f.reasons.join(", ")}',
-        );
-      }
+      final base = f.callerCumulativeBefore != f.callerBaseScore
+          ? ' (base ${f.callerBaseScore})'
+          : '';
+      buf.writeln(
+        '  Caller CC: ${f.callerCumulativeBefore}$base -> '
+        '${f.inlinedCallerScore} after inline (+${f.inlinedDeltaScore}) | '
+        'Est. Saved: ~${f.estimatedLinesSaved}L | '
+        'Why: ${f.reasons.join(", ")}',
+      );
     }
     return buf.toString();
   }

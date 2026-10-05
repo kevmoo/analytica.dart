@@ -102,7 +102,9 @@ void complexFunc(int a) {
         '${d.sandbox}/project_fail',
       ]);
 
-      await check(process.stdout).emitsThrough((s) => s.contains('[VIOLATION'));
+      await check(
+        process.stdout,
+      ).emitsThrough((s) => s.contains('[VIOLATION: score > 2]'));
       await check(
         process.stderr,
       ).emitsThrough((s) => s.contains('exceeded the failure threshold (2)'));
@@ -176,7 +178,8 @@ void complexFunc(int a) {
       ]);
       final textLines = await textProc.stdoutStream().join('\n');
       check(textLines)
-        ..contains('Score  Declaration  Location  Lines')
+        ..contains('Score  Lines  Declaration  Location')
+        ..contains('    0     27  bigDecl      ')
         ..contains('[VIOLATION: lines > 15]');
       await textProc.shouldExit(1);
     });
@@ -372,19 +375,30 @@ int simplified(int a) {
       },
     );
 
-    test('orders --git-diff findings by significance', () async {
+    test('orders --git-diff text rows by significance (violations first, '
+        'then new score desc) and renders Lines + violation reasons', () async {
+      // Sequential top-level `if`s give an exact CC of [cc]; [filler]
+      // pads the declaration's physical line count without adding CC.
+      String fn(String name, int cc, {int filler = 0}) {
+        final body = [
+          for (var i = 0; i < filler; i++) '  final x$i = $i;',
+          for (var i = 0; i < cc; i++) '  if (a > $i) return $i;',
+          '  return -1;',
+        ].join('\n');
+        return 'int $name(int a) {\n$body\n}\n';
+      }
+
       await d.dir('git_sort', [
         d.dir('lib', [
-          d.file('app.dart', '''
-void removed() {}
-
-int existingComplex(int a) {
-  if (a > 0) return 1;
-  return 0;
-}
-
-int newSimple(int a) => a;
-'''),
+          d.file(
+            'app.dart',
+            [
+              fn('violator', 1),
+              fn('grownButOk', 1),
+              fn('improved', 6),
+              fn('deletedComplex', 2),
+            ].join('\n'),
+          ),
         ]),
       ]).create();
 
@@ -397,32 +411,35 @@ int newSimple(int a) => a;
       await git(['init', '-b', 'main']);
       await git(['config', 'user.name', 'Tester']);
       await git(['config', 'user.email', 'test@example.com']);
+      await git(['config', 'commit.gpgsign', 'false']);
       await git(['add', '.']);
       await git(['commit', '-m', 'Initial']);
 
-      File('$repoDir/lib/app.dart').writeAsStringSync('''
-int existingComplex(int a) {
-  if (a > 0) {
-    if (a > 1) {
-      if (a > 2) return 3;
-    }
-  }
-  return 0;
-}
-
-int newComplex(int a) {
-  if (a > 0) {
-    if (a > 1) return 2;
-  }
-  return 0;
-}
-
-int newSimple(int a) => a;
-''');
+      // violator:   1 -> 4   score violation (> 3)
+      // grownButOk: 1 -> 3   increased but within threshold
+      // brandNew:   new -> 2 lines-only violation (13 lines > 8)
+      // improved:   6 -> 5   improved; new score is HIGHER than violator's
+      // deletedComplex: 2 -> del
+      File('$repoDir/lib/app.dart').writeAsStringSync(
+        [
+          fn('violator', 4),
+          fn('grownButOk', 3),
+          fn('brandNew', 2, filler: 8),
+          fn('improved', 5),
+        ].join('\n'),
+      );
 
       final proc = await TestProcess.start(
         Platform.resolvedExecutable,
-        [binPath, '--git-diff', 'main', '--fail-threshold', '3'],
+        [
+          binPath,
+          '--git-diff',
+          'main',
+          '--fail-threshold',
+          '3',
+          '--max-function-lines',
+          '8',
+        ],
         workingDirectory: repoDir,
         environment: {'GITHUB_WORKSPACE': repoDir},
       );
@@ -433,18 +450,42 @@ int newSimple(int a) => a;
       }
       await proc.shouldExit(1);
 
-      final output = lines.join('\n');
+      // Table rows are the only lines that start with a padded delta.
+      final rows = lines
+          .where((l) => RegExp(r'^\s*[+-]?\d+\s{2}').hasMatch(l))
+          .toList();
+      final nameOf = RegExp(
+        r'\b(violator|grownButOk|brandNew|improved|deletedComplex)\b',
+      );
+      check(
+        rows.map((r) => nameOf.firstMatch(r)!.group(1)).toList(),
+      ).deepEquals([
+        'violator', // violation (score), new score 4
+        'brandNew', // violation (lines) despite new score 2
+        'improved', // non-violation, new score 5
+        'grownButOk', // non-violation, new score 3
+        'deletedComplex', // non-violation, new score 0
+      ]);
 
-      final existingIdx = output.indexOf('existingComplex');
-      final newComplexIdx = output.indexOf('newComplex');
-      final removedIdx = output.indexOf('removed');
-
-      check(existingIdx).isGreaterThan(-1);
-      check(newComplexIdx).isGreaterThan(-1);
-      check(removedIdx).isGreaterThan(-1);
-
-      check(existingIdx).isLessThan(newComplexIdx);
-      check(newComplexIdx).isLessThan(removedIdx);
+      check(lines.join('\n')).contains(
+        ' Delta  Score         Lines         Declaration     Location',
+      );
+      check(rows[0])
+        ..contains('1 -> 4')
+        ..endsWith('[VIOLATION: score > 3]');
+      check(rows[1])
+        ..contains('new -> 2')
+        ..contains('new -> 13')
+        ..endsWith('[VIOLATION: lines > 8]');
+      check(rows[2])
+        ..contains('6 -> 5')
+        ..endsWith('[IMPROVED]');
+      check(rows[3])
+        ..contains('1 -> 3')
+        ..not((r) => r.contains('['));
+      check(rows[4])
+        ..contains('2 -> del')
+        ..not((r) => r.contains('['));
     });
   });
 }
