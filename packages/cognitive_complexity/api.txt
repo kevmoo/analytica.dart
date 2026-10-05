@@ -167,10 +167,12 @@ package:cognitive_complexity/cognitive_complexity.dart:
     values (static const getter: List<ShallowClassification>)
     label (getter: String)
   ShallowFinding (class extends Object):
-    new (const constructor: ShallowFinding Function({required int bodyLines, required int callLine, required int callNestingDepth, required String callerFilePath, required String callerName, required int callerScore, required ShallowClassification classification, required int endLine, required int estimatedLinesSaved, required String filePath, required int inlinedCallerScore, required int inlinedDeltaScore, required String name, required int namedParameterCount, required int parameterCount, required List<String> reasons, required int score, required int signatureLines, required int startLine}))
+    new (const constructor: ShallowFinding Function({required int bodyLines, required int callLine, required int callNestingDepth, required int callerBaseScore, required int callerCumulativeBefore, required String callerFilePath, required String callerName, required int callerScore, required ShallowClassification classification, required int endLine, required int estimatedLinesSaved, required String filePath, required int inlinedCallerScore, required int inlinedDeltaScore, required String name, required int namedParameterCount, required int parameterCount, required List<String> reasons, required int score, required int signatureLines, required int startLine}))
     bodyLines (getter: int)
     callLine (getter: int)
     callNestingDepth (getter: int)
+    callerBaseScore (getter: int)
+    callerCumulativeBefore (getter: int)
     callerFilePath (getter: String)
     callerName (getter: String)
     callerScore (getter: int)

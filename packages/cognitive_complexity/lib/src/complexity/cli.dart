@@ -454,23 +454,32 @@ void _printRegularDeclRows(
     if (res.name.length > maxNameLen) maxNameLen = res.name.length;
   }
 
+  final showLines = maxFunctionLines != null;
   final headerScore = 'Score'.padLeft(5);
+  final headerLines = showLines ? '  ${'Lines'.padLeft(5)}' : '';
   final headerName = 'Declaration'.padRight(maxNameLen);
-  sink.writeln('$headerScore  $headerName  Location');
-  sink.writeln('-' * (5 + 2 + maxNameLen + 2 + 30));
+  sink.writeln('$headerScore$headerLines  $headerName  Location');
+  sink.writeln('-' * (5 + headerLines.length + 2 + maxNameLen + 2 + 30));
 
   for (final res in results) {
     final scoreStr = res.score.toString().padLeft(5);
+    final linesStr = showLines ? '  ${'${res.lineCount}'.padLeft(5)}' : '';
     final nameStr = res.name.padRight(maxNameLen);
     final locStr = '${res.filePath}:L${res.startLine}-${res.endLine}';
-    final isVio = res.isViolation(
-      failThreshold: failThreshold,
-      maxFunctionLines: maxFunctionLines,
-    );
-    final violationMarker = isVio ? ' [VIOLATION]' : '';
-    sink.writeln('$scoreStr  $nameStr  $locStr$violationMarker');
+    final marker = _violationMarker([
+      if (failThreshold != null && res.score > failThreshold)
+        'score > $failThreshold',
+      if (maxFunctionLines != null && res.lineCount > maxFunctionLines)
+        'lines > $maxFunctionLines',
+    ]);
+    sink.writeln('$scoreStr$linesStr  $nameStr  $locStr$marker');
   }
 }
+
+/// Renders ` [VIOLATION: <reasons>]` for a non-empty [reasons] list, or an
+/// empty string when the declaration is within every configured limit.
+String _violationMarker(List<String> reasons) =>
+    reasons.isEmpty ? '' : ' [VIOLATION: ${reasons.join(', ')}]';
 
 void _printRegularFileViolationRows(
   List<FileLineMetric> violatedFiles,
@@ -548,11 +557,14 @@ void _printDeltaTableSection(
     if (d.name.length > maxName) maxName = d.name.length;
   }
 
+  final showLines = maxFunctionLines != null;
   final hdrDelta = 'Delta'.padLeft(6);
   final hdrScore = 'Score'.padRight(12);
+  final hdrLines = showLines ? '  ${'Lines'.padRight(12)}' : '';
   final hdrName = 'Declaration'.padRight(maxName);
-  sink.writeln('$hdrDelta  $hdrScore  $hdrName  Location');
-  sink.writeln('-' * (6 + 2 + 12 + 2 + maxName + 2 + 30));
+  sink.writeln('$hdrDelta  $hdrScore$hdrLines  $hdrName  Location');
+  final rule = '-' * (6 + 2 + 12 + hdrLines.length + 2 + maxName + 2 + 30);
+  sink.writeln(rule);
 
   for (final d in deltas) {
     final deltaStr = d.delta > 0 ? '+${d.delta}' : '${d.delta}';
@@ -569,20 +581,47 @@ void _printDeltaTableSection(
       (null, null) => (d.filePath, 'del'),
     };
     final scoreStr = rawScore.padRight(12);
+    final linesStr = showLines
+        ? '  ${'${d.oldLines ?? 'new'} -> ${d.newLines ?? 'del'}'.padRight(12)}'
+        : '';
     final nameStr = d.name.padRight(maxName);
-    final isVio = d.isViolation(
+    final marker = _deltaMarker(
+      d,
       failThreshold: failThreshold,
       maxFunctionLines: maxFunctionLines,
       failOnIncrease: failOnIncrease,
     );
-    final marker = isVio
-        ? ' [VIOLATION]'
-        : (d.status == DeltaStatus.improved ? ' [IMPROVED]' : '');
 
-    sink.writeln('${deltaStr.padLeft(6)}  $scoreStr  $nameStr  $locStr$marker');
+    sink.writeln(
+      '${deltaStr.padLeft(6)}  $scoreStr$linesStr  $nameStr  $locStr$marker',
+    );
   }
 
-  sink.writeln('-' * (6 + 2 + 12 + 2 + maxName + 2 + 30));
+  sink.writeln(rule);
+}
+
+/// Renders ` [VIOLATION: <reasons>]`, ` [IMPROVED]`, or an empty suffix for a
+/// `--git-diff` row, deriving each reason from [ComplexityDelta]'s own
+/// violation predicates.
+String _deltaMarker(
+  ComplexityDelta d, {
+  required int? failThreshold,
+  required int? maxFunctionLines,
+  required bool failOnIncrease,
+}) {
+  final scoreVio = d.isScoreViolation(
+    failThreshold: failThreshold,
+    failOnIncrease: failOnIncrease,
+  );
+  final overThreshold =
+      failThreshold != null && (d.newScore ?? 0) > failThreshold;
+  final marker = _violationMarker([
+    if (scoreVio) overThreshold ? 'score > $failThreshold' : 'increased',
+    if (d.isFunctionLineViolation(maxFunctionLines: maxFunctionLines))
+      'lines > $maxFunctionLines',
+  ]);
+  if (marker.isNotEmpty) return marker;
+  return d.status == DeltaStatus.improved ? ' [IMPROVED]' : '';
 }
 
 void _printDeltaFileViolations(

@@ -416,6 +416,54 @@ void _stepD(int a, int b, int c, int d, int e) {
       },
     );
 
+    test('caller_base_score stays at the static caller score while '
+        'caller_cumulative_before accumulates across sibling helpers', () {
+      // `_caller` scores 3 statically (if +1, nested if +2). Each helper's
+      // `if` inlines at depth 2 for +3, so the cumulative baseline walks
+      // 3 -> 6 -> 9 while the base must stay 3 for every finding.
+      const code = '''
+void _caller(int a, int b, int c, int d, int e, int f) {
+  if (a > 0) {
+    if (b > 0) {
+      _h1(a, b, c, d, e, f);
+      _h2(a, b, c, d, e, f);
+      _h3(a, b, c, d, e, f);
+    }
+  }
+}
+void _h1(int a, int b, int c, int d, int e, int f) { if (true) print(1); }
+void _h2(int a, int b, int c, int d, int e, int f) { if (true) print(2); }
+void _h3(int a, int b, int c, int d, int e, int f) { if (true) print(3); }
+''';
+      final analyzer = ShallowAnalyzer();
+      final report = analyzer.analyzeCode(code);
+
+      final byName = {for (final f in report.findings) f.name: f};
+      check(byName.keys).unorderedEquals(['_h1', '_h2', '_h3']);
+      for (final f in byName.values) {
+        check(f.callerBaseScore).equals(3);
+        check(f.callerScore).equals(f.callerCumulativeBefore);
+        check(
+          f.inlinedCallerScore,
+        ).equals(f.callerCumulativeBefore + f.inlinedDeltaScore);
+        check(f.classification).equals(ShallowClassification.safeInline);
+      }
+      check(byName['_h1']!.callerCumulativeBefore).equals(3);
+      check(byName['_h2']!.callerCumulativeBefore).equals(6);
+      check(byName['_h3']!.callerCumulativeBefore).equals(9);
+
+      final h2Json = byName['_h2']!.toJson();
+      check(h2Json['caller_base_score']).equals(3);
+      check(h2Json['caller_cumulative_before']).equals(6);
+      check(h2Json['caller_score']).equals(6);
+      check(h2Json['inlined_caller_score']).equals(9);
+
+      final text = report.formatText();
+      check(text).contains('Caller CC: 3 -> 6 after inline (+3)');
+      check(text).contains('Caller CC: 6 (base 3) -> 9 after inline (+3)');
+      check(text).contains('Caller CC: 9 (base 3) -> 12 after inline (+3)');
+    });
+
     test('CLI --git-diff filters modified files when run from a workspace '
         'subpackage directory', () async {
       await d.dir('ws_repo', [

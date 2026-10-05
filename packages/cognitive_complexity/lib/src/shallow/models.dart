@@ -38,6 +38,18 @@ class ShallowFinding {
   final String callerName;
   final int callLine;
   final int callNestingDepth;
+
+  /// The caller's static Cognitive Complexity as written, independent of any
+  /// sibling helpers simulated before this one.
+  final int callerBaseScore;
+
+  /// The caller's simulated Cognitive Complexity immediately before this
+  /// helper is inlined: [callerBaseScore] plus the deltas of every earlier
+  /// [ShallowClassification.safeInline] sibling absorbed into the same caller.
+  final int callerCumulativeBefore;
+
+  /// Alias of [callerCumulativeBefore], retained for the `caller_score` JSON
+  /// key.
   final int callerScore;
   final int inlinedDeltaScore;
   final int inlinedCallerScore;
@@ -59,6 +71,8 @@ class ShallowFinding {
     required this.callerName,
     required this.callLine,
     required this.callNestingDepth,
+    required this.callerBaseScore,
+    required this.callerCumulativeBefore,
     required this.callerScore,
     required this.inlinedDeltaScore,
     required this.inlinedCallerScore,
@@ -85,6 +99,8 @@ class ShallowFinding {
     'caller_name': callerName,
     'call_line': callLine,
     'call_nesting_depth': callNestingDepth,
+    'caller_base_score': callerBaseScore,
+    'caller_cumulative_before': callerCumulativeBefore,
     'caller_score': callerScore,
     'inlined_delta_score': inlinedDeltaScore,
     'inlined_caller_score': inlinedCallerScore,
@@ -175,13 +191,17 @@ class ShallowReport {
         ..writeln(
           '  Called once by ${f.callerName} '
           '(${f.callerFilePath}:L${f.callLine}, depth=${f.callNestingDepth})',
-        )
-        ..writeln(
-          '  Caller CC: ${f.callerScore} -> ${f.inlinedCallerScore} after '
-          'inline (+${f.inlinedDeltaScore}) | '
-          'Est. Saved: ~${f.estimatedLinesSaved}L | '
-          'Why: ${f.reasons.join(", ")}',
         );
+
+      final base = f.callerCumulativeBefore != f.callerBaseScore
+          ? ' (base ${f.callerBaseScore})'
+          : '';
+      buf.writeln(
+        '  Caller CC: ${f.callerCumulativeBefore}$base -> '
+        '${f.inlinedCallerScore} after inline (+${f.inlinedDeltaScore}) | '
+        'Est. Saved: ~${f.estimatedLinesSaved}L | '
+        'Why: ${f.reasons.join(", ")}',
+      );
     }
     return buf.toString();
   }
