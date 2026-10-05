@@ -1,4 +1,4 @@
-## 0.2.7-wip
+## 0.2.7
 
 - Fix line violation presentation bugs in `--max-function-lines`.
 - Fix cumulative baseline emission bugs in the `shallow` single-caller helper
