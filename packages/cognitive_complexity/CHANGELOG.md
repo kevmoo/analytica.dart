@@ -1,3 +1,9 @@
+## 0.2.7-wip
+
+- Fix line violation presentation bugs in `--max-function-lines`.
+- Fix cumulative baseline emission bugs in the `shallow` single-caller helper
+  analyzer.
+
 ## 0.2.6
 
 - Auto-discover default targets when no positional paths are given: Pub

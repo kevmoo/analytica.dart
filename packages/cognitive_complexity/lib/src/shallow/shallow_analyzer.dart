@@ -279,6 +279,8 @@ class ShallowAnalyzer {
       }
       findings.add(
         c.toFinding(
+          callerBaseScore: c.caller.score,
+          callerCumulativeBefore: callerScore,
           callerScore: callerScore,
           deltaScore: deltaScore,
           inlinedCallerScore: inlinedCallerScore,
@@ -537,6 +539,8 @@ class _RawCandidate {
   });
 
   ShallowFinding toFinding({
+    required int callerBaseScore,
+    required int callerCumulativeBefore,
     required int callerScore,
     required int deltaScore,
     required int inlinedCallerScore,
@@ -555,6 +559,8 @@ class _RawCandidate {
     callerName: caller.qualifiedName,
     callLine: call.line,
     callNestingDepth: call.nestingDepth,
+    callerBaseScore: callerBaseScore,
+    callerCumulativeBefore: callerCumulativeBefore,
     callerScore: callerScore,
     inlinedDeltaScore: deltaScore,
     inlinedCallerScore: inlinedCallerScore,

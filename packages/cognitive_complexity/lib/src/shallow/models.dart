@@ -38,6 +38,8 @@ class ShallowFinding {
   final String callerName;
   final int callLine;
   final int callNestingDepth;
+  final int callerBaseScore;
+  final int callerCumulativeBefore;
   final int callerScore;
   final int inlinedDeltaScore;
   final int inlinedCallerScore;
@@ -59,6 +61,8 @@ class ShallowFinding {
     required this.callerName,
     required this.callLine,
     required this.callNestingDepth,
+    required this.callerBaseScore,
+    required this.callerCumulativeBefore,
     required this.callerScore,
     required this.inlinedDeltaScore,
     required this.inlinedCallerScore,
@@ -85,6 +89,8 @@ class ShallowFinding {
     'caller_name': callerName,
     'call_line': callLine,
     'call_nesting_depth': callNestingDepth,
+    'caller_base_score': callerBaseScore,
+    'caller_cumulative_before': callerCumulativeBefore,
     'caller_score': callerScore,
     'inlined_delta_score': inlinedDeltaScore,
     'inlined_caller_score': inlinedCallerScore,
@@ -175,13 +181,25 @@ class ShallowReport {
         ..writeln(
           '  Called once by ${f.callerName} '
           '(${f.callerFilePath}:L${f.callLine}, depth=${f.callNestingDepth})',
-        )
-        ..writeln(
-          '  Caller CC: ${f.callerScore} -> ${f.inlinedCallerScore} after '
+        );
+
+      if (f.callerCumulativeBefore != f.callerBaseScore) {
+        buf.writeln(
+          '  Caller CC: ${f.callerCumulativeBefore} (base '
+          '${f.callerBaseScore}) -> ${f.inlinedCallerScore} after '
           'inline (+${f.inlinedDeltaScore}) | '
           'Est. Saved: ~${f.estimatedLinesSaved}L | '
           'Why: ${f.reasons.join(", ")}',
         );
+      } else {
+        buf.writeln(
+          '  Caller CC: ${f.callerCumulativeBefore} -> '
+          '${f.inlinedCallerScore} after '
+          'inline (+${f.inlinedDeltaScore}) | '
+          'Est. Saved: ~${f.estimatedLinesSaved}L | '
+          'Why: ${f.reasons.join(", ")}',
+        );
+      }
     }
     return buf.toString();
   }

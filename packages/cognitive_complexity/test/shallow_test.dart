@@ -416,6 +416,40 @@ void _stepD(int a, int b, int c, int d, int e) {
       },
     );
 
+    test('caller_base_score remains consistent across multiple helpers '
+        'regardless of print order', () {
+      const code = '''
+void _caller(int a, int b, int c, int d, int e, int f) {
+  if (a > 0) {
+    if (b > 0) {
+      _h1(a, b, c, d, e, f);
+      _h2(a, b, c, d, e, f);
+      _h3(a, b, c, d, e, f);
+    }
+  }
+}
+void _h1(int a, int b, int c, int d, int e, int f) { if (true) print(1); }
+void _h2(int a, int b, int c, int d, int e, int f) { if (true) print(2); }
+void _h3(int a, int b, int c, int d, int e, int f) { if (true) print(3); }
+''';
+      final analyzer = ShallowAnalyzer();
+      final report = analyzer.analyzeCode(code);
+
+      final byName = {for (final f in report.findings) f.name: f};
+      check(
+        byName['_h1']!.callerBaseScore,
+      ).equals(byName['_h2']!.callerBaseScore);
+      check(
+        byName['_h2']!.callerBaseScore,
+      ).equals(byName['_h3']!.callerBaseScore);
+      final cumulative = {
+        byName['_h1']!.callerCumulativeBefore,
+        byName['_h2']!.callerCumulativeBefore,
+        byName['_h3']!.callerCumulativeBefore,
+      };
+      check(cumulative.length).equals(3);
+    });
+
     test('CLI --git-diff filters modified files when run from a workspace '
         'subpackage directory', () async {
       await d.dir('ws_repo', [

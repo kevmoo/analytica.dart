@@ -102,9 +102,7 @@ void complexFunc(int a) {
         '${d.sandbox}/project_fail',
       ]);
 
-      await check(
-        process.stdout,
-      ).emitsThrough((s) => s.contains('[VIOLATION]'));
+      await check(process.stdout).emitsThrough((s) => s.contains('[VIOLATION'));
       await check(
         process.stderr,
       ).emitsThrough((s) => s.contains('exceeded the failure threshold (2)'));
@@ -164,6 +162,23 @@ void complexFunc(int a) {
         ghProc.stdout,
       ).emitsThrough((s) => s.contains('title=File Line Limit Exceeded'));
       await ghProc.shouldExit(1);
+
+      // 4. --max-function-lines in text format emits Lines and violations
+      final textProc = await TestProcess.start(Platform.resolvedExecutable, [
+        binPath,
+        '--max-file-lines',
+        '15',
+        '--max-function-lines',
+        '15',
+        '--format',
+        'text',
+        target,
+      ]);
+      final textLines = await textProc.stdoutStream().join('\n');
+      check(textLines)
+        ..contains('Score  Declaration  Location  Lines')
+        ..contains('[VIOLATION: lines > 15]');
+      await textProc.shouldExit(1);
     });
 
     group('default target discovery (no positional args)', () {
@@ -356,5 +371,80 @@ int simplified(int a) {
           );
       },
     );
+
+    test('orders --git-diff findings by significance', () async {
+      await d.dir('git_sort', [
+        d.dir('lib', [
+          d.file('app.dart', '''
+void removed() {}
+
+int existingComplex(int a) {
+  if (a > 0) return 1;
+  return 0;
+}
+
+int newSimple(int a) => a;
+'''),
+        ]),
+      ]).create();
+
+      final repoDir = '${d.sandbox}/git_sort';
+      Future<void> git(List<String> args) async {
+        final res = await Process.run('git', args, workingDirectory: repoDir);
+        check(res.exitCode).equals(0);
+      }
+
+      await git(['init', '-b', 'main']);
+      await git(['config', 'user.name', 'Tester']);
+      await git(['config', 'user.email', 'test@example.com']);
+      await git(['add', '.']);
+      await git(['commit', '-m', 'Initial']);
+
+      File('$repoDir/lib/app.dart').writeAsStringSync('''
+int existingComplex(int a) {
+  if (a > 0) {
+    if (a > 1) {
+      if (a > 2) return 3;
+    }
+  }
+  return 0;
+}
+
+int newComplex(int a) {
+  if (a > 0) {
+    if (a > 1) return 2;
+  }
+  return 0;
+}
+
+int newSimple(int a) => a;
+''');
+
+      final proc = await TestProcess.start(
+        Platform.resolvedExecutable,
+        [binPath, '--git-diff', 'main', '--fail-threshold', '3'],
+        workingDirectory: repoDir,
+        environment: {'GITHUB_WORKSPACE': repoDir},
+      );
+
+      final lines = <String>[];
+      while (await proc.stdout.hasNext) {
+        lines.add(await proc.stdout.next);
+      }
+      await proc.shouldExit(1);
+
+      final output = lines.join('\n');
+
+      final existingIdx = output.indexOf('existingComplex');
+      final newComplexIdx = output.indexOf('newComplex');
+      final removedIdx = output.indexOf('removed');
+
+      check(existingIdx).isGreaterThan(-1);
+      check(newComplexIdx).isGreaterThan(-1);
+      check(removedIdx).isGreaterThan(-1);
+
+      check(existingIdx).isLessThan(newComplexIdx);
+      check(newComplexIdx).isLessThan(removedIdx);
+    });
   });
 }

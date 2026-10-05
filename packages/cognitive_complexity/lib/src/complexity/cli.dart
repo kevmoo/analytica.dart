@@ -456,20 +456,52 @@ void _printRegularDeclRows(
 
   final headerScore = 'Score'.padLeft(5);
   final headerName = 'Declaration'.padRight(maxNameLen);
-  sink.writeln('$headerScore  $headerName  Location');
-  sink.writeln('-' * (5 + 2 + maxNameLen + 2 + 30));
+  final headerLines = maxFunctionLines != null ? '  Lines' : '';
+  sink.writeln('$headerScore  $headerName  Location$headerLines');
+  sink.writeln(
+    '-' * (5 + 2 + maxNameLen + 2 + 30 + (maxFunctionLines != null ? 7 : 0)),
+  );
 
   for (final res in results) {
     final scoreStr = res.score.toString().padLeft(5);
     final nameStr = res.name.padRight(maxNameLen);
     final locStr = '${res.filePath}:L${res.startLine}-${res.endLine}';
+
+    var linesStr = '';
+    if (maxFunctionLines != null) {
+      linesStr = '  ${res.lineCount.toString().padLeft(5)}';
+    }
+
     final isVio = res.isViolation(
       failThreshold: failThreshold,
       maxFunctionLines: maxFunctionLines,
     );
-    final violationMarker = isVio ? ' [VIOLATION]' : '';
-    sink.writeln('$scoreStr  $nameStr  $locStr$violationMarker');
+    final violationMarker = _buildViolationMarker(
+      res,
+      isVio,
+      failThreshold,
+      maxFunctionLines,
+    );
+
+    sink.writeln('$scoreStr  $nameStr  $locStr$linesStr$violationMarker');
   }
+}
+
+String _buildViolationMarker(
+  FunctionComplexity res,
+  bool isVio,
+  int? failThreshold,
+  int? maxFunctionLines,
+) {
+  if (!isVio) return '';
+  final reasons = <String>[];
+  if (failThreshold != null && res.score > failThreshold) {
+    reasons.add('score > $failThreshold');
+  }
+  if (maxFunctionLines != null && res.lineCount > maxFunctionLines) {
+    reasons.add('lines > $maxFunctionLines');
+  }
+  return ' [VIOLATION: ${reasons.join(', ')}]';
 }
 
 void _printRegularFileViolationRows(
