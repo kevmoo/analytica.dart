@@ -1,5 +1,14 @@
 ## 0.4.0-wip
 
+- **Breaking**: `FunctionComplexity` gains a required `composition`
+  (`ComplexityComposition` record: `branches`, `nesting`, `booleanOps`,
+  `maxDepth`) and an `isTestEntrypoint` getter.
+- `cognitive_complexity`: `--format json` declarations now carry `composition`
+  (`branches`, `nesting`, `boolean_ops`, `max_depth`; the first three sum to
+  `score`) and `is_test_entrypoint` (top-level `main` of a `_test.dart` file).
+  New `--verbose` / `-v` flag adds a `Breakdown` column and a
+  `[test entrypoint]` tag to the text table so a flat score-15 function is
+  distinguishable from a five-deep pyramid. Scores are unchanged.
 - **Breaking**: `ShallowFinding` also gains `sharedParamSignatureWith`,
   `sharedParamCount`, `paramsSubsetOfExistingType`, and `simulationIndex`.
 - `shallow`: findings carry two descriptive parameter facts that point at a

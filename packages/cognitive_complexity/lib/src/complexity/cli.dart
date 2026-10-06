@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 
 import 'package:analytica/analytica.dart';
 import 'package:args/args.dart';
@@ -80,6 +81,15 @@ Future<int> runCli(
       allowed: ['text', 'json', 'github'],
       help: 'Output format.',
     )
+    ..addFlag(
+      'verbose',
+      abbr: 'v',
+      negatable: false,
+      help:
+          'With --format=text, add a Breakdown column (branches, nesting, '
+          'boolean operators, max depth) and tag `_test.dart` entrypoints. '
+          'JSON output always includes these fields.',
+    )
     ..addOption(
       'comment-output',
       valueHelp: 'path',
@@ -132,6 +142,7 @@ Future<int> runCli(
     );
 
     final format = argResults['format'] as String;
+    final verbose = argResults['verbose'] as bool;
     final gitDiffBase = argResults['git-diff'] as String?;
     final failOnIncrease = argResults['fail-on-increase'] as bool;
     final commentOutput = argResults['comment-output'] as String?;
@@ -144,6 +155,7 @@ Future<int> runCli(
     _warnIgnoredFlags(
       failOnIncrease: failOnIncrease,
       commentOutput: commentOutput,
+      verbose: verbose,
       format: format,
       gitDiffBase: gitDiffBase,
       err: stderrSink,
@@ -177,6 +189,7 @@ Future<int> runCli(
       maxFileLines: maxFileLines,
       maxFunctionLines: maxFunctionLines,
       format: format,
+      verbose: verbose,
       out: stdoutSink,
       err: stderrSink,
     );
@@ -203,6 +216,7 @@ int? _parseOptInPositiveInt(String? raw, String flagName) {
 void _warnIgnoredFlags({
   required bool failOnIncrease,
   required String? commentOutput,
+  required bool verbose,
   required String format,
   required String? gitDiffBase,
   required StringSink err,
@@ -218,6 +232,12 @@ void _warnIgnoredFlags({
     err.writeln(
       'Warning: --comment-output has no effect unless --format=github '
       'and --git-diff are both set.',
+    );
+  }
+
+  if (verbose && (format != 'text' || gitDiffBase != null)) {
+    err.writeln(
+      'Warning: --verbose only affects --format=text without --git-diff.',
     );
   }
 }
@@ -308,6 +328,7 @@ int _handleRegularMode({
   required int? maxFileLines,
   required int? maxFunctionLines,
   required String format,
+  required bool verbose,
   required StringSink out,
   required StringSink err,
 }) {
@@ -367,6 +388,7 @@ int _handleRegularMode({
       failThreshold,
       maxFileLines,
       maxFunctionLines,
+      verbose: verbose,
     );
   }
 
@@ -419,8 +441,9 @@ void _printTextReport(
   StringSink sink,
   int? failThreshold,
   int? maxFileLines,
-  int? maxFunctionLines,
-) {
+  int? maxFunctionLines, {
+  bool verbose = false,
+}) {
   final violatedFiles = maxFileLines != null
       ? fileMetrics
             .where((f) => f.isViolation(maxFileLines: maxFileLines))
@@ -436,45 +459,105 @@ void _printTextReport(
   }
 
   if (results.isNotEmpty) {
-    _printRegularDeclRows(results, failThreshold, maxFunctionLines, sink);
+    _printRegularDeclRows(
+      results,
+      failThreshold,
+      maxFunctionLines,
+      sink,
+      verbose: verbose,
+    );
   }
   if (violatedFiles.isNotEmpty) {
     _printRegularFileViolationRows(violatedFiles, maxFileLines!, sink);
   }
 }
 
+typedef _RegularTableLayout = ({
+  int maxNameLen,
+  int breakdownWidth,
+  bool showLines,
+  bool verbose,
+});
+
 void _printRegularDeclRows(
   List<FunctionComplexity> results,
   int? failThreshold,
   int? maxFunctionLines,
-  StringSink sink,
-) {
-  var maxNameLen = 'Declaration'.length;
+  StringSink sink, {
+  bool verbose = false,
+}) {
+  final layout = (
+    maxNameLen: results.fold(
+      'Declaration'.length,
+      (w, r) => max(w, r.name.length),
+    ),
+    breakdownWidth: verbose
+        ? results.fold(
+            'Breakdown'.length,
+            (w, r) => max(w, _formatBreakdown(r.composition).length),
+          )
+        : 0,
+    showLines: maxFunctionLines != null,
+    verbose: verbose,
+  );
+  _printRegularHeader(layout, sink);
   for (final res in results) {
-    if (res.name.length > maxNameLen) maxNameLen = res.name.length;
-  }
-
-  final showLines = maxFunctionLines != null;
-  final headerScore = 'Score'.padLeft(5);
-  final headerLines = showLines ? '  ${'Lines'.padLeft(5)}' : '';
-  final headerName = 'Declaration'.padRight(maxNameLen);
-  sink.writeln('$headerScore$headerLines  $headerName  Location');
-  sink.writeln('-' * (5 + headerLines.length + 2 + maxNameLen + 2 + 30));
-
-  for (final res in results) {
-    final scoreStr = res.score.toString().padLeft(5);
-    final linesStr = showLines ? '  ${'${res.lineCount}'.padLeft(5)}' : '';
-    final nameStr = res.name.padRight(maxNameLen);
-    final locStr = '${res.filePath}:L${res.startLine}-${res.endLine}';
-    final marker = _violationMarker([
-      if (failThreshold != null && res.score > failThreshold)
-        'score > $failThreshold',
-      if (maxFunctionLines != null && res.lineCount > maxFunctionLines)
-        'lines > $maxFunctionLines',
-    ]);
-    sink.writeln('$scoreStr$linesStr  $nameStr  $locStr$marker');
+    sink.writeln(
+      _formatRegularRow(res, layout, failThreshold, maxFunctionLines),
+    );
   }
 }
+
+void _printRegularHeader(_RegularTableLayout layout, StringSink sink) {
+  final headerLines = layout.showLines ? '  ${'Lines'.padLeft(5)}' : '';
+  final headerBreakdown = layout.verbose
+      ? '  ${'Breakdown'.padRight(layout.breakdownWidth)}'
+      : '';
+  final headerName = 'Declaration'.padRight(layout.maxNameLen);
+  sink.writeln(
+    '${'Score'.padLeft(5)}$headerLines$headerBreakdown  $headerName  Location',
+  );
+  sink.writeln(
+    '-' *
+        (5 +
+            headerLines.length +
+            headerBreakdown.length +
+            2 +
+            layout.maxNameLen +
+            2 +
+            30),
+  );
+}
+
+String _formatRegularRow(
+  FunctionComplexity res,
+  _RegularTableLayout layout,
+  int? failThreshold,
+  int? maxFunctionLines,
+) {
+  final scoreStr = res.score.toString().padLeft(5);
+  final linesStr = layout.showLines ? '  ${'${res.lineCount}'.padLeft(5)}' : '';
+  final breakdownStr = layout.verbose
+      ? '  ${_formatBreakdown(res.composition).padRight(layout.breakdownWidth)}'
+      : '';
+  final nameStr = res.name.padRight(layout.maxNameLen);
+  final locStr = '${res.filePath}:L${res.startLine}-${res.endLine}';
+  final marker = _violationMarker([
+    if (failThreshold != null && res.score > failThreshold)
+      'score > $failThreshold',
+    if (maxFunctionLines != null && res.lineCount > maxFunctionLines)
+      'lines > $maxFunctionLines',
+  ]);
+  final entrypoint = layout.verbose && res.isTestEntrypoint
+      ? ' [test entrypoint]'
+      : '';
+  return '$scoreStr$linesStr$breakdownStr  $nameStr  $locStr$marker$entrypoint';
+}
+
+/// Renders a [ComplexityComposition] as `br N nest N bool N depth N`.
+String _formatBreakdown(ComplexityComposition c) =>
+    'br ${c.branches} nest ${c.nesting} bool ${c.booleanOps} '
+    'depth ${c.maxDepth}';
 
 /// Renders ` [VIOLATION: <reasons>]` for a non-empty [reasons] list, or an
 /// empty string when the declaration is within every configured limit.

@@ -2,6 +2,23 @@ import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/dart/ast/token.dart';
 import 'package:analyzer/dart/ast/visitor.dart';
 
+/// Breakdown of a Cognitive Complexity score.
+///
+/// - `branches`: flat `+1` increments (`if`, loops, `switch`, `catch`, `?:`,
+///   `else`, labeled jumps, `when` guards).
+/// - `nesting`: the summed nesting penalties paid by structural increments.
+/// - `booleanOps`: increments from sequences of `&&` / `||`.
+/// - `maxDepth`: the deepest nesting level at which a structural increment
+///   scored (`1` for a flat function; `0` when nothing scored).
+///
+/// `branches + nesting + booleanOps` equals the reported score.
+typedef ComplexityComposition = ({
+  int branches,
+  int nesting,
+  int booleanOps,
+  int maxDepth,
+});
+
 /// An AST visitor that calculates Cognitive Complexity following the
 /// SonarSource whitepaper specification (G. Ann Campbell, v1.7).
 ///
@@ -26,17 +43,43 @@ import 'package:analyzer/dart/ast/visitor.dart';
 /// cycle" is not implemented (matching SonarSource's own reference
 /// implementation, which omits it as well).
 class CognitiveComplexityVisitor extends RecursiveAstVisitor<void> {
-  int _score = 0;
+  int _branches = 0;
+  int _nesting = 0;
+  int _booleanOps = 0;
+  int _maxDepth = 0;
   int _depth;
 
   /// Creates a [CognitiveComplexityVisitor] starting at [initialDepth].
   CognitiveComplexityVisitor({int initialDepth = 0}) : _depth = initialDepth;
 
   /// Returns the accumulated cognitive complexity score.
-  int get score => _score;
+  int get score => _branches + _nesting + _booleanOps;
 
-  void _addScore(int value) {
-    _score += value;
+  /// How [score] decomposes: flat increments, nesting penalties, boolean
+  /// operator sequences, and the deepest nesting level that scored.
+  ///
+  /// `branches + nesting + booleanOps == score` always holds.
+  ComplexityComposition get composition => (
+    branches: _branches,
+    nesting: _nesting,
+    booleanOps: _booleanOps,
+    maxDepth: _maxDepth,
+  );
+
+  /// Structural increment: +1 plus the current nesting depth.
+  void _addStructural() {
+    _branches += 1;
+    _nesting += _depth;
+    if (_depth + 1 > _maxDepth) _maxDepth = _depth + 1;
+  }
+
+  /// Hybrid or fundamental increment: flat +1, no nesting penalty.
+  void _addFlat() {
+    _branches += 1;
+  }
+
+  void _addBooleanOp() {
+    _booleanOps += 1;
   }
 
   void _withIncrementedDepth(void Function() f) {
@@ -64,9 +107,9 @@ class CognitiveComplexityVisitor extends RecursiveAstVisitor<void> {
     }
 
     if (isElseIf) {
-      _addScore(1);
+      _addFlat();
     } else {
-      _addScore(1 + _depth);
+      _addStructural();
     }
 
     node.expression.accept(this);
@@ -84,7 +127,7 @@ class CognitiveComplexityVisitor extends RecursiveAstVisitor<void> {
         // extra depth is added here.
         elseStmt.accept(this);
       } else {
-        _addScore(1);
+        _addFlat();
         _withIncrementedDepth(() {
           elseStmt.accept(this);
         });
@@ -101,9 +144,9 @@ class CognitiveComplexityVisitor extends RecursiveAstVisitor<void> {
     }
 
     if (isElseIf) {
-      _addScore(1);
+      _addFlat();
     } else {
-      _addScore(1 + _depth);
+      _addStructural();
     }
 
     node.expression.accept(this);
@@ -119,7 +162,7 @@ class CognitiveComplexityVisitor extends RecursiveAstVisitor<void> {
         // Hybrid increment: same handling as `else if` statements.
         elseEl.accept(this);
       } else {
-        _addScore(1);
+        _addFlat();
         _withIncrementedDepth(() {
           elseEl.accept(this);
         });
@@ -129,7 +172,7 @@ class CognitiveComplexityVisitor extends RecursiveAstVisitor<void> {
 
   @override
   void visitForStatement(ForStatement node) {
-    _addScore(1 + _depth);
+    _addStructural();
     node.forLoopParts.accept(this);
     _withIncrementedDepth(() {
       node.body.accept(this);
@@ -138,7 +181,7 @@ class CognitiveComplexityVisitor extends RecursiveAstVisitor<void> {
 
   @override
   void visitForElement(ForElement node) {
-    _addScore(1 + _depth);
+    _addStructural();
     node.forLoopParts.accept(this);
     _withIncrementedDepth(() {
       node.body.accept(this);
@@ -147,7 +190,7 @@ class CognitiveComplexityVisitor extends RecursiveAstVisitor<void> {
 
   @override
   void visitWhileStatement(WhileStatement node) {
-    _addScore(1 + _depth);
+    _addStructural();
     node.condition.accept(this);
     _withIncrementedDepth(() {
       node.body.accept(this);
@@ -156,7 +199,7 @@ class CognitiveComplexityVisitor extends RecursiveAstVisitor<void> {
 
   @override
   void visitDoStatement(DoStatement node) {
-    _addScore(1 + _depth);
+    _addStructural();
     node.condition.accept(this);
     _withIncrementedDepth(() {
       node.body.accept(this);
@@ -165,7 +208,7 @@ class CognitiveComplexityVisitor extends RecursiveAstVisitor<void> {
 
   @override
   void visitSwitchStatement(SwitchStatement node) {
-    _addScore(1 + _depth);
+    _addStructural();
     node.expression.accept(this);
     _withIncrementedDepth(() {
       for (final member in node.members) {
@@ -176,7 +219,7 @@ class CognitiveComplexityVisitor extends RecursiveAstVisitor<void> {
 
   @override
   void visitSwitchExpression(SwitchExpression node) {
-    _addScore(1 + _depth);
+    _addStructural();
     node.expression.accept(this);
     _withIncrementedDepth(() {
       for (final caseArm in node.cases) {
@@ -187,7 +230,7 @@ class CognitiveComplexityVisitor extends RecursiveAstVisitor<void> {
 
   @override
   void visitConditionalExpression(ConditionalExpression node) {
-    _addScore(1 + _depth);
+    _addStructural();
     node.condition.accept(this);
     _withIncrementedDepth(() {
       node.thenExpression.accept(this);
@@ -197,7 +240,7 @@ class CognitiveComplexityVisitor extends RecursiveAstVisitor<void> {
 
   @override
   void visitCatchClause(CatchClause node) {
-    _addScore(1 + _depth);
+    _addStructural();
     _withIncrementedDepth(() {
       node.body.accept(this);
     });
@@ -206,7 +249,7 @@ class CognitiveComplexityVisitor extends RecursiveAstVisitor<void> {
   @override
   void visitBreakStatement(BreakStatement node) {
     if (node.label != null) {
-      _addScore(1);
+      _addFlat();
     }
     super.visitBreakStatement(node);
   }
@@ -214,14 +257,14 @@ class CognitiveComplexityVisitor extends RecursiveAstVisitor<void> {
   @override
   void visitContinueStatement(ContinueStatement node) {
     if (node.label != null) {
-      _addScore(1);
+      _addFlat();
     }
     super.visitContinueStatement(node);
   }
 
   @override
   void visitWhenClause(WhenClause node) {
-    _addScore(1);
+    _addFlat();
     super.visitWhenClause(node);
   }
 
@@ -251,12 +294,12 @@ class CognitiveComplexityVisitor extends RecursiveAstVisitor<void> {
       return;
     }
 
-    _addScore(1);
+    _addBooleanOp();
 
     var lastOp = operators.first;
     for (var i = 1; i < operators.length; i++) {
       if (operators[i] != lastOp) {
-        _addScore(1);
+        _addBooleanOp();
         lastOp = operators[i];
       }
     }

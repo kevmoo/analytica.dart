@@ -121,9 +121,11 @@ package:cognitive_complexity/cognitive_complexity.dart:
     formatText (method: String Function())
     toJson (method: Map<String, dynamic> Function())
   FunctionComplexity (class extends Object):
-    new (const constructor: FunctionComplexity Function({required int endLine, required String filePath, required String name, required int score, required int startLine}))
+    new (const constructor: FunctionComplexity Function({required ({int booleanOps, int branches, int maxDepth, int nesting}) composition, required int endLine, required String filePath, required String name, required int score, required int startLine}))
+    composition (getter: ({int booleanOps, int branches, int maxDepth, int nesting}))
     endLine (getter: int)
     filePath (getter: String)
+    isTestEntrypoint (getter: bool)
     lineCount (getter: int)
     name (getter: String)
     score (getter: int)
@@ -234,6 +236,7 @@ package:cognitive_complexity/cognitive_complexity.dart:
     tier3PartDirective (enum constant: SplitTier)
     values (static const getter: List<SplitTier>)
     label (getter: String)
+  ComplexityComposition (type alias for ({int booleanOps, int branches, int maxDepth, int nesting}))
 package:cognitive_complexity/data_flow.dart:
   ControlFlowEscape (class extends Object):
     new (const constructor: ControlFlowEscape Function({required String description, required int line, required ControlFlowEscapeType type}))
