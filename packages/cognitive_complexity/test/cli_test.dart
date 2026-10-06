@@ -78,6 +78,92 @@ class MyService {
       },
     );
 
+    test('--verbose adds a Breakdown column and tags test entrypoints; '
+        'JSON always carries composition', () async {
+      await d.dir('project_verbose', [
+        d.dir('lib', [
+          d.file('shape.dart', '''
+int pyramid(bool a, bool b, bool c) {
+  if (a) {
+    if (b) {
+      if (c) {
+        return 3;
+      }
+    }
+  }
+  return 0;
+}
+'''),
+        ]),
+        d.dir('test', [
+          d.file('shape_test.dart', '''
+void main() {
+  group('g', () {
+    test('t', () {
+      if (a && b) {}
+    });
+  });
+}
+'''),
+        ]),
+      ]).create();
+
+      final text = await TestProcess.start(Platform.resolvedExecutable, [
+        binPath,
+        '--verbose',
+        '${d.sandbox}/project_verbose/lib',
+        '${d.sandbox}/project_verbose/test',
+      ]);
+      await check(
+        text.stdout,
+      ).emitsThrough((s) => s.contains('Score  Breakdown'));
+      await check(text.stdout).emitsThrough(
+        (s) => s
+          ..contains('6  br 3 nest 3 bool 0 depth 3  pyramid')
+          ..not((s) => s.contains('[test entrypoint]')),
+      );
+      await check(text.stdout).emitsThrough(
+        (s) => s
+          ..contains('4  br 1 nest 2 bool 1 depth 3  main')
+          ..endsWith('[test entrypoint]'),
+      );
+      await text.shouldExit(0);
+
+      final plain = await TestProcess.start(Platform.resolvedExecutable, [
+        binPath,
+        '${d.sandbox}/project_verbose/test',
+      ]);
+      await check(plain.stdout).emitsThrough(
+        (s) => s
+          ..contains('4  main')
+          ..not((s) => s.contains('br '))
+          ..not((s) => s.contains('[test entrypoint]')),
+      );
+      await plain.shouldExit(0);
+
+      final json = await TestProcess.start(Platform.resolvedExecutable, [
+        binPath,
+        '--format',
+        'json',
+        '--verbose',
+        '${d.sandbox}/project_verbose/test',
+      ]);
+      await check(json.stderr).emitsThrough(
+        (s) => s.contains(
+          '--verbose only affects --format=text without --git-diff',
+        ),
+      );
+      await check(json.stdout).emitsThrough(
+        (s) => s
+          ..contains(
+            '"composition":{"branches":1,"nesting":2,"boolean_ops":1,'
+            '"max_depth":3}',
+          )
+          ..contains('"is_test_entrypoint":true'),
+      );
+      await json.shouldExit(0);
+    });
+
     test('Exits with code 1 when --fail-threshold is exceeded', () async {
       await d.dir('project_fail', [
         d.dir('lib', [

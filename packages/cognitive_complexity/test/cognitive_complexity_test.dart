@@ -40,7 +40,27 @@ int _getComplexity(String code) {
 
   final visitor = CognitiveComplexityVisitor();
   body.accept(visitor);
+  final c = visitor.composition;
+  check(
+    c.branches + c.nesting + c.booleanOps,
+    because: 'composition must sum to the score',
+  ).equals(visitor.score);
   return visitor.score;
+}
+
+ComplexityComposition _getComposition(String code) {
+  final visitor = CognitiveComplexityVisitor();
+  final result = parseString(
+    content: code,
+    featureSet: FeatureSet.latestLanguageVersion(),
+  );
+  final body = result.unit.declarations
+      .whereType<FunctionDeclaration>()
+      .first
+      .functionExpression
+      .body;
+  body.accept(visitor);
+  return visitor.composition;
 }
 
 void main() {
@@ -539,8 +559,94 @@ void main() {
     });
   });
 
+  group('Composition', () {
+    test('flat and pyramid shapes reach the same score with different '
+        'nesting and max depth', () {
+      final flat = _getComposition('''
+        void f() {
+          ${List.filled(15, 'if (a) {}').join('\n')}
+        }
+      ''');
+      check(
+        flat,
+      ).equals((branches: 15, nesting: 0, booleanOps: 0, maxDepth: 1));
+
+      final pyramid = _getComposition('''
+        void f() {
+          if (a) { if (b) { if (c) { if (d) { if (e) {} } } } }
+        }
+      ''');
+      check(
+        pyramid,
+      ).equals((branches: 5, nesting: 10, booleanOps: 0, maxDepth: 5));
+    });
+
+    test('boolean sequences, else, labeled jumps, and when guards are '
+        'flat increments', () {
+      final c = _getComposition('''
+        void f() {
+          if (a && b || c) {} else {}
+          outer:
+          for (;;) {
+            for (;;) { continue outer; }
+          }
+          switch (x) { case int y when y > 0: break; }
+        }
+      ''');
+      // if(+1) else(+1) for(+1) for(+1, nesting +1) continue outer(+1)
+      // switch(+1) when(+1) = 7 branches; unlabeled break is free; && || = 2.
+      check(c).equals((branches: 7, nesting: 1, booleanOps: 2, maxDepth: 2));
+    });
+
+    test('lambdas deepen max depth without adding branches', () {
+      final c = _getComposition('''
+        void f() {
+          run(() { if (a) {} });
+        }
+      ''');
+      check(c).equals((branches: 1, nesting: 1, booleanOps: 0, maxDepth: 2));
+    });
+
+    test('an empty body has an all-zero composition', () {
+      check(
+        _getComposition('void f() {}'),
+      ).equals((branches: 0, nesting: 0, booleanOps: 0, maxDepth: 0));
+    });
+  });
+
   group('Declaration discovery', () {
     final analyzer = ComplexityAnalyzer();
+
+    test('isTestEntrypoint only tags top-level main in _test.dart files', () {
+      const code = '''
+        void main() { if (a) {} }
+        void helper() { if (a) {} }
+      ''';
+      final inTest = analyzer.analyzeCode(code, filePath: 'test/foo_test.dart');
+      check(
+        inTest.map((r) => (r.name, r.isTestEntrypoint)),
+      ).unorderedEquals([('main', true), ('helper', false)]);
+      final inLib = analyzer.analyzeCode(code, filePath: 'lib/foo.dart');
+      check(inLib.every((r) => !r.isTestEntrypoint)).isTrue();
+    });
+
+    test('toJson carries composition and is_test_entrypoint', () {
+      final result = analyzer
+          .analyzeCode(
+            'void main() { if (a) { if (b && c) {} } }',
+            filePath: 'x_test.dart',
+          )
+          .single;
+      final json = result.toJson();
+      check(json['score']).equals(4);
+      check(json['is_test_entrypoint']).equals(true);
+      check(json['composition'] as Map<String, dynamic>).deepEquals({
+        'branches': 2,
+        'nesting': 1,
+        'boolean_ops': 1,
+        'max_depth': 2,
+      });
+    });
 
     test('Constructor initializers are scored', () {
       final results = analyzer.analyzeCode('''

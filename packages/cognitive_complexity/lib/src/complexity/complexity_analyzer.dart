@@ -9,6 +9,7 @@ import 'package:path/path.dart' as p;
 import 'cognitive_complexity_visitor.dart';
 
 export 'package:analytica/analyzer.dart' show PathFilter, isExcludedPath;
+export 'cognitive_complexity_visitor.dart' show ComplexityComposition;
 
 final _directiveParser = CommentDirectiveParser('cognitive_complexity');
 
@@ -41,16 +42,26 @@ class FunctionComplexity {
   final int endLine;
   final int score;
 
+  /// How [score] decomposes into branches, nesting penalties, and boolean
+  /// operator sequences, plus the deepest scoring nesting level.
+  final ComplexityComposition composition;
+
   const FunctionComplexity({
     required this.filePath,
     required this.name,
     required this.startLine,
     required this.endLine,
     required this.score,
+    required this.composition,
   });
 
   /// Total physical line span of this declaration (`endLine - startLine + 1`).
   int get lineCount => endLine >= startLine ? endLine - startLine + 1 : 0;
+
+  /// Whether this is the top-level `main` of a `_test.dart` file, whose score
+  /// is dominated by `group`/`test` closure nesting rather than logic.
+  bool get isTestEntrypoint =>
+      name == 'main' && filePath.endsWith('_test.dart');
 
   /// Whether this declaration violates either [failThreshold] (score) or
   /// [maxFunctionLines] (opt-in declaration line count).
@@ -67,6 +78,13 @@ class FunctionComplexity {
     'end_line': endLine,
     'lines': lineCount,
     'score': score,
+    'composition': {
+      'branches': composition.branches,
+      'nesting': composition.nesting,
+      'boolean_ops': composition.booleanOps,
+      'max_depth': composition.maxDepth,
+    },
+    'is_test_entrypoint': isTestEntrypoint,
   };
 
   @override
@@ -276,6 +294,7 @@ class _DeclarationFinder extends RecursiveAstVisitor<void> {
         startLine: startLoc.lineNumber,
         endLine: endLoc.lineNumber,
         score: visitor.score,
+        composition: visitor.composition,
       ),
     );
   }
