@@ -252,5 +252,49 @@ diff --git a/lib/c.dart b/lib/c.dart
       check(GitDiffParser.parse('')).isEmpty();
       check(GitDiffParser.parse('   \n  \n')).isEmpty();
     });
+
+    test('handles single double-quote path without throwing RangeError', () {
+      const diff = 'diff --git " "\n--- "\n+++ "\n';
+      final result = GitDiffParser.parse(diff);
+      check(result).length.equals(1);
+      check(result.first.path).equals('"');
+    });
+
+    test(
+      'skips hunk headers with oversized line numbers instead of throwing',
+      () {
+        const diff = '''
+diff --git a/lib/a.dart b/lib/a.dart
+--- a/lib/a.dart
++++ b/lib/a.dart
+@@ -9999999999999999999999999 +1 @@
++ignored
+@@ -1,1 +1,2 @@
+ line1
++line2
+''';
+        final result = GitDiffParser.parse(diff);
+        check(result).length.equals(1);
+        check(result.first.hunks).length.equals(1);
+        check(
+          result.first.addedOrModifiedLineRanges,
+        ).deepEquals([const LineRange(2, 2)]);
+      },
+    );
+
+    test('clamps extreme 64-bit hunk start line numbers without overflow', () {
+      const diff = '''
+diff --git a/lib/a.dart b/lib/a.dart
+--- a/lib/a.dart
++++ b/lib/a.dart
+@@ -1 +9223372036854775807 @@
++line1
++line2
+''';
+      final result = GitDiffParser.parse(diff);
+      check(result).length.equals(1);
+      check(result.first.hunks).length.equals(1);
+      check(result.first.addedOrModifiedLineRanges).length.equals(1);
+    });
   });
 }
