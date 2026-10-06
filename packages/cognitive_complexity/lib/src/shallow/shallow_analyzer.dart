@@ -113,6 +113,7 @@ class ShallowAnalyzer {
   }) {
     final allDecls = <ShallowDeclNode>[];
     final callsByName = <String, List<ShallowCallSite>>{};
+    final fieldsByFile = <String, Map<String, Set<String>>>{};
 
     for (final (:entry, :parsed) in parsedUnits) {
       if (shallowDirectiveParser.hasIgnoreForFile(parsed.unit)) continue;
@@ -129,6 +130,7 @@ class ShallowAnalyzer {
       parsed.unit.accept(collector);
       if (!entry.isTestFile) {
         allDecls.addAll(collector.declarations);
+        fieldsByFile[entry.normalizedPath] = collector.fieldNamesByType;
       }
       for (final call in collector.calls) {
         callsByName.putIfAbsent(call.calleeName, () => []).add(call);
@@ -136,8 +138,10 @@ class ShallowAnalyzer {
     }
 
     final declsByName = <String, List<ShallowDeclNode>>{};
+    final declsByFile = <String, List<ShallowDeclNode>>{};
     for (final d in allDecls) {
       declsByName.putIfAbsent(d.rawName, () => []).add(d);
+      declsByFile.putIfAbsent(d.normalizedFilePath, () => []).add(d);
     }
 
     final rawCandidates = <_RawCandidate>[];
@@ -149,12 +153,14 @@ class ShallowAnalyzer {
         decl: decl,
         callsByName: callsByName,
         declsByName: declsByName,
+        sameFileDecls: declsByFile[decl.normalizedFilePath] ?? const [],
+        sameFileFields: fieldsByFile[decl.normalizedFilePath] ?? const {},
       );
       if (candidate != null) rawCandidates.add(candidate);
     }
 
-    final findings = _resolveCumulativeCandidates(rawCandidates)
-      ..sort(_compareFindings);
+    final findings = _resolveCumulativeCandidates(rawCandidates);
+    findings.sort(_buildFindingComparator(findings));
     return ShallowReport(
       findings: findings,
       declarationsScanned: scannedCount,
@@ -167,6 +173,8 @@ class ShallowAnalyzer {
     required ShallowDeclNode decl,
     required Map<String, List<ShallowCallSite>> callsByName,
     required Map<String, List<ShallowDeclNode>> declsByName,
+    required List<ShallowDeclNode> sameFileDecls,
+    required Map<String, Set<String>> sameFileFields,
   }) {
     if (decl.isExempt) return null;
 
@@ -206,6 +214,7 @@ class ShallowAnalyzer {
     final estLinesSaved =
         decl.signatureLines +
         (decl.parameterCount >= 3 ? decl.parameterCount + 1 : 2);
+    final facts = _computeParameterFacts(decl, sameFileDecls, sameFileFields);
 
     return _RawCandidate(
       decl: decl,
@@ -214,6 +223,9 @@ class ShallowAnalyzer {
       baseDeltaScore: baseDeltaScore,
       estimatedLinesSaved: estLinesSaved,
       reasons: reasons,
+      sharedParamSignatureWith: facts.sharedWith,
+      sharedParamCount: facts.sharedCount,
+      paramsSubsetOfExistingType: facts.subsetOf,
     );
   }
 
@@ -247,7 +259,7 @@ class ShallowAnalyzer {
         <ShallowDeclNode, List<({ShallowDeclNode decl, int relativeDepth})>>{};
     final findings = <ShallowFinding>[];
 
-    for (final c in ordered) {
+    for (final (index, c) in ordered.indexed) {
       final children = absorbedChildren[c.decl] ?? const [];
       var deltaScore = c.baseDeltaScore;
       for (final sub in children) {
@@ -287,11 +299,91 @@ class ShallowAnalyzer {
           inlinedCallerScoreIsolated: c.caller.score + deltaScore,
           headroomAfterInline: maxCallerScore - inlinedCallerScore,
           classification: classification,
+          simulationIndex: index,
         ),
       );
     }
     return findings;
   }
+
+  /// Same-file parameter facts that point at a remedy other than inlining:
+  /// a sibling declaration sharing `>= 4` parameter names (prefer a shared
+  /// parameter record) or a type whose instance fields cover `>= 4` of the
+  /// parameters (pass that object directly).
+  static ({String? sharedWith, int sharedCount, String? subsetOf})
+  _computeParameterFacts(
+    ShallowDeclNode decl,
+    List<ShallowDeclNode> sameFileDecls,
+    Map<String, Set<String>> sameFileFields,
+  ) {
+    final names = decl.parameterNames.map(_stripUnderscore).toSet();
+    if (names.length < _minSharedParams) {
+      return (sharedWith: null, sharedCount: 0, subsetOf: null);
+    }
+    final (:sharedWith, :sharedCount) = _sharedSignature(
+      decl,
+      names,
+      sameFileDecls,
+    );
+    return (
+      sharedWith: sharedWith,
+      sharedCount: sharedCount,
+      subsetOf: _fieldSubsetType(decl, names, sameFileFields),
+    );
+  }
+
+  static const _minSharedParams = 4;
+
+  /// Sibling declaration sharing the most parameter names with [names]
+  /// (`null`/0 when below [_minSharedParams]).
+  static ({String? sharedWith, int sharedCount}) _sharedSignature(
+    ShallowDeclNode decl,
+    Set<String> names,
+    List<ShallowDeclNode> sameFileDecls,
+  ) {
+    String? sharedWith;
+    var sharedCount = 0;
+    for (final sibling in sameFileDecls) {
+      if (identical(sibling, decl)) continue;
+      final shared = sibling.parameterNames
+          .map(_stripUnderscore)
+          .where(names.contains)
+          .length;
+      if (shared > sharedCount) {
+        sharedCount = shared;
+        sharedWith = sibling.qualifiedName;
+      }
+    }
+    if (sharedCount < _minSharedParams) {
+      return (sharedWith: null, sharedCount: 0);
+    }
+    return (sharedWith: sharedWith, sharedCount: sharedCount);
+  }
+
+  /// Same-file type whose instance fields cover `>= _minSharedParams` of
+  /// [names]; the enclosing type wins whenever it qualifies.
+  static String? _fieldSubsetType(
+    ShallowDeclNode decl,
+    Set<String> names,
+    Map<String, Set<String>> sameFileFields,
+  ) {
+    String? subsetOf;
+    var subsetCount = 0;
+    for (final MapEntry(key: type, value: fields) in sameFileFields.entries) {
+      final covered = fields.map(_stripUnderscore).where(names.contains).length;
+      final preferred =
+          type == decl.enclosingType && covered >= _minSharedParams;
+      if (covered > subsetCount || preferred) {
+        subsetCount = covered;
+        subsetOf = type;
+        if (preferred) break;
+      }
+    }
+    return subsetCount < _minSharedParams ? null : subsetOf;
+  }
+
+  static String _stripUnderscore(String name) =>
+      name.startsWith('_') ? name.substring(1) : name;
 
   ShallowClassification _classifyInlinedScore({
     required int inlinedCallerScore,
@@ -497,14 +589,45 @@ class ShallowAnalyzer {
   }
 }
 
-int _compareFindings(ShallowFinding a, ShallowFinding b) {
-  final classCmp = a.classification.index.compareTo(b.classification.index);
-  if (classCmp != 0) return classCmp;
-  final savedCmp = b.estimatedLinesSaved.compareTo(a.estimatedLinesSaved);
-  if (savedCmp != 0) return savedCmp;
-  final fileCmp = a.filePath.compareTo(b.filePath);
-  if (fileCmp != 0) return fileCmp;
-  return a.startLine.compareTo(b.startLine);
+/// Builds the report ordering: classification, then caller groups ranked by
+/// their most significant finding, then the caller, then simulation order.
+/// Within one caller the printed order therefore matches the order in which
+/// siblings were absorbed, so a `Caller CC: N (base B)` line never precedes
+/// the sibling that produced `N`.
+Comparator<ShallowFinding> _buildFindingComparator(
+  List<ShallowFinding> findings,
+) {
+  final groupRank = <String, int>{};
+  for (final f in findings) {
+    final key = _callerKey(f);
+    final rank = _significanceRank(f);
+    final existing = groupRank[key];
+    if (existing == null || rank < existing) groupRank[key] = rank;
+  }
+  return (a, b) {
+    final classCmp = a.classification.index.compareTo(b.classification.index);
+    if (classCmp != 0) return classCmp;
+    final aKey = _callerKey(a);
+    final bKey = _callerKey(b);
+    final rankCmp = groupRank[aKey]!.compareTo(groupRank[bKey]!);
+    if (rankCmp != 0) return rankCmp;
+    final keyCmp = aKey.compareTo(bKey);
+    if (keyCmp != 0) return keyCmp;
+    return a.simulationIndex.compareTo(b.simulationIndex);
+  };
+}
+
+String _callerKey(ShallowFinding f) => '${f.callerFilePath}#${f.callerName}';
+
+/// `0` for arity/signature findings, `1` for findings that move the caller's
+/// score, `2` for `+0` micro-predicates.
+int _significanceRank(ShallowFinding f) {
+  if (f.reasons.any(
+    (r) => r.startsWith('HIGH_ARITY') || r.startsWith('SIG_HEAVY'),
+  )) {
+    return 0;
+  }
+  return f.inlinedDeltaScore != 0 ? 1 : 2;
 }
 
 bool _isPublicLibEntryPath(List<String> normParts, String absPath) {
@@ -549,6 +672,9 @@ class _RawCandidate {
   final int baseDeltaScore;
   final int estimatedLinesSaved;
   final List<String> reasons;
+  final String? sharedParamSignatureWith;
+  final int sharedParamCount;
+  final String? paramsSubsetOfExistingType;
 
   const _RawCandidate({
     required this.decl,
@@ -557,6 +683,9 @@ class _RawCandidate {
     required this.baseDeltaScore,
     required this.estimatedLinesSaved,
     required this.reasons,
+    required this.sharedParamSignatureWith,
+    required this.sharedParamCount,
+    required this.paramsSubsetOfExistingType,
   });
 
   ShallowFinding toFinding({
@@ -568,6 +697,7 @@ class _RawCandidate {
     required int inlinedCallerScoreIsolated,
     required int headroomAfterInline,
     required ShallowClassification classification,
+    required int simulationIndex,
   }) => ShallowFinding(
     filePath: decl.filePath,
     name: decl.qualifiedName,
@@ -592,6 +722,10 @@ class _RawCandidate {
     inlinedCallerScore: inlinedCallerScore,
     inlinedCallerScoreIsolated: inlinedCallerScoreIsolated,
     headroomAfterInline: headroomAfterInline,
+    sharedParamSignatureWith: sharedParamSignatureWith,
+    sharedParamCount: sharedParamCount,
+    paramsSubsetOfExistingType: paramsSubsetOfExistingType,
+    simulationIndex: simulationIndex,
     estimatedLinesSaved: estimatedLinesSaved,
     classification: classification,
     reasons: reasons,

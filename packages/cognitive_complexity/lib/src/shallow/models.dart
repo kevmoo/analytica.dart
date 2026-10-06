@@ -76,6 +76,25 @@ class ShallowFinding {
   /// `maxCallerScore - inlinedCallerScore`; negative when the cumulative
   /// inline exceeds the ceiling.
   final int headroomAfterInline;
+
+  /// Qualified name of a same-file declaration sharing `>= 4` parameter names
+  /// with this helper, or `null`. A shared clump suggests a parameter record
+  /// rather than inlining.
+  final String? sharedParamSignatureWith;
+
+  /// Number of parameter names shared with [sharedParamSignatureWith] (`0`
+  /// when `null`).
+  final int sharedParamCount;
+
+  /// Name of a same-file type whose instance fields cover `>= 4` of this
+  /// helper's parameters (the enclosing type is preferred), or `null`.
+  /// Suggests passing that object instead of unpacking its fields.
+  final String? paramsSubsetOfExistingType;
+
+  /// Position of this helper in the bottom-up inline simulation. Findings
+  /// sharing a caller are reported in this order so cumulative values read
+  /// top to bottom.
+  final int simulationIndex;
   final int estimatedLinesSaved;
   final ShallowClassification classification;
   final List<String> reasons;
@@ -104,6 +123,10 @@ class ShallowFinding {
     required this.inlinedCallerScore,
     required this.inlinedCallerScoreIsolated,
     required this.headroomAfterInline,
+    required this.sharedParamSignatureWith,
+    required this.sharedParamCount,
+    required this.paramsSubsetOfExistingType,
+    required this.simulationIndex,
     required this.estimatedLinesSaved,
     required this.classification,
     required this.reasons,
@@ -137,6 +160,10 @@ class ShallowFinding {
     'inlined_caller_score': inlinedCallerScore,
     'inlined_caller_score_isolated': inlinedCallerScoreIsolated,
     'headroom_after_inline': headroomAfterInline,
+    'shared_param_signature_with': sharedParamSignatureWith,
+    'shared_param_count': sharedParamCount,
+    'params_subset_of_existing_type': paramsSubsetOfExistingType,
+    'simulation_index': simulationIndex,
     'estimated_lines_saved': estimatedLinesSaved,
     'classification': classification.label,
     'reasons': reasons,
@@ -241,7 +268,17 @@ class ShallowReport {
         'Est. Saved: ~${f.estimatedLinesSaved}L | '
         'Why: ${f.reasons.join(", ")}',
       );
+      final facts = _formatFacts(f);
+      if (facts.isNotEmpty) buf.writeln('  Facts: ${facts.join('; ')}');
     }
     return buf.toString();
   }
+
+  static List<String> _formatFacts(ShallowFinding f) => [
+    if (f.sharedParamSignatureWith case final sibling?)
+      'shares ${f.sharedParamCount} params with $sibling '
+          '-> prefer a shared parameter record',
+    if (f.paramsSubsetOfExistingType case final type?)
+      'params mirror $type fields -> pass $type directly',
+  ];
 }

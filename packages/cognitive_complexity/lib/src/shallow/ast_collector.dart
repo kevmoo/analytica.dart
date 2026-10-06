@@ -221,6 +221,10 @@ class ShallowFileCollector extends RecursiveAstVisitor<void> {
   final List<ShallowDeclNode> declarations = [];
   final List<ShallowCallSite> calls = [];
 
+  /// Instance field names declared by each class, mixin, enum, or extension
+  /// type in this file, keyed by type name.
+  final Map<String, Set<String>> fieldNamesByType = {};
+
   ShallowDeclNode? _currentDecl;
 
   ShallowFileCollector({
@@ -288,6 +292,17 @@ class ShallowFileCollector extends RecursiveAstVisitor<void> {
     );
     declarations.add(decl);
     _visitInsideDecl(decl, () => super.visitMethodDeclaration(node));
+  }
+
+  @override
+  void visitFieldDeclaration(FieldDeclaration node) {
+    final enclosing = _enclosingTypeName(node);
+    if (!node.isStatic && enclosing != null) {
+      fieldNamesByType
+          .putIfAbsent(enclosing, () => {})
+          .addAll(node.fields.variables.map((v) => v.name.lexeme));
+    }
+    super.visitFieldDeclaration(node);
   }
 
   void _visitInsideDecl(ShallowDeclNode decl, void Function() visitChildren) {

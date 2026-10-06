@@ -1,5 +1,21 @@
 ## 0.4.0-wip
 
+- **Breaking**: `ShallowFinding` also gains `sharedParamSignatureWith`,
+  `sharedParamCount`, `paramsSubsetOfExistingType`, and `simulationIndex`.
+- `shallow`: findings carry two descriptive parameter facts that point at a
+  remedy other than inlining: `shared_param_signature_with` /
+  `shared_param_count` (a same-file declaration sharing `>= 4` parameter names,
+  suggesting a shared parameter record) and `params_subset_of_existing_type` (a
+  same-file type whose instance fields cover `>= 4` of the parameters,
+  preferring the enclosing type, suggesting that object be passed directly).
+  Text output adds a `Facts:` line when either is present.
+- `shallow`: report ordering is now classification, then caller groups ranked by
+  their most significant finding (`HIGH_ARITY`/`SIG_HEAVY` before helpers that
+  change the caller's score, before `+0` micro-predicates), then the caller,
+  then simulation order (`simulation_index`). Within one caller the printed
+  order matches the inline simulation, so a `Caller CC: N (base B)` line never
+  precedes the sibling that produced `N`. Previously findings were ordered by
+  estimated lines saved.
 - **Breaking**: `ShallowFinding` gains five required constructor parameters:
   `effectiveParameterCount`, `statementCount`, `callerZone`,
   `inlinedCallerScoreIsolated`, and `headroomAfterInline`. Code that only reads
