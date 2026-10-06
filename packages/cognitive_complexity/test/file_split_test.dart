@@ -567,5 +567,79 @@ $padRoot
         check(cut.suggestedFileName).equals('big_dominant.dart');
       },
     );
+
+    test(
+      'Splits a cone whose root only bridges unrelated components',
+      () async {
+        final file = File(p.join(tempDir.path, 'bridge_core.dart'));
+        final padTop = List.generate(58, (i) => '  final t$i = $i;').join('\n');
+        final padBridge = List.generate(
+          16,
+          (i) => '  final g$i = $i;',
+        ).join('\n');
+        final padLeaf = List.generate(
+          38,
+          (i) => '  final l$i = $i;',
+        ).join('\n');
+        // Top (61L) -> Bridge (21L) -> {AlphaStore (40L)} and
+        //                              {BetaRenderer (40L) + BetaTheme (3L)}.
+        // The two leaf groups share no edges, so the 104L Bridge cone is
+        // really two unrelated components held together by Bridge. Bridge
+        // has two edges into the Beta side and one into Alpha, so it travels
+        // with Beta; Alpha is committed first because Beta's group depends
+        // on it through Bridge.
+        file.writeAsStringSync('''
+class Top {
+  final Bridge b = Bridge();
+$padTop
+}
+
+class Bridge {
+  final AlphaStore a = AlphaStore();
+  final BetaRenderer r = BetaRenderer();
+  final BetaTheme t = BetaTheme();
+$padBridge
+}
+
+class AlphaStore {
+$padLeaf
+}
+
+class BetaRenderer {
+  final BetaTheme theme = BetaTheme();
+$padLeaf
+}
+
+class BetaTheme {
+  final int accent = 1;
+}
+''');
+
+        const analyzer = FileSplitAnalyzer();
+        final report = await analyzer.analyzeFile(
+          file.path,
+          targetLines: 110,
+          minClusterLines: 20,
+        );
+
+        check(
+          report.clusters.map((c) => c.suggestedFileName).toList(),
+        ).deepEquals(['alpha_store.dart', 'beta_renderer.dart']);
+        check(
+          report.clusters[0].declarations.map((d) => d.name).toList(),
+        ).deepEquals(['AlphaStore']);
+        check(
+          report.clusters[1].declarations.map((d) => d.name).toList(),
+        ).deepEquals(['Bridge', 'BetaRenderer', 'BetaTheme']);
+        for (final cluster in report.clusters) {
+          check(cluster.tier).equals(SplitTier.tier1CleanLibrary);
+          check(cluster.rationale).contains('Sub-component of the Bridge cone');
+        }
+        check(
+          report.survivingDeclarations.map((d) => d.name).toList(),
+        ).deepEquals(['Top']);
+        check(report.estimatedRemainingLines).isLessOrEqual(110);
+      },
+    );
   });
 }

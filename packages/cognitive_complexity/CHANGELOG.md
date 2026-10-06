@@ -52,6 +52,14 @@
   extraction cuts recommended" now receive cuts.
 - `file_split`: suggested filenames derive from the largest public declaration
   in the cut rather than the first one in source order.
+- `file_split`: a dominator-cone cut whose root declaration(s) merely bridge two
+  or more otherwise-disconnected groups of `>= --min-cluster-lines` each is now
+  emitted as one cut per group. Each root joins the group it has the most edges
+  into and undersized groups follow their callers; the bundled cut is kept when
+  the groups would import each other cyclically or would need more `@internal`
+  widenings than the bundle. A root that bridges several groups only names its
+  group when it holds at least a third of the group's lines. Rationale reads
+  `Sub-component of the <root> cone`.
 
 ## 0.3.0
 
