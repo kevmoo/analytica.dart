@@ -462,6 +462,217 @@ void _h3(int a, int b, int c, int d, int e, int f) { if (true) print(3); }
       check(text).contains('Caller CC: 3 -> 6 after inline (+3)');
       check(text).contains('Caller CC: 6 (base 3) -> 9 after inline (+3)');
       check(text).contains('Caller CC: 9 (base 3) -> 12 after inline (+3)');
+
+      // The isolated score is base + own delta regardless of sibling order,
+      // while headroom tracks the cumulative result.
+      for (final f in byName.values) {
+        check(f.inlinedCallerScoreIsolated).equals(6);
+        check(f.headroomAfterInline).equals(15 - f.inlinedCallerScore);
+      }
+      check(h2Json['inlined_caller_score_isolated']).equals(6);
+      check(h2Json['headroom_after_inline']).equals(6);
+      check(h2Json['caller_zone']).equals('other');
+      check(text).contains('Caller CC: 3 -> 6 after inline (+3) | Est.');
+      check(text).contains('(+3) [isolated 3 -> 6, headroom 6] | Est.');
+      check(text).contains('(+3) [isolated 3 -> 6, headroom 3] | Est.');
+    });
+
+    test('headroom_after_inline is 0 at exactly maxCallerScore and negative '
+        'above it', () {
+      // `_edge` scores 6 (nested ifs) + 5 (flat ifs) = 11; `_h` adds 1 + 3
+      // (call depth 3) = 4, landing exactly on 15.
+      const code = '''
+void _edge(int a, int b, int c, int d, int e, int f) {
+  if (a > 0) {
+    if (b > 0) {
+      if (c > 0) {
+        _h(a, b, c, d, e, f);
+      }
+    }
+  }
+  if (d > 0) {}
+  if (e > 0) {}
+  if (f > 0) {}
+  if (a > 1) {}
+  if (b > 1) {}
+}
+void _h(int a, int b, int c, int d, int e, int f) { if (true) print(1); }
+''';
+      final atCeiling = ShallowAnalyzer().analyzeCode(code).findings.single;
+      check(atCeiling.callerBaseScore).equals(11);
+      check(atCeiling.inlinedCallerScore).equals(15);
+      check(atCeiling.inlinedCallerScoreIsolated).equals(15);
+      check(atCeiling.headroomAfterInline).equals(0);
+      check(atCeiling.classification).equals(ShallowClassification.safeInline);
+
+      final overCeiling = ShallowAnalyzer(
+        maxCallerScore: 14,
+      ).analyzeCode(code).findings.single;
+      check(overCeiling.headroomAfterInline).equals(-1);
+      check(
+        overCeiling.classification,
+      ).equals(ShallowClassification.flattenAndInline);
+    });
+
+    test('MICRO_HELPER catches formatter-wrapped helpers with <= 2 statements '
+        'but not 3-statement helpers of the same length', () {
+      const code = '''
+void _caller(int a, int b) {
+  if (a > 0) {
+    _wrapped(a);
+    _threeStatements(b);
+  }
+}
+
+void _wrapped(int value) {
+  final label = value.toString() +
+      '-' +
+      value.toRadixString(16) +
+      '-' +
+      value.toRadixString(2);
+  print(label);
+}
+
+void _threeStatements(int value) {
+  final a = value.toString();
+  final b = value.toRadixString(16) +
+      '-' +
+      value.toRadixString(2) +
+      '-';
+  print(a + b);
+}
+''';
+      final report = ShallowAnalyzer().analyzeCode(code);
+      final finding = report.findings.single;
+      check(finding.name).equals('_wrapped');
+      check(finding.bodyLines).equals(8);
+      check(finding.statementCount).equals(2);
+      check(finding.score).equals(0);
+      check(
+        finding.reasons,
+      ).deepEquals(['MICRO_HELPER(8 bodyL, 2 stmt, CC=0)']);
+      check(finding.toJson()['statement_count']).equals(2);
+    });
+
+    test('HIGH_ARITY counts record-typed parameters by their field count', () {
+      const code = '''
+void _caller(int a, int b, int c, int d, int e, int f) {
+  if (a > 0) {
+    _packed(a, b, c, (d, e, name: 'x'));
+    _packedOptional(a, b, c, (d, e));
+    _plain(a, b, c, d);
+  }
+}
+
+void _packed(int a, int b, int c, (int, int, {String name}) rec) {
+  if (a > b) print(c + rec.\$1 + rec.\$2 + rec.name.length);
+}
+
+void _packedOptional(int a, int b, int c, [(int, int)? rec]) {
+  if (a > b) print(c + (rec?.\$1 ?? 0));
+}
+
+void _plain(int a, int b, int c, int d) {
+  if (a > b) print(c + d);
+}
+''';
+      final report = ShallowAnalyzer().analyzeCode(code);
+      final byName = {for (final f in report.findings) f.name: f};
+      check(
+        byName.keys,
+      ).unorderedEquals(['_packed', '_packedOptional', '_plain']);
+
+      final packed = byName['_packed']!;
+      check(packed.parameterCount).equals(4);
+      check(packed.effectiveParameterCount).equals(6);
+      check(packed.reasons).contains('HIGH_ARITY(4 params, 6 effective)');
+      check(packed.toJson()['effective_parameter_count']).equals(6);
+
+      final optional = byName['_packedOptional']!;
+      check(optional.effectiveParameterCount).equals(5);
+      check(optional.reasons).contains('HIGH_ARITY(4 params, 5 effective)');
+
+      final plain = byName['_plain']!;
+      check(plain.effectiveParameterCount).equals(4);
+      check(plain.reasons.any((r) => r.startsWith('HIGH_ARITY'))).isFalse();
+    });
+
+    test('suppresses CROSS_FILE_SINGLE_CALLER for lib/ helpers whose only '
+        'caller is in bin/, but keeps it for lib/ -> lib/ edges', () async {
+      // `wideHelper` has 4 statements and CC 3, so it is neither MICRO_HELPER
+      // nor HIGH_ARITY nor SIG_HEAVY: only CROSS_FILE_SINGLE_CALLER can flag
+      // it. `tinyHelper` is a MICRO_HELPER regardless of caller zone.
+      const helpers = '''
+int wideHelper(int a, int b, int c) {
+  var total = a;
+  if (b > 0) total += b;
+  if (c > 0) total += c;
+  if (a < 0) total = -total;
+  return total;
+}
+
+int tinyHelper(int a, int b, int c) => a + b + c;
+''';
+      await d.dir('zone_pkg', [
+        d.file('pubspec.yaml', 'name: zone_pkg\n'),
+        d.dir('lib', [
+          d.dir('src', [d.file('helpers.dart', helpers)]),
+        ]),
+        d.dir('bin', [
+          d.file('tool.dart', '''
+import 'package:zone_pkg/src/helpers.dart';
+
+void main(List<String> args) {
+  _runCommand(args.length);
+}
+
+void _runCommand(int n) {
+  if (n > 0) {
+    print(wideHelper(n, n, n));
+    print(tinyHelper(n, n, n));
+  }
+}
+'''),
+        ]),
+      ]).create();
+      await d.dir('lib_pkg', [
+        d.file('pubspec.yaml', 'name: lib_pkg\n'),
+        d.dir('lib', [
+          d.dir('src', [
+            d.file('helpers.dart', helpers),
+            d.file('service.dart', '''
+import 'helpers.dart';
+
+void _runService(int n) {
+  if (n > 0) {
+    print(wideHelper(n, n, n));
+    print(tinyHelper(n, n, n));
+  }
+}
+'''),
+          ]),
+        ]),
+      ]).create();
+
+      final analyzer = ShallowAnalyzer();
+      final fromBin = analyzer.analyzePath('${d.sandbox}/zone_pkg/lib');
+      final binByName = {for (final f in fromBin.findings) f.name: f};
+      check(binByName.keys).unorderedEquals(['tinyHelper']);
+      final tinyFromBin = binByName['tinyHelper']!;
+      check(tinyFromBin.callerZone).equals('bin');
+      check(tinyFromBin.callerName).equals('_runCommand');
+      check(
+        tinyFromBin.reasons.any((r) => r.startsWith('CROSS_FILE')),
+      ).isFalse();
+      check(tinyFromBin.toJson()['caller_zone']).equals('bin');
+
+      final fromLib = analyzer.analyzePath('${d.sandbox}/lib_pkg/lib');
+      final libByName = {for (final f in fromLib.findings) f.name: f};
+      check(libByName.keys).unorderedEquals(['wideHelper', 'tinyHelper']);
+      check(libByName['wideHelper']!.callerZone).equals('lib');
+      check(
+        libByName['wideHelper']!.reasons,
+      ).deepEquals(['CROSS_FILE_SINGLE_CALLER(from service.dart)']);
     });
 
     test('CLI --git-diff filters modified files when run from a workspace '

@@ -1,3 +1,26 @@
+## 0.4.0-wip
+
+- **Breaking**: `ShallowFinding` gains five required constructor parameters:
+  `effectiveParameterCount`, `statementCount`, `callerZone`,
+  `inlinedCallerScoreIsolated`, and `headroomAfterInline`. Code that only reads
+  findings from `ShallowAnalyzer` is unaffected.
+- `shallow`: `MICRO_HELPER` now also fires for helpers with `<= 2` statements
+  spanning up to 15 body lines, so formatter-wrapped one-liners no longer evade
+  it. The reason text includes the statement count.
+- `shallow`: `HIGH_ARITY` is evaluated against the effective parameter count,
+  where record-typed parameters expand to their field count; the reason text
+  reports both (`HIGH_ARITY(4 params, 6 effective)`).
+- `shallow`: `CROSS_FILE_SINGLE_CALLER` is no longer reported for `lib/`
+  declarations whose single caller lives in `bin/`, `test/`, `tool/`,
+  `example/`, or `web/` (package layering, not shallow extraction). Other
+  reasons still apply to such helpers.
+- `shallow`: JSON findings gain `effective_parameter_count`, `statement_count`,
+  `caller_zone`, `inlined_caller_score_isolated` (caller base score plus this
+  helper's delta, independent of sibling simulation order), and
+  `headroom_after_inline` (`max_caller_cc - inlined_caller_score`). Text output
+  appends `[isolated B -> I, headroom H]` when sibling absorption made the
+  cumulative score differ from the isolated one.
+
 ## 0.3.0
 
 - **Breaking**: `ShallowFinding` gains two required constructor parameters,

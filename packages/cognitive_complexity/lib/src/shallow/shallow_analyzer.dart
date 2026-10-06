@@ -284,6 +284,8 @@ class ShallowAnalyzer {
           callerScore: callerScore,
           deltaScore: deltaScore,
           inlinedCallerScore: inlinedCallerScore,
+          inlinedCallerScoreIsolated: c.caller.score + deltaScore,
+          headroomAfterInline: maxCallerScore - inlinedCallerScore,
           classification: classification,
         ),
       );
@@ -314,11 +316,20 @@ class ShallowAnalyzer {
     ShallowDeclNode caller,
   ) {
     final reasons = <String>[];
-    if (decl.parameterCount >= maxParams) {
-      reasons.add('HIGH_ARITY(${decl.parameterCount} params)');
+    if (decl.effectiveParameterCount >= maxParams) {
+      final effective = decl.effectiveParameterCount != decl.parameterCount
+          ? ', ${decl.effectiveParameterCount} effective'
+          : '';
+      reasons.add('HIGH_ARITY(${decl.parameterCount} params$effective)');
     }
-    if (decl.bodyLines <= 6 && decl.score <= 2) {
-      reasons.add('MICRO_HELPER(${decl.bodyLines} bodyL, CC=${decl.score})');
+    final isTiny =
+        decl.bodyLines <= 6 ||
+        (decl.statementCount <= 2 && decl.bodyLines <= 15);
+    if (isTiny && decl.score <= 2) {
+      reasons.add(
+        'MICRO_HELPER(${decl.bodyLines} bodyL, ${decl.statementCount} stmt, '
+        'CC=${decl.score})',
+      );
     }
     if (decl.parameterCount >= 3 && decl.signatureLines >= decl.bodyLines - 2) {
       reasons.add(
@@ -328,6 +339,7 @@ class ShallowAnalyzer {
     final isStandaloneHelper = decl.enclosingType == null || decl.isStatic;
     if (isStandaloneHelper &&
         caller.normalizedFilePath != decl.normalizedFilePath &&
+        !_isLibraryToConsumerEdge(decl, caller) &&
         decl.lineCount <= 35 &&
         (decl.parameterCount >= 3 || decl.score <= 4)) {
       reasons.add(
@@ -335,6 +347,15 @@ class ShallowAnalyzer {
       );
     }
     return reasons;
+  }
+
+  /// Whether [decl] lives under `lib/` while [caller] lives in a consumer zone
+  /// (`bin/`, `test/`, `tool/`, `example/`, `web/`). Such edges are normal
+  /// package layering, not a shallow extraction.
+  bool _isLibraryToConsumerEdge(ShallowDeclNode decl, ShallowDeclNode caller) {
+    if (_zoneOf(decl.normalizedFilePath) != 'lib') return false;
+    final callerZone = _zoneOf(caller.normalizedFilePath);
+    return callerZone != 'lib' && callerZone != 'other';
   }
 
   ParseStringResult? _tryParseFile(String absPath) {
@@ -544,6 +565,8 @@ class _RawCandidate {
     required int callerScore,
     required int deltaScore,
     required int inlinedCallerScore,
+    required int inlinedCallerScoreIsolated,
+    required int headroomAfterInline,
     required ShallowClassification classification,
   }) => ShallowFinding(
     filePath: decl.filePath,
@@ -552,11 +575,14 @@ class _RawCandidate {
     endLine: decl.endLine,
     parameterCount: decl.parameterCount,
     namedParameterCount: decl.namedParameterCount,
+    effectiveParameterCount: decl.effectiveParameterCount,
     signatureLines: decl.signatureLines,
     bodyLines: decl.bodyLines,
+    statementCount: decl.statementCount,
     score: decl.score,
     callerFilePath: call.filePath,
     callerName: caller.qualifiedName,
+    callerZone: _zoneOf(caller.normalizedFilePath),
     callLine: call.line,
     callNestingDepth: call.nestingDepth,
     callerBaseScore: callerBaseScore,
@@ -564,10 +590,26 @@ class _RawCandidate {
     callerScore: callerScore,
     inlinedDeltaScore: deltaScore,
     inlinedCallerScore: inlinedCallerScore,
+    inlinedCallerScoreIsolated: inlinedCallerScoreIsolated,
+    headroomAfterInline: headroomAfterInline,
     estimatedLinesSaved: estimatedLinesSaved,
     classification: classification,
     reasons: reasons,
   );
+}
+
+const _knownZones = {'lib', 'bin', 'test', 'tool', 'example', 'web'};
+
+/// Classifies a normalized relative Dart file path by its package layout
+/// directory: `lib`, `bin`, `test`, `tool`, `example`, `web`, or `other` when
+/// no such segment is present. The last matching segment wins so nested
+/// packages (`tool/lib/x.dart`) resolve to their own layout directory.
+String _zoneOf(String normalizedFilePath) {
+  final segments = p.split(normalizedFilePath);
+  for (var i = segments.length - 2; i >= 0; i--) {
+    if (_knownZones.contains(segments[i])) return segments[i];
+  }
+  return 'other';
 }
 
 int _compareRawCandidates(_RawCandidate a, _RawCandidate b) {

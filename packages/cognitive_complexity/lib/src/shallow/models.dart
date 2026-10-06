@@ -31,11 +31,25 @@ class ShallowFinding {
   final int endLine;
   final int parameterCount;
   final int namedParameterCount;
+
+  /// [parameterCount] with record-typed parameters expanded to their field
+  /// count. `HIGH_ARITY` is evaluated against this value so packing values into
+  /// an inline record cannot hide arity.
+  final int effectiveParameterCount;
   final int signatureLines;
   final int bodyLines;
+
+  /// Number of top-level statements in the helper body (`1` for `=>` bodies).
+  /// `MICRO_HELPER` also fires for `<= 2` statements spanning up to 15 body
+  /// lines, so formatter-wrapped one-liners cannot evade it.
+  final int statementCount;
   final int score;
   final String callerFilePath;
   final String callerName;
+
+  /// Package layout directory of the caller: `lib`, `bin`, `test`, `tool`,
+  /// `example`, `web`, or `other`.
+  final String callerZone;
   final int callLine;
   final int callNestingDepth;
 
@@ -53,6 +67,15 @@ class ShallowFinding {
   final int callerScore;
   final int inlinedDeltaScore;
   final int inlinedCallerScore;
+
+  /// The caller's score if only this helper were inlined
+  /// (`callerBaseScore + inlinedDeltaScore`), independent of sibling
+  /// simulation order.
+  final int inlinedCallerScoreIsolated;
+
+  /// `maxCallerScore - inlinedCallerScore`; negative when the cumulative
+  /// inline exceeds the ceiling.
+  final int headroomAfterInline;
   final int estimatedLinesSaved;
   final ShallowClassification classification;
   final List<String> reasons;
@@ -64,11 +87,14 @@ class ShallowFinding {
     required this.endLine,
     required this.parameterCount,
     required this.namedParameterCount,
+    required this.effectiveParameterCount,
     required this.signatureLines,
     required this.bodyLines,
+    required this.statementCount,
     required this.score,
     required this.callerFilePath,
     required this.callerName,
+    required this.callerZone,
     required this.callLine,
     required this.callNestingDepth,
     required this.callerBaseScore,
@@ -76,6 +102,8 @@ class ShallowFinding {
     required this.callerScore,
     required this.inlinedDeltaScore,
     required this.inlinedCallerScore,
+    required this.inlinedCallerScoreIsolated,
+    required this.headroomAfterInline,
     required this.estimatedLinesSaved,
     required this.classification,
     required this.reasons,
@@ -92,11 +120,14 @@ class ShallowFinding {
     'lines': lineCount,
     'parameter_count': parameterCount,
     'named_parameter_count': namedParameterCount,
+    'effective_parameter_count': effectiveParameterCount,
     'signature_lines': signatureLines,
     'body_lines': bodyLines,
+    'statement_count': statementCount,
     'score': score,
     'caller_file': callerFilePath,
     'caller_name': callerName,
+    'caller_zone': callerZone,
     'call_line': callLine,
     'call_nesting_depth': callNestingDepth,
     'caller_base_score': callerBaseScore,
@@ -104,6 +135,8 @@ class ShallowFinding {
     'caller_score': callerScore,
     'inlined_delta_score': inlinedDeltaScore,
     'inlined_caller_score': inlinedCallerScore,
+    'inlined_caller_score_isolated': inlinedCallerScoreIsolated,
+    'headroom_after_inline': headroomAfterInline,
     'estimated_lines_saved': estimatedLinesSaved,
     'classification': classification.label,
     'reasons': reasons,
@@ -196,9 +229,15 @@ class ShallowReport {
       final base = f.callerCumulativeBefore != f.callerBaseScore
           ? ' (base ${f.callerBaseScore})'
           : '';
+      final isolated = f.inlinedCallerScoreIsolated != f.inlinedCallerScore
+          ? ' [isolated ${f.callerBaseScore} -> '
+                '${f.inlinedCallerScoreIsolated}, '
+                'headroom ${f.headroomAfterInline}]'
+          : '';
       buf.writeln(
         '  Caller CC: ${f.callerCumulativeBefore}$base -> '
-        '${f.inlinedCallerScore} after inline (+${f.inlinedDeltaScore}) | '
+        '${f.inlinedCallerScore} after inline (+${f.inlinedDeltaScore})'
+        '$isolated | '
         'Est. Saved: ~${f.estimatedLinesSaved}L | '
         'Why: ${f.reasons.join(", ")}',
       );
