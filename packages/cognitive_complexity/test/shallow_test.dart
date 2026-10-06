@@ -675,6 +675,184 @@ void _runService(int n) {
       ).deepEquals(['CROSS_FILE_SINGLE_CALLER(from service.dart)']);
     });
 
+    test('reports shared_param_signature_with for siblings sharing >= 4 '
+        'parameter names', () {
+      const code = '''
+void _runPublish(List<String> parts, bool viaHttp) {
+  if (viaHttp) {
+    _publishViaHttp(parts[0], parts[1], parts[2], parts[3], parts[4],
+        parts[5], parts[6], parts[7], 3);
+  } else {
+    _publishToDatastore(parts[0], parts[1], parts[2], parts[3], parts[4],
+        parts[5], parts[6], parts[7], 'ns');
+  }
+}
+
+void _publishViaHttp(String host, String path, String token, String body,
+    String owner, String repo, String branch, String label, int retries) {
+  print([host, path, token, body, owner, repo, branch, label, retries]);
+}
+
+void _publishToDatastore(String host, String path, String token, String body,
+    String owner, String repo, String branch, String label, String ns) {
+  print([host, path, token, body, owner, repo, branch, label, ns]);
+}
+''';
+      final report = ShallowAnalyzer().analyzeCode(code);
+      final byName = {for (final f in report.findings) f.name: f};
+      check(
+        byName.keys,
+      ).unorderedEquals(['_publishViaHttp', '_publishToDatastore']);
+
+      final http = byName['_publishViaHttp']!;
+      check(http.sharedParamSignatureWith).equals('_publishToDatastore');
+      check(http.sharedParamCount).equals(8);
+      check(http.paramsSubsetOfExistingType).isNull();
+      final json = http.toJson();
+      check(json['shared_param_signature_with']).equals('_publishToDatastore');
+      check(json['shared_param_count']).equals(8);
+      check(json['params_subset_of_existing_type']).isNull();
+
+      check(
+        byName['_publishToDatastore']!.sharedParamSignatureWith,
+      ).equals('_publishViaHttp');
+      check(report.formatText()).contains(
+        '  Facts: shares 8 params with _publishToDatastore '
+        '-> prefer a shared parameter record',
+      );
+    });
+
+    test('reports params_subset_of_existing_type from same-file instance '
+        'fields, preferring the enclosing type', () {
+      const code = '''
+class _Unrelated {
+  final int rows;
+  final int title;
+  final int sortKey;
+  final int ascending;
+  final int filter;
+  final int extra;
+  _Unrelated(this.rows, this.title, this.sortKey, this.ascending, this.filter,
+      this.extra);
+}
+
+class _SentinelTableState {
+  final int _rows;
+  final int title;
+  final int sortKey;
+  final bool ascending;
+  final String filter;
+  _SentinelTableState(
+      this._rows, this.title, this.sortKey, this.ascending, this.filter);
+
+  String render() {
+    if (title > 0) {
+      return _buildToolbarHtml(_rows, title, sortKey, ascending, filter, 1) +
+          _renderRows(_rows, title, sortKey, ascending);
+    }
+    return '';
+  }
+
+  String _renderRows(int rows, int title, int sortKey, bool ascending) =>
+      '\$rows \$title \$sortKey \$ascending';
+}
+
+String _buildToolbarHtml(
+    int rows, int title, int sortKey, bool ascending, String filter, int extra) {
+  if (ascending) return '\$rows \$title \$sortKey \$filter \$extra';
+  return '';
+}
+''';
+      final report = ShallowAnalyzer().analyzeCode(code);
+      final byName = {for (final f in report.findings) f.name: f};
+      check(byName.keys).unorderedEquals([
+        '_buildToolbarHtml',
+        '_SentinelTableState._renderRows',
+      ]);
+
+      // Top-level helper: highest field coverage wins (6 of 6 in _Unrelated).
+      final toolbar = byName['_buildToolbarHtml']!;
+      check(toolbar.paramsSubsetOfExistingType).equals('_Unrelated');
+      check(
+        toolbar.sharedParamSignatureWith,
+      ).equals('_SentinelTableState._renderRows');
+      check(toolbar.sharedParamCount).equals(4);
+
+      // Method: the enclosing type is preferred on a 4-vs-4 tie, and `_rows`
+      // matches `rows` because leading underscores are ignored.
+      final rows = byName['_SentinelTableState._renderRows']!;
+      check(rows.paramsSubsetOfExistingType).equals('_SentinelTableState');
+      check(
+        rows.toJson()['params_subset_of_existing_type'],
+      ).equals('_SentinelTableState');
+      check(report.formatText()).contains(
+        'params mirror _SentinelTableState fields '
+        '-> pass _SentinelTableState directly',
+      );
+    });
+
+    test('orders findings by caller-group significance, then simulation '
+        'order within a caller', () {
+      // `_micro` is a +0 micro-predicate declared first in the file; the
+      // HIGH_ARITY `_wide` under a different caller must still print first.
+      const significance = '''
+void _callerP(int a, int b) {
+  if (a > 0) print(_micro(a, b));
+}
+int _micro(int a, int b) => a + b;
+
+void _callerQ(int a, int b, int c, int d, int e) {
+  if (a > 0) _wide(a, b, c, d, e);
+}
+void _wide(int a, int b, int c, int d, int e) {
+  print(a + b + c + d + e);
+}
+''';
+      final ranked = ShallowAnalyzer().analyzeCode(significance);
+      check(
+        ranked.findings.map((f) => f.name).toList(),
+      ).deepEquals(['_wide', '_micro']);
+
+      // `_y` saves more lines than `_x` (the old print key) but `_x` has the
+      // lower delta and is simulated first, so `_x` must print first and
+      // `_y`'s `(base 1)` line must follow the sibling that produced its
+      // cumulative baseline.
+      const chained = '''
+void _caller(int a, int b, int c, int d, int e, int f) {
+  if (a > 0) {
+    _x(a, b, c, d, e);
+    _y(a, b, c, d, e, f);
+  }
+}
+void _x(int a, int b, int c, int d, int e) {
+  if (a > b) print(c + d + e);
+}
+void _y(int a, int b, int c, int d, int e, int f) {
+  if (a > b) {
+    if (c > d) print(e + f);
+  }
+}
+''';
+      final report = ShallowAnalyzer().analyzeCode(chained);
+      final names = report.findings.map((f) => f.name).toList();
+      check(names).deepEquals(['_x', '_y']);
+      check(
+        report.findings.map((f) => f.simulationIndex).toList(),
+      ).deepEquals([0, 1]);
+      check(
+        report.findings.map((f) => f.callerCumulativeBefore).toList(),
+      ).deepEquals([1, 3]);
+      check(
+        report.findings.first.estimatedLinesSaved,
+      ).isLessThan(report.findings.last.estimatedLinesSaved);
+      check(report.findings.last.toJson()['simulation_index']).equals(1);
+
+      final text = report.formatText();
+      check(text.indexOf('Caller CC: 1 -> 3 after inline (+2)')).isLessThan(
+        text.indexOf('Caller CC: 3 (base 1) -> 8 after inline (+5)'),
+      );
+    });
+
     test('CLI --git-diff filters modified files when run from a workspace '
         'subpackage directory', () async {
       await d.dir('ws_repo', [
