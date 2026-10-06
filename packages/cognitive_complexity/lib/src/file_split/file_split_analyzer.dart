@@ -342,8 +342,178 @@ class _ExtractionCutPlanner {
     }
     if (eligible.isEmpty) return false;
     eligible.sort((a, b) => _compareCandidateCones(a, b, neededLines));
-    _commitCluster(eligible.first, isDisjointIsland: false);
+    _commitCone(eligible.first);
     return true;
+  }
+
+  /// Commits [cone] as one cluster, unless its root SCC(s) merely bridge two
+  /// or more otherwise-disconnected components of `>= minClusterLines` each.
+  /// In that case each component becomes its own cut, every root joins the
+  /// component it has the most edges into, and undersized components follow
+  /// the root that reaches them. The split is abandoned (bundled cut kept) if
+  /// the resulting groups would import each other cyclically or would need
+  /// more private widenings than the bundled cut.
+  void _commitCone(Set<int> cone) {
+    final groups = _splitBridgedCone(cone);
+    if (groups == null) {
+      _commitCluster(cone, isDisjointIsland: false);
+      return;
+    }
+    final roots = _coneRoots(cone);
+    final rootNames = [for (final r in roots) ...sccs[r]]..sort();
+    final bridging = {
+      for (final r in roots)
+        if (groups.where((g) => _dependsOnAnyOf({r}, [g])).length >= 2) r,
+    };
+    for (final group in groups) {
+      // A bridging root only forfeits naming rights when it is a small guest
+      // in the group; a root holding a third or more of the group's lines is
+      // the group's substance.
+      final guests = {
+        for (final r in bridging)
+          if (group.contains(r) && _sccLines(r) * 3 < _setLines(group)) r,
+      };
+      _commitCluster(
+        group,
+        isDisjointIsland: false,
+        rationale: _subConeRationale(rootNames, group),
+        namingSccs: group.difference(guests),
+      );
+    }
+  }
+
+  List<Set<int>>? _splitBridgedCone(Set<int> cone) {
+    final roots = _coneRoots(cone);
+    if (roots.isEmpty) return null;
+    final groups = _weaklyConnectedComponentsOf(cone.difference(roots));
+    final largeCount = groups.where((g) => _setLines(g) >= minClusterLines);
+    if (largeCount.length < 2) return null;
+
+    for (final root in roots) {
+      groups[_mostConnectedGroup(root, groups)].add(root);
+    }
+    _absorbUndersizedGroups(groups);
+    final ordered = _topologicalGroupOrder(groups);
+    if (ordered == null || ordered.length < 2) return null;
+
+    final bundledCrossings = _countBoundaryCrossings(cone);
+    final splitCrossings = ordered.fold(
+      0,
+      (s, g) => s + _countBoundaryCrossings(g),
+    );
+    return splitCrossings > bundledCrossings ? null : ordered;
+  }
+
+  /// Index of the group that [node] has the most outgoing edges into; ties go
+  /// to the larger group.
+  int _mostConnectedGroup(int node, List<Set<int>> groups) {
+    final successors = dag[node] ?? const <int>{};
+    var best = 0;
+    var bestEdges = -1;
+    for (var i = 0; i < groups.length; i++) {
+      final edges = successors.where(groups[i].contains).length;
+      final larger = _setLines(groups[i]) > _setLines(groups[best]);
+      if (edges > bestEdges || (edges == bestEdges && larger)) {
+        best = i;
+        bestEdges = edges;
+      }
+    }
+    return best;
+  }
+
+  /// Merges every group below `minClusterLines` into the group whose members
+  /// have the most edges into it, so helpers travel with their callers.
+  void _absorbUndersizedGroups(List<Set<int>> groups) {
+    var changed = true;
+    while (changed) {
+      changed = false;
+      for (var i = 0; i < groups.length; i++) {
+        if (_setLines(groups[i]) >= minClusterLines) continue;
+        final target = _mostDependentGroup(i, groups);
+        if (target == null) continue;
+        groups[target].addAll(groups.removeAt(i));
+        changed = true;
+        break;
+      }
+    }
+  }
+
+  int? _mostDependentGroup(int small, List<Set<int>> groups) {
+    int? best;
+    var bestEdges = 0;
+    for (var i = 0; i < groups.length; i++) {
+      if (i == small) continue;
+      final edges = groups[i]
+          .expand((u) => dag[u] ?? const <int>{})
+          .where(groups[small].contains)
+          .length;
+      if (edges > bestEdges) {
+        best = i;
+        bestEdges = edges;
+      }
+    }
+    return best;
+  }
+
+  /// Orders [groups] so every group is committed after the groups it depends
+  /// on; independent groups follow source order. Returns `null` when the
+  /// group graph is cyclic.
+  List<Set<int>>? _topologicalGroupOrder(List<Set<int>> groups) {
+    final pending = [...groups];
+    final ordered = <Set<int>>[];
+    while (pending.isNotEmpty) {
+      final ready = [
+        for (final g in pending)
+          if (!_dependsOnAnyOf(g, pending.where((o) => !identical(o, g)))) g,
+      ];
+      if (ready.isEmpty) return null;
+      ready.sort((a, b) => _minStartLine(a).compareTo(_minStartLine(b)));
+      pending.remove(ready.first);
+      ordered.add(ready.first);
+    }
+    return ordered;
+  }
+
+  int _minStartLine(Set<int> sccIndices) => sccIndices
+      .expand((i) => sccs[i])
+      .map((n) => declsByName[n]?.startLine ?? 0)
+      .fold(1 << 30, math.min);
+
+  bool _dependsOnAnyOf(Set<int> group, Iterable<Set<int>> others) => group
+      .expand((u) => dag[u] ?? const <int>{})
+      .any((v) => others.any((o) => o.contains(v)));
+
+  /// SCCs in [cone] with no predecessor inside [cone].
+  Set<int> _coneRoots(Set<int> cone) {
+    final hasPredecessor = <int>{
+      for (final u in cone)
+        for (final v in dag[u] ?? const <int>{})
+          if (cone.contains(v)) v,
+    };
+    return cone.difference(hasPredecessor);
+  }
+
+  List<Set<int>> _weaklyConnectedComponentsOf(Set<int> nodes) {
+    final index = nodes.toList();
+    final position = {for (var i = 0; i < index.length; i++) index[i]: i};
+    final relabeled = <int, Set<int>>{
+      for (final u in nodes)
+        position[u]!: {
+          for (final v in dag[u] ?? const <int>{})
+            if (nodes.contains(v)) position[v]!,
+        },
+    };
+    return [
+      for (final comp in computeWeaklyConnectedIslands(index.length, relabeled))
+        {for (final i in comp) index[i]},
+    ];
+  }
+
+  String _subConeRationale(List<String> rootNames, Set<int> group) {
+    final count = group.fold(0, (s, i) => s + sccs[i].length);
+    return 'Sub-component of the ${rootNames.join(', ')} cone '
+        '($count declaration(s)); shares no edges with its sibling cut(s) '
+        'other than through the cone root(s), 0 circular imports.';
   }
 
   int _compareCandidateCones(Set<int> a, Set<int> b, int neededLines) {
@@ -561,16 +731,25 @@ class _ExtractionCutPlanner {
   /// [FileSplitReport.estimatedRemainingLines].
   int _remainingLines() => totalLines - _setLines(extractedSccs);
 
+  /// Declarations belonging to [sccIndices], in source order.
+  List<DeclarationUnit> _declsOf(Iterable<int> sccIndices) => <DeclarationUnit>[
+    for (final idx in sccIndices)
+      for (final name in sccs[idx]) ?declsByName[name],
+  ]..sort((a, b) => a.startLine.compareTo(b.startLine));
+
   void _commitCluster(
     Set<int> sccIndices, {
     required bool isDisjointIsland,
     bool forceTier3 = false,
+    String? rationale,
+    Set<int>? namingSccs,
   }) {
     extractedSccs.addAll(sccIndices);
     final clusterNames = <String>{for (final idx in sccIndices) ...sccs[idx]};
-    final decls = <DeclarationUnit>[
-      for (final name in clusterNames) ?declsByName[name],
-    ]..sort((a, b) => a.startLine.compareTo(b.startLine));
+    final decls = _declsOf(sccIndices);
+    final namingDecls = (namingSccs == null || namingSccs.isEmpty)
+        ? decls
+        : _declsOf(namingSccs);
 
     final (:absorbed, :privTopToWiden, :privMembersToWiden) =
         _classifyBoundaryCrossings(clusterNames, decls);
@@ -584,7 +763,7 @@ class _ExtractionCutPlanner {
     final clusterDepth = sccIndices
         .map((i) => depths[i] ?? 0)
         .fold(0, math.max);
-    final fileName = _suggestFileName(decls, clusterDepth);
+    final fileName = _suggestFileName(namingDecls, clusterDepth);
     final directive = (tier == SplitTier.tier3PartDirective && useParts == null)
         ? kAskUserPartsPreferenceDirective
         : null;
@@ -606,7 +785,9 @@ class _ExtractionCutPlanner {
           for (final d in decls)
             if (d.isPublic) d.name,
         ],
-        rationale: _buildRationale(isDisjointIsland, tier, clusterDepth, decls),
+        rationale:
+            rationale ??
+            _buildRationale(isDisjointIsland, tier, clusterDepth, decls),
         agentDirective: directive,
       ),
     );
