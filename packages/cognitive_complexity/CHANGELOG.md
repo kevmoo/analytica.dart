@@ -45,6 +45,13 @@
   `headroom_after_inline` (`max_caller_cc - inlined_caller_score`). Text output
   appends `[isolated B -> I, headroom H]` when sibling absorption made the
   cumulative score differ from the isolated one.
+- `file_split`: the extraction planner now measures its remaining budget against
+  the physical file length (imports, comments, and blank lines included) instead
+  of the sum of declaration lines, matching the `estimated_remaining_lines` it
+  reports. Files that were previously left over `--target-lines` with "No clean
+  extraction cuts recommended" now receive cuts.
+- `file_split`: suggested filenames derive from the largest public declaration
+  in the cut rather than the first one in source order.
 
 ## 0.3.0
 

@@ -485,5 +485,87 @@ $pad
         emptyOut.toString(),
       ).contains('No files exceeding 5000 lines found.');
     });
+
+    test('Budget counts physical lines, not just declaration lines', () async {
+      final file = File(p.join(tempDir.path, 'header_heavy.dart'));
+      // ~45 lines of header (license, doc comments, imports, blank lines)
+      // plus two unrelated 30-line classes. Declaration lines sum to ~64
+      // (under target 80), but the physical file is ~110 lines (over target).
+      final header = List.generate(45, (i) => '// header line $i').join('\n');
+      final pad = List.generate(28, (i) => '  final v$i = $i;').join('\n');
+      file.writeAsStringSync('''
+$header
+
+class CoreEngine {
+$pad
+}
+
+class SideUtility {
+$pad
+}
+''');
+
+      const analyzer = FileSplitAnalyzer();
+      final report = await analyzer.analyzeFile(
+        file.path,
+        targetLines: 80,
+        minClusterLines: 15,
+      );
+
+      check(report.totalLines).isGreaterThan(80);
+      check(report.clusters.length).equals(1);
+      check(
+        report.clusters.single.declarations.map((d) => d.name).toList(),
+      ).deepEquals(['SideUtility']);
+      check(report.estimatedRemainingLines).isLessOrEqual(80);
+    });
+
+    test(
+      'Suggested filename follows the dominant public declaration',
+      () async {
+        final file = File(p.join(tempDir.path, 'naming_target.dart'));
+        final padSmall = List.generate(
+          6,
+          (i) => '  final s$i = $i;',
+        ).join('\n');
+        final padBig = List.generate(30, (i) => '  final b$i = $i;').join('\n');
+        final padRoot = List.generate(
+          30,
+          (i) => '  final r$i = $i;',
+        ).join('\n');
+        // TinyFirst appears first in source order; BigDominant is 4x larger.
+        // Both land in the same cut because RootUser depends on both.
+        file.writeAsStringSync('''
+class TinyFirst {
+$padSmall
+}
+
+class BigDominant {
+  final TinyFirst t = TinyFirst();
+$padBig
+}
+
+class RootUser {
+  final BigDominant b = BigDominant();
+$padRoot
+}
+''');
+
+        const analyzer = FileSplitAnalyzer();
+        final report = await analyzer.analyzeFile(
+          file.path,
+          targetLines: 50,
+          minClusterLines: 15,
+        );
+
+        final cut = report.clusters.firstWhere(
+          (c) => c.declarations.any((d) => d.name == 'BigDominant'),
+        );
+        check(
+          cut.declarations.map((d) => d.name).toList(),
+        ).deepEquals(['TinyFirst', 'BigDominant']);
+        check(cut.suggestedFileName).equals('big_dominant.dart');
+      },
+    );
   });
 }

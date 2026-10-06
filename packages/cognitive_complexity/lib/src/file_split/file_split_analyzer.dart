@@ -110,6 +110,7 @@ class FileSplitAnalyzer {
 
     final planner = _ExtractionCutPlanner(
       filePath: pathStr,
+      totalLines: totalLines,
       targetLines: targetLines,
       minClusterLines: minClusterLines,
       useParts: useParts,
@@ -138,6 +139,10 @@ class FileSplitAnalyzer {
 
 class _ExtractionCutPlanner {
   final String filePath;
+
+  /// Physical line count of the file, including imports, comments, and blank
+  /// lines that are not attributed to any declaration.
+  final int totalLines;
   final int targetLines;
   final int minClusterLines;
   final bool? useParts;
@@ -154,6 +159,7 @@ class _ExtractionCutPlanner {
 
   _ExtractionCutPlanner({
     required this.filePath,
+    required this.totalLines,
     required this.targetLines,
     required this.minClusterLines,
     required this.useParts,
@@ -549,11 +555,11 @@ class _ExtractionCutPlanner {
     }
   }
 
-  int _remainingLines() => _setLines(
-    Iterable<int>.generate(
-      sccs.length,
-    ).where((i) => !extractedSccs.contains(i)),
-  );
+  /// Lines left in the file after the committed cuts, measured against the
+  /// physical file length so imports, comments, and blank lines count toward
+  /// the budget exactly as they do in
+  /// [FileSplitReport.estimatedRemainingLines].
+  int _remainingLines() => totalLines - _setLines(extractedSccs);
 
   void _commitCluster(
     Set<int> sccIndices, {
@@ -711,7 +717,7 @@ class _ExtractionCutPlanner {
     if (!hasPublic && decls.length >= 5) {
       return _deduplicateFileName('${stem}_helpers.dart');
     }
-    final primary = decls.firstWhere((d) => d.isPublic, orElse: () => decls[0]);
+    final primary = _dominantDeclaration(decls);
     final clean = primary.name.replaceFirst(RegExp('^_+'), '');
     final snake = clean
         .replaceAllMapped(RegExp('([a-z0-9])([A-Z])'), (m) => '${m[1]}_${m[2]}')
@@ -719,6 +725,15 @@ class _ExtractionCutPlanner {
 
     final base = snake == stem ? '${stem}_layer_$depth.dart' : '$snake.dart';
     return _deduplicateFileName(base);
+  }
+
+  /// The public declaration with the most lines (ties go to the earliest in
+  /// source order, since [decls] is sorted by start line). Falls back to the
+  /// largest declaration overall when the cluster has no public symbols.
+  DeclarationUnit _dominantDeclaration(List<DeclarationUnit> decls) {
+    final publics = decls.where((d) => d.isPublic);
+    final pool = publics.isEmpty ? decls : publics;
+    return pool.reduce((a, b) => b.lineCount > a.lineCount ? b : a);
   }
 
   String _deduplicateFileName(String initial) {
