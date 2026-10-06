@@ -37,3 +37,12 @@
   in `SKILL.md` with explicit SemVer constraints matching published versions
   (e.g. `dart run cognitive_complexity@^0.3.0`, `dart run dedupe@^0.1.0`,
   `dart run undead@^0.1.1`).
+
+## Releasing a Package
+
+- Follow [`doc/release.md`](doc/release.md). In short: drop `-wip` in
+  `pubspec.yaml` and `CHANGELOG.md`, run
+  `dart run tool/bin/release_check.dart --fix` to bump every skill pin and run
+  the `tool/` test gate in one step, open a `release(<pkg>)` PR, then push an
+  **annotated** tag (`git tag -m … <pkg>-vX.Y.Z`) after merge to trigger
+  publishing.
