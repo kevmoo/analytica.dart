@@ -20,6 +20,16 @@ class ShallowDeclNode {
   final int bodyLines;
   final int parameterCount;
   final int namedParameterCount;
+
+  /// Number of top-level statements in the body (`1` for `=>` bodies).
+  final int statementCount;
+
+  /// [parameterCount] with record-typed parameters expanded to their field
+  /// count, so packing values into an inline record cannot hide arity.
+  final int effectiveParameterCount;
+
+  /// Declared parameter names in declaration order.
+  final List<String> parameterNames;
   final bool isPrivate;
   final bool isStatic;
   final bool isExempt;
@@ -40,6 +50,9 @@ class ShallowDeclNode {
     required this.bodyLines,
     required this.parameterCount,
     required this.namedParameterCount,
+    required this.statementCount,
+    required this.effectiveParameterCount,
+    required this.parameterNames,
     required this.isPrivate,
     required this.isStatic,
     required this.isExempt,
@@ -52,6 +65,39 @@ class ShallowDeclNode {
       enclosingType != null ? '$enclosingType.$rawName' : rawName;
 
   int get lineCount => endLine >= startLine ? endLine - startLine + 1 : 0;
+}
+
+/// Counts the statements directly inside [body] (`1` for expression bodies).
+int countBodyStatements(FunctionBody body) => switch (body) {
+  BlockFunctionBody(:final block) => block.statements.length,
+  ExpressionFunctionBody() => 1,
+  _ => 0,
+};
+
+/// Counts [parameters] with record-typed parameters expanded to their field
+/// count.
+int countEffectiveParameters(Iterable<FormalParameter> parameters) {
+  var count = 0;
+  for (final param in parameters) {
+    final type = _typeAnnotationOf(param);
+    count += type is RecordTypeAnnotation
+        ? type.positionalFields.length + (type.namedFields?.fields.length ?? 0)
+        : 1;
+  }
+  return count;
+}
+
+/// Returns the declared type annotation of [param], if any.
+///
+/// Walks `childEntities` rather than matching concrete node classes because
+/// the parameter node hierarchy differs across the supported `analyzer` range
+/// (`DefaultFormalParameter` wraps the parameter before 13.0.0).
+TypeAnnotation? _typeAnnotationOf(FormalParameter param) {
+  for (final child in param.childEntities) {
+    if (child is TypeAnnotation) return child;
+    if (child is FormalParameter) return _typeAnnotationOf(child);
+  }
+  return null;
 }
 
 /// Internal AST representation of a function or method call / tear-off site.
@@ -300,6 +346,12 @@ class ShallowFileCollector extends RecursiveAstVisitor<void> {
       bodyLines: bodyLines,
       parameterCount: paramList.length,
       namedParameterCount: namedCount,
+      statementCount: countBodyStatements(body),
+      effectiveParameterCount: countEffectiveParameters(paramList),
+      parameterNames: [
+        for (final param in paramList)
+          if (param.name case final name?) name.lexeme,
+      ],
       isPrivate: isPrivate,
       isStatic: isStatic,
       isExempt: isExempt,
