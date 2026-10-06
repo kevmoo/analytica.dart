@@ -333,6 +333,92 @@ $pad
       );
     });
 
+    test('Reports the implemented interface and suppresses the static-'
+        'promotion hint when >= half of the members are @override', () async {
+      final file = File(p.join(tempDir.path, 'interface_bound.dart'));
+      final pad = List.generate(8, (i) => '    final v$i = $i;').join('\n');
+      final overrides = List.generate(
+        4,
+        (i) => '  @override\n  void op$i() {\n$pad\n  }\n',
+      ).join('\n');
+      file.writeAsStringSync('''
+abstract class Store {
+  void op0();
+  void op1();
+  void op2();
+  void op3();
+}
+
+class SqlStore implements Store {
+$overrides
+  static int _encode(int v) => v + 1;
+
+  static int _decode(int v) => v - 1;
+
+  int roundTrip(int v) => _decode(_encode(v));
+}
+''');
+
+      const analyzer = FileSplitAnalyzer();
+      final report = await analyzer.analyzeFile(file.path, targetLines: 30);
+      final decl = report.survivingDeclarations.singleWhere(
+        (d) => d.name == 'SqlStore',
+      );
+      check(decl.supertypeLabel).equals('implements Store');
+      check(decl.memberCount).equals(7);
+      check(decl.overrideMemberCount).equals(4);
+      check(decl.staticMethodCount).equals(2);
+      check(decl.isInterfaceBound).isTrue();
+      final json = decl.toJson();
+      check(json['supertype']).equals('implements Store');
+      check(json['member_count']).equals(7);
+      check(json['override_member_count']).equals(4);
+      final text = report.formatText();
+      check(text).contains(
+        'implements Store (4/7 members are @override), so its size is '
+        'bound by the interface surface;',
+      );
+      check(text).not((it) => it.contains('can be promoted'));
+    });
+
+    test('Reports `extends` facts but keeps the static-promotion hint when '
+        'overrides are a minority', () async {
+      final file = File(p.join(tempDir.path, 'subclass_monolith.dart'));
+      final pad = List.generate(14, (i) => '    final v$i = $i;').join('\n');
+      file.writeAsStringSync('''
+class Base {
+  void run() {}
+}
+
+class Worker extends Base {
+  @override
+  void run() => _helperOne();
+
+  void other() => _helperTwo();
+
+  static void _helperOne() {
+$pad
+  }
+
+  static void _helperTwo() {
+$pad
+  }
+}
+''');
+
+      const analyzer = FileSplitAnalyzer();
+      final report = await analyzer.analyzeFile(file.path, targetLines: 30);
+      final decl = report.survivingDeclarations.singleWhere(
+        (d) => d.name == 'Worker',
+      );
+      check(decl.supertypeLabel).equals('extends Base');
+      check(decl.isInterfaceBound).isFalse();
+      final text = report.formatText();
+      check(text).contains('extends Base (1/4 members are @override); ');
+      check(text).contains('contains 2 static method(s)');
+      check(text).not((it) => it.contains('bound by the interface surface'));
+    });
+
     test('Dynamically re-evaluates shared-tail diamond cones so surviving '
         'file drops below targetLines', () async {
       final file = File(p.join(tempDir.path, 'diamond_harvester.dart'));
