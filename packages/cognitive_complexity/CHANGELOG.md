@@ -60,6 +60,15 @@
   widenings than the bundle. A root that bridges several groups only names its
   group when it holds at least a third of the group's lines. Rationale reads
   `Sub-component of the <root> cone`.
+- `file_split`: the oversized-class note for a surviving declaration now reports
+  its declared supertype and override ratio, e.g.
+  `implements StorageAdapter (32/51 members are @override)`, and when at least
+  half of the members are `@override` it states that the class size is bound by
+  the interface surface instead of advising that static methods be promoted.
+  `extends X` is reported the same way; mixins are not. `DeclarationUnit` gains
+  `memberCount`, `overrideMemberCount`, `supertypeLabel`, and an
+  `isInterfaceBound` getter (`member_count`, `override_member_count`,
+  `supertype` in JSON).
 
 ## 0.3.0
 

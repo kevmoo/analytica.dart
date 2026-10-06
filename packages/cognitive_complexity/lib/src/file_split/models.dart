@@ -33,6 +33,17 @@ class DeclarationUnit {
   final int staticMethodCount;
   final int staticMethodLines;
   final int stringLiteralLines;
+
+  /// Instance and static members (methods, getters, setters, fields) declared
+  /// directly on this class; constructors are excluded. `0` for non-classes.
+  final int memberCount;
+
+  /// Members of [memberCount] annotated with `@override`.
+  final int overrideMemberCount;
+
+  /// `implements A, B` or `extends X` for classes that declare one; mixins
+  /// (`with`) are not reported.
+  final String? supertypeLabel;
   final Set<String> outgoingIntraFileRefs;
   final Map<String, Set<String>> privateMemberAccessesByTarget;
   final Set<String> requiredImportDirectives;
@@ -48,6 +59,9 @@ class DeclarationUnit {
     this.staticMethodCount = 0,
     this.staticMethodLines = 0,
     this.stringLiteralLines = 0,
+    this.memberCount = 0,
+    this.overrideMemberCount = 0,
+    this.supertypeLabel,
     required this.outgoingIntraFileRefs,
     required this.privateMemberAccessesByTarget,
     required this.requiredImportDirectives,
@@ -55,6 +69,14 @@ class DeclarationUnit {
   });
 
   int get lineCount => endLine >= startLine ? endLine - startLine + 1 : 0;
+
+  /// True when at least half of the declared members are `@override`s of a
+  /// declared supertype, i.e. the class size is bound by an interface surface
+  /// rather than by promotable helpers.
+  bool get isInterfaceBound =>
+      supertypeLabel != null &&
+      memberCount > 0 &&
+      overrideMemberCount * 2 >= memberCount;
 
   Map<String, dynamic> toJson() => {
     'name': name,
@@ -67,6 +89,9 @@ class DeclarationUnit {
     if (staticMethodCount > 0) 'static_method_count': staticMethodCount,
     if (staticMethodLines > 0) 'static_method_lines': staticMethodLines,
     if (stringLiteralLines > 0) 'string_literal_lines': stringLiteralLines,
+    if (memberCount > 0) 'member_count': memberCount,
+    if (overrideMemberCount > 0) 'override_member_count': overrideMemberCount,
+    if (supertypeLabel != null) 'supertype': supertypeLabel,
     'outgoing_refs': outgoingIntraFileRefs.toList()..sort(),
     if (privateMemberAccessesByTarget.isNotEmpty)
       'private_member_accesses': {
@@ -306,20 +331,40 @@ class FileSplitReport {
           'literals (>75% of declaration); consider moving raw string or '
           'template assets to a separate file rather than splitting methods]';
     }
-    final staticHint = d.staticMethodCount > 0
-        ? 'contains ${d.staticMethodCount} static method(s) '
-              '(~${d.staticMethodLines} lines) that can be promoted to '
-              'top-level functions to unlock standalone library extraction; '
-        : '';
+    final hints = '${_supertypeFact(d)}${_staticHint(d)}';
     if (useParts == false) {
       return ' [Note: single ${d.kind} exceeds target $targetLines lines — '
-          '${staticHint}consider extracting cohesive methods into a helper '
+          '${hints}consider extracting cohesive methods into a helper '
           'or extension (--no-use-parts active)]';
     }
     return ' [Note: single ${d.kind} exceeds target $targetLines lines — '
-        '${staticHint}consider extracting cohesive methods into a helper or '
+        '${hints}consider extracting cohesive methods into a helper or '
         'extension, or splitting with `part` / `part of` (--use-parts) to '
         'preserve private `_field` access. Agent Directive: '
         '$kAskUserPartsPreferenceDirective]';
+  }
+
+  /// `implements X (n/m members are @override)` when the class declares a
+  /// supertype and overrides at least one member; flags interface binding.
+  static String _supertypeFact(DeclarationUnit d) {
+    final label = d.supertypeLabel;
+    if (label == null || d.overrideMemberCount == 0) return '';
+    final ratio =
+        '${d.overrideMemberCount}/${d.memberCount} members are '
+        '@override';
+    if (d.isInterfaceBound) {
+      return '$label ($ratio), so its size is bound by the interface '
+          'surface; ';
+    }
+    return '$label ($ratio); ';
+  }
+
+  /// Static-promotion hint, omitted for interface-bound classes where
+  /// promoting statics cannot meaningfully shrink the declaration.
+  static String _staticHint(DeclarationUnit d) {
+    if (d.staticMethodCount == 0 || d.isInterfaceBound) return '';
+    return 'contains ${d.staticMethodCount} static method(s) '
+        '(~${d.staticMethodLines} lines) that can be promoted to '
+        'top-level functions to unlock standalone library extraction; ';
   }
 }

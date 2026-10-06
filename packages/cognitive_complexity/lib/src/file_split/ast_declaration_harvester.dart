@@ -50,6 +50,9 @@ _extractInitialUnits(CompilationUnit unit, LineInfo lineInfo) {
       staticMethodCount: metrics.staticCount,
       staticMethodLines: metrics.staticLines,
       stringLiteralLines: metrics.stringLines,
+      memberCount: metrics.memberCount,
+      overrideMemberCount: metrics.overrideCount,
+      supertypeLabel: metrics.supertypeLabel,
       outgoingIntraFileRefs: const {},
       privateMemberAccessesByTarget: const {},
       requiredImportDirectives: const {},
@@ -63,7 +66,14 @@ _extractInitialUnits(CompilationUnit unit, LineInfo lineInfo) {
   return (units: units, elementToDeclName: elementToDeclName);
 }
 
-({int staticCount, int staticLines, int stringLines})
+({
+  int staticCount,
+  int staticLines,
+  int stringLines,
+  int memberCount,
+  int overrideCount,
+  String? supertypeLabel,
+})
 _measureDeclarationMetrics(CompilationUnitMember member, LineInfo lineInfo) {
   final visitor = _DeclarationMetricsVisitor(lineInfo);
   member.accept(visitor);
@@ -71,7 +81,22 @@ _measureDeclarationMetrics(CompilationUnitMember member, LineInfo lineInfo) {
     staticCount: visitor.staticCount,
     staticLines: visitor.staticLines,
     stringLines: visitor.stringLines,
+    memberCount: visitor.memberCount,
+    overrideCount: visitor.overrideCount,
+    supertypeLabel: _supertypeLabel(member),
   );
+}
+
+/// `implements A, B` when the class declares interfaces, else `extends X`,
+/// else `null`. Mixins (`with`) are intentionally not reported.
+String? _supertypeLabel(CompilationUnitMember member) {
+  if (member is! ClassDeclaration) return null;
+  final interfaces = member.implementsClause?.interfaces;
+  if (interfaces != null && interfaces.isNotEmpty) {
+    return 'implements ${interfaces.map((t) => t.toSource()).join(', ')}';
+  }
+  final superclass = member.extendsClause?.superclass;
+  return superclass == null ? null : 'extends ${superclass.toSource()}';
 }
 
 class _DeclarationMetricsVisitor extends RecursiveAstVisitor<void> {
@@ -79,11 +104,14 @@ class _DeclarationMetricsVisitor extends RecursiveAstVisitor<void> {
   int staticCount = 0;
   int staticLines = 0;
   int stringLines = 0;
+  int memberCount = 0;
+  int overrideCount = 0;
 
   _DeclarationMetricsVisitor(this.lineInfo);
 
   @override
   void visitMethodDeclaration(MethodDeclaration node) {
+    _recordMember(node);
     if (node.isStatic) {
       staticCount++;
       final start = lineInfo.getLocation(node.offset).lineNumber;
@@ -91,6 +119,19 @@ class _DeclarationMetricsVisitor extends RecursiveAstVisitor<void> {
       staticLines += end >= start ? end - start + 1 : 0;
     }
     super.visitMethodDeclaration(node);
+  }
+
+  @override
+  void visitFieldDeclaration(FieldDeclaration node) {
+    _recordMember(node);
+    super.visitFieldDeclaration(node);
+  }
+
+  void _recordMember(ClassMember node) {
+    memberCount++;
+    if (node.metadata.any((a) => a.name.name == 'override')) {
+      overrideCount++;
+    }
   }
 
   @override
@@ -272,6 +313,9 @@ DeclarationUnit _mergeUnitWithRefs(
   staticMethodCount: base.staticMethodCount,
   staticMethodLines: base.staticMethodLines,
   stringLiteralLines: base.stringLiteralLines,
+  memberCount: base.memberCount,
+  overrideMemberCount: base.overrideMemberCount,
+  supertypeLabel: base.supertypeLabel,
   outgoingIntraFileRefs: refs?.outgoing ?? const {},
   privateMemberAccessesByTarget: refs?.privAccess ?? const {},
   requiredImportDirectives: refs?.reqImports ?? const {},
