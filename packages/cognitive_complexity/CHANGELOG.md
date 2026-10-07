@@ -1,3 +1,16 @@
+## 1.0.0-wip
+
+- **Breaking**: Pruned legacy backward-compatibility aliases, re-export shims,
+  and internal helper leaks from the public library surface (`api.txt`):
+  - Removed `ShallowFinding.callerScore` and the `'caller_score'` JSON alias
+    (use `callerCumulativeBefore` / `'caller_cumulative_before'`).
+  - Removed the `GitDiffService` and `isExcludedPath` re-exports from
+    `package:cognitive_complexity/cognitive_complexity.dart`.
+  - Removed internal implementation symbols (`GitHubReporter`,
+    `SignatureSynthesizer`, `DataFlowAnalyzer.synthesizer`,
+    `SplitCluster.writeText`, `VariableUsage.copyWith`, `compareBySignificance`,
+    and `kAskUserPartsPreferenceDirective`) from the public entrypoints.
+
 ## 0.4.0
 
 - **Breaking**: `FunctionComplexity` gains a required `composition`

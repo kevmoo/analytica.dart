@@ -6,9 +6,6 @@ executables:
   file_split
   shallow
 package:cognitive_complexity/cognitive_complexity.dart:
-  kAskUserPartsPreferenceDirective (static const getter: String)
-  compareBySignificance (function: int Function(ComplexityDelta, ComplexityDelta, {bool failOnIncrease, int? failThreshold, int? maxFunctionLines}))
-  isExcludedPath (function: bool Function(String))
   ComplexityAnalyzer (class extends Object):
     new (constructor: ComplexityAnalyzer Function({PathFilter? pathFilter}))
     pathFilter (getter: PathFilter)
@@ -137,19 +134,6 @@ package:cognitive_complexity/cognitive_complexity.dart:
     isViolation (method: bool Function({int? failThreshold, int? maxFunctionLines}))
     toJson (method: Map<String, dynamic> Function())
     toString (method: String Function())
-  GitDiffService (class extends Object):
-    new (const constructor: GitDiffService Function({String? workingDirectory}))
-    workingDirectory (getter: String?)
-    getCurrentFileContent (method: Future<String> Function(String))
-    getHistoricalFileContent (method: Future<String> Function(String, String))
-    getMergeBase (method: Future<String> Function(String))
-    getModifiedDartFiles (method: Future<List<String>> Function(String, {List<String> targetPaths}))
-    getParsedDiff (method: Future<List<GitFileDiff>> Function(String, {List<String> targetPaths}))
-    getRepoRoot (method: Future<String> Function())
-    getUnifiedDiff (method: Future<String> Function(String, {List<String> targetPaths}))
-  GitHubReporter (class extends Object):
-    new (constructor: GitHubReporter Function({File? commentFile, int maxCommentRows, StringSink? stdoutSink, File? summaryFile}))
-    printReport (method: void Function({DeltaSummary? deltaSummary, bool failOnIncrease, int? failThreshold, List<FileLineMetric>? fileMetrics, int? maxFileLines, int? maxFunctionLines, List<FunctionComplexity>? regularResults}))
   PathFilter (class extends Object):
     defaultGeneratedPatterns (static const getter: List<String>)
     defaultIgnoredDirectories (static const getter: List<String>)
@@ -174,7 +158,7 @@ package:cognitive_complexity/cognitive_complexity.dart:
     zeroHeadroom (enum constant: ShallowClassification)
     label (getter: String)
   ShallowFinding (class extends Object):
-    new (const constructor: ShallowFinding Function({required int bodyLines, required int callLine, required int callNestingDepth, required int callerBaseScore, required int callerCumulativeBefore, required String callerFilePath, required String callerName, required int callerScore, required String callerZone, required ShallowClassification classification, required int effectiveParameterCount, required int endLine, required int estimatedLinesSaved, required String filePath, required int headroomAfterInline, required int inlinedCallerScore, required int inlinedCallerScoreIsolated, required int inlinedDeltaScore, required String name, required int namedParameterCount, required int parameterCount, required String? paramsSubsetOfExistingType, required List<String> reasons, required int score, required int sharedParamCount, required String? sharedParamSignatureWith, required int signatureLines, required int simulationIndex, required int startLine, required int statementCount}))
+    new (const constructor: ShallowFinding Function({required int bodyLines, required int callLine, required int callNestingDepth, required int callerBaseScore, required int callerCumulativeBefore, required String callerFilePath, required String callerName, required String callerZone, required ShallowClassification classification, required int effectiveParameterCount, required int endLine, required int estimatedLinesSaved, required String filePath, required int headroomAfterInline, required int inlinedCallerScore, required int inlinedCallerScoreIsolated, required int inlinedDeltaScore, required String name, required int namedParameterCount, required int parameterCount, required String? paramsSubsetOfExistingType, required List<String> reasons, required int score, required int sharedParamCount, required String? sharedParamSignatureWith, required int signatureLines, required int simulationIndex, required int startLine, required int statementCount}))
     bodyLines (getter: int)
     callLine (getter: int)
     callNestingDepth (getter: int)
@@ -182,7 +166,6 @@ package:cognitive_complexity/cognitive_complexity.dart:
     callerCumulativeBefore (getter: int)
     callerFilePath (getter: String)
     callerName (getter: String)
-    callerScore (getter: int)
     callerZone (getter: String)
     classification (getter: ShallowClassification)
     effectiveParameterCount (getter: int)
@@ -235,7 +218,6 @@ package:cognitive_complexity/cognitive_complexity.dart:
     totalLines (getter: int)
     zeroChurnExportDirective (getter: String?)
     toJson (method: Map<String, dynamic> Function())
-    writeText (method: void Function(StringBuffer, int, String))
   SplitTier (enum):
     tier1CleanLibrary (enum constant: SplitTier)
     tier2InternalWidening (enum constant: SplitTier)
@@ -260,9 +242,8 @@ package:cognitive_complexity/data_flow.dart:
     values (static const getter: List<ControlFlowEscapeType>)
     yieldEscape (enum constant: ControlFlowEscapeType)
   DataFlowAnalyzer (class extends Object):
-    new (const constructor: DataFlowAnalyzer Function({String? sdkPath, SignatureSynthesizer synthesizer}))
+    new (const constructor: DataFlowAnalyzer Function({String? sdkPath}))
     sdkPath (getter: String?)
-    synthesizer (getter: SignatureSynthesizer)
     analyzeFile (method: Future<DataFlowResult> Function({required int endLine, required String filePath, String methodName, required int startLine}))
     analyzeSource (method: Future<DataFlowResult> Function({required int endLine, String methodName, required String sourceCode, required int startLine}))
   DataFlowResult (class extends Object):
@@ -283,9 +264,6 @@ package:cognitive_complexity/data_flow.dart:
     startLine (getter: int)
     suggestedSignature (getter: String)
     toJson (method: Map<String, dynamic> Function())
-  SignatureSynthesizer (class extends Object):
-    new (const constructor: SignatureSynthesizer Function())
-    synthesize (method: String Function({required List<VariableUsage> inputs, bool isAsync, String methodName, required List<VariableUsage> outputs, List<String> typeParameters}))
   VariableUsage (class extends Object):
     new (const constructor: VariableUsage Function({required int declarationLine, required int declarationOffset, int? firstMutationLine, bool isMutated, required String name, required String type}))
     declarationLine (getter: int)
@@ -294,7 +272,6 @@ package:cognitive_complexity/data_flow.dart:
     isMutated (getter: bool)
     name (getter: String)
     type (getter: String)
-    copyWith (method: VariableUsage Function({int? firstMutationLine, bool? isMutated}))
     toJson (method: Map<String, dynamic> Function())
 dart:async:
   Future (referenced)
@@ -305,13 +282,9 @@ dart:core:
   Object (referenced)
   Set (referenced)
   String (referenced)
-  StringBuffer (referenced)
-  StringSink (referenced)
   bool (referenced)
   int (referenced)
-dart:io:
-  File (referenced)
-package:analytica/src/git/models.dart:
-  GitFileDiff (referenced)
+package:analytica/src/git/git_diff_service.dart:
+  GitDiffService (referenced)
 package:analyzer/dart/analysis/results.dart:
   ResolvedUnitResult (referenced)

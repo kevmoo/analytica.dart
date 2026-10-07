@@ -293,7 +293,6 @@ class ShallowAnalyzer {
         c.toFinding(
           callerBaseScore: c.caller.score,
           callerCumulativeBefore: callerScore,
-          callerScore: callerScore,
           deltaScore: deltaScore,
           inlinedCallerScore: inlinedCallerScore,
           inlinedCallerScoreIsolated: c.caller.score + deltaScore,
@@ -694,7 +693,6 @@ class _RawCandidate {
   ShallowFinding toFinding({
     required int callerBaseScore,
     required int callerCumulativeBefore,
-    required int callerScore,
     required int deltaScore,
     required int inlinedCallerScore,
     required int inlinedCallerScoreIsolated,
@@ -720,7 +718,6 @@ class _RawCandidate {
     callNestingDepth: call.nestingDepth,
     callerBaseScore: callerBaseScore,
     callerCumulativeBefore: callerCumulativeBefore,
-    callerScore: callerScore,
     inlinedDeltaScore: deltaScore,
     inlinedCallerScore: inlinedCallerScore,
     inlinedCallerScoreIsolated: inlinedCallerScoreIsolated,

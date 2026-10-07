@@ -19,17 +19,6 @@ class VariableUsage {
     this.firstMutationLine,
   });
 
-  VariableUsage copyWith({bool? isMutated, int? firstMutationLine}) {
-    return VariableUsage(
-      name: name,
-      type: type,
-      isMutated: isMutated ?? this.isMutated,
-      declarationOffset: declarationOffset,
-      declarationLine: declarationLine,
-      firstMutationLine: firstMutationLine ?? this.firstMutationLine,
-    );
-  }
-
   Map<String, dynamic> toJson() => {
     'name': name,
     'type': type,

@@ -2,10 +2,10 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:analytica/analytica.dart';
+import 'package:analytica/git.dart';
 import 'package:args/args.dart';
 import 'package:path/path.dart' as p;
 
-import '../complexity/git_diff_service.dart';
 import 'shallow_analyzer.dart';
 
 /// Executes the `shallow` single-caller helper scanner CLI with [args] and

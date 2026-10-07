@@ -224,18 +224,14 @@ class InBlockVisitor extends RecursiveAstVisitor<void> {
       _addClosureEscapeIfRequired(node, currentLine, element.name ?? node.name);
 
       final existing = inputs[element];
-      inputs[element] =
-          (existing ??
-                  VariableUsage(
-                    name: element.name ?? node.name,
-                    type: typeName,
-                    declarationOffset: declOffset,
-                    declarationLine: declLine,
-                  ))
-              .copyWith(
-                isMutated: true,
-                firstMutationLine: existing?.firstMutationLine ?? currentLine,
-              );
+      inputs[element] = VariableUsage(
+        name: existing?.name ?? element.name ?? node.name,
+        type: existing?.type ?? typeName,
+        declarationOffset: existing?.declarationOffset ?? declOffset,
+        declarationLine: existing?.declarationLine ?? declLine,
+        isMutated: true,
+        firstMutationLine: existing?.firstMutationLine ?? currentLine,
+      );
 
       mutations[element] = VariableUsage(
         name: element.name ?? node.name,

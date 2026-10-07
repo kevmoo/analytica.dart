@@ -160,7 +160,7 @@ class SplitCluster {
     'zero_churn_directive': zeroChurnExportDirective,
   };
 
-  void writeText(StringBuffer buf, int cutIndex, String originalFilePath) {
+  void _writeText(StringBuffer buf, int cutIndex, String originalFilePath) {
     buf
       ..writeln()
       ..writeln('[Cut $cutIndex - ${tier.label}]')
@@ -300,7 +300,7 @@ class FileSplitReport {
       '0 circular deps, 0 caller churn) ===',
     );
     for (var i = 0; i < clusters.length; i++) {
-      clusters[i].writeText(buf, i + 1, filePath);
+      clusters[i]._writeText(buf, i + 1, filePath);
     }
     _writeSurviving(buf);
     return buf.toString();

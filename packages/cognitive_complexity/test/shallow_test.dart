@@ -49,7 +49,7 @@ class OrderProcessor {
         // Caller score before inline: if (1) + for (2) = 3.
         // Callee has an `if` at root depth 0 (score 1), which at call depth 2
         // adds 1 + 2 = 3 to the caller, yielding 3 + 3 = 6 <= 15 (SAFE_INLINE).
-        check(finding.callerScore).equals(3);
+        check(finding.callerCumulativeBefore).equals(3);
         check(finding.inlinedDeltaScore).equals(3);
         check(finding.inlinedCallerScore).equals(6);
         check(finding.classification).equals(ShallowClassification.safeInline);
@@ -92,7 +92,7 @@ void _wideHelper(int a, int b, int c, int d, int e) {
         // Caller CC: 1 + 2 + 3 + 4 = 10.
         // Call at depth 4: _wideHelper has outer if (5) + inner if (6) = 11.
         // Inlined caller CC = 10 + 11 = 21 -> FLATTEN_AND_INLINE (16..22).
-        check(finding.callerScore).equals(10);
+        check(finding.callerCumulativeBefore).equals(10);
         check(finding.inlinedDeltaScore).equals(11);
         check(finding.inlinedCallerScore).equals(21);
         check(
@@ -442,7 +442,6 @@ void _h3(int a, int b, int c, int d, int e, int f) { if (true) print(3); }
       check(byName.keys).unorderedEquals(['_h1', '_h2', '_h3']);
       for (final f in byName.values) {
         check(f.callerBaseScore).equals(3);
-        check(f.callerScore).equals(f.callerCumulativeBefore);
         check(
           f.inlinedCallerScore,
         ).equals(f.callerCumulativeBefore + f.inlinedDeltaScore);
@@ -455,7 +454,7 @@ void _h3(int a, int b, int c, int d, int e, int f) { if (true) print(3); }
       final h2Json = byName['_h2']!.toJson();
       check(h2Json['caller_base_score']).equals(3);
       check(h2Json['caller_cumulative_before']).equals(6);
-      check(h2Json['caller_score']).equals(6);
+      check(h2Json.containsKey('caller_score')).isFalse();
       check(h2Json['inlined_caller_score']).equals(9);
 
       final text = report.formatText();

@@ -1,6 +1,11 @@
 import 'dart:io';
+
+import 'package:analytica/git.dart';
 import 'package:checks/checks.dart';
 import 'package:cognitive_complexity/cognitive_complexity.dart';
+import 'package:cognitive_complexity/src/complexity/delta_analyzer.dart'
+    show compareBySignificance;
+import 'package:cognitive_complexity/src/complexity/github_reporter.dart';
 import 'package:test/scaffolding.dart';
 
 void main() {
