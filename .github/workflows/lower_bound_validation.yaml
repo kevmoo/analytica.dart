@@ -16,8 +16,8 @@ jobs:
       - name: Setup Dart SDK
         uses: dart-lang/setup-dart@v1
 
-      - name: Self-Dogfood Lower-Bound Check
-        uses: ./packages/lower_bound
+      - name: Run Lower-Bound Validator
+        uses: kevmoo/lower_bound.dart@main
         with:
           allow-local-siblings: 'true'
           format: 'github'
