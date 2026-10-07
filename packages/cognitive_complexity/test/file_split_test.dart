@@ -185,9 +185,24 @@ $pad
         err: jsonErr,
       );
       check(code).equals(0);
-      final decoded = jsonDecode(jsonOut.toString()) as Map<String, dynamic>;
-      check(decoded['declaration_count']).equals(2);
-      check((decoded['clusters'] as List).isNotEmpty).equals(true);
+      final decoded = jsonDecode(jsonOut.toString()) as List<dynamic>;
+      final report = decoded.single as Map<String, dynamic>;
+      check(report['declaration_count']).equals(2);
+      check((report['clusters'] as List).isNotEmpty).equals(true);
+
+      // A directory scan with no oversized files still yields an (empty)
+      // array, never an object. (Explicit file paths are always analyzed.)
+      final onlyDir = Directory(p.join(tempDir.path, 'json_shape_dir'))
+        ..createSync();
+      file.copySync(p.join(onlyDir.path, 'small.dart'));
+      final emptyOut = StringBuffer();
+      final emptyCode = await file_split_cli.runFileSplitCli(
+        ['--format', 'json', '--target-lines', '5000', onlyDir.path],
+        out: emptyOut,
+        err: StringBuffer(),
+      );
+      check(emptyCode).equals(0);
+      check(jsonDecode(emptyOut.toString())).isA<List<dynamic>>().isEmpty();
     });
 
     test('Merges sibling cones sharing private helpers to eliminate '
