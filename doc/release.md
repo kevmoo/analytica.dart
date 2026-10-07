@@ -19,7 +19,9 @@ Generic pre-flight tooling that only formats/analyzes does not catch this.
 1. **Promote the version.** In `packages/<pkg>/pubspec.yaml` change
    `version: x.y.z-wip` to `version: x.y.z`, and in
    `packages/<pkg>/CHANGELOG.md` rename the `## x.y.z-wip` heading to
-   `## x.y.z`.
+   `## x.y.z`. Some packages also keep a hand-maintained version constant
+   (`dedupe`: `lib/src/version.dart`; `undead`: `lib/src/cli.dart`) that
+   `test/version_test.dart` checks against `pubspec.yaml` — update it too.
 
 2. **Sync the pins and run the gate.**
 
