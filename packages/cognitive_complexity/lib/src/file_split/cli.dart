@@ -71,7 +71,9 @@ ArgParser _buildArgParser() => ArgParser()
     'format',
     defaultsTo: 'text',
     allowed: ['text', 'json'],
-    help: 'Output format (text or json).',
+    help:
+        'Output format (text or json). JSON output is always an array with '
+        'one report per analyzed file.',
   )
   ..addSdkPathOption();
 
@@ -145,9 +147,7 @@ void _writeReports(
   StringSink stdoutSink,
 ) {
   if (format == 'json') {
-    final payload = reports.length == 1
-        ? reports.single.toJson()
-        : [for (final r in reports) r.toJson()];
+    final payload = [for (final r in reports) r.toJson()];
     stdoutSink.writeln(const JsonEncoder.withIndent('  ').convert(payload));
     return;
   }
