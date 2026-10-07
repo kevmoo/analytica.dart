@@ -34,7 +34,10 @@
   it. The reason text includes the statement count.
 - `shallow`: `HIGH_ARITY` is evaluated against the effective parameter count,
   where record-typed parameters expand to their field count; the reason text
-  reports both (`HIGH_ARITY(4 params, 6 effective)`).
+  reports both (`HIGH_ARITY(4 params, 6 effective)`). Only inline record type
+  annotations expand, one level deep. A record `typedef` is a type declaration
+  like a class and counts as one parameter, so a domain record passed through a
+  helper is not reported as packing.
 - `shallow`: `CROSS_FILE_SINGLE_CALLER` is no longer reported for `lib/`
   declarations whose single caller lives in `bin/`, `test/`, `tool/`,
   `example/`, or `web/` (package layering, not shallow extraction). Other
