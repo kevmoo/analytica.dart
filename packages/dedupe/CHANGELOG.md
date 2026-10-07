@@ -1,5 +1,6 @@
-## 0.1.1-wip
+## 0.1.1
 
+- Require `analytica` `^0.1.4`.
 - Adopt centralized `PathFilter` for `--exclude` and generated code filtering
   (`--[no-]ignore-generated`).
 - Add `ensure_cli_readme_test.dart` to verify CLI `--help` documentation in

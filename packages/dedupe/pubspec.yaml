@@ -2,7 +2,7 @@ name: dedupe
 description: >-
   High-performance code duplication and clone detection engine and CLI tool
   for Dart and Flutter.
-version: 0.1.1-wip
+version: 0.1.1
 repository: https://github.com/kevmoo/analytica.dart/tree/main/packages/dedupe
 issue_tracker: https://github.com/kevmoo/analytica.dart/issues
 
@@ -21,7 +21,7 @@ environment:
   sdk: '^3.12.0'
 
 dependencies:
-  analytica: ^0.1.2-wip
+  analytica: ^0.1.4
   analyzer: '>=12.0.0 <15.0.0'
   args: ^2.7.0
   io: ^1.0.5
