@@ -1,4 +1,4 @@
-## 1.0.0-wip
+## 1.0.0
 
 - **Breaking**: Pruned legacy backward-compatibility aliases, re-export shims,
   and internal helper leaks from the public library surface (`api.txt`):
@@ -10,7 +10,9 @@
     `SignatureSynthesizer`, `DataFlowAnalyzer.synthesizer`,
     `SplitCluster.writeText`, `VariableUsage.copyWith`, `compareBySignificance`,
     and `kAskUserPartsPreferenceDirective`) from the public entrypoints.
-- `file_split`: Skips Tier-3 `part` fallback cuts that would leave less than 25%
+- `file_split`: Eliminated super-linear cone-merge overhead on dense
+  many-declaration files, guarded against plans that extract 100% of top-level
+  declarations, skips Tier-3 `part` fallback cuts that would leave less than 25%
   of the file behind, adds `largestResultingFileLines`, `meetsTarget`, and
   `hasSurvivingCoupledScc` (`largest_resulting_file_lines` and `meets_target` in
   `--format json`) to `FileSplitReport`, and prints oversized-declaration notes

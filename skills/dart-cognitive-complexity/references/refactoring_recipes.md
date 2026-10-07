@@ -227,7 +227,7 @@ Run the companion statement-level data-flow analyzer on each candidate line
 slice before extracting:
 
 ```bash
-dart run cognitive_complexity:data_flow@^0.4.0 lib/src/my_file.dart:45-80
+dart run cognitive_complexity:data_flow@^1.0.0 lib/src/my_file.dart:45-80
 ```
 
 Its report (`inputs`, `mutations`, live `outputs`, control-flow escapes,
@@ -349,22 +349,30 @@ When a Dart file grows beyond `400` lines (enforceable via opt-in
 run the deterministic intra-file dependency graph advisor:
 
 ```bash
-dart run cognitive_complexity:file_split@^0.4.0 lib/src/large_file.dart --target-lines 300
+dart run cognitive_complexity:file_split@^1.0.0 lib/src/large_file.dart --target-lines 300
 ```
 
 `--target-lines` is a physical-line budget for the surviving file. The planner
 extracts disjoint islands first, then sub-cone leaf groups out of the dominant
-island (one level), and names each cut after its dominant public declaration.
-`--format json` always emits an array with one report per analyzed file. If a
-surviving class is still oversized and at least half of its members are
-`@override`, the report states `implements X (n/m members are @override)` (or
-`extends X`): the class size is bound by the interface surface, so promoting
-static members will not help; narrow the interface or delegate instead.
+island (one level), names each cut after its dominant public declaration, and
+skips Tier-3 `part` fallback cuts that would leave `< 25%` of the pre-fallback
+file behind. The header reports `largest resulting file: N lines` (appending
+`(target M not met)` when `N > M`; `largest_resulting_file_lines` and
+`meets_target` in `--format json`, which always emits an array with one report
+per analyzed file). Oversized-declaration notes
+(`implements X (n/m members are @override)` / `extends X`, static-promotion
+hints, embedded-asset hints, and coupled-SCC vs. cohesive-island summaries)
+appear on both `Move Declarations` in extracted cuts and
+`Surviving Declarations`: when at least half of a class's members are
+`@override`, its size is bound by the interface surface, so promoting static
+members will not help; narrow the interface or delegate instead.
 
 Apply the **Load-Bearing Library Boundary Rule** (Section 1.2) when selecting
-between a standalone `lib/src/<topic>.dart` file (**Tier 1**) and `part` /
-`part of` (**Tier 2**), and always run the `api_summary` verification gate
-(Section 1.3) before and after splitting.
+between a standalone `lib/src/<topic>.dart` file (**Tier 1**, CLI
+`[Cut N - Tier 1]` or `[Cut N - Tier 2]` for `1–3` `@internal` widenings inside
+`lib/src/`) and `part` / `part of` (**Tier 2**, reported by `file_split` as
+`[Cut N - Tier 3]`), and always run the `api_summary` verification gate (Section
+1.3) before and after splitting.
 
 ---
 
@@ -375,7 +383,7 @@ micro-helpers or high-arity bucket-brigade functions (`>= 5` parameters), run
 the AST shallow helper scanner:
 
 ```bash
-dart run cognitive_complexity:shallow@^0.4.0 lib/
+dart run cognitive_complexity:shallow@^1.0.0 lib/
 ```
 
 The scanner identifies non-exported helpers with `FanIn == 1` and
@@ -419,6 +427,6 @@ To reproduce or re-evaluate cognitive complexity scores:
 ```
 
 ```bash
-dart run cognitive_complexity:data_flow@^0.4.0 {file}:{start_line}-{end_line}
+dart run cognitive_complexity:data_flow@^1.0.0 {file}:{start_line}-{end_line}
 ```
 ````

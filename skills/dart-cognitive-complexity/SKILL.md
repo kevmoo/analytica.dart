@@ -47,8 +47,8 @@ Run the CLI directly (requires Dart SDK **3.12.0+**, verify via
 
 - **Scope 1 — Targeted (Specific File or Directory)**:
   ```bash
-  dart run cognitive_complexity@^0.4.0 --threshold 15 lib/src/auth/
-  dart run cognitive_complexity@^0.4.0 --threshold 15 --verbose lib/src/auth/
+  dart run cognitive_complexity@^1.0.0 --threshold 15 lib/src/auth/
+  dart run cognitive_complexity@^1.0.0 --threshold 15 --verbose lib/src/auth/
   ```
   `--verbose` / `-v` adds a `Breakdown` column (`branches`, `nesting`,
   `boolean_ops`, `max_depth`; also in JSON as `composition`) so a flat score-15
@@ -57,26 +57,26 @@ Run the CLI directly (requires Dart SDK **3.12.0+**, verify via
   `[test entrypoint]`.
 - **Scope 2 — Delta (PR, Branch, or Pre-Flight Audit)**:
   ```bash
-  dart run cognitive_complexity@^0.4.0 --git-diff origin/main --fail-threshold 15 --fail-on-increase
+  dart run cognitive_complexity@^1.0.0 --git-diff origin/main --fail-threshold 15 --fail-on-increase
   ```
 - **Scope 3 — Whole-Project (Default Naked Invocation)**: Invoking
   `cognitive_complexity` with zero positional paths automatically discovers
   package roots or workspace members and defaults to analyzing `lib/`:
   ```bash
-  dart run cognitive_complexity@^0.4.0 --threshold 15
-  dart run cognitive_complexity@^0.4.0 --threshold 40 test/
+  dart run cognitive_complexity@^1.0.0 --threshold 15
+  dart run cognitive_complexity@^1.0.0 --threshold 40 test/
   ```
   > [!NOTE]
   >
   > **CLI Package Caveat (`lib/ bin/`)**: Zero-argument auto-discovery only
   > inspects `lib/`. For CLI tools and applications with entrypoints in `bin/`
   > (or `tool/`), pass target directories explicitly:
-  > `dart run cognitive_complexity@^0.4.0 --threshold 15 lib/ bin/`
+  > `dart run cognitive_complexity@^1.0.0 --threshold 15 lib/ bin/`
 - **Scope 4 — Shallow Helper Audit (Over-Extraction & Re-Inlining)**:
   ```bash
-  dart run cognitive_complexity:shallow@^0.4.0 lib/
-  dart run cognitive_complexity:shallow@^0.4.0 lib/ bin/
-  dart run cognitive_complexity:shallow@^0.4.0 --git-diff origin/main --fail-on-safe-inline
+  dart run cognitive_complexity:shallow@^1.0.0 lib/
+  dart run cognitive_complexity:shallow@^1.0.0 lib/ bin/
+  dart run cognitive_complexity:shallow@^1.0.0 --git-diff origin/main --fail-on-safe-inline
   ```
 
 ---
@@ -186,7 +186,7 @@ template.
 Run the statement-level data-flow analyzer on candidate line slices:
 
 ```bash
-dart run cognitive_complexity:data_flow@^0.4.0 lib/src/my_file.dart:45-80
+dart run cognitive_complexity:data_flow@^1.0.0 lib/src/my_file.dart:45-80
 ```
 
 Inspect the complexity impact (`enclosingScore`, `sliceScoreInPlace`,
@@ -221,27 +221,37 @@ flattening in place with Patterns A/B instead of extracting a shallow helper:
   flags.
 - **Pattern F (Acyclic File Decomposition & Load-Bearing Library Boundaries)**:
   Run
-  `dart run cognitive_complexity:file_split@^0.4.0 lib/src/large_file.dart --target-lines 300`
+  `dart run cognitive_complexity:file_split@^1.0.0 lib/src/large_file.dart --target-lines 300`
   for files `> 400` lines and select the library boundary tier. `--target-lines`
   is a physical-line budget for the surviving file; the planner cuts disjoint
-  islands first, then sub-cone leaf groups out of the dominant island, and names
-  each cut after its dominant public declaration. `--format json` always emits
-  an array (one report per analyzed file). When a surviving class is still
-  oversized and `>= 50%` of its members are `@override`, the report states
-  `implements X (n/m members are @override)` — the size is bound by the
-  interface surface, so do not promote statics; narrow the interface or split
-  the implementation behind a delegate instead.
-  - **Tier 1 (Default — Standalone `lib/src/<topic>.dart`)**: Use when extracted
-    helpers form a genuine sub-domain with narrow parameter lists (`<= 3` args)
-    and do **not** need private `_` members or library-scoped modifiers of the
-    parent class/library.
-  - **Tier 2 (`part` / `part of`)**: Use when splitting one cohesive domain
-    where helpers share private `_` fields, private constructors (`._()`),
-    `sealed`/`final`/`interface`/`base` modifiers, or internal invariants, OR
-    when standalone `lib/src/` files would require widening visibility and risk
-    leaking internal types via unscoped `export 'src/...';` directives.
+  islands first, then sub-cone leaf groups out of the dominant island, names
+  each cut after its dominant public declaration, and skips Tier-3 `part`
+  fallback cuts that would leave `< 25%` of the pre-fallback file behind. The
+  header reports `largest resulting file: N lines` (appending
+  `(target M not met)` when `N > M`; `largest_resulting_file_lines` and
+  `meets_target` in `--format json`, which always emits an array of one report
+  per analyzed file). Oversized-declaration notes
+  (`implements X (n/m members are @override)`, static-promotion hints,
+  embedded-asset hints, and coupled-SCC vs. cohesive-island summaries) appear on
+  both `Move Declarations` in extracted cuts and `Surviving Declarations` — when
+  `>= 50%` of a class's members are `@override`, its size is bound by the
+  interface surface, so narrow the interface or split behind a delegate rather
+  than promoting statics.
+  - **Tier 1 (Default — Standalone `lib/src/<topic>.dart`, CLI
+    `[Cut N - Tier 1]`)**: Use when extracted helpers form a genuine sub-domain
+    with narrow parameter lists (`<= 3` args) and do **not** need private `_`
+    members or library-scoped modifiers of the parent class/library
+    (`[Cut N - Tier 2]` in `file_split` indicates a one-way acyclic cut that
+    requires widening `1–3` internal `_` helpers to `@internal` inside
+    `lib/src/`).
+  - **Tier 2 (`part` / `part of`, CLI `[Cut N - Tier 3]`)**: Use when splitting
+    one cohesive domain where helpers share private `_` fields, private
+    constructors (`._()`), `sealed`/`final`/`interface`/`base` modifiers, or
+    internal invariants, OR when standalone `lib/src/` files would require
+    widening visibility and risk leaking internal types via unscoped
+    `export 'src/...';` directives.
 - **Pattern G (Re-Inlining Shallow Single-Caller Helpers — `shallow`)**: Run
-  `dart run cognitive_complexity:shallow@^0.4.0 lib/` to detect single-caller
+  `dart run cognitive_complexity:shallow@^1.0.0 lib/` to detect single-caller
   pass-through helpers (`HIGH_ARITY`, `MICRO_HELPER`, `SIG_HEAVY`,
   `CROSS_FILE_SINGLE_CALLER`). Re-inline `SAFE_INLINE` findings
   (`CallerCCAfter < 15`) directly into their sole caller, treat `ZERO_HEADROOM`
@@ -257,9 +267,9 @@ flattening in place with Patterns A/B instead of extracting a shallow helper:
 ## 6. Verification & Public API Surface Guardrails
 
 1. **Complexity & Shallow-Helper Audit**: Run
-   `dart run cognitive_complexity@^0.4.0 --fail-threshold 15 <refactored files>`
+   `dart run cognitive_complexity@^1.0.0 --fail-threshold 15 <refactored files>`
    and
-   `dart run cognitive_complexity:shallow@^0.4.0 --fail-on-safe-inline <refactored files>`.
+   `dart run cognitive_complexity:shallow@^1.0.0 --fail-on-safe-inline <refactored files>`.
 2. **Mandatory `api_summary` Public API Surface Verification Gate**: Whenever a
    refactor extracts helpers across files or touches `lib/` exports:
    ```bash
