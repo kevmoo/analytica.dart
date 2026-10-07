@@ -1,0 +1,23 @@
+name: Fuzz
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: '0 6 * * 1'
+
+jobs:
+  fuzz-analytica:
+    uses: kevmoo/fuzz.dart/.github/workflows/fuzz.yaml@main
+    with:
+      package-root: packages/analytica
+      target: test/fuzz/diff_parser_fuzz.dart
+      max-total-time: 30
+
+  fuzz-cli-readme:
+    uses: kevmoo/fuzz.dart/.github/workflows/fuzz.yaml@main
+    with:
+      package-root: packages/cli_readme
+      target: test/fuzz/cli_readme_fuzz.dart
+      max-total-time: 30

@@ -1,3 +1,8 @@
+## 0.1.4-wip
+
+- Fix `GitDiffParser.parse` to handle single-quote file paths and oversized hunk
+  header line numbers without throwing.
+
 ## 0.1.3
 
 - Add `discoverDefaultTargets` in `package:analytica/cli.dart` to resolve
