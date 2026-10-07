@@ -10,26 +10,12 @@ Actions, and AI Agent Skills for Dart and Flutter repositories.
 
 ## 📦 Published Packages
 
-<!-- mdformat off(prevent table wrapping) -->
-
 | Package                                                  |                                                          Pub                                                           | Description                                                                                |
 | :------------------------------------------------------- | :--------------------------------------------------------------------------------------------------------------------: | :----------------------------------------------------------------------------------------- |
 | [`cognitive_complexity`](packages/cognitive_complexity/) | [![pub package](https://img.shields.io/pub/v/cognitive_complexity.svg)](https://pub.dev/packages/cognitive_complexity) | Algorithmic Cognitive Complexity calculation and AST data-flow analysis library and CLI.   |
 | [`dedupe`](packages/dedupe/)                             |               [![pub package](https://img.shields.io/pub/v/dedupe.svg)](https://pub.dev/packages/dedupe)               | High-performance token, structural, and parameterized code clone detection engine and CLI. |
 | [`undead`](packages/undead/)                             |               [![pub package](https://img.shields.io/pub/v/undead.svg)](https://pub.dev/packages/undead)               | Whole-program reachability and dead declaration analysis for packages and closed apps.     |
 | [`analytica`](packages/analytica/)                       |            [![pub package](https://img.shields.io/pub/v/analytica.svg)](https://pub.dev/packages/analytica)            | Shared SDK discovery, AST analyzer extensions, Git diff utilities, and CI reporting.       |
-
-<!-- mdformat on -->
-
-### 🚧 In Development
-
-<!-- mdformat off(prevent table wrapping) -->
-
-| Package                                |   Version   | Description                                                                             |
-| :------------------------------------- | :---------: | :-------------------------------------------------------------------------------------- |
-| [`lower_bound`](packages/lower_bound/) | `0.1.0-wip` | Automated Dart dependency lower-bound validator and synthetic runtime isolation engine. |
-
-<!-- mdformat on -->
 
 ---
 
@@ -41,9 +27,6 @@ respective package directories:
 - [**Cognitive Complexity Audit**](packages/cognitive_complexity/README.md#github-actions)
   (`packages/cognitive_complexity`): Calculates Cognitive Complexity scores on
   pull requests and flags regressions.
-- [**Dependency Lower-Bound Validator**](packages/lower_bound/README.md#github-action)
-  (`packages/lower_bound`): Validates that declared dependency lower bounds
-  resolve and build against synthetic minimums.
 
 ---
 
