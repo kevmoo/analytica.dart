@@ -10,6 +10,11 @@
     `SignatureSynthesizer`, `DataFlowAnalyzer.synthesizer`,
     `SplitCluster.writeText`, `VariableUsage.copyWith`, `compareBySignificance`,
     and `kAskUserPartsPreferenceDirective`) from the public entrypoints.
+- `file_split`: Pre-index cross-SCC private spans and memoize rejected candidate
+  cone pairs per merge phase, avoiding `O(G^3 * (N + E))` scaling on files with
+  hundreds of top-level declarations, and prevent extracting the final remaining
+  declaration when header or blank-line overhead exceeds `--target-lines`
+  (#174).
 
 ## 0.4.0
 

@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:analytica/analyzer.dart';
 import 'package:checks/checks.dart';
 import 'package:cognitive_complexity/cognitive_complexity.dart';
 import 'package:cognitive_complexity/src/file_split/cli.dart' as file_split_cli;
@@ -742,5 +743,62 @@ class BetaTheme {
         check(report.estimatedRemainingLines).isLessOrEqual(110);
       },
     );
+
+    test('Handles high-fan-out star topology (320+ leaf cones) in < 500 ms '
+        'and preserves >= 1 surviving declaration when header overhead exceeds '
+        'targetLines (#174)', () async {
+      final file = File(p.join(tempDir.path, 'bench_paths_sim.dart'));
+      final header = List.generate(450, (i) => '// header $i').join('\n');
+      final leaves = List.generate(
+        320,
+        (i) =>
+            'int leaf$i() {\n'
+            '  final a = $i;\n'
+            '  final b = a + 1;\n'
+            '  return b;\n'
+            '}',
+      ).join('\n\n');
+      final calls = List.generate(
+        320,
+        (i) => '  sum += leaf$i();',
+      ).take(55).join('\n');
+      final tailCalls = List.generate(
+        320,
+        (i) => 'leaf$i()',
+      ).skip(55).join(' + ');
+      file.writeAsStringSync('''
+$header
+
+int createPaths() {
+  var sum = 0;
+$calls
+  return sum + $tailCalls;
+}
+
+$leaves
+''');
+
+      final absPath = p.canonicalize(file.absolute.path);
+      final helper = AnalysisContextHelper(includedPaths: [absPath]);
+      final unitResult = await helper.getRequiredResolvedUnit(absPath);
+
+      const analyzer = FileSplitAnalyzer();
+      final sw = Stopwatch()..start();
+      final report = analyzer.analyzeResolvedUnit(
+        unitResult,
+        displayPath: file.path,
+        targetLines: 400,
+        minClusterLines: 30,
+      );
+      sw.stop();
+
+      check(sw.elapsedMilliseconds).isLessThan(500);
+      check(report.declarationCount).equals(321);
+      check(report.clusters).isNotEmpty();
+      check(report.survivingDeclarations).isNotEmpty();
+      check(
+        report.survivingDeclarations.map((d) => d.name).toSet(),
+      ).contains('createPaths');
+    });
   });
 }

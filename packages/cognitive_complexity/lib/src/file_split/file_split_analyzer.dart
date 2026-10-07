@@ -137,6 +137,8 @@ class FileSplitAnalyzer {
   }
 }
 
+typedef _ScoredCone = ({Set<int> cone, int lines, int crossings});
+
 class _ExtractionCutPlanner {
   final String filePath;
 
@@ -156,6 +158,10 @@ class _ExtractionCutPlanner {
   final extractedSccs = <int>{};
   final clusters = <SplitCluster>[];
   final Set<String> usedFileNames;
+  final List<int> _sccLineCounts;
+  final List<bool> _sccAllPrivate;
+  final _BoundaryCrossingIndex _crossingIndex;
+  int _nextCandidateGroupId = 0;
 
   _ExtractionCutPlanner({
     required this.filePath,
@@ -169,13 +175,21 @@ class _ExtractionCutPlanner {
     required this.depths,
     required this.islands,
   }) : stem = p.basenameWithoutExtension(filePath),
-       usedFileNames = <String>{p.basename(filePath)};
+       usedFileNames = <String>{p.basename(filePath)},
+       _sccLineCounts = [
+         for (final scc in sccs)
+           scc.fold(0, (s, n) => s + (declsByName[n]?.lineCount ?? 0)),
+       ],
+       _sccAllPrivate = [
+         for (final scc in sccs)
+           scc.every((n) => !(declsByName[n]?.isPublic ?? true)),
+       ],
+       _crossingIndex = _BoundaryCrossingIndex.build(sccs, declsByName);
 
-  int _sccLines(int idx) =>
-      sccs[idx].fold(0, (s, n) => s + (declsByName[n]?.lineCount ?? 0));
+  int _sccLines(int idx) => _sccLineCounts[idx];
 
   int _setLines(Iterable<int> indices) =>
-      indices.fold(0, (s, idx) => s + _sccLines(idx));
+      indices.fold(0, (s, idx) => s + _sccLineCounts[idx]);
 
   ({List<SplitCluster> clusters, List<DeclarationUnit> surviving}) plan() {
     _extractDisjointIslands();
@@ -328,21 +342,28 @@ class _ExtractionCutPlanner {
     if (remLines <= targetLines) return false;
 
     final neededLines = remLines - targetLines;
-    final eligible = <Set<int>>[];
+    final remSccCount = sccs.length - extractedSccs.length;
+    final eligible = <_ScoredCone>[];
     for (final g in groups) {
       final unextracted = _unextractedDownwardClosure(g);
       final lines = _setLines(unextracted);
-      final withinRem = !requireSmallerThanRemaining || lines < remLines;
+      final withinRem =
+          !requireSmallerThanRemaining ||
+          (lines < remLines && unextracted.length < remSccCount);
       if (lines >= minClusterLines &&
           lines <= targetLines &&
           withinRem &&
           _isValidDownwardClosedCut(unextracted)) {
-        eligible.add(unextracted);
+        eligible.add((
+          cone: unextracted,
+          lines: lines,
+          crossings: _crossingIndex.countCrossings(unextracted),
+        ));
       }
     }
     if (eligible.isEmpty) return false;
     eligible.sort((a, b) => _compareCandidateCones(a, b, neededLines));
-    _commitCone(eligible.first);
+    _commitCone(eligible.first.cone);
     return true;
   }
 
@@ -396,10 +417,10 @@ class _ExtractionCutPlanner {
     final ordered = _topologicalGroupOrder(groups);
     if (ordered == null || ordered.length < 2) return null;
 
-    final bundledCrossings = _countBoundaryCrossings(cone);
+    final bundledCrossings = _crossingIndex.countCrossings(cone);
     final splitCrossings = ordered.fold(
       0,
-      (s, g) => s + _countBoundaryCrossings(g),
+      (s, g) => s + _crossingIndex.countCrossings(g),
     );
     return splitCrossings > bundledCrossings ? null : ordered;
   }
@@ -516,21 +537,17 @@ class _ExtractionCutPlanner {
         'other than through the cone root(s), 0 circular imports.';
   }
 
-  int _compareCandidateCones(Set<int> a, Set<int> b, int neededLines) {
-    final aLines = _setLines(a);
-    final bLines = _setLines(b);
-    final aSufficient = aLines >= neededLines;
-    final bSufficient = bLines >= neededLines;
+  int _compareCandidateCones(_ScoredCone a, _ScoredCone b, int neededLines) {
+    final aSufficient = a.lines >= neededLines;
+    final bSufficient = b.lines >= neededLines;
     if (aSufficient != bSufficient) {
       return aSufficient ? -1 : 1;
     }
-    final crossCmp = _countBoundaryCrossings(
-      a,
-    ).compareTo(_countBoundaryCrossings(b));
+    final crossCmp = a.crossings.compareTo(b.crossings);
     if (aSufficient && bSufficient) {
-      return crossCmp != 0 ? crossCmp : aLines.compareTo(bLines);
+      return crossCmp != 0 ? crossCmp : a.lines.compareTo(b.lines);
     }
-    return bLines != aLines ? bLines.compareTo(aLines) : crossCmp;
+    return b.lines != a.lines ? b.lines.compareTo(a.lines) : crossCmp;
   }
 
   Set<int> _unextractedDownwardClosure(Iterable<int> seeds) {
@@ -557,12 +574,22 @@ class _ExtractionCutPlanner {
       survivingChildren,
       coneNodes,
     );
-    while (_tryMergeOneCrossingPair(groups, requireReduction: true)) {}
-    while (_tryMergeOneCrossingPair(groups, requireReduction: false)) {}
-    return groups;
+    final rejectedPhase1 = <(int, int)>{};
+    while (_tryMergeOneCrossingPair(
+      groups,
+      rejectedPhase1,
+      requireReduction: true,
+    )) {}
+    final rejectedPhase2 = <(int, int)>{};
+    while (_tryMergeOneCrossingPair(
+      groups,
+      rejectedPhase2,
+      requireReduction: false,
+    )) {}
+    return [for (final g in groups) g.sccs];
   }
 
-  List<Set<int>> _initialDownwardClosedChildGroups(
+  List<_CandidateGroup> _initialDownwardClosedChildGroups(
     List<int> survivingChildren,
     Map<int, Set<int>> coneNodes,
   ) {
@@ -574,23 +601,34 @@ class _ExtractionCutPlanner {
       for (final c in survivingChildren)
         if (closures[c]!.isNotEmpty &&
             !(_isAllPrivateGroup(closures[c]!) &&
-                closures.entries.any(
-                  (e) => e.key != c && e.value.containsAll(closures[c]!),
-                )))
-          closures[c]!,
+                closures.entries.any((e) => e.key != c && e.value.contains(c))))
+          _CandidateGroup(
+            id: _nextCandidateGroupId++,
+            sccs: closures[c]!,
+            lines: _setLines(closures[c]!),
+            crossings: _crossingIndex.countCrossings(closures[c]!),
+            isAllPrivate: _isAllPrivateGroup(closures[c]!),
+            touchedItems: {
+              for (final u in closures[c]!) ..._crossingIndex.itemsByScc[u],
+            },
+          ),
     ];
   }
 
-  bool _isAllPrivateGroup(Set<int> group) => group.every(
-    (idx) => sccs[idx].every((n) => !(declsByName[n]?.isPublic ?? true)),
-  );
+  bool _isAllPrivateGroup(Set<int> group) =>
+      group.every((idx) => _sccAllPrivate[idx]);
 
   bool _tryMergeOneCrossingPair(
-    List<Set<int>> groups, {
+    List<_CandidateGroup> groups,
+    Set<(int, int)> rejected, {
     required bool requireReduction,
   }) {
     for (var i = 0; i < groups.length; i++) {
+      final gi = groups[i];
+      if (requireReduction && gi.touchedItems.isEmpty) continue;
       for (var j = i + 1; j < groups.length; j++) {
+        final pairKey = (gi.id, groups[j].id);
+        if (rejected.contains(pairKey)) continue;
         if (_mergePairIfEligible(
           groups,
           i,
@@ -599,48 +637,56 @@ class _ExtractionCutPlanner {
         )) {
           return true;
         }
+        rejected.add(pairKey);
       }
     }
     return false;
   }
 
   bool _mergePairIfEligible(
-    List<Set<int>> groups,
+    List<_CandidateGroup> groups,
     int i,
     int j, {
     required bool requireReduction,
   }) {
-    final candidate = <int>{...groups[i], ...groups[j]};
-    final candLines = _setLines(candidate);
-    if (candLines > targetLines || !_isValidDownwardClosedCut(candidate)) {
+    final gi = groups[i];
+    final gj = groups[j];
+    if (!gi.canAttemptMergeWith(
+      gj,
+      targetLines,
+      requireReduction: requireReduction,
+    )) {
       return false;
     }
-    final crossBefore =
-        _countBoundaryCrossings(groups[i]) + _countBoundaryCrossings(groups[j]);
-    final crossAfter = _countBoundaryCrossings(candidate);
-
-    if (!requireReduction) {
-      final bothPrivate =
-          _isAllPrivateGroup(groups[i]) && _isAllPrivateGroup(groups[j]);
-      final smallZeroCrossingPair =
-          targetLines >= 200 &&
-          crossBefore == 0 &&
-          crossAfter == 0 &&
-          candLines <= targetLines ~/ 2;
-      if (!bothPrivate && !smallZeroCrossingPair) return false;
+    final candidate = <int>{...gi.sccs, ...gj.sccs};
+    final candLines = _setLines(candidate);
+    final bothPrivate = gi.isAllPrivate && gj.isAllPrivate;
+    final maxLines = (!requireReduction && !bothPrivate)
+        ? targetLines ~/ 2
+        : targetLines;
+    if (candLines > maxLines || !_isValidDownwardClosedCut(candidate)) {
+      return false;
     }
-
+    final crossBefore = gi.crossings + gj.crossings;
+    final crossAfter = _crossingIndex.countCrossings(candidate);
     final worse = requireReduction
         ? crossAfter >= crossBefore
-        : crossAfter > crossBefore;
+        : crossAfter > crossBefore || (!bothPrivate && crossAfter != 0);
     if (worse) return false;
 
-    final removedA = groups[i];
-    final removedB = groups[j];
     groups
-      ..remove(removedA)
-      ..remove(removedB)
-      ..add(candidate);
+      ..removeAt(j)
+      ..removeAt(i)
+      ..add(
+        _CandidateGroup(
+          id: _nextCandidateGroupId++,
+          sccs: candidate,
+          lines: candLines,
+          crossings: crossAfter,
+          isAllPrivate: bothPrivate,
+          touchedItems: {...gi.touchedItems, ...gj.touchedItems},
+        ),
+      );
     return true;
   }
 
@@ -701,16 +747,6 @@ class _ExtractionCutPlanner {
       }
     }
     return true;
-  }
-
-  int _countBoundaryCrossings(Set<int> sccIndices) {
-    final clusterNames = <String>{for (final idx in sccIndices) ...sccs[idx]};
-    final decls = <DeclarationUnit>[
-      for (final name in clusterNames) ?declsByName[name],
-    ];
-    final (:absorbed, :privTopToWiden, :privMembersToWiden) =
-        _classifyBoundaryCrossings(clusterNames, decls);
-    return privTopToWiden.length + privMembersToWiden.length;
   }
 
   void _extractOversizedSccFallbacks() {
@@ -833,21 +869,6 @@ class _ExtractionCutPlanner {
         privMem,
       );
     }
-    _classifyOutsideDecls(outsideDecls, clusterNames, privTop, privMem);
-
-    return (
-      absorbed: absorbed..sort(),
-      privTopToWiden: privTop.toList()..sort(),
-      privMembersToWiden: privMem.toList()..sort(),
-    );
-  }
-
-  void _classifyOutsideDecls(
-    List<DeclarationUnit> outsideDecls,
-    Set<String> clusterNames,
-    Set<String> privTop,
-    Set<String> privMem,
-  ) {
     for (final out in outsideDecls) {
       privTop.addAll(
         out.outgoingIntraFileRefs.where(
@@ -860,6 +881,12 @@ class _ExtractionCutPlanner {
         privMem,
       );
     }
+
+    return (
+      absorbed: absorbed..sort(),
+      privTopToWiden: privTop.toList()..sort(),
+      privMembersToWiden: privMem.toList()..sort(),
+    );
   }
 
   void _collectCrossMembers(
@@ -925,5 +952,125 @@ class _ExtractionCutPlanner {
       counter++;
     }
     return candidate;
+  }
+}
+
+class _CandidateGroup {
+  final int id;
+  final Set<int> sccs;
+  final int lines;
+  final int crossings;
+  final bool isAllPrivate;
+  final Set<int> touchedItems;
+
+  const _CandidateGroup({
+    required this.id,
+    required this.sccs,
+    required this.lines,
+    required this.crossings,
+    required this.isAllPrivate,
+    required this.touchedItems,
+  });
+
+  bool canAttemptMergeWith(
+    _CandidateGroup other,
+    int targetLines, {
+    required bool requireReduction,
+  }) {
+    if (lines > targetLines || other.lines > targetLines) return false;
+    if (requireReduction) {
+      return touchedItems.any(other.touchedItems.contains);
+    }
+    if (isAllPrivate && other.isAllPrivate) return true;
+    final halfTarget = targetLines ~/ 2;
+    return targetLines >= 200 &&
+        crossings == 0 &&
+        other.crossings == 0 &&
+        lines <= halfTarget &&
+        other.lines <= halfTarget;
+  }
+}
+
+/// Pre-indexes cross-SCC spans of private top-level declarations and private
+/// members so boundary crossings for any candidate SCC set can be counted in
+/// `O(touched items)` without scanning outside declarations.
+class _BoundaryCrossingIndex {
+  final List<int> spanSizes;
+  final List<List<int>> itemsByScc;
+  final List<int> _hits;
+  final List<int> _touched = [];
+
+  _BoundaryCrossingIndex._(this.spanSizes, this.itemsByScc)
+    : _hits = List<int>.filled(spanSizes.length, 0);
+
+  factory _BoundaryCrossingIndex.build(
+    List<List<String>> sccs,
+    Map<String, DeclarationUnit> declsByName,
+  ) {
+    final nameToScc = <String, int>{
+      for (var i = 0; i < sccs.length; i++)
+        for (final name in sccs[i]) name: i,
+    };
+    final spans = <String, Set<int>>{};
+    for (final decl in declsByName.values) {
+      final sccIdx = nameToScc[decl.name];
+      if (sccIdx == null) continue;
+      if (!decl.isPublic) {
+        spans.putIfAbsent(decl.name, () => <int>{}).add(sccIdx);
+      }
+      _recordDeclSpans(decl, sccIdx, nameToScc, spans);
+    }
+
+    final spanSizes = <int>[];
+    final itemsByScc = <List<int>>[for (var i = 0; i < sccs.length; i++) []];
+    for (final span in spans.values) {
+      if (span.length < 2) continue;
+      final itemId = spanSizes.length;
+      spanSizes.add(span.length);
+      for (final sccIdx in span) {
+        itemsByScc[sccIdx].add(itemId);
+      }
+    }
+    return _BoundaryCrossingIndex._(spanSizes, itemsByScc);
+  }
+
+  static void _recordDeclSpans(
+    DeclarationUnit decl,
+    int sccIdx,
+    Map<String, int> nameToScc,
+    Map<String, Set<int>> spans,
+  ) {
+    for (final ref in decl.outgoingIntraFileRefs) {
+      final targetScc = ref.startsWith('_') ? nameToScc[ref] : null;
+      if (targetScc != null) {
+        spans.putIfAbsent(ref, () => <int>{targetScc}).add(sccIdx);
+      }
+    }
+    for (final entry in decl.privateMemberAccessesByTarget.entries) {
+      final targetScc = nameToScc[entry.key];
+      if (targetScc == null) continue;
+      for (final member in entry.value) {
+        spans
+            .putIfAbsent('${entry.key}.$member', () => <int>{targetScc})
+            .add(sccIdx);
+      }
+    }
+  }
+
+  int countCrossings(Set<int> sccIndices) {
+    for (final sccIdx in sccIndices) {
+      for (final itemId in itemsByScc[sccIdx]) {
+        final prev = _hits[itemId];
+        if (prev == 0) _touched.add(itemId);
+        _hits[itemId] = prev + 1;
+      }
+    }
+    var crossings = 0;
+    for (final itemId in _touched) {
+      if (_hits[itemId] < spanSizes[itemId]) crossings++;
+      _hits[itemId] = 0;
+    }
+    _touched.clear();
+    return crossings;
   }
 }
