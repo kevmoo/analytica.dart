@@ -23,7 +23,7 @@ Add the package to `dev_dependencies` in `pubspec.yaml`:
 
 ```yaml
 dev_dependencies:
-  cognitive_complexity: ^0.2.3
+  cognitive_complexity: ^1.0.0
 ```
 
 Execute locally:
@@ -41,20 +41,35 @@ dart install cognitive_complexity
 cognitive_complexity [options] [targets]
 ```
 
-## Command Options & Flags
+## Companion CLI Executables
 
-<!-- mdformat off(prevent table wrapping) -->
+In addition to `cognitive_complexity`, the package includes three specialized
+static-analysis CLIs:
 
-| Option / Flag                  | Type     | Default | Description                                                                                    |
-| :----------------------------- | :------- | :-----: | :--------------------------------------------------------------------------------------------- |
-| `-t, --threshold <value>`      | `int`    |   `0`   | Minimum score required to display a declaration in the report.                                 |
-| `-f, --fail-threshold <value>` | `int`    | _None_  | Ceilings score. Exits with code `1` if any declaration exceeds this value.                     |
-| `-d, --git-diff <git-ref>`     | `String` | _None_  | Compares current workspace declarations against `<git-ref>`, evaluating complexity deltas (Δ). |
-| `--fail-on-increase`           | `flag`   | `false` | When using `--git-diff`, fails if any modified function increases in complexity.               |
-| `--format <type>`              | `enum`   | `text`  | Output format: `text` (terminal), `json` (machine-readable), or `github` (GHA annotations).    |
-| `--sdk-path <path>`            | `String` | _Auto_  | Overrides automated Dart/Flutter SDK location discovery.                                       |
+- `dart run cognitive_complexity:data_flow`: Statement-level data-flow and
+  method-extraction slice analyzer (`--sdk-path` supported).
+- `dart run cognitive_complexity:file_split`: Intra-file dependency graph and
+  acyclic file-decomposition advisor (`--sdk-path` supported).
+- `dart run cognitive_complexity:shallow`: Single-caller shallow-helper and
+  nesting-aware re-inlining advisor.
 
-<!-- mdformat on -->
+## Command Options & Flags (`cognitive_complexity`)
+
+| Option / Flag                  | Type     | Default | Description                                                                                                                            |
+| :----------------------------- | :------- | :-----: | :------------------------------------------------------------------------------------------------------------------------------------- |
+| `-h, --help`                   | `flag`   | `false` | Print usage information and exit.                                                                                                      |
+| `-t, --threshold <value>`      | `int`    |   `0`   | Minimum complexity score to include in the report.                                                                                     |
+| `-f, --fail-threshold <value>` | `int`    | _None_  | Ceiling score; exits with code `1` if any declaration exceeds this value.                                                              |
+| `--max-file-lines <lines>`     | `int`    |   `0`   | Opt-in maximum physical line count per source file (`0` = disabled).                                                                   |
+| `--max-function-lines <lines>` | `int`    |   `0`   | Opt-in maximum line span per function/method declaration (`0` = disabled).                                                             |
+| `-d, --git-diff <git-ref>`     | `String` | _None_  | Compares current workspace declarations against `<git-ref>`, evaluating complexity deltas (Δ).                                         |
+| `--fail-on-increase`           | `flag`   | `false` | With `--git-diff`, fails if any modified function increases in complexity (or exceeds `--fail-threshold` when both are set).           |
+| `--format <type>`              | `enum`   | `text`  | Output format: `text` (terminal), `json` (machine-readable), or `github` (GHA annotations).                                            |
+| `-v, --verbose`                | `flag`   | `false` | With `--format=text`, adds a `Breakdown` column (`branches`, `nesting`, `boolean_ops`, `max_depth`) and tags `_test.dart` entrypoints. |
+| `--comment-output <path>`      | `String` | _None_  | With `--format=github` and `--git-diff`, writes a significance-ordered standalone PR comment report.                                   |
+| `--max-comment-rows <count>`   | `int`    |   `0`   | Maximum table rows in `--comment-output` (`0` = unlimited).                                                                            |
+| `--exclude <glob>`             | `multi`  | _None_  | Glob patterns of files/directories to exclude (repeatable or comma-separated).                                                         |
+| `--[no-]ignore-generated`      | `flag`   | `true`  | Exclude generated files (`*.g.dart`, `*.freezed.dart`, `*.mocks.dart`, etc.).                                                          |
 
 ## Target Resolution
 
@@ -67,7 +82,7 @@ dart run cognitive_complexity lib bin
 # Scan specific files
 dart run cognitive_complexity lib/src/analyzer.dart lib/src/visitor.dart
 
-# Scan current working directory (defaults to lib if omitted)
+# Auto-discover lib/ (or workspace members packages/*/lib, pkgs/*/lib)
 dart run cognitive_complexity
 ```
 
@@ -100,4 +115,5 @@ dart run cognitive_complexity --git-diff=origin/main --fail-on-increase
 
 - `0`: Scan completed successfully; all thresholds and gates satisfied.
 - `1`: Complexity ceiling exceeded, unauthorized complexity increase detected,
-  or fatal analysis error.
+  file/function line limit exceeded, or fatal analysis error.
+- `64`: Invalid command-line arguments, unknown option, or missing target path.

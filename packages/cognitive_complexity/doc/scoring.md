@@ -14,20 +14,18 @@ Scoring follows the [SonarSource Cognitive Complexity whitepaper][whitepaper]
 Each construct contributes a **Base Cost** (flat penalty) and may also apply a
 **Nesting Multiplier** based on the current nesting depth ($D$).
 
-<!-- mdformat off(prevent table wrapping) -->
-
-| Construct / Syntax                                              | Base Cost |  Nesting Multiplier  | Deepens Nesting? | Notes                                            |
-| :-------------------------------------------------------------- | :-------: | :------------------: | :--------------: | :----------------------------------------------- |
-| **`if`, `for`, `while`, `do-while`, `catch` / `on`**            |   `+1`    | `+D` (Current Depth) |     **Yes**      | Standard flow-breaking structures                |
-| **`switch` Statements & Expressions**                           |   `+1`    | `+D` (Current Depth) |     **Yes**      | Entire block costs `+1` regardless of arm count  |
-| **`else` / `else if`**                                          |   `+1`    | `+0` (Flat penalty)  |      **No**      | Branch contents sit one level below head `if`    |
-| **Logical Operators (`&&`, `\|\|`)**                            |   `+1`    | `+0` (Flat penalty)  |      **No**      | `+1` per sequence; `+1` for each alternation     |
-| **Pattern `when` Guards**                                       |   `+1`    | `+0` (Flat penalty)  |      **No**      | Dart 3 specific interpretation                   |
-| **Lambdas & Local Functions**                                   |   `+0`    |         `+0`         |     **Yes**      | Deepens nesting depth for enclosed bodies        |
-| **Null-Aware (`??`, `?.`, `??=`), `assert`, `try` / `finally`** |   `+0`    |         `+0`         |      **No**      | Benign syntax; completely free                   |
-| **Switch Case Labels & Pattern Combinators**                    |   `+0`    |         `+0`         |      **No**      | Stacked arms / or-patterns (`1 \|\| 2`) are free |
-
-<!-- mdformat on -->
+| Construct / Syntax                                                                              | Base Cost |  Nesting Multiplier  | Deepens Nesting? | Notes                                             |
+| :---------------------------------------------------------------------------------------------- | :-------: | :------------------: | :--------------: | :------------------------------------------------ |
+| **`if`, `for`, `while`, `do-while`, `catch` / `on`**                                            |   `+1`    | `+D` (Current Depth) |     **Yes**      | Standard flow-breaking structures                 |
+| **Conditional (`?:`) Operator**                                                                 |   `+1`    | `+D` (Current Depth) |     **Yes**      | Ternary expressions deepen nesting for both arms  |
+| **`switch` Statements & Expressions**                                                           |   `+1`    | `+D` (Current Depth) |     **Yes**      | Entire block costs `+1` regardless of arm count   |
+| **`else` / `else if`**                                                                          |   `+1`    | `+0` (Flat penalty)  |      **No**      | Branch contents sit one level below head `if`     |
+| **Logical Operators (`&&`, `\|\|`)**                                                            |   `+1`    | `+0` (Flat penalty)  |      **No**      | `+1` per sequence; `+1` for each alternation      |
+| **Labeled `break` / `continue`**                                                                |   `+1`    | `+0` (Flat penalty)  |      **No**      | Non-linear jump to a named label (`break outer;`) |
+| **Pattern `when` Guards**                                                                       |   `+1`    | `+0` (Flat penalty)  |      **No**      | Dart 3 specific interpretation                    |
+| **Lambdas & Local Functions**                                                                   |   `+0`    |         `+0`         |     **Yes**      | Deepens nesting depth for enclosed bodies         |
+| **Null-Aware (`??`, `?.`, `??=`), `assert`, `try` / `finally`, Unlabeled `break` / `continue`** |   `+0`    |         `+0`         |      **No**      | Benign syntax; completely free                    |
+| **Switch Case Labels & Pattern Combinators**                                                    |   `+0`    |         `+0`         |      **No**      | Stacked arms / or-patterns (`1 \|\| 2`) are free  |
 
 ## Dart-Specific Interpretations
 

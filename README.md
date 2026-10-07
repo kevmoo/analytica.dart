@@ -10,12 +10,12 @@ Actions, and AI Agent Skills for Dart and Flutter repositories.
 
 ## 📦 Published Packages
 
-| Package                                                  |                                                          Pub                                                           | Description                                                                                |
-| :------------------------------------------------------- | :--------------------------------------------------------------------------------------------------------------------: | :----------------------------------------------------------------------------------------- |
-| [`cognitive_complexity`](packages/cognitive_complexity/) | [![pub package](https://img.shields.io/pub/v/cognitive_complexity.svg)](https://pub.dev/packages/cognitive_complexity) | Algorithmic Cognitive Complexity calculation and AST data-flow analysis library and CLI.   |
-| [`dedupe`](packages/dedupe/)                             |               [![pub package](https://img.shields.io/pub/v/dedupe.svg)](https://pub.dev/packages/dedupe)               | High-performance token, structural, and parameterized code clone detection engine and CLI. |
-| [`undead`](packages/undead/)                             |               [![pub package](https://img.shields.io/pub/v/undead.svg)](https://pub.dev/packages/undead)               | Whole-program reachability and dead declaration analysis for packages and closed apps.     |
-| [`analytica`](packages/analytica/)                       |            [![pub package](https://img.shields.io/pub/v/analytica.svg)](https://pub.dev/packages/analytica)            | Shared SDK discovery, AST analyzer extensions, Git diff utilities, and CI reporting.       |
+| Package                                                  |                                                          Pub                                                           | Description                                                                                                                                       |
+| :------------------------------------------------------- | :--------------------------------------------------------------------------------------------------------------------: | :------------------------------------------------------------------------------------------------------------------------------------------------ |
+| [`cognitive_complexity`](packages/cognitive_complexity/) | [![pub package](https://img.shields.io/pub/v/cognitive_complexity.svg)](https://pub.dev/packages/cognitive_complexity) | Cognitive Complexity scoring, statement data-flow (`data_flow`), file decomposition (`file_split`), and shallow-helper (`shallow`) CLI & library. |
+| [`dedupe`](packages/dedupe/)                             |               [![pub package](https://img.shields.io/pub/v/dedupe.svg)](https://pub.dev/packages/dedupe)               | High-performance token, structural, and parameterized code clone detection engine and CLI.                                                        |
+| [`undead`](packages/undead/)                             |               [![pub package](https://img.shields.io/pub/v/undead.svg)](https://pub.dev/packages/undead)               | Whole-program reachability and dead declaration analysis for packages and closed apps.                                                            |
+| [`analytica`](packages/analytica/)                       |            [![pub package](https://img.shields.io/pub/v/analytica.svg)](https://pub.dev/packages/analytica)            | Shared SDK discovery, AST analyzer extensions, Git diff utilities, and CI reporting.                                                              |
 
 ---
 

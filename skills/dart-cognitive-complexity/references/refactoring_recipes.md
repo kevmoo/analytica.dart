@@ -233,9 +233,10 @@ dart run cognitive_complexity:data_flow@^1.0.0 lib/src/my_file.dart:45-80
 Its report (`inputs`, `mutations`, live `outputs`, control-flow escapes,
 complexity impact `enclosingScore` / `sliceScoreInPlace` / `sliceScoreAtRoot` /
 `estimatedEnclosingScoreAfter`, `extractionWarnings`, and a synthesized Dart 3
-record signature) selects the tier. If `extractionWarnings` flags `HIGH_ARITY`
-(`>= 5` inputs) or `LOW_COMPLEXITY_PAYOFF`, flatten in place with Patterns A/B
-instead of extracting a shallow pass-through helper:
+record signature) selects the tier. If `extractionWarnings` warns about high
+parameter count (`>= 5` inputs), low complexity payoff, or a shallow
+signature-to-complexity ratio, flatten in place with Patterns A/B instead of
+extracting a shallow pass-through helper:
 
 1. **Tier 1 — Pure Functional Decomposition (First Choice)**:
    - **Selection**: Cleanly extractable slice with 2+ live outputs, `<= 4`
@@ -396,10 +397,11 @@ caller Cognitive Complexity at the call-site nesting depth after re-inlining:
 - **`ZERO_HEADROOM` (`CallerCCAfter == 15`)**: Inlining is legal but spends the
   caller's last point of budget; it is not counted by `--fail-on-safe-inline`.
   Prefer trimming the caller first, then re-inline.
-- **`FLATTEN_AND_INLINE` (`HelperCC <= 4` and `CallerCCAfter > 15`)**: Flatten
-  nesting at the call site using Pattern A (`switch` expression) or Pattern B
-  (early guard clauses) and inline the helper.
-- **`LOAD_BEARING` (`HelperCC >= 5` and `CallerCCAfter > 15`)**: Keep extracted,
+- **`FLATTEN_AND_INLINE` (`HelperCC <= 4`, `depth > 0`, `CallerCCAfter <= 22`,
+  and no absorbed child helpers)**: Flatten nesting at the call site using
+  Pattern A (`switch` expression) or Pattern B (early guard clauses) and inline
+  the helper.
+- **`LOAD_BEARING` (`HelperCC >= 5` or `CallerCCAfter > 22`)**: Keep extracted,
   or narrow its parameter list if `HIGH_ARITY`.
 
 ---

@@ -45,4 +45,21 @@ void processUser(String rawInput, int defaultAge) {
   print('Inputs: ${dataFlowResult.inputs.map((u) => u.name).join(', ')}');
   print('Outputs: ${dataFlowResult.outputs.map((u) => u.name).join(', ')}');
   print('Suggested Signature: ${dataFlowResult.suggestedSignature}');
+
+  // 3. Detect single-caller shallow helpers and simulate re-inlining.
+  final shallowAnalyzer = ShallowAnalyzer();
+  const shallowSample = '''
+String formatBadge(String label, bool active) =>
+    _wrapLabel(label, active ? '[*]' : '[ ]');
+
+String _wrapLabel(String label, String prefix) => '\$prefix \$label';
+''';
+
+  final shallowReport = shallowAnalyzer.analyzeCode(shallowSample);
+  for (final finding in shallowReport.findings) {
+    print(
+      '${finding.name} -> ${finding.callerName}: '
+      '${finding.classification.label} (${finding.reasons.join(', ')})',
+    );
+  }
 }

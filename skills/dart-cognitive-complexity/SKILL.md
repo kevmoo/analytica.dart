@@ -76,8 +76,10 @@ Run the CLI directly (requires Dart SDK **3.12.0+**, verify via
   ```bash
   dart run cognitive_complexity:shallow@^1.0.0 lib/
   dart run cognitive_complexity:shallow@^1.0.0 lib/ bin/
-  dart run cognitive_complexity:shallow@^1.0.0 --git-diff origin/main --fail-on-safe-inline
+  dart run cognitive_complexity:shallow@^1.0.0 --git-diff origin/main --fail-on-safe-inline lib/
   ```
+  Without positional targets, `shallow` scans `lib/` in the current directory
+  (pass `lib/ bin/` or package paths explicitly for CLI tools and monorepos).
 
 ---
 
@@ -191,8 +193,9 @@ dart run cognitive_complexity:data_flow@^1.0.0 lib/src/my_file.dart:45-80
 
 Inspect the complexity impact (`enclosingScore`, `sliceScoreInPlace`,
 `sliceScoreAtRoot`, `estimatedEnclosingScoreAfter`) and honor any
-`extractionWarnings` (`HIGH_ARITY` `>= 5` inputs or `LOW_COMPLEXITY_PAYOFF`) by
-flattening in place with Patterns A/B instead of extracting a shallow helper:
+`extractionWarnings` (high parameter count `>= 5` inputs, low complexity payoff,
+or shallow signature-to-complexity ratio) by flattening in place with Patterns
+A/B instead of extracting a shallow helper:
 
 - **Pattern A (Dart 3 Switch Expressions)**: Replace nested `if-else` ladders
   with exhaustive table-driven `switch` expressions (single base penalty).
