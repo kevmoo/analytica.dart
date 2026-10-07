@@ -98,20 +98,16 @@ class _TarjanState {
     onStack.add(v);
 
     for (final w in adj[v] ?? const <int>{}) {
-      _visitNeighbor(v, w, adj);
+      if (!indices.containsKey(w)) {
+        strongConnect(w, adj);
+        lowlink[v] = math.min(lowlink[v]!, lowlink[w]!);
+      } else if (onStack.contains(w)) {
+        lowlink[v] = math.min(lowlink[v]!, indices[w]!);
+      }
     }
 
     if (lowlink[v] == indices[v]) {
       _popScc(v);
-    }
-  }
-
-  void _visitNeighbor(int v, int w, Map<int, Set<int>> adj) {
-    if (!indices.containsKey(w)) {
-      strongConnect(w, adj);
-      lowlink[v] = math.min(lowlink[v]!, lowlink[w]!);
-    } else if (onStack.contains(w)) {
-      lowlink[v] = math.min(lowlink[v]!, indices[w]!);
     }
   }
 

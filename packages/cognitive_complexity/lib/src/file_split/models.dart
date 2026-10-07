@@ -405,7 +405,12 @@ class FileSplitReport {
           'literals (>75% of declaration); consider moving raw string or '
           'template assets to a separate file rather than splitting methods]';
     }
-    final hints = '${_supertypeFact(d)}${_staticHint(d)}';
+    final staticHint = (d.staticMethodCount == 0 || d.isInterfaceBound)
+        ? ''
+        : 'contains ${d.staticMethodCount} static method(s) '
+              '(~${d.staticMethodLines} lines) that can be promoted to '
+              'top-level functions to unlock standalone library extraction; ';
+    final hints = '${_supertypeFact(d)}$staticHint';
     if (useParts == false) {
       return ' [Note: single ${d.kind} exceeds target $targetLines lines — '
           '${hints}consider extracting cohesive methods into a helper '
@@ -437,14 +442,5 @@ class FileSplitReport {
           'surface; ';
     }
     return '$label ($ratio); ';
-  }
-
-  /// Static-promotion hint, omitted for interface-bound classes where
-  /// promoting statics cannot meaningfully shrink the declaration.
-  static String _staticHint(DeclarationUnit d) {
-    if (d.staticMethodCount == 0 || d.isInterfaceBound) return '';
-    return 'contains ${d.staticMethodCount} static method(s) '
-        '(~${d.staticMethodLines} lines) that can be promoted to '
-        'top-level functions to unlock standalone library extraction; ';
   }
 }

@@ -42,8 +42,16 @@ class ShallowAnalyzer {
     final exportTracker = ExportedSurfaceTracker();
 
     for (final entry in fileEntries) {
-      final parsed = _tryParseFile(entry.absPath);
-      if (parsed == null) continue;
+      final ParseStringResult parsed;
+      try {
+        parsed = parseFile(
+          path: entry.absPath,
+          featureSet: _featureSet,
+          throwIfDiagnostics: false,
+        );
+      } catch (_) {
+        continue;
+      }
       parsedUnits.add((entry: entry, parsed: parsed));
       collectConditionalDirectiveFiles(
         directives: parsed.unit.directives,
@@ -290,15 +298,36 @@ class ShallowAnalyzer {
         }
       }
       findings.add(
-        c.toFinding(
+        ShallowFinding(
+          filePath: c.decl.filePath,
+          name: c.decl.qualifiedName,
+          startLine: c.decl.startLine,
+          endLine: c.decl.endLine,
+          parameterCount: c.decl.parameterCount,
+          namedParameterCount: c.decl.namedParameterCount,
+          effectiveParameterCount: c.decl.effectiveParameterCount,
+          signatureLines: c.decl.signatureLines,
+          bodyLines: c.decl.bodyLines,
+          statementCount: c.decl.statementCount,
+          score: c.decl.score,
+          callerFilePath: c.call.filePath,
+          callerName: c.caller.qualifiedName,
+          callerZone: _zoneOf(c.caller.normalizedFilePath),
+          callLine: c.call.line,
+          callNestingDepth: c.call.nestingDepth,
           callerBaseScore: c.caller.score,
           callerCumulativeBefore: callerScore,
-          deltaScore: deltaScore,
+          inlinedDeltaScore: deltaScore,
           inlinedCallerScore: inlinedCallerScore,
           inlinedCallerScoreIsolated: c.caller.score + deltaScore,
           headroomAfterInline: maxCallerScore - inlinedCallerScore,
-          classification: classification,
+          sharedParamSignatureWith: c.sharedParamSignatureWith,
+          sharedParamCount: c.sharedParamCount,
+          paramsSubsetOfExistingType: c.paramsSubsetOfExistingType,
           simulationIndex: index,
+          estimatedLinesSaved: c.estimatedLinesSaved,
+          classification: classification,
+          reasons: c.reasons,
         ),
       );
     }
@@ -452,18 +481,6 @@ class ShallowAnalyzer {
     return callerZone != 'lib' && callerZone != 'other';
   }
 
-  ParseStringResult? _tryParseFile(String absPath) {
-    try {
-      return parseFile(
-        path: absPath,
-        featureSet: _featureSet,
-        throwIfDiagnostics: false,
-      );
-    } catch (_) {
-      return null;
-    }
-  }
-
   List<_ScanFileEntry> _discoverScanFiles(
     List<String> targetPaths,
     Set<String>? modifiedFilesFilter,
@@ -561,7 +578,14 @@ class ShallowAnalyzer {
     final existing = entriesByAbs[absPath];
     if (existing != null) {
       if (effectiveRequested && !existing.isInRequestedTargets) {
-        entriesByAbs[absPath] = existing.withRequested(file.path);
+        entriesByAbs[absPath] = _ScanFileEntry(
+          absPath: existing.absPath,
+          displayPath: file.path,
+          normalizedPath: existing.normalizedPath,
+          isTestFile: existing.isTestFile,
+          isPublicEntryFile: existing.isPublicEntryFile,
+          isInRequestedTargets: true,
+        );
       }
       return;
     }
@@ -656,15 +680,6 @@ class _ScanFileEntry {
     required this.isPublicEntryFile,
     required this.isInRequestedTargets,
   });
-
-  _ScanFileEntry withRequested(String preferredDisplayPath) => _ScanFileEntry(
-    absPath: absPath,
-    displayPath: preferredDisplayPath,
-    normalizedPath: normalizedPath,
-    isTestFile: isTestFile,
-    isPublicEntryFile: isPublicEntryFile,
-    isInRequestedTargets: true,
-  );
 }
 
 class _RawCandidate {
@@ -689,47 +704,6 @@ class _RawCandidate {
     required this.sharedParamCount,
     required this.paramsSubsetOfExistingType,
   });
-
-  ShallowFinding toFinding({
-    required int callerBaseScore,
-    required int callerCumulativeBefore,
-    required int deltaScore,
-    required int inlinedCallerScore,
-    required int inlinedCallerScoreIsolated,
-    required int headroomAfterInline,
-    required ShallowClassification classification,
-    required int simulationIndex,
-  }) => ShallowFinding(
-    filePath: decl.filePath,
-    name: decl.qualifiedName,
-    startLine: decl.startLine,
-    endLine: decl.endLine,
-    parameterCount: decl.parameterCount,
-    namedParameterCount: decl.namedParameterCount,
-    effectiveParameterCount: decl.effectiveParameterCount,
-    signatureLines: decl.signatureLines,
-    bodyLines: decl.bodyLines,
-    statementCount: decl.statementCount,
-    score: decl.score,
-    callerFilePath: call.filePath,
-    callerName: caller.qualifiedName,
-    callerZone: _zoneOf(caller.normalizedFilePath),
-    callLine: call.line,
-    callNestingDepth: call.nestingDepth,
-    callerBaseScore: callerBaseScore,
-    callerCumulativeBefore: callerCumulativeBefore,
-    inlinedDeltaScore: deltaScore,
-    inlinedCallerScore: inlinedCallerScore,
-    inlinedCallerScoreIsolated: inlinedCallerScoreIsolated,
-    headroomAfterInline: headroomAfterInline,
-    sharedParamSignatureWith: sharedParamSignatureWith,
-    sharedParamCount: sharedParamCount,
-    paramsSubsetOfExistingType: paramsSubsetOfExistingType,
-    simulationIndex: simulationIndex,
-    estimatedLinesSaved: estimatedLinesSaved,
-    classification: classification,
-    reasons: reasons,
-  );
 }
 
 const _knownZones = {

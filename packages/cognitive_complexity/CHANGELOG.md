@@ -15,6 +15,9 @@
   `hasSurvivingCoupledScc` (`largest_resulting_file_lines` and `meets_target` in
   `--format json`) to `FileSplitReport`, and prints oversized-declaration notes
   on extracted cuts as well as surviving declarations.
+- `shallow`: Weights multi-arm `switch` expressions and `switch` statements by
+  `max(0, armCount - 1)` when computing `statement_count` so lookup-table
+  helpers with 3+ arms are no longer flagged as `MICRO_HELPER`.
 
 ## 0.4.0
 
