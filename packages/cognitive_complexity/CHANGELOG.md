@@ -69,6 +69,14 @@
   `memberCount`, `overrideMemberCount`, `supertypeLabel`, and an
   `isInterfaceBound` getter (`member_count`, `override_member_count`,
   `supertype` in JSON).
+- **Breaking**: `shallow` classifies a helper whose inlining lands the caller
+  exactly on `--max-caller-cc` as `ZERO_HEADROOM` instead of `SAFE_INLINE`
+  (`ShallowClassification.zeroHeadroom`, ranked between `SAFE_INLINE` and
+  `FLATTEN_AND_INLINE`). `SAFE_INLINE` now requires the caller to stay strictly
+  below the ceiling. `ZERO_HEADROOM` helpers are not absorbed into the caller's
+  cumulative score for later siblings and do not count toward
+  `--fail-on-safe-inline` or `--only-safe`. Reports gain `zero_headroom_count`
+  and the text header lists the count.
 
 ## 0.3.0
 
