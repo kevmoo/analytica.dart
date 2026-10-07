@@ -1,4 +1,4 @@
-## 0.4.0-wip
+## 0.4.0
 
 - **Breaking**: `FunctionComplexity` gains a required `composition`
   (`ComplexityComposition` record: `branches`, `nesting`, `booleanOps`,
