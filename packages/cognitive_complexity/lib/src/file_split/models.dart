@@ -160,7 +160,7 @@ class SplitCluster {
     'zero_churn_directive': zeroChurnExportDirective,
   };
 
-  void _writeText(StringBuffer buf, int cutIndex, String originalFilePath) {
+  void _writeText(StringBuffer buf, int cutIndex, FileSplitReport report) {
     buf
       ..writeln()
       ..writeln('[Cut $cutIndex - ${tier.label}]')
@@ -170,14 +170,19 @@ class SplitCluster {
       buf.writeln('  Agent Directive: $agentDirective');
     }
     buf.writeln('  Move Declarations (${declarations.length}):');
-    for (final d in declarations) {
-      final absorbed = absorbedPrivateHelpers.contains(d.name)
-          ? ' [private — single-dominator absorbed]'
-          : '';
-      buf.writeln(
-        '    - ${d.kind} ${d.name} '
-        '(L${d.startLine}-${d.endLine}, ${d.lineCount} lines)$absorbed',
-      );
+    report._writeDeclarationRows(buf, declarations, cluster: this);
+    if (totalLines > report.targetLines &&
+        declarations.length > 1 &&
+        declarations.every((d) => d.lineCount <= report.targetLines)) {
+      final note = tier == SplitTier.tier3PartDirective
+          ? '[Note: cut exceeds target ${report.targetLines} lines across '
+                '${declarations.length} mutually coupled declarations — '
+                'breaking mutual private references is required to split '
+                'further]'
+          : '[Note: cut exceeds target ${report.targetLines} lines as a '
+                'cohesive ${declarations.length}-declaration cluster — can '
+                'be decomposed further once extracted]';
+      buf.writeln('    $note');
     }
     _writeWidenings(buf);
     if (requiredImports.isNotEmpty) {
@@ -188,7 +193,7 @@ class SplitCluster {
     }
     final bridge = zeroChurnExportDirective;
     if (bridge != null) {
-      buf.writeln('  Zero-Churn Bridge for $originalFilePath:');
+      buf.writeln('  Zero-Churn Bridge for ${report.filePath}:');
       if (tier == SplitTier.tier3PartDirective) {
         buf.writeln('    + $bridge');
       } else {
@@ -237,6 +242,7 @@ class FileSplitReport {
   final int maxTopologicalDepth;
   final List<SplitCluster> clusters;
   final List<DeclarationUnit> survivingDeclarations;
+  final bool hasSurvivingCoupledScc;
 
   const FileSplitReport({
     required this.filePath,
@@ -249,12 +255,24 @@ class FileSplitReport {
     required this.maxTopologicalDepth,
     required this.clusters,
     required this.survivingDeclarations,
+    this.hasSurvivingCoupledScc = false,
   });
 
   int get extractedLines => clusters.fold(0, (sum, c) => sum + c.totalLines);
 
   int get estimatedRemainingLines =>
       (totalLines - extractedLines).clamp(1, totalLines);
+
+  /// Line count of the largest file produced by this plan (the maximum of
+  /// [estimatedRemainingLines] and each extracted cluster's
+  /// [SplitCluster.totalLines]).
+  int get largestResultingFileLines => clusters.fold(
+    estimatedRemainingLines,
+    (maxLines, c) => c.totalLines > maxLines ? c.totalLines : maxLines,
+  );
+
+  /// Whether every file produced by this plan is at or below [targetLines].
+  bool get meetsTarget => largestResultingFileLines <= targetLines;
 
   Map<String, dynamic> toJson() => {
     'file': filePath,
@@ -267,6 +285,8 @@ class FileSplitReport {
     'max_topological_depth': maxTopologicalDepth,
     'extracted_lines': extractedLines,
     'estimated_remaining_lines': estimatedRemainingLines,
+    'largest_resulting_file_lines': largestResultingFileLines,
+    'meets_target': meetsTarget,
     'clusters': clusters.map((c) => c.toJson()).toList(),
     'surviving_declarations': survivingDeclarations
         .map((d) => d.toJson())
@@ -286,21 +306,31 @@ class FileSplitReport {
       ..writeln();
 
     if (clusters.isEmpty) {
-      buf.writeln(
-        'No clean extraction cuts recommended '
-        '(file is already cohesive or below target size).',
-      );
+      if (totalLines <= targetLines) {
+        buf.writeln(
+          'No clean extraction cuts recommended '
+          '(file is already below target $targetLines lines).',
+        );
+      } else {
+        buf.writeln(
+          'No clean extraction cuts recommended '
+          '(no extractable group fits; largest resulting file: '
+          '$totalLines lines (target $targetLines not met)).',
+        );
+      }
       _writeSurviving(buf);
       return buf.toString();
     }
 
+    final targetNote = meetsTarget ? '' : ' (target $targetLines not met)';
     buf.writeln(
       '=== RECOMMENDED EXTRACTION PLAN '
       '(Reduces $filePath: $totalLines -> ~$estimatedRemainingLines lines, '
+      'largest resulting file: ~$largestResultingFileLines lines$targetNote, '
       '0 circular deps, 0 caller churn) ===',
     );
     for (var i = 0; i < clusters.length; i++) {
-      clusters[i]._writeText(buf, i + 1, filePath);
+      clusters[i]._writeText(buf, i + 1, this);
     }
     _writeSurviving(buf);
     return buf.toString();
@@ -314,16 +344,60 @@ class FileSplitReport {
         'Surviving in $filePath (~$estimatedRemainingLines lines, '
         '${survivingDeclarations.length} declaration(s)):',
       );
-    for (final d in survivingDeclarations) {
-      final note = d.lineCount > targetLines ? _oversizedDeclNote(d) : '';
+    _writeDeclarationRows(buf, survivingDeclarations);
+    if (estimatedRemainingLines > targetLines &&
+        hasSurvivingCoupledScc &&
+        survivingDeclarations.length > 1 &&
+        survivingDeclarations.every((d) => d.lineCount <= targetLines)) {
+      if (useParts == false) {
+        buf.writeln(
+          '  [Note: surviving declarations exceed target $targetLines lines '
+          'across mutually coupled declarations — breaking mutual private '
+          'references is required to split without `part` / `part of` '
+          '(--no-use-parts active)]',
+        );
+      } else if (useParts == true) {
+        buf.writeln(
+          '  [Note: surviving declarations exceed target $targetLines lines '
+          'across mutually coupled declarations — breaking mutual private '
+          'references or splitting further with `part` / `part of` is '
+          'required to reduce below target]',
+        );
+      } else {
+        buf.writeln(
+          '  [Note: surviving declarations exceed target $targetLines lines '
+          'across mutually coupled declarations — breaking mutual private '
+          'references is required to split into standalone libraries, or use '
+          '`part` / `part of` (--use-parts) to split across part files. '
+          'Agent Directive: $kAskUserPartsPreferenceDirective]',
+        );
+      }
+    }
+  }
+
+  void _writeDeclarationRows(
+    StringBuffer buf,
+    List<DeclarationUnit> declarations, {
+    SplitCluster? cluster,
+  }) {
+    final indent = cluster != null ? '    ' : '  ';
+    final insideTier3Cut = cluster?.tier == SplitTier.tier3PartDirective;
+    for (final d in declarations) {
+      final absorbed =
+          (cluster != null && cluster.absorbedPrivateHelpers.contains(d.name))
+          ? ' [private — single-dominator absorbed]'
+          : '';
+      final note = d.lineCount > targetLines
+          ? _oversizedDeclNote(d, insideTier3Cut: insideTier3Cut)
+          : '';
       buf.writeln(
-        '  - ${d.kind} ${d.name} '
-        '(L${d.startLine}-${d.endLine}, ${d.lineCount} lines)$note',
+        '$indent- ${d.kind} ${d.name} '
+        '(L${d.startLine}-${d.endLine}, ${d.lineCount} lines)$absorbed$note',
       );
     }
   }
 
-  String _oversizedDeclNote(DeclarationUnit d) {
+  String _oversizedDeclNote(DeclarationUnit d, {required bool insideTier3Cut}) {
     final isEmbeddedAsset = d.stringLiteralLines >= (d.lineCount * 3) ~/ 4;
     if (isEmbeddedAsset) {
       return ' [Note: single ${d.kind} exceeds target $targetLines lines — '
@@ -336,6 +410,12 @@ class FileSplitReport {
       return ' [Note: single ${d.kind} exceeds target $targetLines lines — '
           '${hints}consider extracting cohesive methods into a helper '
           'or extension (--no-use-parts active)]';
+    }
+    if (insideTier3Cut || useParts == true) {
+      return ' [Note: single ${d.kind} exceeds target $targetLines lines — '
+          '${hints}consider extracting cohesive methods into a helper or '
+          'extension, or splitting further with `part` / `part of` to '
+          'preserve private `_field` access]';
     }
     return ' [Note: single ${d.kind} exceeds target $targetLines lines — '
         '${hints}consider extracting cohesive methods into a helper or '

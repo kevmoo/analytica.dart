@@ -10,6 +10,11 @@
     `SignatureSynthesizer`, `DataFlowAnalyzer.synthesizer`,
     `SplitCluster.writeText`, `VariableUsage.copyWith`, `compareBySignificance`,
     and `kAskUserPartsPreferenceDirective`) from the public entrypoints.
+- `file_split`: Skips Tier-3 `part` fallback cuts that would leave less than 25%
+  of the file behind, adds `largestResultingFileLines`, `meetsTarget`, and
+  `hasSurvivingCoupledScc` (`largest_resulting_file_lines` and `meets_target` in
+  `--format json`) to `FileSplitReport`, and prints oversized-declaration notes
+  on extracted cuts as well as surviving declarations.
 
 ## 0.4.0
 
