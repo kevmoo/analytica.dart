@@ -25,7 +25,7 @@ runs:
         echo "      uses: kevmoo/analytica.dart/packages/cognitive_complexity@main"
         echo ""
         echo "  • Dependency Lower-Bound Validator:"
-        echo "      uses: kevmoo/analytica.dart/packages/lower_bound@main"
+        echo "      uses: kevmoo/lower_bound.dart@main"
         echo ""
         echo "For documentation, visit: https://github.com/kevmoo/analytica.dart"
         echo "=================================================================================="

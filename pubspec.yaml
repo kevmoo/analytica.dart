@@ -9,7 +9,6 @@ workspace:
   - packages/cli_readme
   - packages/cognitive_complexity
   - packages/dedupe
-  - packages/lower_bound
   - packages/undead
   - tool
 
