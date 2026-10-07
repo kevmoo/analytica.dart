@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:analytica/analyzer.dart';
 import 'package:checks/checks.dart';
 import 'package:cognitive_complexity/cognitive_complexity.dart';
 import 'package:cognitive_complexity/src/file_split/cli.dart' as file_split_cli;
@@ -740,6 +741,111 @@ class BetaTheme {
           report.survivingDeclarations.map((d) => d.name).toList(),
         ).deepEquals(['Top']);
         check(report.estimatedRemainingLines).isLessOrEqual(110);
+      },
+    );
+
+    test('Handles high-fan-out star topology (320+ leaf cones) in < 500 ms '
+        'and preserves >= 1 surviving declaration when header overhead exceeds '
+        'targetLines (#174)', () async {
+      final file = File(p.join(tempDir.path, 'bench_paths_sim.dart'));
+      final header = List.generate(450, (i) => '// header $i').join('\n');
+      final leaves = List.generate(
+        320,
+        (i) =>
+            'int leaf$i() {\n'
+            '  final a = $i;\n'
+            '  final b = a + 1;\n'
+            '  return b;\n'
+            '}',
+      ).join('\n\n');
+      final calls = List.generate(
+        320,
+        (i) => '  sum += leaf$i();',
+      ).take(55).join('\n');
+      final tailCalls = List.generate(
+        320,
+        (i) => 'leaf$i()',
+      ).skip(55).join(' + ');
+      file.writeAsStringSync('''
+$header
+
+int createPaths() {
+  var sum = 0;
+$calls
+  return sum + $tailCalls;
+}
+
+$leaves
+''');
+
+      final absPath = p.canonicalize(file.absolute.path);
+      final helper = AnalysisContextHelper(includedPaths: [absPath]);
+      final unitResult = await helper.getRequiredResolvedUnit(absPath);
+
+      const analyzer = FileSplitAnalyzer();
+      final sw = Stopwatch()..start();
+      final report = analyzer.analyzeResolvedUnit(
+        unitResult,
+        displayPath: file.path,
+        targetLines: 400,
+        minClusterLines: 30,
+      );
+      sw.stop();
+
+      check(sw.elapsedMilliseconds).isLessThan(500);
+      check(report.declarationCount).equals(321);
+      check(report.clusters).isNotEmpty();
+      check(report.survivingDeclarations).isNotEmpty();
+      check(
+        report.survivingDeclarations.map((d) => d.name).toSet(),
+      ).contains('createPaths');
+    });
+
+    test(
+      'Splits bridged root cone when header overhead exceeds targetLines '
+      'while keeping the bridging root in survivingDeclarations (#174)',
+      () async {
+        final file = File(p.join(tempDir.path, 'bridged_root_sim.dart'));
+        final header = List.generate(30, (i) => '// header $i').join('\n');
+        final padA = List.generate(25, (i) => '  final a$i = $i;').join('\n');
+        final padB = List.generate(25, (i) => '  final b$i = $i;').join('\n');
+        file.writeAsStringSync('''
+$header
+
+class BaseTap {
+$padA
+}
+
+class ExtraTap {
+$padB
+}
+
+class MainTap extends BaseTap {
+  final ExtraTap extra = ExtraTap();
+}
+''');
+
+        final absPath = p.canonicalize(file.absolute.path);
+        final helper = AnalysisContextHelper(includedPaths: [absPath]);
+        final unitResult = await helper.getRequiredResolvedUnit(absPath);
+
+        const analyzer = FileSplitAnalyzer();
+        final report = analyzer.analyzeResolvedUnit(
+          unitResult,
+          displayPath: file.path,
+          targetLines: 80,
+          minClusterLines: 20,
+        );
+
+        check(report.totalLines).isGreaterThan(80);
+        check(report.clusters).length.equals(1);
+        check(
+          report.clusters.single.declarations.map((d) => d.name).toList(),
+        ).deepEquals(['ExtraTap']);
+        check(
+          report.survivingDeclarations.map((d) => d.name).toList(),
+        ).deepEquals(['BaseTap', 'MainTap']);
+        check(report.estimatedRemainingLines).isLessOrEqual(80);
       },
     );
   });
