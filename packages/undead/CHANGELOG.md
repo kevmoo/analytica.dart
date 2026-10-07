@@ -1,5 +1,6 @@
-## 0.1.2-wip
+## 0.1.2
 
+- Require `analytica` `^0.1.4`.
 - Fix false-positive `testedUndead` findings on private helpers and `typedef`s
   transitively referenced by active `@visibleForTesting` / test-support
   declarations.

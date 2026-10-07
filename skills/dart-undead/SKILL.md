@@ -62,7 +62,7 @@ Execute the official package CLI directly in the terminal to retrieve
 reachability findings deterministically:
 
 ```bash
-dart run undead@^0.1.1 [options] [target_path]
+dart run undead@^0.1.2 [options] [target_path]
 ```
 
 > [!NOTE]
@@ -72,7 +72,7 @@ dart run undead@^0.1.1 [options] [target_path]
 > packages are unresolved, pass `--pub-get` to automatically run `dart pub get`
 > or `flutter pub get`. If encountering `.dart_tool` atomic rename errors in
 > sandboxed environments, pass `--no-precompile` (e.g.
-> `dart run --no-precompile undead@^0.1.1`).
+> `dart run --no-precompile undead@^0.1.2`).
 
 ### Execution Modes
 
@@ -84,10 +84,10 @@ tests:
 
 ```bash
 # Markdown output for human review
-dart run undead@^0.1.1
+dart run undead@^0.1.2
 
 # Machine-readable JSON output for agent automation
-dart run undead@^0.1.1 --format=json
+dart run undead@^0.1.2 --format=json
 ```
 
 #### Mode 2: Closed Application (`--mode=closed-app`)
@@ -97,7 +97,7 @@ Traces execution strictly from executable entrypoints (`bin/**`,
 dead:
 
 ```bash
-dart run undead@^0.1.1 --mode=closed-app
+dart run undead@^0.1.2 --mode=closed-app
 ```
 
 #### Mode 3: Example Code Handling (`--example-mode`)
@@ -110,7 +110,7 @@ Controls how code in `example/` is treated during reachability analysis:
 - `skip`: Ignores `example/` completely during analysis.
 
 ```bash
-dart run undead@^0.1.1 --example-mode=demonstration
+dart run undead@^0.1.2 --example-mode=demonstration
 ```
 
 ### Common CLI Options Reference
@@ -286,7 +286,7 @@ follow this strict 2-stage workflow:
 
 ### Stage 1: Read-Only Audit & Reporting (Mandatory Stop)
 
-Run `dart run undead@^0.1.1 --format=markdown` (or `--format=json`).
+Run `dart run undead@^0.1.2 --format=markdown` (or `--format=json`).
 
 **Mandatory Persistent Artifact**: You MUST create a structured Markdown
 artifact named `undead_triage_report.md` in
@@ -405,6 +405,6 @@ To reproduce or re-run this reachability audit locally:
 Determine the package version dynamically:
 
 - Check `pubspec.lock` in the workspace or run
-  `dart run undead@^0.1.1 --version`.
+  `dart run undead@^0.1.2 --version`.
 - If invoked with a specific version constraint (e.g. `undead@^0.1.1`), use that
   exact version.
