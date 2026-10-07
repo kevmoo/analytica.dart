@@ -391,8 +391,11 @@ class ShallowAnalyzer {
     required int callNestingDepth,
     required bool hasAbsorbedChildren,
   }) {
-    if (inlinedCallerScore <= maxCallerScore) {
+    if (inlinedCallerScore < maxCallerScore) {
       return ShallowClassification.safeInline;
+    }
+    if (inlinedCallerScore == maxCallerScore) {
+      return ShallowClassification.zeroHeadroom;
     }
     if (helperScore <= 4 &&
         callNestingDepth > 0 &&

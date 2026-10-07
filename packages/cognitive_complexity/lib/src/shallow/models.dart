@@ -4,9 +4,15 @@ library;
 /// Classification of a single-caller shallow helper based on simulated caller
 /// Cognitive Complexity after inlining.
 enum ShallowClassification {
-  /// Inlining keeps the caller's Cognitive Complexity at or below the maximum
-  /// caller complexity ceiling (`<= maxCallerScore`, default `15`).
+  /// Inlining keeps the caller's Cognitive Complexity strictly below the
+  /// maximum caller complexity ceiling (`< maxCallerScore`, default `15`).
   safeInline('SAFE_INLINE'),
+
+  /// Inlining lands the caller exactly on the ceiling (`== maxCallerScore`).
+  /// The inline is legal but spends the caller's last point of budget, so it
+  /// is reported separately, is not absorbed into the caller's cumulative
+  /// score, and does not count toward `--fail-on-safe-inline`.
+  zeroHeadroom('ZERO_HEADROOM'),
 
   /// Inlining pushes the caller's Cognitive Complexity modestly above the
   /// ceiling (`maxCallerScore + 1 .. maxCallerScore + 7`); flattening a guard
@@ -189,6 +195,11 @@ class ShallowReport {
       .where((f) => f.classification == ShallowClassification.safeInline)
       .length;
 
+  /// Number of findings classified as [ShallowClassification.zeroHeadroom].
+  int get zeroHeadroomCount => findings
+      .where((f) => f.classification == ShallowClassification.zeroHeadroom)
+      .length;
+
   /// Estimated lines of signature and call-site boilerplate saved by inlining
   /// all [ShallowClassification.safeInline] findings.
   int get estimatedSafeLinesSaved => findings
@@ -209,6 +220,7 @@ class ShallowReport {
       'max_params': maxParams,
       'total_findings': findings.length,
       'safe_inline_count': safeInlineCount,
+      'zero_headroom_count': zeroHeadroomCount,
       'estimated_safe_lines_saved': estimatedSafeLinesSaved,
       'findings': [for (final f in displayed) f.toJson()],
     };
@@ -231,11 +243,16 @@ class ShallowReport {
                 '($declarationsScanned declarations scanned).\n';
     }
 
+    final zeroHeadroom = zeroHeadroomCount > 0
+        ? ', $zeroHeadroomCount ZERO_HEADROOM landing exactly on '
+              '$maxCallerScore'
+        : '';
     final buf = StringBuffer()
       ..writeln(
         'Found ${findings.length} single-caller shallow helper(s) across '
         '$declarationsScanned declarations '
-        '($safeInlineCount SAFE_INLINE keeping Caller CC <= $maxCallerScore, '
+        '($safeInlineCount SAFE_INLINE keeping Caller CC < $maxCallerScore'
+        '$zeroHeadroom, '
         'saving ~$estimatedSafeLinesSaved lines of boilerplate):',
       )
       ..writeln();

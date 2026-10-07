@@ -92,16 +92,20 @@ automated harness (`evalin` / subagent).
      and unit test status.
    - **Shallow Helpers (Pattern G — Over-Extracted Single-Caller Helpers)**:
      Listing findings from `cognitive_complexity:shallow` (`SAFE_INLINE`,
-     `FLATTEN_AND_INLINE`, `LOAD_BEARING`):
+     `ZERO_HEADROOM`, `FLATTEN_AND_INLINE`, `LOAD_BEARING`):
 
-     | Classification    | Helper Declaration       | Sole Caller                         | Helper Metrics               | Caller CC (`Before -> After`) | Est. Saved | Recommended Remediation                                                                                             |
-     | :---------------- | :----------------------- | :---------------------------------- | :--------------------------- | :---------------------------: | :--------: | :------------------------------------------------------------------------------------------------------------------ |
-     | **`SAFE_INLINE`** | [`_helper`](file:///...) | [`caller`](file:///...) (`depth=0`) | `params=6`, `LOC=18`, `CC=2` |   `0 (base 0) -> 2` (`+2`)    |   `~12L`   | **Re-inline (Pattern G)**: Inlining eliminates pass-through plumbing while keeping caller in Target Zone (`<= 15`). |
+     | Classification    | Helper Declaration       | Sole Caller                         | Helper Metrics               | Caller CC (`Before -> After`) | Est. Saved | Recommended Remediation                                                                                            |
+     | :---------------- | :----------------------- | :---------------------------------- | :--------------------------- | :---------------------------: | :--------: | :----------------------------------------------------------------------------------------------------------------- |
+     | **`SAFE_INLINE`** | [`_helper`](file:///...) | [`caller`](file:///...) (`depth=0`) | `params=6`, `LOC=18`, `CC=2` |   `0 (base 0) -> 2` (`+2`)    |   `~12L`   | **Re-inline (Pattern G)**: Inlining eliminates pass-through plumbing while keeping caller in Target Zone (`< 15`). |
      - **Guidance on Choosing the Right Shallow Remediation**:
        - **Re-inline (`SAFE_INLINE`)**: Re-inline single-caller helpers directly
-         into their sole caller when `CallerCCAfter <= 15` (especially
+         into their sole caller when `CallerCCAfter < 15` (especially
          `MICRO_HELPER`s or `HIGH_ARITY` helpers where inlining deletes
          parameter plumbing and restores localized reading flow).
+       - **Zero Headroom (`ZERO_HEADROOM`)**: `CallerCCAfter == 15`. Legal to
+         inline, but it leaves the caller no budget; trim the caller first
+         (Patterns A/B) or leave extracted. Not counted by
+         `--fail-on-safe-inline`.
        - **Parameter Record**: For sibling helpers sharing high-arity parameter
          clumps (`HIGH_ARITY`), synthesize a shared Dart 3 named record rather
          than passing 5+ separate arguments or packing ad-hoc inline records.

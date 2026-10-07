@@ -498,12 +498,29 @@ void _edge(int a, int b, int c, int d, int e, int f) {
 }
 void _h(int a, int b, int c, int d, int e, int f) { if (true) print(1); }
 ''';
-      final atCeiling = ShallowAnalyzer().analyzeCode(code).findings.single;
+      final atCeilingReport = ShallowAnalyzer().analyzeCode(code);
+      final atCeiling = atCeilingReport.findings.single;
       check(atCeiling.callerBaseScore).equals(11);
       check(atCeiling.inlinedCallerScore).equals(15);
       check(atCeiling.inlinedCallerScoreIsolated).equals(15);
       check(atCeiling.headroomAfterInline).equals(0);
-      check(atCeiling.classification).equals(ShallowClassification.safeInline);
+      check(
+        atCeiling.classification,
+      ).equals(ShallowClassification.zeroHeadroom);
+      check(atCeilingReport.safeInlineCount).equals(0);
+      check(atCeilingReport.zeroHeadroomCount).equals(1);
+      check(atCeilingReport.toJson()['zero_headroom_count']).equals(1);
+      check(
+        atCeilingReport.formatText(),
+      ).contains('1 ZERO_HEADROOM landing exactly on 15');
+
+      final belowCeiling = ShallowAnalyzer(
+        maxCallerScore: 16,
+      ).analyzeCode(code).findings.single;
+      check(belowCeiling.headroomAfterInline).equals(1);
+      check(
+        belowCeiling.classification,
+      ).equals(ShallowClassification.safeInline);
 
       final overCeiling = ShallowAnalyzer(
         maxCallerScore: 14,
@@ -512,6 +529,61 @@ void _h(int a, int b, int c, int d, int e, int f) { if (true) print(1); }
       check(
         overCeiling.classification,
       ).equals(ShallowClassification.flattenAndInline);
+    });
+
+    test('ZERO_HEADROOM helpers are not absorbed into the caller cumulative '
+        'score and do not trip --fail-on-safe-inline', () async {
+      // `_edge` scores 11. Candidates simulate in ascending delta order:
+      // `_h1` (+4) lands exactly on 15 (ZERO_HEADROOM) and must not raise
+      // the cumulative base, so `_h2` (+6 at depth 1) simulates 11 -> 17,
+      // not 15 -> 21.
+      const code = '''
+void _edge(int a, int b, int c, int d, int e, int f) {
+  if (a > 0) {
+    if (b > 0) {
+      if (c > 0) {
+        _h1(a, b, c, d, e, f);
+      }
+    }
+  }
+  if (d > 0) {}
+  if (e > 0) {}
+  if (f > 0) {}
+  if (a > 1) {}
+  if (b > 1) {
+    _h2(a, b, c, d, e, f);
+  }
+}
+void _h1(int a, int b, int c, int d, int e, int f) { if (true) print(1); }
+void _h2(int a, int b, int c, int d, int e, int f) {
+  if (a > 2) print(2);
+  if (b > 2) print(2);
+  if (c > 2) print(2);
+}
+''';
+      final report = ShallowAnalyzer().analyzeCode(code);
+      final byName = {for (final f in report.findings) f.name: f};
+      final h1 = byName['_h1']!;
+      final h2 = byName['_h2']!;
+      check(h1.classification).equals(ShallowClassification.zeroHeadroom);
+      check(h1.inlinedCallerScore).equals(15);
+      check(h2.callerCumulativeBefore).equals(11);
+      check(h2.inlinedCallerScore).equals(17);
+      check(h2.classification).equals(ShallowClassification.flattenAndInline);
+
+      final dir = Directory.systemTemp.createTempSync('zero_headroom_');
+      addTearDown(() => dir.deleteSync(recursive: true));
+      final file = File(
+        '${dir.path}/ceiling.dart',
+      )..writeAsStringSync(code.replaceAll('    _h2(a, b, c, d, e, f);\n', ''));
+      final out = StringBuffer();
+      final code0 = await runShallowCli(
+        ['--fail-on-safe-inline', file.path],
+        out: out,
+        err: StringBuffer(),
+      );
+      check(code0).equals(0);
+      check(out.toString()).contains('[ZERO_HEADROOM]');
     });
 
     test('MICRO_HELPER catches formatter-wrapped helpers with <= 2 statements '

@@ -142,11 +142,11 @@ Usage: dart run cognitive_complexity:shallow [options] [file_or_directory...]
 
 Options:
 -h, --help                     Print this usage information.
-    --max-caller-cc=<score>    Maximum allowed caller Cognitive Complexity score after inlining for a candidate to be classified as SAFE_INLINE.
+    --max-caller-cc=<score>    Caller Cognitive Complexity ceiling after inlining. Below it a candidate is SAFE_INLINE; exactly on it is ZERO_HEADROOM.
                                (defaults to "15")
     --max-params=<count>       Parameter count threshold at or above which a single-caller function is flagged as HIGH_ARITY.
                                (defaults to "5")
-    --only-safe                Only output SAFE_INLINE candidates where inlining keeps caller complexity <= --max-caller-cc.
+    --only-safe                Only output SAFE_INLINE candidates where inlining keeps caller complexity below --max-caller-cc.
 -d, --git-diff=<git-ref>       Git reference to compare against. Only reports shallow helpers in modified files.
     --fail-on-safe-inline      Exit with non-zero code if any SAFE_INLINE single-caller shallow helper is found.
     --format                   Output format (text or json).
