@@ -69,6 +69,9 @@
   `memberCount`, `overrideMemberCount`, `supertypeLabel`, and an
   `isInterfaceBound` getter (`member_count`, `override_member_count`,
   `supertype` in JSON).
+- **Breaking**: `file_split --format json` always emits a JSON array with one
+  report per analyzed file. Previously a single matching file produced a bare
+  object and zero or several files produced an array.
 - **Breaking**: `shallow` classifies a helper whose inlining lands the caller
   exactly on `--max-caller-cc` as `ZERO_HEADROOM` instead of `SAFE_INLINE`
   (`ShallowClassification.zeroHeadroom`, ranked between `SAFE_INLINE` and
