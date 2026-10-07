@@ -273,10 +273,19 @@ String _statusLabel() {
     test('Supports --use-parts, --no-use-parts, and default agent '
         'ask-user directive', () async {
       final file = File(p.join(tempDir.path, 'monolith_engine.dart'));
-      final pad = List.generate(50, (i) => '  final x$i = $i;').join('\n');
+      final padCoord = List.generate(22, (i) => '  final c$i = $i;').join('\n');
+      final padEngine = List.generate(
+        50,
+        (i) => '  final x$i = $i;',
+      ).join('\n');
       file.writeAsStringSync('''
+class CompanionCoordinator {
+  final MonolithEngine engine = MonolithEngine();
+$padCoord
+}
+
 class MonolithEngine {
-$pad
+$padEngine
 }
 ''');
 
@@ -285,7 +294,7 @@ $pad
       // 1. Default (useParts: null): advises part/part of + ask-user prompt
       final defaultReport = await analyzer.analyzeFile(
         file.path,
-        targetLines: 30,
+        targetLines: 35,
       );
       check(defaultReport.clusters).isEmpty();
       check(
@@ -293,9 +302,10 @@ $pad
       ).contains('Explicitly ASK the user whether they prefer');
 
       // 2. Explicit --use-parts (useParts: true): emits Tier 3 part cluster
+      // because CompanionCoordinator leaves >= 25% of the file behind.
       final partsReport = await analyzer.analyzeFile(
         file.path,
-        targetLines: 30,
+        targetLines: 35,
         useParts: true,
       );
       check(partsReport.clusters.length).equals(1);
@@ -306,11 +316,14 @@ $pad
       check(
         partsReport.clusters.first.zeroChurnExportDirective,
       ).equals("part '${partsReport.clusters.first.suggestedFileName}';");
+      check(
+        partsReport.formatText(),
+      ).not((it) => it.contains('Explicitly ASK the user'));
 
       // 3. Explicit --no-use-parts (useParts: false): suppresses part/part of
       final noPartsReport = await analyzer.analyzeFile(
         file.path,
-        targetLines: 30,
+        targetLines: 35,
         useParts: false,
       );
       check(noPartsReport.clusters).isEmpty();
@@ -846,6 +859,184 @@ class MainTap extends BaseTap {
           report.survivingDeclarations.map((d) => d.name).toList(),
         ).deepEquals(['BaseTap', 'MainTap']);
         check(report.estimatedRemainingLines).isLessOrEqual(80);
+      },
+    );
+
+    test('Skips < 25% no-op Tier-3 fallback cuts and reports surviving coupled '
+        'SCC summary notes (#173)', () async {
+      // 1. Single-class monolith with --use-parts: leaves < 25% behind, so
+      // no Tier-3 fallback cut is emitted and no ask-user directive appears.
+      final singleFile = File(p.join(tempDir.path, 'single_monolith.dart'));
+      final padSingle = List.generate(
+        45,
+        (i) => '  final s$i = $i;',
+      ).join('\n');
+      singleFile.writeAsStringSync('''
+class MonolithOnly {
+$padSingle
+}
+''');
+
+      const analyzer = FileSplitAnalyzer();
+      final singleReport = await analyzer.analyzeFile(
+        singleFile.path,
+        targetLines: 30,
+        useParts: true,
+      );
+      check(singleReport.clusters).isEmpty();
+      check(singleReport.meetsTarget).isFalse();
+      check(
+        singleReport.largestResultingFileLines,
+      ).equals(singleReport.totalLines);
+      final singleText = singleReport.formatText();
+      check(singleText).contains(
+        'largest resulting file: ${singleReport.totalLines} lines '
+        '(target 30 not met)',
+      );
+      check(singleText).not((it) => it.contains('Explicitly ASK the user'));
+
+      // 2. Coupled 2-class SCC (~50L) + tiny companion (~8L, < 25% of file):
+      // skips the no-op Tier-3 fallback cut and emits a surviving coupled-SCC
+      // summary note when each declaration alone is <= targetLines.
+      final coupledFile = File(p.join(tempDir.path, 'coupled_stub.dart'));
+      final padHalf = List.generate(20, (i) => '  final h$i = $i;').join('\n');
+      coupledFile.writeAsStringSync('''
+class TinyCompanion {
+  final CoupledAlpha a = CoupledAlpha();
+  final int v0 = 0;
+  final int v1 = 1;
+  final int v2 = 2;
+}
+
+class CoupledAlpha {
+  CoupledBeta? peer;
+$padHalf
+}
+
+class CoupledBeta {
+  CoupledAlpha? peer;
+$padHalf
+}
+''');
+
+      final coupledReport = await analyzer.analyzeFile(
+        coupledFile.path,
+        targetLines: 30,
+        minClusterLines: 15,
+      );
+      check(coupledReport.clusters).isEmpty();
+      check(coupledReport.hasSurvivingCoupledScc).isTrue();
+      check(coupledReport.meetsTarget).isFalse();
+      final coupledText = coupledReport.formatText();
+      check(coupledText).contains(
+        'surviving declarations exceed target 30 lines across mutually '
+        'coupled declarations',
+      );
+    });
+
+    test(
+      'Reports largestResultingFileLines, meetsTarget, and cut-side oversized '
+      'declaration and multi-declaration notes (#173)',
+      () async {
+        const analyzer = FileSplitAnalyzer();
+
+        // 1. Tier-1 cohesive multi-declaration island exceeding targetLines
+        // where each individual declaration is <= targetLines.
+        final islandFile = File(p.join(tempDir.path, 'cohesive_island.dart'));
+        final padRoot = List.generate(
+          55,
+          (i) => '  final r$i = $i;',
+        ).join('\n');
+        final padPart = List.generate(
+          18,
+          (i) => '  final p$i = $i;',
+        ).join('\n');
+        islandFile.writeAsStringSync('''
+class PrimaryRoot {
+$padRoot
+}
+
+class IslandHead {
+  final IslandHelper h = IslandHelper();
+$padPart
+}
+
+class IslandHelper {
+$padPart
+}
+''');
+
+        final islandReport = await analyzer.analyzeFile(
+          islandFile.path,
+          targetLines: 35,
+          minClusterLines: 15,
+        );
+        check(islandReport.clusters).length.equals(1);
+        check(islandReport.meetsTarget).isFalse();
+        check(islandReport.largestResultingFileLines).isGreaterThan(35);
+        final islandJson = islandReport.toJson();
+        check(
+          islandJson['largest_resulting_file_lines'],
+        ).equals(islandReport.largestResultingFileLines);
+        check(islandJson['meets_target']).equals(false);
+        final islandText = islandReport.formatText();
+        check(islandText).contains(
+          'largest resulting file: ~${islandReport.largestResultingFileLines} '
+          'lines (target 35 not met)',
+        );
+        check(islandText).contains(
+          'cohesive 2-declaration cluster — can be decomposed further once '
+          'extracted',
+        );
+
+        // 2. Tier-3 coupled SCC cut (>= 25% left behind) containing an
+        // oversized declaration: cut-side declaration note is emitted without
+        // duplicating Agent Directive on the declaration row.
+        final tier3File = File(p.join(tempDir.path, 'tier3_cut_notes.dart'));
+        final padHost = List.generate(
+          25,
+          (i) => '  final s$i = $i;',
+        ).join('\n');
+        final padBig = List.generate(40, (i) => '  final b$i = $i;').join('\n');
+        tier3File.writeAsStringSync('''
+class SurvivingHost {
+  final CycleBig big = CycleBig();
+$padHost
+}
+
+class CycleBig {
+  CyclePeer? peer;
+$padBig
+}
+
+class CyclePeer {
+  CycleBig? owner;
+  final int x = 1;
+}
+''');
+
+        final tier3Report = await analyzer.analyzeFile(
+          tier3File.path,
+          targetLines: 35,
+          minClusterLines: 15,
+        );
+        check(tier3Report.clusters).length.equals(1);
+        check(
+          tier3Report.clusters.single.tier,
+        ).equals(SplitTier.tier3PartDirective);
+        final tier3Text = tier3Report.formatText();
+        check(tier3Text).contains('- class CycleBig (L');
+        check(tier3Text).contains(
+          '[Note: single class exceeds target 35 lines — consider extracting '
+          'cohesive methods into a helper or extension, or splitting further '
+          'with `part` / `part of` to preserve private `_field` access]',
+        );
+        // Agent Directive appears once at the cut level, not duplicated inside
+        // the declaration's [Note: ...].
+        final directiveMatches = 'Explicitly ASK the user'
+            .allMatches(tier3Text)
+            .length;
+        check(directiveMatches).equals(1);
       },
     );
   });

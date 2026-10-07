@@ -120,7 +120,7 @@ class FileSplitAnalyzer {
       depths: depths,
       islands: islands,
     );
-    final (:clusters, :surviving) = planner.plan();
+    final (:clusters, :surviving, :hasSurvivingCoupledScc) = planner.plan();
 
     return FileSplitReport(
       filePath: pathStr,
@@ -131,6 +131,7 @@ class FileSplitAnalyzer {
       maxTopologicalDepth: maxDepth,
       clusters: clusters,
       survivingDeclarations: surviving,
+      hasSurvivingCoupledScc: hasSurvivingCoupledScc,
       targetLines: targetLines,
       useParts: useParts,
     );
@@ -191,11 +192,27 @@ class _ExtractionCutPlanner {
   int _setLines(Iterable<int> indices) =>
       indices.fold(0, (s, idx) => s + _sccLineCounts[idx]);
 
-  ({List<SplitCluster> clusters, List<DeclarationUnit> surviving}) plan() {
+  ({
+    List<SplitCluster> clusters,
+    List<DeclarationUnit> surviving,
+    bool hasSurvivingCoupledScc,
+  })
+  plan() {
     _extractDisjointIslands();
     _extractDominatorCones();
     _extractOversizedSccFallbacks();
     _reabsorbSurplusSmallCuts();
+
+    final remLines = _remainingLines();
+    final hasSurvivingCoupledScc =
+        [
+          for (var i = 0; i < sccs.length; i++)
+            if (!extractedSccs.contains(i) && sccs[i].length > 1) i,
+        ].any(
+          (i) =>
+              _sccLines(i) > targetLines ||
+              remLines - _sccLines(i) <= targetLines,
+        );
 
     final surviving = <DeclarationUnit>[
       for (var i = 0; i < sccs.length; i++)
@@ -203,7 +220,11 @@ class _ExtractionCutPlanner {
           for (final name in sccs[i]) ?declsByName[name],
     ]..sort((a, b) => a.startLine.compareTo(b.startLine));
 
-    return (clusters: clusters, surviving: surviving);
+    return (
+      clusters: clusters,
+      surviving: surviving,
+      hasSurvivingCoupledScc: hasSurvivingCoupledScc,
+    );
   }
 
   void _extractDisjointIslands() {
@@ -754,11 +775,18 @@ class _ExtractionCutPlanner {
 
   void _extractOversizedSccFallbacks() {
     if (useParts == false) return;
-    for (var i = 0; i < sccs.length; i++) {
-      final allowSingleClassPart = useParts == true && sccs[i].length == 1;
-      if (!extractedSccs.contains(i) &&
-          (sccs[i].length > 1 || allowSingleClassPart) &&
-          _sccLines(i) > targetLines) {
+    final preFallbackRemaining = _remainingLines();
+    final candidates = [
+      for (var i = 0; i < sccs.length; i++)
+        if (!extractedSccs.contains(i) &&
+            (sccs[i].length > 1 || (useParts == true && sccs[i].length == 1)) &&
+            _sccLines(i) > targetLines)
+          i,
+    ]..sort((a, b) => _sccLines(b).compareTo(_sccLines(a)));
+    for (final i in candidates) {
+      if (extractedSccs.length + 1 >= sccs.length) break;
+      final remainingAfter = _remainingLines() - _sccLines(i);
+      if (remainingAfter * 4 >= preFallbackRemaining) {
         _commitCluster({i}, isDisjointIsland: false, forceTier3: true);
       }
     }
