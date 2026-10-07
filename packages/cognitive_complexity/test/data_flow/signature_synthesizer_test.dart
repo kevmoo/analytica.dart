@@ -1,5 +1,6 @@
 import 'package:checks/checks.dart';
 import 'package:cognitive_complexity/data_flow.dart';
+import 'package:cognitive_complexity/src/data_flow/signature_synthesizer.dart';
 import 'package:test/scaffolding.dart';
 
 void main() {

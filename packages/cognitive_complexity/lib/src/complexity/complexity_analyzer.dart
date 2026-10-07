@@ -8,7 +8,7 @@ import 'package:analyzer/source/line_info.dart';
 import 'package:path/path.dart' as p;
 import 'cognitive_complexity_visitor.dart';
 
-export 'package:analytica/analyzer.dart' show PathFilter, isExcludedPath;
+export 'package:analytica/analyzer.dart' show PathFilter;
 export 'cognitive_complexity_visitor.dart' show ComplexityComposition;
 
 final _directiveParser = CommentDirectiveParser('cognitive_complexity');

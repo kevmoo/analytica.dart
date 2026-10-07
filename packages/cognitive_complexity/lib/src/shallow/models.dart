@@ -67,10 +67,6 @@ class ShallowFinding {
   /// helper is inlined: [callerBaseScore] plus the deltas of every earlier
   /// [ShallowClassification.safeInline] sibling absorbed into the same caller.
   final int callerCumulativeBefore;
-
-  /// Alias of [callerCumulativeBefore], retained for the `caller_score` JSON
-  /// key.
-  final int callerScore;
   final int inlinedDeltaScore;
   final int inlinedCallerScore;
 
@@ -124,7 +120,6 @@ class ShallowFinding {
     required this.callNestingDepth,
     required this.callerBaseScore,
     required this.callerCumulativeBefore,
-    required this.callerScore,
     required this.inlinedDeltaScore,
     required this.inlinedCallerScore,
     required this.inlinedCallerScoreIsolated,
@@ -161,7 +156,6 @@ class ShallowFinding {
     'call_nesting_depth': callNestingDepth,
     'caller_base_score': callerBaseScore,
     'caller_cumulative_before': callerCumulativeBefore,
-    'caller_score': callerScore,
     'inlined_delta_score': inlinedDeltaScore,
     'inlined_caller_score': inlinedCallerScore,
     'inlined_caller_score_isolated': inlinedCallerScoreIsolated,

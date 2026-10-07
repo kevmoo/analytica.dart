@@ -15,13 +15,10 @@ import 'visitors/post_block_visitor.dart';
 /// Main programmatic analyzer that computes reaching definitions, mutations,
 /// and live outputs for a code slice using Dart's resolved AST.
 class DataFlowAnalyzer {
-  final SignatureSynthesizer synthesizer;
+  static const _synthesizer = SignatureSynthesizer();
   final String? sdkPath;
 
-  const DataFlowAnalyzer({
-    this.synthesizer = const SignatureSynthesizer(),
-    this.sdkPath,
-  });
+  const DataFlowAnalyzer({this.sdkPath});
 
   /// Analyzes a file on disk by file path and 1-based line bounds.
   Future<DataFlowResult> analyzeFile({
@@ -112,7 +109,7 @@ class DataFlowAnalyzer {
 
     final typeParams = _extractTypeParams(enclosingNode, inputList, outputList);
 
-    final signature = synthesizer.synthesize(
+    final signature = _synthesizer.synthesize(
       inputs: inputList,
       outputs: outputList,
       typeParameters: typeParams,

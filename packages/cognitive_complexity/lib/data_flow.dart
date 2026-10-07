@@ -5,6 +5,10 @@
 /// "Extract Method" refactorings with Dart 3 Records.
 library;
 
-export 'src/data_flow/data_flow_analyzer.dart';
-export 'src/data_flow/models.dart';
-export 'src/data_flow/signature_synthesizer.dart';
+export 'src/data_flow/data_flow_analyzer.dart' show DataFlowAnalyzer;
+export 'src/data_flow/models.dart'
+    show
+        ControlFlowEscape,
+        ControlFlowEscapeType,
+        DataFlowResult,
+        VariableUsage;
