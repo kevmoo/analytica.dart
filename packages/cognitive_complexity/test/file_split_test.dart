@@ -800,5 +800,53 @@ $leaves
         report.survivingDeclarations.map((d) => d.name).toSet(),
       ).contains('createPaths');
     });
+
+    test(
+      'Splits bridged root cone when header overhead exceeds targetLines '
+      'while keeping the bridging root in survivingDeclarations (#174)',
+      () async {
+        final file = File(p.join(tempDir.path, 'bridged_root_sim.dart'));
+        final header = List.generate(30, (i) => '// header $i').join('\n');
+        final padA = List.generate(25, (i) => '  final a$i = $i;').join('\n');
+        final padB = List.generate(25, (i) => '  final b$i = $i;').join('\n');
+        file.writeAsStringSync('''
+$header
+
+class BaseTap {
+$padA
+}
+
+class ExtraTap {
+$padB
+}
+
+class MainTap extends BaseTap {
+  final ExtraTap extra = ExtraTap();
+}
+''');
+
+        final absPath = p.canonicalize(file.absolute.path);
+        final helper = AnalysisContextHelper(includedPaths: [absPath]);
+        final unitResult = await helper.getRequiredResolvedUnit(absPath);
+
+        const analyzer = FileSplitAnalyzer();
+        final report = analyzer.analyzeResolvedUnit(
+          unitResult,
+          displayPath: file.path,
+          targetLines: 80,
+          minClusterLines: 20,
+        );
+
+        check(report.totalLines).isGreaterThan(80);
+        check(report.clusters).length.equals(1);
+        check(
+          report.clusters.single.declarations.map((d) => d.name).toList(),
+        ).deepEquals(['ExtraTap']);
+        check(
+          report.survivingDeclarations.map((d) => d.name).toList(),
+        ).deepEquals(['BaseTap', 'MainTap']);
+        check(report.estimatedRemainingLines).isLessOrEqual(80);
+      },
+    );
   });
 }

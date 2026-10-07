@@ -349,7 +349,9 @@ class _ExtractionCutPlanner {
       final lines = _setLines(unextracted);
       final withinRem =
           !requireSmallerThanRemaining ||
-          (lines < remLines && unextracted.length < remSccCount);
+          (lines < remLines &&
+              (unextracted.length < remSccCount ||
+                  _splitBridgedCone(unextracted) != null));
       if (lines >= minClusterLines &&
           lines <= targetLines &&
           withinRem &&
@@ -387,6 +389,7 @@ class _ExtractionCutPlanner {
         if (groups.where((g) => _dependsOnAnyOf({r}, [g])).length >= 2) r,
     };
     for (final group in groups) {
+      if (extractedSccs.length + group.length >= sccs.length) break;
       // A bridging root only forfeits naming rights when it is a small guest
       // in the group; a root holding a third or more of the group's lines is
       // the group's substance.
