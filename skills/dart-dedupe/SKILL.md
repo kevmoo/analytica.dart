@@ -65,7 +65,7 @@ detect:
 Run the official package CLI directly:
 
 ```bash
-dart run dedupe@^0.1.0 [options] [target_path]
+dart run dedupe@^0.1.1 [options] [target_path]
 ```
 
 ### Execution Modes
@@ -74,13 +74,13 @@ dart run dedupe@^0.1.0 [options] [target_path]
 
 ```bash
 # Markdown summary with clickable file links
-dart run dedupe@^0.1.0
+dart run dedupe@^0.1.1
 
 # Machine-readable JSON output for agent pipelines
-dart run dedupe@^0.1.0 --format=json
+dart run dedupe@^0.1.1 --format=json
 
 # Write JSON report to file alongside human stdout
-dart run dedupe@^0.1.0 --json-output=report.json
+dart run dedupe@^0.1.1 --json-output=report.json
 ```
 
 #### Mode 2: PR / Git Diff Delta Scan (`--git-diff`)
@@ -89,13 +89,13 @@ Focus strictly on code modified in a branch or PR:
 
 ```bash
 # In Git checkouts:
-dart run dedupe@^0.1.0 --git-diff=origin/main
+dart run dedupe@^0.1.1 --git-diff=origin/main
 
 # Filter report strictly to clusters intersecting modified lines:
-dart run dedupe@^0.1.0 --git-diff=origin/main --only-changed
+dart run dedupe@^0.1.1 --git-diff=origin/main --only-changed
 
 # Fail CI if diff duplication exceeds 5%:
-dart run dedupe@^0.1.0 --git-diff=origin/main --fail-threshold=5
+dart run dedupe@^0.1.1 --git-diff=origin/main --fail-threshold=5
 ```
 
 ### Common CLI Options Reference
@@ -114,6 +114,7 @@ dart run dedupe@^0.1.0 --git-diff=origin/main --fail-threshold=5
 | `-d, --git-diff`            | Git reference to compare against (e.g. `origin/main`).                         | None                |
 | `--only-changed`            | Only report clusters intersecting modified lines.                              | `false`             |
 | `--exclude`                 | Comma-separated glob patterns of files to exclude.                             | Standard exclusions |
+| `--[no-]ignore-generated`   | Exclude generated files (`*.g.dart`, `*.freezed.dart`, `*.mocks.dart`, etc.).  | `true`              |
 | `--include`                 | Comma-separated glob patterns of files to include.                             | `**/*.dart`         |
 | `--[no-]cache`              | Enable on-disk caching of AST candidates & token sequences.                    | `true`              |
 | `--cache-dir`               | Custom directory for cache (defaults to `.dart_tool/dedupe`).                  | None                |
@@ -183,7 +184,7 @@ strict 2-stage workflow:
 
 ### Stage 1: Read-Only Audit & Reporting (Mandatory Stop)
 
-Run `dart run dedupe@^0.1.0 --format=markdown` (or `--format=json`).
+Run `dart run dedupe@^0.1.1 --format=markdown` (or `--format=json`).
 
 **Mandatory Persistent Artifact**: You MUST create a structured Markdown
 artifact named `dedupe_triage_report.md` in
@@ -252,7 +253,7 @@ Wrap all deduplication refactoring in a strict verification sandwich:
    - Run `flutter test` or `dart test`.
    - **Monorepo Downstream Gate**: In multi-package workspaces, run tests across
      all dependent packages.
-4. **Zero-Clone Confirmation**: Re-run `dart run dedupe@^0.1.0` to confirm the
+4. **Zero-Clone Confirmation**: Re-run `dart run dedupe@^0.1.1` to confirm the
    target cluster was eliminated.
 5. **Local Staging**: Stage verified diffs locally (`git add .`).
 
@@ -295,6 +296,6 @@ To reproduce or re-run this duplication scan locally:
 Determine the package version dynamically:
 
 - Check `pubspec.lock` in the workspace or run
-  `dart run dedupe@^0.1.0 --version`.
+  `dart run dedupe@^0.1.1 --version`.
 - If invoked with a specific version constraint (e.g. `dedupe@^0.1.0`), use that
   exact version.
