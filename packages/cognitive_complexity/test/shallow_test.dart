@@ -747,6 +747,77 @@ void _runService(int n) {
       ).deepEquals(['CROSS_FILE_SINGLE_CALLER(from service.dart)']);
     });
 
+    test('drops CROSS_FILE_SINGLE_CALLER for lib/ helpers called once from '
+        'tool/, example/, web/, or benchmark/, and ignores helpers with a '
+        'test/ caller', () async {
+      String helper(String name) =>
+          'int $name(int a, int b, int c) => a + b + c;';
+      String caller(String name) =>
+          '''
+import 'package:zones_pkg/src/helpers.dart';
+
+void main() {
+  print($name(1, 2, 3));
+}
+''';
+      await d.dir('zones_pkg', [
+        d.file('pubspec.yaml', 'name: zones_pkg\n'),
+        d.dir('lib', [
+          d.dir('src', [
+            d.file(
+              'helpers.dart',
+              [
+                helper('toolHelper'),
+                helper('exampleHelper'),
+                helper('webHelper'),
+                helper('benchHelper'),
+                helper('mixedHelper'),
+              ].join('\n'),
+            ),
+            d.file('service.dart', '''
+import 'helpers.dart';
+
+void _runService(int n) {
+  if (n > 0) print(mixedHelper(n, n, n));
+}
+'''),
+          ]),
+        ]),
+        d.dir('tool', [d.file('t.dart', caller('toolHelper'))]),
+        d.dir('example', [d.file('ex.dart', caller('exampleHelper'))]),
+        d.dir('web', [d.file('main.dart', caller('webHelper'))]),
+        d.dir('benchmark', [d.file('b.dart', caller('benchHelper'))]),
+        d.dir('test', [d.file('mixed_test.dart', caller('mixedHelper'))]),
+      ]).create();
+
+      final report = ShallowAnalyzer().analyzePath(
+        '${d.sandbox}/zones_pkg/lib',
+      );
+      final byName = {for (final f in report.findings) f.name: f};
+      check(byName.keys).unorderedEquals([
+        'toolHelper',
+        'exampleHelper',
+        'webHelper',
+        'benchHelper',
+      ]);
+      const zones = {
+        'toolHelper': 'tool',
+        'exampleHelper': 'example',
+        'webHelper': 'web',
+        'benchHelper': 'benchmark',
+      };
+      for (final MapEntry(key: name, value: zone) in zones.entries) {
+        final finding = byName[name]!;
+        check(finding.callerZone).equals(zone);
+        check(finding.toJson()['caller_zone']).equals(zone);
+        check(finding.callerName).equals('main');
+        check(finding.reasons.any((r) => r.startsWith('CROSS_FILE'))).isFalse();
+        check(
+          finding.reasons.any((r) => r.startsWith('MICRO_HELPER')),
+        ).isTrue();
+      }
+    });
+
     test('reports shared_param_signature_with for siblings sharing >= 4 '
         'parameter names', () {
       const code = '''

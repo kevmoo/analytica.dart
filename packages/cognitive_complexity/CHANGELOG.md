@@ -39,9 +39,10 @@
   like a class and counts as one parameter, so a domain record passed through a
   helper is not reported as packing.
 - `shallow`: `CROSS_FILE_SINGLE_CALLER` is no longer reported for `lib/`
-  declarations whose single caller lives in `bin/`, `test/`, `tool/`,
-  `example/`, or `web/` (package layering, not shallow extraction). Other
-  reasons still apply to such helpers.
+  declarations whose single caller lives in `bin/`, `tool/`, `example/`, `web/`,
+  or `benchmark/` (package layering, not shallow extraction). Other reasons
+  still apply to such helpers. Helpers with a `test/` caller are, as before, not
+  single-caller candidates at all.
 - `shallow`: JSON findings gain `effective_parameter_count`, `statement_count`,
   `caller_zone`, `inlined_caller_score_isolated` (caller base score plus this
   helper's delta, independent of sibling simulation order), and

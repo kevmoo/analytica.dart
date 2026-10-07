@@ -498,7 +498,7 @@ class ShallowAnalyzer {
     }
 
     for (final pkgRoot in packageRoots) {
-      for (final sibling in const ['lib', 'bin', 'tool', 'test']) {
+      for (final sibling in _knownZones) {
         final sibDir = Directory(p.join(pkgRoot, sibling));
         _collectDirEntries(
           entriesByAbs,
@@ -735,12 +735,20 @@ class _RawCandidate {
   );
 }
 
-const _knownZones = {'lib', 'bin', 'test', 'tool', 'example', 'web'};
+const _knownZones = {
+  'lib',
+  'bin',
+  'test',
+  'tool',
+  'example',
+  'web',
+  'benchmark',
+};
 
 /// Classifies a normalized relative Dart file path by its package layout
-/// directory: `lib`, `bin`, `test`, `tool`, `example`, `web`, or `other` when
-/// no such segment is present. The last matching segment wins so nested
-/// packages (`tool/lib/x.dart`) resolve to their own layout directory.
+/// directory: `lib`, `bin`, `test`, `tool`, `example`, `web`, `benchmark`, or
+/// `other` when no such segment is present. The last matching segment wins so
+/// nested packages (`tool/lib/x.dart`) resolve to their own layout directory.
 String _zoneOf(String normalizedFilePath) {
   final segments = p.split(normalizedFilePath);
   for (var i = segments.length - 2; i >= 0; i--) {
