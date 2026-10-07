@@ -459,13 +459,26 @@ void _printTextReport(
   }
 
   if (results.isNotEmpty) {
-    _printRegularDeclRows(
-      results,
-      failThreshold,
-      maxFunctionLines,
-      sink,
+    final layout = (
+      maxNameLen: results.fold(
+        'Declaration'.length,
+        (w, r) => max(w, r.name.length),
+      ),
+      breakdownWidth: verbose
+          ? results.fold(
+              'Breakdown'.length,
+              (w, r) => max(w, _formatBreakdown(r.composition).length),
+            )
+          : 0,
+      showLines: maxFunctionLines != null,
       verbose: verbose,
     );
+    _printRegularHeader(layout, sink);
+    for (final res in results) {
+      sink.writeln(
+        _formatRegularRow(res, layout, failThreshold, maxFunctionLines),
+      );
+    }
   }
   if (violatedFiles.isNotEmpty) {
     _printRegularFileViolationRows(violatedFiles, maxFileLines!, sink);
@@ -478,35 +491,6 @@ typedef _RegularTableLayout = ({
   bool showLines,
   bool verbose,
 });
-
-void _printRegularDeclRows(
-  List<FunctionComplexity> results,
-  int? failThreshold,
-  int? maxFunctionLines,
-  StringSink sink, {
-  bool verbose = false,
-}) {
-  final layout = (
-    maxNameLen: results.fold(
-      'Declaration'.length,
-      (w, r) => max(w, r.name.length),
-    ),
-    breakdownWidth: verbose
-        ? results.fold(
-            'Breakdown'.length,
-            (w, r) => max(w, _formatBreakdown(r.composition).length),
-          )
-        : 0,
-    showLines: maxFunctionLines != null,
-    verbose: verbose,
-  );
-  _printRegularHeader(layout, sink);
-  for (final res in results) {
-    sink.writeln(
-      _formatRegularRow(res, layout, failThreshold, maxFunctionLines),
-    );
-  }
-}
 
 void _printRegularHeader(_RegularTableLayout layout, StringSink sink) {
   final headerLines = layout.showLines ? '  ${'Lines'.padLeft(5)}' : '';

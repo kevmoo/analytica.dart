@@ -48,6 +48,9 @@ jobs:
       - name: Analyze code
         run: dart analyze --fatal-infos
         if: always() && steps.install.outcome == 'success'
+      - name: Self-dogfood shallow helper check
+        run: dart run bin/shallow.dart --only-safe --fail-on-safe-inline lib/
+        if: always() && steps.install.outcome == 'success'
 
   # Run tests on ubuntu-latest across supported SDKs.
   test:

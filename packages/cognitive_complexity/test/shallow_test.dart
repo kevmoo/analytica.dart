@@ -1106,5 +1106,117 @@ void _trampoline(int a, int b, int c, int d, int e) {
         ).contains('SAFE_INLINE shallow helper(s) detected');
       },
     );
+
+    test('weights multi-arm switch expressions and statements in '
+        'statement_count so lookup tables are not MICRO_HELPER', () {
+      const code = '''
+String describeKind(int kind, int? baseline) {
+  return '\${_kindLabel(kind)}:\${_deltaIcon(kind, baseline)}:'
+      '\${_statementLookup(kind)}:\${_twoArmSwitch(kind)}';
+}
+
+String _kindLabel(int kind) => switch (kind) {
+  0 => 'alpha',
+  1 => 'beta',
+  2 => 'gamma',
+  3 => 'delta',
+  4 => 'epsilon',
+  _ => 'other',
+};
+
+String _deltaIcon(int score, int? base) {
+  if (base == null) return 'new';
+  return switch (score.compareTo(base)) {
+    > 0 => 'up',
+    < 0 => 'down',
+    0 => 'same',
+    _ => 'unknown',
+  };
+}
+
+String _statementLookup(int kind) {
+  switch (kind) {
+    case 0:
+      return 'zero';
+    case 1:
+      return 'one';
+    case 2:
+      return 'two';
+    case 3:
+      return 'three';
+    default:
+      return 'many';
+  }
+}
+
+String _twoArmSwitch(int kind) => switch (kind) {
+  0 =>
+    'zero_value_'
+        'wrapped_across_lines',
+  _ =>
+    'nonzero_value_'
+        'wrapped_across_lines',
+};
+''';
+      final report = ShallowAnalyzer().analyzeCode(code);
+      // `_kindLabel` (6-arm switch expr -> 6 stmts), `_deltaIcon` (1 guard +
+      // 4-arm switch expr -> 5 stmts), and `_statementLookup` (5-arm switch
+      // stmt -> 5 stmts) all exceed 6 body lines and 2 statements, so none are
+      // flagged as MICRO_HELPER. `_twoArmSwitch` (2 arms -> 2 stmts across 8
+      // body lines) IS still flagged as MICRO_HELPER.
+      check(
+        report.findings.map((f) => f.name).toList(),
+      ).deepEquals(['_twoArmSwitch']);
+      final twoArm = report.findings.single;
+      check(twoArm.statementCount).equals(2);
+      check(twoArm.bodyLines).isGreaterThan(6);
+      check(twoArm.reasons.any((r) => r.startsWith('MICRO_HELPER'))).isTrue();
+    });
+
+    test('switch statement arm counting ignores stacked empty case labels, '
+        'empty switches, and nested closures', () {
+      const code = '''
+void caller(int a, int b, int c, int d, int e) {
+  _stackedCases(a, b, c, d, e);
+  _emptySwitchAndClosure(a, b, c, d, e);
+}
+
+String _stackedCases(int a, int b, int c, int d, int e) {
+  switch (a + b + c + d + e) {
+    case 0:
+    case 1:
+    case 2:
+      return 'small';
+    default:
+      return 'large';
+  }
+}
+
+int _emptySwitchAndClosure(int a, int b, int c, int d, int e) {
+  switch (a) {}
+  final f = (int x) => switch (x) {
+    0 => 10,
+    1 => 20,
+    2 => 30,
+    _ => 40,
+  };
+  return f(b + c + d + e);
+}
+''';
+      final report = ShallowAnalyzer().analyzeCode(code);
+      final byName = {for (final f in report.findings) f.name: f};
+
+      // `_stackedCases` has 1 top-level SwitchStatement with 2 non-empty
+      // members (`case 2` and `default`), so statementCount = 1 + (2 - 1) = 2.
+      final stacked = byName['_stackedCases']!;
+      check(stacked.statementCount).equals(2);
+
+      // `_emptySwitchAndClosure` has 3 top-level statements (`switch (a) {}`,
+      // `final f = ...`, `return ...`). The empty switch contributes
+      // max(0, 0 - 1) = 0 (no underflow), and the 4-arm switch inside closure
+      // `f` is excluded by nested-function boundary stopping.
+      final emptyAndClosure = byName['_emptySwitchAndClosure']!;
+      check(emptyAndClosure.statementCount).equals(3);
+    });
   });
 }

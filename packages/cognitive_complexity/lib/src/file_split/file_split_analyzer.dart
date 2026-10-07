@@ -418,10 +418,14 @@ class _ExtractionCutPlanner {
         for (final r in bridging)
           if (group.contains(r) && _sccLines(r) * 3 < _setLines(group)) r,
       };
+      final declCount = group.fold(0, (s, i) => s + sccs[i].length);
       _commitCluster(
         group,
         isDisjointIsland: false,
-        rationale: _subConeRationale(rootNames, group),
+        rationale:
+            'Sub-component of the ${rootNames.join(', ')} cone '
+            '($declCount declaration(s)); shares no edges with its sibling '
+            'cut(s) other than through the cone root(s), 0 circular imports.',
         namingSccs: group.difference(guests),
       );
     }
@@ -552,13 +556,6 @@ class _ExtractionCutPlanner {
       for (final comp in computeWeaklyConnectedIslands(index.length, relabeled))
         {for (final i in comp) index[i]},
     ];
-  }
-
-  String _subConeRationale(List<String> rootNames, Set<int> group) {
-    final count = group.fold(0, (s, i) => s + sccs[i].length);
-    return 'Sub-component of the ${rootNames.join(', ')} cone '
-        '($count declaration(s)); shares no edges with its sibling cut(s) '
-        'other than through the cone root(s), 0 circular imports.';
   }
 
   int _compareCandidateCones(_ScoredCone a, _ScoredCone b, int neededLines) {

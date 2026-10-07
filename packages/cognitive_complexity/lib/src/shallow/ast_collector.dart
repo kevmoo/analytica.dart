@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:analytica/analyzer.dart';
 import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/dart/ast/visitor.dart';
@@ -21,7 +23,9 @@ class ShallowDeclNode {
   final int parameterCount;
   final int namedParameterCount;
 
-  /// Number of top-level statements in the body (`1` for `=>` bodies).
+  /// Number of top-level statements in the body (`1` for `=>` bodies), plus
+  /// `max(0, armCount - 1)` for each multi-arm `switch` expression or
+  /// statement (excluding nested functions).
   final int statementCount;
 
   /// [parameterCount] with record-typed parameters expanded to their field
@@ -67,12 +71,43 @@ class ShallowDeclNode {
   int get lineCount => endLine >= startLine ? endLine - startLine + 1 : 0;
 }
 
-/// Counts the statements directly inside [body] (`1` for expression bodies).
-int countBodyStatements(FunctionBody body) => switch (body) {
-  BlockFunctionBody(:final block) => block.statements.length,
-  ExpressionFunctionBody() => 1,
-  _ => 0,
-};
+/// Counts the statements directly inside [body] (`1` for expression bodies),
+/// plus `max(0, armCount - 1)` for each multi-arm `switch` expression or
+/// `switch` statement inside [body] (stopping at nested function boundaries).
+int countBodyStatements(FunctionBody body) {
+  final base = switch (body) {
+    BlockFunctionBody(:final block) => block.statements.length,
+    ExpressionFunctionBody() => 1,
+    _ => 0,
+  };
+  if (base == 0) return 0;
+  final counter = _SwitchArmCounter();
+  body.accept(counter);
+  return base + counter.extraStatements;
+}
+
+class _SwitchArmCounter extends RecursiveAstVisitor<void> {
+  int extraStatements = 0;
+
+  @override
+  void visitSwitchExpression(SwitchExpression node) {
+    extraStatements += math.max(0, node.cases.length - 1);
+    super.visitSwitchExpression(node);
+  }
+
+  @override
+  void visitSwitchStatement(SwitchStatement node) {
+    final armCount = node.members.where((m) => m.statements.isNotEmpty).length;
+    extraStatements += math.max(0, armCount - 1);
+    super.visitSwitchStatement(node);
+  }
+
+  @override
+  void visitFunctionExpression(FunctionExpression node) {}
+
+  @override
+  void visitFunctionDeclaration(FunctionDeclaration node) {}
+}
 
 /// Counts [parameters] with record-typed parameters expanded to their field
 /// count.

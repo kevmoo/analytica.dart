@@ -45,9 +45,12 @@ class ShallowFinding {
   final int signatureLines;
   final int bodyLines;
 
-  /// Number of top-level statements in the helper body (`1` for `=>` bodies).
-  /// `MICRO_HELPER` also fires for `<= 2` statements spanning up to 15 body
-  /// lines, so formatter-wrapped one-liners cannot evade it.
+  /// Number of top-level statements in the helper body (`1` for `=>` bodies),
+  /// plus `max(0, armCount - 1)` for each multi-arm `switch` expression or
+  /// `switch` statement (excluding nested functions). `MICRO_HELPER` also
+  /// fires for `<= 2` statements spanning up to 15 body lines, so
+  /// formatter-wrapped one-liners cannot evade it while multi-arm `switch`
+  /// tables are not misclassified as micro-helpers.
   final int statementCount;
   final int score;
   final String callerFilePath;
