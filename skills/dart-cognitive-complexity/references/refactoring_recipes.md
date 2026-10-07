@@ -374,8 +374,11 @@ The scanner identifies non-exported helpers with `FanIn == 1` and
 `MICRO_HELPER`, `SIG_HEAVY`, `CROSS_FILE_SINGLE_CALLER`) and simulates the exact
 caller Cognitive Complexity at the call-site nesting depth after re-inlining:
 
-- **`SAFE_INLINE` (`CallerCCAfter <= 15`)**: Re-inline the helper directly into
+- **`SAFE_INLINE` (`CallerCCAfter < 15`)**: Re-inline the helper directly into
   its sole caller and delete the helper declaration.
+- **`ZERO_HEADROOM` (`CallerCCAfter == 15`)**: Inlining is legal but spends the
+  caller's last point of budget; it is not counted by `--fail-on-safe-inline`.
+  Prefer trimming the caller first, then re-inline.
 - **`FLATTEN_AND_INLINE` (`HelperCC <= 4` and `CallerCCAfter > 15`)**: Flatten
   nesting at the call site using Pattern A (`switch` expression) or Pattern B
   (early guard clauses) and inline the helper.

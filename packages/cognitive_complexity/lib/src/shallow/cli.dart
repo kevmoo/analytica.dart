@@ -51,8 +51,8 @@ ArgParser _buildArgParser() => ArgParser()
     defaultsTo: '15',
     valueHelp: 'score',
     help:
-        'Maximum allowed caller Cognitive Complexity score after inlining for '
-        'a candidate to be classified as SAFE_INLINE.',
+        'Caller Cognitive Complexity ceiling after inlining. Below it a '
+        'candidate is SAFE_INLINE; exactly on it is ZERO_HEADROOM.',
   )
   ..addOption(
     'max-params',
@@ -67,7 +67,7 @@ ArgParser _buildArgParser() => ArgParser()
     negatable: false,
     help:
         'Only output SAFE_INLINE candidates where inlining keeps caller '
-        'complexity <= --max-caller-cc.',
+        'complexity below --max-caller-cc.',
   )
   ..addOption(
     'git-diff',
@@ -153,7 +153,7 @@ Future<int> _executeShallowScan(
     if (format == 'text') {
       err.writeln(
         '\nError: ${report.safeInlineCount} SAFE_INLINE shallow helper(s) '
-        'detected (Caller CC <= $maxCallerCc after inlining).',
+        'detected (Caller CC < $maxCallerCc after inlining).',
       );
     }
     return 1;
