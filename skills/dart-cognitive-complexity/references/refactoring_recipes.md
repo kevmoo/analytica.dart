@@ -375,13 +375,19 @@ between a standalone `lib/src/<topic>.dart` file (**Tier 1**, CLI
 `[Cut N - Tier 3]`), and always run the `api_summary` verification gate (Section
 1.3) before and after splitting.
 
+Treat the plan as advisory. The suggested cut name follows one declaration;
+rename each new file after what it actually holds (shared types belong in a
+`models`-style file), and update import sites directly instead of adding
+`export ... show` barrels.
+
 ---
 
-### Pattern G: Re-Inlining Shallow Single-Caller Helpers (`shallow`)
+### Pattern G: Reviewing Shallow Single-Caller Helpers (`shallow`, Advisory)
 
-When over-eager complexity decomposition leaves behind single-caller
-micro-helpers or high-arity bucket-brigade functions (`>= 5` parameters), run
-the AST shallow helper scanner:
+When you suspect over-eager decomposition left behind pass-through plumbing
+(single-caller micro-helpers or high-arity bucket-brigade functions with `>= 5`
+parameters), you can optionally run the AST shallow helper scanner as a review
+aid:
 
 ```bash
 dart run cognitive_complexity:shallow@^1.0.0 lib/
@@ -390,17 +396,19 @@ dart run cognitive_complexity:shallow@^1.0.0 lib/
 The scanner identifies non-exported helpers with `FanIn == 1` and
 `TestFanIn == 0` matching any of 4 structural tags (`HIGH_ARITY`,
 `MICRO_HELPER`, `SIG_HEAVY`, `CROSS_FILE_SINGLE_CALLER`) and simulates the exact
-caller Cognitive Complexity at the call-site nesting depth after re-inlining:
+caller Cognitive Complexity at the call-site nesting depth after re-inlining.
+Its classifications describe what is _possible_, not what to do:
 
-- **`SAFE_INLINE` (`CallerCCAfter < 15`)**: Re-inline the helper directly into
-  its sole caller and delete the helper declaration.
-- **`ZERO_HEADROOM` (`CallerCCAfter == 15`)**: Inlining is legal but spends the
-  caller's last point of budget; it is not counted by `--fail-on-safe-inline`.
-  Prefer trimming the caller first, then re-inline.
+- **`SAFE_INLINE` (`CallerCCAfter < 15`)**: Inlining would not breach the
+  caller's budget. Consider it only when the helper is pure plumbing; keep it
+  when it has same-shape siblings that stay extracted, when its name or doc
+  comment carries meaning, or when inlining an early `return` would skip later
+  caller logic (see `SKILL.md` Section 5.3).
+- **`ZERO_HEADROOM` (`CallerCCAfter == 15`)**: Inlining would spend the caller's
+  last point of budget; leave extracted.
 - **`FLATTEN_AND_INLINE` (`HelperCC <= 4`, `depth > 0`, `CallerCCAfter <= 22`,
-  and no absorbed child helpers)**: Flatten nesting at the call site using
-  Pattern A (`switch` expression) or Pattern B (early guard clauses) and inline
-  the helper.
+  and no absorbed child helpers)**: Only relevant when the caller is itself
+  being fixed; flatten with Pattern A or B as part of that work.
 - **`LOAD_BEARING` (`HelperCC >= 5` or `CallerCCAfter > 22`)**: Keep extracted,
   or narrow its parameter list if `HIGH_ARITY`.
 

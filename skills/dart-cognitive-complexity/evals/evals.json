@@ -8,7 +8,8 @@
         "A high-level summary of complexity outliers is pre-rendered in visible chat.",
         "A clickable link to 'complexity_triage_report.md' is rendered in visible chat.",
         "The confirmation gate ('ask_question') explicitly references 'complexity_triage_report.md' in its question prompt.",
-        "The agent does not call 'ask_question' blindly before generating the report artifact and visible summary."
+        "The agent does not call 'ask_question' blindly before generating the report artifact and visible summary.",
+        "The confirmation gate does not offer an option to batch re-inline SAFE_INLINE shallow helpers."
       ],
       "expected_repo_state": [
         "The artifact 'complexity_triage_report.md' is created on disk with flagged functions, scores, and refactoring strategies.",
@@ -22,7 +23,8 @@
       "expected_chat_output": [
         "Recommends targeting the single primary outlier first (sorted descending by complexity score).",
         "Links to 'complexity_triage_report.md' in chat.",
-        "Includes '(Recommended) Refactor Primary Outlier First' in confirmation gate options."
+        "Includes '(Recommended) Refactor Primary Outlier First' in confirmation gate options.",
+        "Treats only declarations scoring above the threshold as work items; any shallow or file_split findings are presented as advisory, not as items to clear."
       ],
       "expected_repo_state": [
         "The artifact 'complexity_triage_report.md' is created on disk.",
@@ -37,12 +39,26 @@
         "Consults 'references/refactoring_recipes.md' for progressive-disclosure refactoring patterns.",
         "Applies the Load-Bearing Library Boundary Rule (Tier 1 standalone lib/src/ file vs. Tier 2 part/part of or in-file private helpers).",
         "Runs or specifies 'dart run api_summary@^1.1.0' before and after refactoring to verify zero unintended public API leaks.",
-        "Runs or specifies 'dart run cognitive_complexity:shallow@^1.0.0' to verify no single-caller SAFE_INLINE shallow helpers were introduced."
+        "Does not use 'shallow' (or '--fail-on-safe-inline') as a pass/fail gate and does not batch-inline SAFE_INLINE helpers."
       ],
       "expected_repo_state": [
         "All modified functions score <= 15 on the cognitive complexity scanner.",
         "Extracted helpers are pure file-private functions or static methods with <= 4 parameters returning immutable values/records; no single-use stateful _Populator or _Runner classes are created.",
-        "The package's public API surface (api_summary / api.txt) has zero unintended symbol leaks."
+        "The package's public API surface (api_summary / api.txt) has zero unintended symbol leaks.",
+        "Pre-existing sibling-step helpers with the same shape (e.g. _readX / _readY / _readZ) remain extracted; none is inlined while its siblings stay helpers.",
+        "Code outside the refactored outlier has no style-only edits."
+      ],
+      "agent_config": "bare-agent"
+    },
+    {
+      "id": "complexity_stop_when_clean",
+      "prompt": "Run dart-cognitive-complexity on this package (every declaration already scores <= 15) and fix anything that needs fixing.",
+      "expected_chat_output": [
+        "Reports that the maximum cognitive complexity score is <= 15 and that no refactoring is required.",
+        "Does not propose or perform re-inlining of SAFE_INLINE shallow helpers or file splits as required work; any such suggestions are explicitly optional."
+      ],
+      "expected_repo_state": [
+        "No source files under lib/, bin/, or test/ are modified."
       ],
       "agent_config": "bare-agent"
     }
