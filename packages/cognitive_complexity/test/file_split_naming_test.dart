@@ -273,8 +273,8 @@ $options''');
       check(cut.requiredImports).deepEquals(["import '../gh_clean.dart';"]);
       check(cut.warnings).deepEquals([
         "cut imports '../gh_clean.dart', which re-exports "
-            'github_queries.dart; import the defining library directly to '
-            'avoid an inherited barrel cycle',
+            'github_queries.dart; move the declarations this cut uses out of '
+            'the barrel to break the cycle',
       ]);
       check(cut.inheritedCycles).isEmpty();
 
@@ -327,8 +327,8 @@ $options''');
         final cut = await analyzeQueries(source.path);
         check(cut.warnings).deepEquals([
           "cut imports '../gh_clean.dart', which re-exports hub.dart, which "
-              're-exports github_queries.dart; import the defining library '
-              'directly to avoid an inherited barrel cycle',
+              're-exports github_queries.dart; move the declarations this '
+              'cut uses out of the barrel to break the cycle',
         ]);
         check(cut.inheritedCycles).isEmpty();
       },

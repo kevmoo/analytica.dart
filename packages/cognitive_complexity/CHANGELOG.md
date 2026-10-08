@@ -10,8 +10,9 @@
     that stays within `--target-lines` and adds no boundary crossings; otherwise
     the cut gets a `sibling type(s) … left in …` note.
   - A cut whose copied imports include a barrel that re-exports the source file
-    (directly or through one re-export hop) gets an `inherited barrel cycle`
-    warning, and the plan header counts them.
+    (directly or through one re-export hop) gets a warning suggesting moving the
+    declarations the cut uses out of the barrel, and the plan header counts
+    them.
   - A copied import whose library merely imports the source file (an existing
     cycle the cut carries over) is informational: listed under
     `inherited_cycles` in JSON and summarized as one

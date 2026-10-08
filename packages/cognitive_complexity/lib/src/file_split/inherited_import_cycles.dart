@@ -41,8 +41,8 @@ Map<String, InheritedImportCycle> inheritedImportCycles(
 
 /// The warning text for a barrel [cycle].
 String barrelCycleWarning(InheritedImportCycle cycle) =>
-    "cut imports '${cycle.import}', which ${cycle.via}; import the defining "
-    'library directly to avoid an inherited barrel cycle';
+    "cut imports '${cycle.import}', which ${cycle.via}; move the declarations "
+    'this cut uses out of the barrel to break the cycle';
 
 /// Splits the [cycles] a cut's [requiredImports] bring in into barrel
 /// warnings and informational inherited cycles.
