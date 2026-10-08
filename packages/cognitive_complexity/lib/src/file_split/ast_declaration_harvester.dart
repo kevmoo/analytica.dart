@@ -61,6 +61,8 @@ _extractInitialUnits(CompilationUnit unit, LineInfo lineInfo) {
       overrideMemberCount:
           (prev?.overrideMemberCount ?? 0) + metrics.overrideCount,
       supertypeLabel: prev?.supertypeLabel ?? metrics.supertypeLabel,
+      representationType:
+          prev?.representationType ?? metrics.representationType,
       outgoingIntraFileRefs: const {},
       privateMemberAccessesByTarget: const {},
       requiredImportDirectives: const {},
@@ -81,6 +83,7 @@ _extractInitialUnits(CompilationUnit unit, LineInfo lineInfo) {
   int memberCount,
   int overrideCount,
   String? supertypeLabel,
+  String? representationType,
 })
 _measureDeclarationMetrics(CompilationUnitMember member, LineInfo lineInfo) {
   final visitor = _DeclarationMetricsVisitor(lineInfo);
@@ -92,6 +95,11 @@ _measureDeclarationMetrics(CompilationUnitMember member, LineInfo lineInfo) {
     memberCount: visitor.memberCount,
     overrideCount: visitor.overrideCount,
     supertypeLabel: _supertypeLabel(member),
+    representationType: switch (member.declaredFragment?.element) {
+      ExtensionTypeElement(:final representation) =>
+        representation.type.getDisplayString(),
+      _ => null,
+    },
   );
 }
 
@@ -336,6 +344,7 @@ DeclarationUnit _mergeUnitWithRefs(
   memberCount: base.memberCount,
   overrideMemberCount: base.overrideMemberCount,
   supertypeLabel: base.supertypeLabel,
+  representationType: base.representationType,
   outgoingIntraFileRefs: refs == null
       ? const {}
       : Set.unmodifiable(refs.outgoing),

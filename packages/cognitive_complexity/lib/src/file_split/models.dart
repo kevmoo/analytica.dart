@@ -44,6 +44,10 @@ class DeclarationUnit {
   /// `implements A, B` or `extends X` for classes that declare one; mixins
   /// (`with`) are not reported.
   final String? supertypeLabel;
+
+  /// The representation type of an `extension type` (e.g. `String`), or
+  /// `null` for every other kind.
+  final String? representationType;
   final Set<String> outgoingIntraFileRefs;
   final Map<String, Set<String>> privateMemberAccessesByTarget;
   final Set<String> requiredImportDirectives;
@@ -62,6 +66,7 @@ class DeclarationUnit {
     this.memberCount = 0,
     this.overrideMemberCount = 0,
     this.supertypeLabel,
+    this.representationType,
     required this.outgoingIntraFileRefs,
     required this.privateMemberAccessesByTarget,
     required this.requiredImportDirectives,
@@ -92,6 +97,7 @@ class DeclarationUnit {
     if (memberCount > 0) 'member_count': memberCount,
     if (overrideMemberCount > 0) 'override_member_count': overrideMemberCount,
     if (supertypeLabel != null) 'supertype': supertypeLabel,
+    if (representationType != null) 'representation_type': representationType,
     'outgoing_refs': outgoingIntraFileRefs.toList()..sort(),
     if (privateMemberAccessesByTarget.isNotEmpty)
       'private_member_accesses': {
@@ -116,6 +122,14 @@ class SplitCluster {
   final String rationale;
   final String? agentDirective;
 
+  /// Informational notes, e.g. sibling types kept with this cut or left in
+  /// the source file.
+  final List<String> notes;
+
+  /// Problems the cut inherits from the source file, e.g. a copied import
+  /// that re-exports the source file (an inherited import cycle).
+  final List<String> warnings;
+
   const SplitCluster({
     required this.suggestedFileName,
     required this.tier,
@@ -129,6 +143,8 @@ class SplitCluster {
     required this.exportedPublicSymbols,
     required this.rationale,
     this.agentDirective,
+    this.notes = const [],
+    this.warnings = const [],
   });
 
   int get totalLines => declarations.fold(0, (sum, d) => sum + d.lineCount);
@@ -158,6 +174,8 @@ class SplitCluster {
     'required_imports': requiredImports,
     'exported_public_symbols': exportedPublicSymbols,
     'zero_churn_directive': zeroChurnExportDirective,
+    if (notes.isNotEmpty) 'notes': notes,
+    if (warnings.isNotEmpty) 'warnings': warnings,
   };
 
   void _writeText(StringBuffer buf, int cutIndex, FileSplitReport report) {
@@ -184,12 +202,18 @@ class SplitCluster {
                 'be decomposed further once extracted]';
       buf.writeln('    $note');
     }
+    for (final note in notes) {
+      buf.writeln('    [Note: $note]');
+    }
     _writeWidenings(buf);
     if (requiredImports.isNotEmpty) {
       buf.writeln('  Required Imports for $suggestedFileName:');
       for (final imp in requiredImports) {
         buf.writeln('    $imp');
       }
+    }
+    for (final warning in warnings) {
+      buf.writeln('  Warning: $warning');
     }
     final bridge = zeroChurnExportDirective;
     if (bridge != null) {
@@ -324,11 +348,15 @@ class FileSplitReport {
     }
 
     final targetNote = meetsTarget ? '' : ' (target $targetLines not met)';
+    final cycleWarnings = clusters.fold(0, (s, c) => s + c.warnings.length);
+    final cycleNote = cycleWarnings == 0
+        ? '0 circular deps'
+        : '$cycleWarnings inherited import cycle warning(s)';
     buf.writeln(
       '=== RECOMMENDED EXTRACTION PLAN '
       '(Reduces $filePath: $totalLines -> ~$estimatedRemainingLines lines, '
       'largest resulting file: ~$largestResultingFileLines lines$targetNote, '
-      '0 circular deps, 0 caller churn) ===',
+      '$cycleNote, 0 caller churn) ===',
     );
     for (var i = 0; i < clusters.length; i++) {
       clusters[i]._writeText(buf, i + 1, this);

@@ -7,6 +7,7 @@ import 'package:path/path.dart' as p;
 
 import 'ast_declaration_harvester.dart';
 import 'graph_topology.dart';
+import 'inherited_import_cycles.dart';
 import 'models.dart';
 
 /// Analyzes a Dart source file's resolved AST to build its intra-file
@@ -120,6 +121,7 @@ FileSplitReport analyzeResolvedUnit(
     dag: sccDag,
     depths: depths,
     islands: islands,
+    importCycleWarnings: inheritedImportCycleWarnings(unitResult),
   );
   final (:clusters, :surviving, :hasSurvivingCoupledScc) = planner.plan();
 
@@ -140,6 +142,19 @@ FileSplitReport analyzeResolvedUnit(
 
 typedef _ScoredCone = ({Set<int> cone, int lines, int crossings});
 
+/// Inputs of a committed cut, kept so the cut can be rebuilt in place when
+/// sibling types are pulled into it.
+typedef _CutSpec = ({
+  Set<int> sccIndices,
+  bool isDisjointIsland,
+  bool forceTier3,
+  String? rationale,
+  Set<int>? namingSccs,
+});
+
+/// Public declaration kinds that count as types for cut naming.
+const _typeKinds = {'class', 'enum', 'extension type', 'typedef', 'mixin'};
+
 class _ExtractionCutPlanner {
   final String filePath;
 
@@ -155,9 +170,15 @@ class _ExtractionCutPlanner {
   final Map<int, int> depths;
   final List<Set<int>> islands;
 
+  /// Inherited-cycle warnings keyed by the import directive source text.
+  final Map<String, String> importCycleWarnings;
+
   final String stem;
   final extractedSccs = <int>{};
   final clusters = <SplitCluster>[];
+
+  /// Parallel to [clusters].
+  final _specs = <_CutSpec>[];
   final Set<String> usedFileNames;
   final List<int> _sccLineCounts;
   final List<bool> _sccAllPrivate;
@@ -175,6 +196,7 @@ class _ExtractionCutPlanner {
     required this.dag,
     required this.depths,
     required this.islands,
+    this.importCycleWarnings = const {},
   }) : stem = p.basenameWithoutExtension(filePath),
        usedFileNames = <String>{p.basename(filePath)},
        _sccLineCounts = [
@@ -202,6 +224,7 @@ class _ExtractionCutPlanner {
     _extractDominatorCones();
     _extractOversizedSccFallbacks();
     _reabsorbSurplusSmallCuts();
+    _keepSiblingTypesTogether();
 
     final remLines = _remainingLines();
     final hasSurvivingCoupledScc =
@@ -751,6 +774,7 @@ class _ExtractionCutPlanner {
 
   void _removeClusterAt(int clusterIdx) {
     final removed = clusters.removeAt(clusterIdx);
+    _specs.removeAt(clusterIdx);
     final removedNames = removed.declarations.map((d) => d.name).toSet();
     for (var i = 0; i < sccs.length; i++) {
       if (sccs[i].any(removedNames.contains)) {
@@ -809,6 +833,25 @@ class _ExtractionCutPlanner {
     Set<int>? namingSccs,
   }) {
     extractedSccs.addAll(sccIndices);
+    final spec = (
+      sccIndices: sccIndices,
+      isDisjointIsland: isDisjointIsland,
+      forceTier3: forceTier3,
+      rationale: rationale,
+      namingSccs: namingSccs,
+    );
+    _specs.add(spec);
+    clusters.add(_buildCluster(spec));
+  }
+
+  SplitCluster _buildCluster(_CutSpec spec, {List<String> notes = const []}) {
+    final (
+      :sccIndices,
+      :isDisjointIsland,
+      :forceTier3,
+      :rationale,
+      :namingSccs,
+    ) = spec;
     final clusterNames = <String>{for (final idx in sccIndices) ...sccs[idx]};
     final decls = _declsOf(sccIndices);
     final namingDecls = (namingSccs == null || namingSccs.isEmpty)
@@ -831,31 +874,123 @@ class _ExtractionCutPlanner {
     final directive = (tier == SplitTier.tier3PartDirective && useParts == null)
         ? kAskUserPartsPreferenceDirective
         : null;
+    final requiredImports = {
+      for (final d in decls) ...d.requiredImportDirectives,
+    }.toList()..sort();
 
-    clusters.add(
-      SplitCluster(
-        suggestedFileName: fileName,
-        tier: tier,
-        topologicalDepth: clusterDepth,
-        isDisjointIsland: isDisjointIsland,
-        declarations: List.unmodifiable(decls),
-        absorbedPrivateHelpers: List.unmodifiable(absorbed),
-        privateTopLevelsToWiden: List.unmodifiable(privTopToWiden),
-        privateMembersToWiden: List.unmodifiable(privMembersToWiden),
-        requiredImports: List.unmodifiable(
-          {for (final d in decls) ...d.requiredImportDirectives}.toList()
-            ..sort(),
-        ),
-        exportedPublicSymbols: List.unmodifiable([
-          for (final d in decls)
-            if (d.isPublic) d.name,
-        ]),
-        rationale:
-            rationale ??
-            _buildRationale(isDisjointIsland, tier, clusterDepth, decls),
-        agentDirective: directive,
-      ),
+    return SplitCluster(
+      suggestedFileName: fileName,
+      tier: tier,
+      topologicalDepth: clusterDepth,
+      isDisjointIsland: isDisjointIsland,
+      declarations: List.unmodifiable(decls),
+      absorbedPrivateHelpers: List.unmodifiable(absorbed),
+      privateTopLevelsToWiden: List.unmodifiable(privTopToWiden),
+      privateMembersToWiden: List.unmodifiable(privMembersToWiden),
+      requiredImports: List.unmodifiable(requiredImports),
+      exportedPublicSymbols: List.unmodifiable([
+        for (final d in decls)
+          if (d.isPublic) d.name,
+      ]),
+      rationale:
+          rationale ??
+          _buildRationale(isDisjointIsland, tier, clusterDepth, decls),
+      agentDirective: directive,
+      notes: List.unmodifiable(notes),
+      warnings: List.unmodifiable([
+        for (final imp in requiredImports) ?importCycleWarnings[imp],
+      ]),
     );
+  }
+
+  /// Pulls public leaf types that share a sibling key (see [_siblingKey])
+  /// with a leaf type already moved by a cut into that cut, when doing so
+  /// keeps the cut within budget and adds no boundary crossings. Siblings that
+  /// cannot follow are reported in the cut's notes.
+  void _keepSiblingTypesTogether() {
+    for (var i = 0; i < clusters.length; i++) {
+      if (!_specs[i].isDisjointIsland) _keepSiblingsWithCut(i);
+    }
+  }
+
+  void _keepSiblingsWithCut(int i) {
+    final spec = _specs[i];
+    final keys = {
+      for (final d in clusters[i].declarations)
+        if (d.outgoingIntraFileRefs.isEmpty) ?_siblingKey(d),
+    };
+    if (keys.isEmpty) return;
+    final (:pulled, :leftBehind) = _pullSiblings(spec.sccIndices, keys);
+    if (pulled.isEmpty && leftBehind.isEmpty) return;
+
+    final namingSccs = spec.namingSccs;
+    final grown = (
+      sccIndices: {...spec.sccIndices, ...pulled.keys},
+      isDisjointIsland: spec.isDisjointIsland,
+      forceTier3: spec.forceTier3,
+      rationale: spec.rationale,
+      namingSccs: namingSccs == null ? null : {...namingSccs, ...pulled.keys},
+    );
+    usedFileNames.remove(clusters[i].suggestedFileName);
+    _specs[i] = grown;
+    clusters[i] = _buildCluster(
+      grown,
+      notes: [
+        if (pulled.isNotEmpty)
+          'sibling type(s) ${pulled.values.join(', ')} kept with this cut '
+              '(same kind as a type it moves)',
+        if (leftBehind.isNotEmpty)
+          'sibling type(s) ${leftBehind.join(', ')} left in '
+              '${p.basename(filePath)} (they reference declarations that '
+              'stay behind, are coupled to them, or would exceed the '
+              'budget)',
+      ],
+    );
+  }
+
+  ({Map<int, String> pulled, List<String> leftBehind}) _pullSiblings(
+    Set<int> cut,
+    Set<String> keys,
+  ) {
+    final pulled = <int, String>{};
+    final leftBehind = <String>[];
+    for (var s = 0; s < sccs.length; s++) {
+      if (extractedSccs.contains(s)) continue;
+      final siblings = [
+        for (final name in sccs[s])
+          if (declsByName[name] case final d?
+              when keys.contains(_siblingKey(d)))
+            name,
+      ];
+      if (siblings.isEmpty) continue;
+      final grown = {...cut, ...pulled.keys, s};
+      if (_canPullSibling(s, grown)) {
+        pulled[s] = siblings.single;
+        extractedSccs.add(s);
+      } else {
+        leftBehind.addAll(siblings);
+      }
+    }
+    return (pulled: pulled, leftBehind: leftBehind);
+  }
+
+  bool _canPullSibling(int scc, Set<int> grown) =>
+      sccs[scc].length == 1 &&
+      extractedSccs.length + 1 < sccs.length &&
+      (dag[scc] ?? const <int>{}).every(grown.contains) &&
+      _setLines(grown) <= targetLines &&
+      _crossingIndex.countCrossings(grown) <=
+          _crossingIndex.countCrossings(grown.difference({scc}));
+
+  /// Groups value-like public types that belong together: extension types by
+  /// representation type, and enums. `null` for every other declaration.
+  static String? _siblingKey(DeclarationUnit d) {
+    if (!d.isPublic) return null;
+    return switch (d.kind) {
+      'extension type' => 'extension type on ${d.representationType}',
+      'enum' => 'enum',
+      _ => null,
+    };
   }
 
   ({
@@ -954,6 +1089,9 @@ class _ExtractionCutPlanner {
     if (!hasPublic && decls.length >= 5) {
       return _deduplicateFileName('${stem}_helpers.dart');
     }
+    if (_isTypeCluster(decls)) {
+      return _deduplicateFileName('${stem}_models.dart');
+    }
     final primary = _dominantDeclaration(decls);
     final clean = primary.name.replaceFirst(RegExp('^_+'), '');
     final snake = clean
@@ -964,6 +1102,24 @@ class _ExtractionCutPlanner {
         ? '${stem}_layer_$depth.dart'
         : '$snake.dart';
     return _deduplicateFileName(base);
+  }
+
+  /// Whether [decls] form a type cluster: at least two public type
+  /// declarations make up at least half of their lines, and either the
+  /// longest public declaration is not a type (so the cut would otherwise be
+  /// named after a function) or no single type holds half of the type lines.
+  bool _isTypeCluster(List<DeclarationUnit> decls) {
+    final types = [
+      for (final d in decls)
+        if (d.isPublic && _typeKinds.contains(d.kind)) d,
+    ];
+    if (types.length < 2) return false;
+    final typeLines = types.fold(0, (s, d) => s + d.lineCount);
+    final allLines = decls.fold(0, (s, d) => s + d.lineCount);
+    if (typeLines * 2 < allLines) return false;
+    final dominant = _dominantDeclaration(decls);
+    return !_typeKinds.contains(dominant.kind) ||
+        dominant.lineCount * 2 < typeLines;
   }
 
   /// The public declaration with the most lines (ties go to the earliest in
