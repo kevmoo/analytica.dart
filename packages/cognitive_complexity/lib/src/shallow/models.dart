@@ -14,6 +14,16 @@ enum ShallowClassification {
   /// score, and does not count toward `--fail-on-safe-inline`.
   zeroHeadroom('ZERO_HEADROOM'),
 
+  /// Inlining would keep the caller below the ceiling, but the helper is one
+  /// step of a sequence: another callee of the same caller, declared in the
+  /// same file and enclosing type, shares `>= 2` leading camelCase name tokens
+  /// with it, two or more share its leading verb, or one shares its verb and
+  /// arity (one-line pass-throughs skip the arity test). Inlining one step
+  /// while its siblings stay extracted breaks the sequence's symmetry, so it
+  /// is reported separately, is not absorbed into the caller's cumulative
+  /// score, and does not count toward `--fail-on-safe-inline`.
+  siblingStep('SIBLING_STEP'),
+
   /// Inlining pushes the caller's Cognitive Complexity modestly above the
   /// ceiling (`maxCallerScore + 1 .. maxCallerScore + 7`); flattening a guard
   /// clause or branch allows clean inlining.
@@ -104,6 +114,11 @@ class ShallowFinding {
   final ShallowClassification classification;
   final List<String> reasons;
 
+  /// For [ShallowClassification.siblingStep] findings, the sorted names of
+  /// the same-caller sibling helpers that share this helper's name stem;
+  /// empty otherwise.
+  final List<String> siblingSteps;
+
   const ShallowFinding({
     required this.filePath,
     required this.name,
@@ -134,6 +149,7 @@ class ShallowFinding {
     required this.estimatedLinesSaved,
     required this.classification,
     required this.reasons,
+    this.siblingSteps = const [],
   });
 
   /// Total physical line span of this declaration (`endLine - startLine + 1`).
@@ -170,6 +186,7 @@ class ShallowFinding {
     'estimated_lines_saved': estimatedLinesSaved,
     'classification': classification.label,
     'reasons': reasons,
+    'sibling_steps': siblingSteps,
   };
 }
 
@@ -197,6 +214,11 @@ class ShallowReport {
       .where((f) => f.classification == ShallowClassification.zeroHeadroom)
       .length;
 
+  /// Number of findings classified as [ShallowClassification.siblingStep].
+  int get siblingStepCount => findings
+      .where((f) => f.classification == ShallowClassification.siblingStep)
+      .length;
+
   /// Estimated lines of signature and call-site boilerplate saved by inlining
   /// all [ShallowClassification.safeInline] findings.
   int get estimatedSafeLinesSaved => findings
@@ -218,6 +240,7 @@ class ShallowReport {
       'total_findings': findings.length,
       'safe_inline_count': safeInlineCount,
       'zero_headroom_count': zeroHeadroomCount,
+      'sibling_step_count': siblingStepCount,
       'estimated_safe_lines_saved': estimatedSafeLinesSaved,
       'findings': [for (final f in displayed) f.toJson()],
     };
@@ -244,12 +267,16 @@ class ShallowReport {
         ? ', $zeroHeadroomCount ZERO_HEADROOM landing exactly on '
               '$maxCallerScore'
         : '';
+    final siblingStep = siblingStepCount > 0
+        ? ', $siblingStepCount SIBLING_STEP with same-stem siblings kept '
+              'extracted'
+        : '';
     final buf = StringBuffer()
       ..writeln(
         'Found ${findings.length} single-caller shallow helper(s) across '
         '$declarationsScanned declarations '
         '($safeInlineCount SAFE_INLINE keeping Caller CC < $maxCallerScore'
-        '$zeroHeadroom, '
+        '$zeroHeadroom$siblingStep, '
         'saving ~$estimatedSafeLinesSaved lines of boilerplate):',
       )
       ..writeln();
@@ -294,5 +321,8 @@ class ShallowReport {
           '-> prefer a shared parameter record',
     if (f.paramsSubsetOfExistingType case final type?)
       'params mirror $type fields -> pass $type directly',
+    if (f.siblingSteps.isNotEmpty)
+      'siblings=[${f.siblingSteps.join(', ')}] stay extracted '
+          '-> keep the sequence symmetric',
   ];
 }

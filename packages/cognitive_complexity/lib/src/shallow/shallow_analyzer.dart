@@ -144,6 +144,9 @@ class ShallowAnalyzer {
         callsByName.putIfAbsent(call.calleeName, () => []).add(call);
       }
     }
+    final calleesByCaller = _indexCalleesByCaller(
+      callsByName.values.expand((calls) => calls),
+    );
 
     final declsByName = <String, List<ShallowDeclNode>>{};
     final declsByFile = <String, List<ShallowDeclNode>>{};
@@ -161,6 +164,7 @@ class ShallowAnalyzer {
         decl: decl,
         callsByName: callsByName,
         declsByName: declsByName,
+        calleesByCaller: calleesByCaller,
         sameFileDecls: declsByFile[decl.normalizedFilePath] ?? const [],
         sameFileFields: fieldsByFile[decl.normalizedFilePath] ?? const {},
       );
@@ -181,6 +185,7 @@ class ShallowAnalyzer {
     required ShallowDeclNode decl,
     required Map<String, List<ShallowCallSite>> callsByName,
     required Map<String, List<ShallowDeclNode>> declsByName,
+    required Map<ShallowDeclNode, Set<String>> calleesByCaller,
     required List<ShallowDeclNode> sameFileDecls,
     required Map<String, Set<String>> sameFileFields,
   }) {
@@ -235,6 +240,12 @@ class ShallowAnalyzer {
       sharedParamSignatureWith: facts.sharedWith,
       sharedParamCount: facts.sharedCount,
       paramsSubsetOfExistingType: facts.subsetOf,
+      siblingSteps: _siblingSteps(
+        decl,
+        caller,
+        calleesByCaller[caller] ?? const {},
+        sameFileDecls,
+      ),
     );
   }
 
@@ -314,6 +325,7 @@ class ShallowAnalyzer {
         helperScore: c.decl.score,
         callNestingDepth: c.call.nestingDepth,
         hasAbsorbedChildren: children.isNotEmpty,
+        hasSiblingSteps: c.siblingSteps.isNotEmpty,
       );
       if (classification == ShallowClassification.safeInline) {
         effectiveScore[c.caller] = inlinedCallerScore;
@@ -359,6 +371,9 @@ class ShallowAnalyzer {
           estimatedLinesSaved: c.estimatedLinesSaved,
           classification: classification,
           reasons: List.unmodifiable(c.reasons),
+          siblingSteps: classification == ShallowClassification.siblingStep
+              ? List.unmodifiable(c.siblingSteps)
+              : const [],
         ),
       );
     }
@@ -444,14 +459,85 @@ class ShallowAnalyzer {
   static String _stripUnderscore(String name) =>
       name.startsWith('_') ? name.substring(1) : name;
 
+  /// Names invoked or torn off from each production caller.
+  static Map<ShallowDeclNode, Set<String>> _indexCalleesByCaller(
+    Iterable<ShallowCallSite> calls,
+  ) {
+    final callees = <ShallowDeclNode, Set<String>>{};
+    for (final call in calls) {
+      if (call.caller case final caller? when !call.isTestFile) {
+        callees.putIfAbsent(caller, () => {}).add(call.calleeName);
+      }
+    }
+    return callees;
+  }
+
+  /// Names of the other callees of [caller] (declared in [decl]'s file and
+  /// enclosing type, sharing its leading camelCase verb) that make [decl] one
+  /// step of a sibling sequence, or empty when the rule does not fire.
+  ///
+  /// The rule fires when one sibling shares `>= 2` leading name tokens with
+  /// [decl] (`_readProc*`), when two or more siblings share its verb
+  /// (`_filter*`), or when one sibling shares its verb and arity
+  /// (`_report*`). The arity test is skipped for one-line pass-throughs.
+  static List<String> _siblingSteps(
+    ShallowDeclNode decl,
+    ShallowDeclNode caller,
+    Set<String> callerCallees,
+    List<ShallowDeclNode> sameFileDecls,
+  ) {
+    final tokens = _nameTokens(decl.rawName);
+    if (tokens.isEmpty) return const [];
+    final siblings = <String, ShallowDeclNode>{};
+    for (final s in sameFileDecls) {
+      if (s.rawName == decl.rawName ||
+          identical(s, caller) ||
+          s.enclosingType != decl.enclosingType ||
+          !callerCallees.contains(s.rawName) ||
+          _sharedLeadingTokens(tokens, _nameTokens(s.rawName)) == 0) {
+        continue;
+      }
+      siblings.putIfAbsent(s.rawName, () => s);
+    }
+    final fires =
+        siblings.length >= 2 ||
+        siblings.keys.any(
+          (name) => _sharedLeadingTokens(tokens, _nameTokens(name)) >= 2,
+        ) ||
+        (decl.bodyLines > 1 &&
+            siblings.values.any(
+              (s) => s.parameterCount == decl.parameterCount,
+            ));
+    return fires ? (siblings.keys.toList()..sort()) : const [];
+  }
+
+  static final _nameTokenPattern = RegExp(r'[A-Z]?[a-z]+|[A-Z]+(?![a-z])|\d+');
+
+  /// Lowercased camelCase tokens of [name] (`_printSection4Closed` ->
+  /// `print`, `section`, `4`, `closed`).
+  static List<String> _nameTokens(String name) => [
+    for (final m in _nameTokenPattern.allMatches(name)) m[0]!.toLowerCase(),
+  ];
+
+  static int _sharedLeadingTokens(List<String> a, List<String> b) {
+    var n = 0;
+    while (n < a.length && n < b.length && a[n] == b[n]) {
+      n++;
+    }
+    return n;
+  }
+
   ShallowClassification _classifyInlinedScore({
     required int inlinedCallerScore,
     required int helperScore,
     required int callNestingDepth,
     required bool hasAbsorbedChildren,
+    required bool hasSiblingSteps,
   }) {
     if (inlinedCallerScore < maxCallerScore) {
-      return ShallowClassification.safeInline;
+      return hasSiblingSteps
+          ? ShallowClassification.siblingStep
+          : ShallowClassification.safeInline;
     }
     if (inlinedCallerScore == maxCallerScore) {
       return ShallowClassification.zeroHeadroom;
@@ -723,6 +809,7 @@ class _RawCandidate {
   final String? sharedParamSignatureWith;
   final int sharedParamCount;
   final String? paramsSubsetOfExistingType;
+  final List<String> siblingSteps;
 
   const _RawCandidate({
     required this.decl,
@@ -734,6 +821,7 @@ class _RawCandidate {
     required this.sharedParamSignatureWith,
     required this.sharedParamCount,
     required this.paramsSubsetOfExistingType,
+    required this.siblingSteps,
   });
 }
 
