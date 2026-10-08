@@ -116,7 +116,11 @@ int countEffectiveParameters(Iterable<FormalParameter> parameters) {
   for (final param in parameters) {
     final type = _typeAnnotationOf(param);
     count += type is RecordTypeAnnotation
-        ? type.positionalFields.length + (type.namedFields?.fields.length ?? 0)
+        ? math.max(
+            1,
+            type.positionalFields.length +
+                (type.namedFields?.fields.length ?? 0),
+          )
         : 1;
   }
   return count;
@@ -366,7 +370,8 @@ class ShallowFileCollector extends RecursiveAstVisitor<void> {
     final namedCount = paramList.where((p) => p.isNamed).length;
     final isPrivate =
         rawName.startsWith('_') ||
-        (enclosingType != null && enclosingType.startsWith('_'));
+        (enclosingType != null &&
+            (enclosingType.startsWith('_') || enclosingType.startsWith('<')));
     final isPublicApi =
         !isPrivate &&
         exportTracker.isPubliclyExported(
@@ -414,11 +419,15 @@ class ShallowFileCollector extends RecursiveAstVisitor<void> {
   String? _enclosingTypeName(AstNode node) {
     var cur = node.parent;
     while (cur != null) {
+      if (cur is ExtensionDeclaration) {
+        return extractNodeName(cur) ??
+            '<extension on '
+                '${cur.onClause?.extendedType.toSource() ?? 'dynamic'}>';
+      }
       if (cur is ClassDeclaration ||
           cur is EnumDeclaration ||
           cur is MixinDeclaration ||
-          cur is ExtensionTypeDeclaration ||
-          cur is ExtensionDeclaration) {
+          cur is ExtensionTypeDeclaration) {
         return extractNodeName(cur);
       }
       cur = cur.parent;

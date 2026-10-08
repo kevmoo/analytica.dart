@@ -15,23 +15,32 @@
     `compareBySignificance`, and `kAskUserPartsPreferenceDirective`) from the
     public entrypoints.
 - **Breaking**: Standardized `data_flow --format json` (`DataFlowResult.toJson`
-  and `VariableUsage.toJson`) keys to `snake_case` (`start_line`, `end_line`,
-  `is_cleanly_extractable`, `enclosing_score`, `slice_score_in_place`,
-  `slice_score_at_root`, `estimated_enclosing_score_after`,
-  `extraction_warnings`, `suggested_signature`, `is_mutated`,
-  `declaration_line`, and `mutation_line`) to match `cognitive_complexity`,
+  and `VariableUsage.toJson`) keys to 1-to-1 `snake_case` field names
+  (`start_line`, `end_line`, `enclosing_declaration`, `is_cleanly_extractable`,
+  `enclosing_score`, `slice_score_in_place`, `slice_score_at_root`,
+  `estimated_enclosing_score_after`, `extraction_warnings`,
+  `suggested_signature`, `is_mutated`, `declaration_line`, and
+  `first_mutation_line`, retaining `'file'`) to match `cognitive_complexity`,
   `file_split`, and `shallow`.
 - `file_split`: Eliminated super-linear cone-merge overhead on dense
   many-declaration files, guarded against plans that extract 100% of top-level
   declarations, skips Tier-3 `part` fallback cuts that would leave less than 25%
   of the file behind, adds `largestResultingFileLines`, `meetsTarget`, and
   `hasSurvivingCoupledScc` (`largest_resulting_file_lines`, `meets_target`, and
-  `has_surviving_coupled_scc` in `--format json`) to `FileSplitReport`, and
-  prints oversized-declaration notes on extracted cuts as well as surviving
-  declarations.
+  `has_surviving_coupled_scc` in `--format json`) to `FileSplitReport`, prints
+  oversized-declaration notes on extracted cuts as well as surviving
+  declarations, and merges top-level getter/setter pairs without losing spans or
+  reference edges.
 - `shallow`: Weights multi-arm `switch` expressions and `switch` statements by
   `max(0, armCount - 1)` when computing `statement_count` so lookup-table
-  helpers with 3+ arms are no longer flagged as `MICRO_HELPER`.
+  helpers with 3+ arms are no longer flagged as `MICRO_HELPER`, excludes
+  mutually recursive call cycles from single-caller candidates, treats unnamed
+  `extension on T` declarations as library-private (`<extension on T>`), and
+  counts empty record `()` parameters as at least 1 effective parameter.
+- `data_flow`: Preserves transitive generic type parameter bounds in synthesized
+  signatures, marks `inputs` entries as mutated when reassigned via Dart 3
+  pattern assignments (`(a, b) = ...`), detects collection `await for` elements,
+  and ignores `await` / `yield` inside nested function closures.
 
 ## 0.4.0
 

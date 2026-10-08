@@ -267,26 +267,36 @@ class DataFlowAnalyzer {
     List<VariableUsage> inputList,
     List<VariableUsage> outputList,
   ) {
-    final typeParams = <String>[];
-    TypeParameterList? tpl;
-    if (enclosingNode is FunctionDeclaration) {
-      tpl = enclosingNode.functionExpression.typeParameters;
-    } else if (enclosingNode is MethodDeclaration) {
-      tpl = enclosingNode.typeParameters;
-    }
-    if (tpl != null) {
-      for (final typeParam in tpl.typeParameters) {
-        final tpName = typeParam.name.lexeme;
-        final regex = RegExp('\\b${RegExp.escape(tpName)}\\b');
-        final isReferenced =
-            inputList.any((i) => regex.hasMatch(i.type)) ||
-            outputList.any((o) => regex.hasMatch(o.type));
-        if (isReferenced) {
-          typeParams.add(typeParam.toSource());
+    final tpl = switch (enclosingNode) {
+      FunctionDeclaration(:final functionExpression) =>
+        functionExpression.typeParameters,
+      MethodDeclaration(:final typeParameters) => typeParameters,
+      _ => null,
+    };
+    if (tpl == null) return const [];
+
+    final params = tpl.typeParameters;
+    var corpus = [...inputList, ...outputList].map((u) => u.type).join(' ');
+    final referenced = <String>{};
+
+    var added = true;
+    while (added) {
+      added = false;
+      for (final tp in params) {
+        final name = tp.name.lexeme;
+        if (!referenced.contains(name) &&
+            RegExp('\\b${RegExp.escape(name)}\\b').hasMatch(corpus)) {
+          referenced.add(name);
+          corpus = '$corpus ${tp.bound?.toSource() ?? ''}';
+          added = true;
         }
       }
     }
-    return typeParams;
+
+    return params
+        .where((tp) => referenced.contains(tp.name.lexeme))
+        .map((tp) => tp.toSource())
+        .toList();
   }
 }
 

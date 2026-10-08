@@ -22,7 +22,7 @@ class VariableUsage {
     'type': type,
     'is_mutated': isMutated,
     'declaration_line': declarationLine,
-    if (firstMutationLine != null) 'mutation_line': firstMutationLine,
+    if (firstMutationLine != null) 'first_mutation_line': firstMutationLine,
   };
 }
 
@@ -99,7 +99,7 @@ class DataFlowResult {
     'file': filePath,
     'start_line': startLine,
     'end_line': endLine,
-    'enclosing': enclosingDeclaration,
+    'enclosing_declaration': enclosingDeclaration,
     'is_cleanly_extractable': isCleanlyExtractable,
     'enclosing_score': enclosingScore,
     'slice_score_in_place': sliceScoreInPlace,

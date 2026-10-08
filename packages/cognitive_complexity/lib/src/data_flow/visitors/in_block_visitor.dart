@@ -54,7 +54,7 @@ class InBlockVisitor extends RecursiveAstVisitor<void> {
 
   @override
   void visitAwaitExpression(AwaitExpression node) {
-    if (_isWithinSlice(node)) {
+    if (_isWithinSlice(node) && !_isInsideNestedFunction(node)) {
       hasAwait = true;
     }
     super.visitAwaitExpression(node);
@@ -84,40 +84,54 @@ class InBlockVisitor extends RecursiveAstVisitor<void> {
 
   @override
   void visitAssignedVariablePattern(AssignedVariablePattern node) {
-    if (_isWithinSlice(node)) {
-      final element = node.element;
-      if (element is VariableElement &&
-          element is! FieldElement &&
-          element is! TopLevelVariableElement &&
-          element is! PropertyInducingElement) {
-        final declOffset = _resolveOffset(element);
-        final isDeclaredInsideSlice =
-            (declOffset >= sliceStartOffset && declOffset <= sliceEndOffset) ||
-            internalDeclarations.contains(element);
+    if (!_isWithinSlice(node)) {
+      super.visitAssignedVariablePattern(node);
+      return;
+    }
+    final element = node.element;
+    if (element is! VariableElement ||
+        element is FieldElement ||
+        element is TopLevelVariableElement ||
+        element is PropertyInducingElement) {
+      super.visitAssignedVariablePattern(node);
+      return;
+    }
 
-        if (!isDeclaredInsideSlice && declOffset < sliceStartOffset) {
-          final currentLine = lineInfo.getLocation(node.offset).lineNumber;
-          final declLine = declOffset >= 0
-              ? lineInfo.getLocation(declOffset).lineNumber
-              : currentLine;
-          final typeName = _resolveTypeName(element);
+    final declOffset = _resolveOffset(element);
+    final isDeclaredInsideSlice =
+        (declOffset >= sliceStartOffset && declOffset <= sliceEndOffset) ||
+        internalDeclarations.contains(element);
 
-          _addClosureEscapeIfRequired(
-            node,
-            currentLine,
-            element.name ?? node.name.lexeme,
-          );
+    if (!isDeclaredInsideSlice && declOffset < sliceStartOffset) {
+      final currentLine = lineInfo.getLocation(node.offset).lineNumber;
+      final declLine = declOffset >= 0
+          ? lineInfo.getLocation(declOffset).lineNumber
+          : currentLine;
+      final typeName = _resolveTypeName(element);
+      final name = element.name ?? node.name.lexeme;
 
-          mutations[element] = VariableUsage(
-            name: element.name ?? node.name.lexeme,
-            type: typeName,
-            isMutated: true,
-            declarationLine: declLine,
-            firstMutationLine:
-                mutations[element]?.firstMutationLine ?? currentLine,
-          );
-        }
+      _addClosureEscapeIfRequired(node, currentLine, name);
+
+      final firstMutation =
+          mutations[element]?.firstMutationLine ?? currentLine;
+      final existingInput = inputs[element];
+      if (existingInput != null) {
+        inputs[element] = VariableUsage(
+          name: existingInput.name,
+          type: existingInput.type,
+          declarationLine: existingInput.declarationLine,
+          isMutated: true,
+          firstMutationLine: existingInput.firstMutationLine ?? firstMutation,
+        );
       }
+
+      mutations[element] = VariableUsage(
+        name: name,
+        type: typeName,
+        isMutated: true,
+        declarationLine: declLine,
+        firstMutationLine: firstMutation,
+      );
     }
     super.visitAssignedVariablePattern(node);
   }
@@ -210,11 +224,14 @@ class InBlockVisitor extends RecursiveAstVisitor<void> {
         ? lineInfo.getLocation(declOffset).lineNumber
         : currentLine;
 
+    final priorMutation = mutations[element];
     if (isRead && !inputs.containsKey(element)) {
       inputs[element] = VariableUsage(
         name: element.name ?? node.name,
         type: typeName,
         declarationLine: declLine,
+        isMutated: priorMutation != null,
+        firstMutationLine: priorMutation?.firstMutationLine,
       );
     }
 
@@ -235,7 +252,7 @@ class InBlockVisitor extends RecursiveAstVisitor<void> {
         type: typeName,
         declarationLine: declLine,
         isMutated: true,
-        firstMutationLine: mutations[element]?.firstMutationLine ?? currentLine,
+        firstMutationLine: priorMutation?.firstMutationLine ?? currentLine,
       );
     } else {
       inputs.putIfAbsent(
@@ -244,6 +261,8 @@ class InBlockVisitor extends RecursiveAstVisitor<void> {
           name: element.name ?? node.name,
           type: typeName,
           declarationLine: declLine,
+          isMutated: priorMutation != null,
+          firstMutationLine: priorMutation?.firstMutationLine,
         ),
       );
     }
@@ -306,10 +325,22 @@ class InBlockVisitor extends RecursiveAstVisitor<void> {
 
   @override
   void visitForStatement(ForStatement node) {
-    if (_isWithinSlice(node) && node.awaitKeyword != null) {
+    if (_isWithinSlice(node) &&
+        node.awaitKeyword != null &&
+        !_isInsideNestedFunction(node)) {
       hasAwait = true;
     }
     super.visitForStatement(node);
+  }
+
+  @override
+  void visitForElement(ForElement node) {
+    if (_isWithinSlice(node) &&
+        node.awaitKeyword != null &&
+        !_isInsideNestedFunction(node)) {
+      hasAwait = true;
+    }
+    super.visitForElement(node);
   }
 
   @override
@@ -403,7 +434,7 @@ class InBlockVisitor extends RecursiveAstVisitor<void> {
 
   @override
   void visitYieldStatement(YieldStatement node) {
-    if (_isWithinSlice(node)) {
+    if (_isWithinSlice(node) && !_isInsideNestedFunction(node)) {
       escapes.add(
         ControlFlowEscape(
           type: ControlFlowEscapeType.yieldEscape,

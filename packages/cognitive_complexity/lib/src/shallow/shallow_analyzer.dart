@@ -211,6 +211,7 @@ class ShallowAnalyzer {
     final caller = call.caller;
     if (caller == null || identical(caller, decl)) return null;
     if (_isExemptCallerOrCrossFileFacade(decl, caller)) return null;
+    if (_isInCallCycle(decl, caller, callsByName, declsByName)) return null;
 
     final reasons = _computeShallowReasons(decl, caller);
     if (reasons.isEmpty) return null;
@@ -237,6 +238,35 @@ class ShallowAnalyzer {
     );
   }
 
+  bool _isInCallCycle(
+    ShallowDeclNode decl,
+    ShallowDeclNode caller,
+    Map<String, List<ShallowCallSite>> callsByName,
+    Map<String, List<ShallowDeclNode>> declsByName,
+  ) {
+    final visited = <ShallowDeclNode>{caller};
+    final queue = <ShallowDeclNode>[caller];
+    while (queue.isNotEmpty) {
+      final current = queue.removeLast();
+      final checkFile =
+          current.isPrivate && (declsByName[current.rawName]?.length ?? 0) > 1;
+      for (final site
+          in callsByName[current.rawName] ?? const <ShallowCallSite>[]) {
+        final pred = site.caller;
+        final isNewPredecessor =
+            (!checkFile ||
+                site.normalizedFilePath == current.normalizedFilePath) &&
+            pred != null &&
+            !site.isTestFile &&
+            visited.add(pred);
+        if (!isNewPredecessor) continue;
+        if (identical(pred, decl)) return true;
+        queue.add(pred);
+      }
+    }
+    return false;
+  }
+
   bool _isExemptCallerOrCrossFileFacade(
     ShallowDeclNode decl,
     ShallowDeclNode caller,
@@ -248,6 +278,7 @@ class ShallowAnalyzer {
     final enclosingType = decl.enclosingType;
     if (enclosingType != null &&
         !enclosingType.startsWith('_') &&
+        !enclosingType.startsWith('<') &&
         !decl.isPrivate &&
         caller.enclosingType != enclosingType) {
       return true;

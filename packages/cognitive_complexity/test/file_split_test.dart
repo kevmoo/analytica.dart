@@ -1040,5 +1040,61 @@ class CyclePeer {
         check(directiveMatches).equals(1);
       },
     );
+
+    test(
+      'merges top-level getter/setter pair spans and outgoing references, and '
+      'falls back cleanly on underscore-only declaration names',
+      () async {
+        const analyzer = FileSplitAnalyzer();
+        final pairFile = File(p.join(tempDir.path, 'getter_setter_pair.dart'));
+        final pad = List.generate(25, (i) => '  final f$i = $i;').join('\n');
+        pairFile.writeAsStringSync('''
+class ReaderDep {
+  int read() => 1;
+$pad
+}
+
+class WriterDep {
+  void write(int v) {}
+$pad
+}
+
+final ReaderDep _reader = ReaderDep();
+final WriterDep _writer = WriterDep();
+
+int get sharedProp => _reader.read();
+
+set sharedProp(int value) {
+  _writer.write(value);
+}
+
+void _() {
+  $pad
+}
+''');
+
+        final report = await analyzer.analyzeFile(
+          pairFile.path,
+          targetLines: 30,
+          minClusterLines: 15,
+        );
+        final allDecls = [
+          ...report.survivingDeclarations,
+          for (final c in report.clusters) ...c.declarations,
+        ];
+        final prop = allDecls.singleWhere((d) => d.name == 'sharedProp');
+        // Both getter (_reader) and setter (_writer) outgoing refs are kept,
+        // and the line range spans from the getter start through setter end.
+        check(prop.outgoingIntraFileRefs).contains('_reader');
+        check(prop.outgoingIntraFileRefs).contains('_writer');
+        check(prop.lineCount).isGreaterOrEqual(4);
+
+        // No cluster suggested filename may degenerate to bare `.dart`.
+        for (final cluster in report.clusters) {
+          check(cluster.suggestedFileName).not((it) => it.equals('.dart'));
+          check(cluster.suggestedFileName).endsWith('.dart');
+        }
+      },
+    );
   });
 }

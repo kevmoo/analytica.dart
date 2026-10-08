@@ -1218,5 +1218,52 @@ int _emptySwitchAndClosure(int a, int b, int c, int d, int e) {
       final emptyAndClosure = byName['_emptySwitchAndClosure']!;
       check(emptyAndClosure.statementCount).equals(3);
     });
+
+    test('excludes mutually recursive call cycles from shallow candidates', () {
+      const code = '''
+int entry(int n) => _ping(n) + _pong(n);
+
+int _ping(int n) => n <= 0 ? 0 : _subPing(n);
+int _subPing(int n) => _ping(n - 1);
+
+int _pong(int n) => _pongStep(n);
+int _pongStep(int n) => n <= 0 ? 0 : _pongBack(n);
+int _pongBack(int n) => _pong(n - 1);
+''';
+      final report = ShallowAnalyzer().analyzeCode(code);
+      // `_subPing` (2-cycle with `_ping`) and `_pongStep`/`_pongBack`
+      // (3-cycle with `_pong`) each have a single static caller in their
+      // cycle, so inlining any of them would fold recursion into the caller.
+      check(report.findings).isEmpty();
+    });
+
+    test('counts empty record () as 1 effective parameter and attributes '
+        'unnamed extension methods to <extension on T>', () {
+      const code = '''
+extension on String {
+  String shout() => toUpperCase();
+}
+
+String run(int a, int b, int c, int d, () empty) =>
+    _withEmptyRecord(a, b, c, d, empty).shout();
+
+String _withEmptyRecord(int a, int b, int c, int d, () empty) =>
+    '\${a + b + c + d}\$empty';
+''';
+      final report = ShallowAnalyzer().analyzeCode(code);
+      final byName = {for (final f in report.findings) f.name: f};
+
+      final emptyRec = byName['_withEmptyRecord']!;
+      check(emptyRec.parameterCount).equals(5);
+      check(emptyRec.effectiveParameterCount).equals(5);
+      check(
+        emptyRec.reasons.any((r) => r.startsWith('HIGH_ARITY(5 params)')),
+      ).isTrue();
+
+      final extMethod = byName['<extension on String>.shout']!;
+      check(
+        extMethod.reasons.any((r) => r.startsWith('MICRO_HELPER')),
+      ).isTrue();
+    });
   });
 }

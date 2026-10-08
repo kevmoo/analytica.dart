@@ -960,7 +960,9 @@ class _ExtractionCutPlanner {
         .replaceAllMapped(RegExp('([a-z0-9])([A-Z])'), (m) => '${m[1]}_${m[2]}')
         .toLowerCase();
 
-    final base = snake == stem ? '${stem}_layer_$depth.dart' : '$snake.dart';
+    final base = snake.isEmpty || snake == stem
+        ? '${stem}_layer_$depth.dart'
+        : '$snake.dart';
     return _deduplicateFileName(base);
   }
 
