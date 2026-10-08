@@ -316,10 +316,19 @@ DeclarationUnit _mergeUnitWithRefs(
   memberCount: base.memberCount,
   overrideMemberCount: base.overrideMemberCount,
   supertypeLabel: base.supertypeLabel,
-  outgoingIntraFileRefs: refs?.outgoing ?? const {},
-  privateMemberAccessesByTarget: refs?.privAccess ?? const {},
-  requiredImportDirectives: refs?.reqImports ?? const {},
-  hardPinnedPeers: hardPins,
+  outgoingIntraFileRefs: refs == null
+      ? const {}
+      : Set.unmodifiable(refs.outgoing),
+  privateMemberAccessesByTarget: refs == null || refs.privAccess.isEmpty
+      ? const {}
+      : Map.unmodifiable({
+          for (final entry in refs.privAccess.entries)
+            entry.key: Set.unmodifiable(entry.value),
+        }),
+  requiredImportDirectives: refs == null
+      ? const {}
+      : Set.unmodifiable(refs.reqImports),
+  hardPinnedPeers: hardPins.isEmpty ? const {} : Set.unmodifiable(hardPins),
 );
 
 void _detectHardPins(

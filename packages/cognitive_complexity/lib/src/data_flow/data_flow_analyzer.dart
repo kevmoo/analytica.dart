@@ -131,16 +131,16 @@ class DataFlowAnalyzer {
       startLine: startLine,
       endLine: endLine,
       enclosingDeclaration: enclosingName,
-      inputs: inputList,
-      mutations: mutationList,
-      outputs: outputList,
-      escapes: escapes,
+      inputs: List.unmodifiable(inputList),
+      mutations: List.unmodifiable(mutationList),
+      outputs: List.unmodifiable(outputList),
+      escapes: List.unmodifiable(escapes),
       suggestedSignature: signature,
       isCleanlyExtractable: escapes.isEmpty,
       enclosingScore: enclosingScore,
       sliceScoreInPlace: sliceScoreInPlace,
       sliceScoreAtRoot: sliceScoreAtRoot,
-      extractionWarnings: warnings,
+      extractionWarnings: List.unmodifiable(warnings),
     );
   }
 

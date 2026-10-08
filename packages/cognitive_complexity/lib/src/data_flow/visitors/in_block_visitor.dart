@@ -112,7 +112,6 @@ class InBlockVisitor extends RecursiveAstVisitor<void> {
             name: element.name ?? node.name.lexeme,
             type: typeName,
             isMutated: true,
-            declarationOffset: declOffset,
             declarationLine: declLine,
             firstMutationLine:
                 mutations[element]?.firstMutationLine ?? currentLine,
@@ -215,7 +214,6 @@ class InBlockVisitor extends RecursiveAstVisitor<void> {
       inputs[element] = VariableUsage(
         name: element.name ?? node.name,
         type: typeName,
-        declarationOffset: declOffset,
         declarationLine: declLine,
       );
     }
@@ -227,7 +225,6 @@ class InBlockVisitor extends RecursiveAstVisitor<void> {
       inputs[element] = VariableUsage(
         name: existing?.name ?? element.name ?? node.name,
         type: existing?.type ?? typeName,
-        declarationOffset: existing?.declarationOffset ?? declOffset,
         declarationLine: existing?.declarationLine ?? declLine,
         isMutated: true,
         firstMutationLine: existing?.firstMutationLine ?? currentLine,
@@ -236,7 +233,6 @@ class InBlockVisitor extends RecursiveAstVisitor<void> {
       mutations[element] = VariableUsage(
         name: element.name ?? node.name,
         type: typeName,
-        declarationOffset: declOffset,
         declarationLine: declLine,
         isMutated: true,
         firstMutationLine: mutations[element]?.firstMutationLine ?? currentLine,
@@ -247,7 +243,6 @@ class InBlockVisitor extends RecursiveAstVisitor<void> {
         () => VariableUsage(
           name: element.name ?? node.name,
           type: typeName,
-          declarationOffset: declOffset,
           declarationLine: declLine,
         ),
       );

@@ -93,7 +93,6 @@ class PostBlockVisitor extends RecursiveAstVisitor<void> {
         liveOutputs[element] = VariableUsage(
           name: element.name ?? node.name,
           type: typeName,
-          declarationOffset: declOffset,
           declarationLine: declLine,
         );
       }
@@ -146,7 +145,6 @@ class PostBlockVisitor extends RecursiveAstVisitor<void> {
       name: element.name ?? node.name,
       type: _resolveTypeName(element),
       isMutated: true,
-      declarationOffset: declOffset,
       declarationLine: declLine,
       firstMutationLine: mutations[element]!.firstMutationLine,
     );

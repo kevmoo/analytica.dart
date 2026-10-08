@@ -71,6 +71,13 @@ static-analysis CLIs:
 | `--exclude <glob>`             | `multi`  | _None_  | Glob patterns of files/directories to exclude (repeatable or comma-separated).                                                         |
 | `--[no-]ignore-generated`      | `flag`   | `true`  | Exclude generated files (`*.g.dart`, `*.freezed.dart`, `*.mocks.dart`, etc.).                                                          |
 
+> [!NOTE]
+>
+> By default, `--format=json` emits a top-level JSON array of declaration
+> objects (`[...]`). When `--max-file-lines` is enabled (`> 0`), it emits a
+> top-level object `{"declarations": [...], "files": [...]}` so file-line
+> violations are reported alongside declaration scores.
+
 ## Target Resolution
 
 Pass one or more file paths or directories as positional arguments:

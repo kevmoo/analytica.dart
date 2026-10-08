@@ -287,6 +287,7 @@ class FileSplitReport {
     'estimated_remaining_lines': estimatedRemainingLines,
     'largest_resulting_file_lines': largestResultingFileLines,
     'meets_target': meetsTarget,
+    'has_surviving_coupled_scc': hasSurvivingCoupledScc,
     'clusters': clusters.map((c) => c.toJson()).toList(),
     'surviving_declarations': survivingDeclarations
         .map((d) => d.toJson())

@@ -170,7 +170,7 @@ class ShallowAnalyzer {
     final findings = _resolveCumulativeCandidates(rawCandidates);
     findings.sort(_buildFindingComparator(findings));
     return ShallowReport(
-      findings: findings,
+      findings: List.unmodifiable(findings),
       declarationsScanned: scannedCount,
       maxCallerScore: maxCallerScore,
       maxParams: maxParams,
@@ -327,7 +327,7 @@ class ShallowAnalyzer {
           simulationIndex: index,
           estimatedLinesSaved: c.estimatedLinesSaved,
           classification: classification,
-          reasons: c.reasons,
+          reasons: List.unmodifiable(c.reasons),
         ),
       );
     }

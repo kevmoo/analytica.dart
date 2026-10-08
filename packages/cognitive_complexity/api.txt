@@ -54,7 +54,7 @@ package:cognitive_complexity/cognitive_complexity.dart:
     supertypeLabel (getter: String?)
     toJson (method: Map<String, dynamic> Function())
   DeltaAnalyzer (class extends Object):
-    new (constructor: DeltaAnalyzer Function({ComplexityAnalyzer? analyzer, GitDiffService? gitService, PathFilter? pathFilter, String? workingDirectory}))
+    new (constructor: DeltaAnalyzer Function({ComplexityAnalyzer? analyzer, PathFilter? pathFilter, String? workingDirectory}))
     pathFilter (getter: PathFilter)
     computeDeltaForCode (method: List<ComplexityDelta> Function(String, String, {String filePath}))
     computeDeltas (method: Future<DeltaSummary> Function(String, {bool failOnIncrease, int? failThreshold, int? maxFunctionLines, List<String> targetPaths}))
@@ -66,7 +66,6 @@ package:cognitive_complexity/cognitive_complexity.dart:
     removed (enum constant: DeltaStatus)
     unchanged (enum constant: DeltaStatus)
     values (static const getter: List<DeltaStatus>)
-    label (getter: String)
   DeltaSummary (class extends Object):
     new (const constructor: DeltaSummary Function({required String baseRef, required List<ComplexityDelta> deltas, List<FileLineDelta> fileDeltas, required int filesAnalyzed, required String targetRef}))
     baseRef (getter: String)
@@ -104,7 +103,6 @@ package:cognitive_complexity/cognitive_complexity.dart:
     sdkPath (getter: String?)
     analyzeFile (method: Future<FileSplitReport> Function(String, {int minClusterLines, int targetLines, bool? useParts}))
     analyzeFiles (method: Future<List<FileSplitReport>> Function(List<String>, {int minClusterLines, int targetLines, bool? useParts}))
-    analyzeResolvedUnit (method: FileSplitReport Function(ResolvedUnitResult, {String? displayPath, int minClusterLines, int targetLines, bool? useParts}))
   FileSplitReport (class extends Object):
     new (const constructor: FileSplitReport Function({required List<SplitCluster> clusters, required int declarationCount, required String filePath, bool hasSurvivingCoupledScc, required int lcom4Islands, required int maxTopologicalDepth, required int sccCount, required List<DeclarationUnit> survivingDeclarations, int targetLines, required int totalLines, bool? useParts}))
     clusters (getter: List<SplitCluster>)
@@ -268,9 +266,8 @@ package:cognitive_complexity/data_flow.dart:
     suggestedSignature (getter: String)
     toJson (method: Map<String, dynamic> Function())
   VariableUsage (class extends Object):
-    new (const constructor: VariableUsage Function({required int declarationLine, required int declarationOffset, int? firstMutationLine, bool isMutated, required String name, required String type}))
+    new (const constructor: VariableUsage Function({required int declarationLine, int? firstMutationLine, bool isMutated, required String name, required String type}))
     declarationLine (getter: int)
-    declarationOffset (getter: int)
     firstMutationLine (getter: int?)
     isMutated (getter: bool)
     name (getter: String)
@@ -287,7 +284,3 @@ dart:core:
   String (referenced)
   bool (referenced)
   int (referenced)
-package:analytica/src/git/git_diff_service.dart:
-  GitDiffService (referenced)
-package:analyzer/dart/analysis/results.dart:
-  ResolvedUnitResult (referenced)

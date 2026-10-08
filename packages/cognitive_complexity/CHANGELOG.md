@@ -5,18 +5,30 @@
   - Removed `ShallowFinding.callerScore` and the `'caller_score'` JSON alias
     (use `callerCumulativeBefore` / `'caller_cumulative_before'`).
   - Removed the `GitDiffService` and `isExcludedPath` re-exports from
-    `package:cognitive_complexity/cognitive_complexity.dart`.
-  - Removed internal implementation symbols (`GitHubReporter`,
-    `SignatureSynthesizer`, `DataFlowAnalyzer.synthesizer`,
-    `SplitCluster.writeText`, `VariableUsage.copyWith`, `compareBySignificance`,
-    and `kAskUserPartsPreferenceDirective`) from the public entrypoints.
+    `package:cognitive_complexity/cognitive_complexity.dart`, and removed the
+    `gitService` parameter from the public `DeltaAnalyzer` constructor (so
+    `package:analytica` is no longer leaked in `api.txt`).
+  - Removed dead or internal symbols (`GitHubReporter`, `SignatureSynthesizer`,
+    `DataFlowAnalyzer.synthesizer`, `SplitCluster.writeText`,
+    `VariableUsage.copyWith`, `VariableUsage.declarationOffset`,
+    `DeltaStatus.label`, `FileSplitAnalyzer.analyzeResolvedUnit`,
+    `compareBySignificance`, and `kAskUserPartsPreferenceDirective`) from the
+    public entrypoints.
+- **Breaking**: Standardized `data_flow --format json` (`DataFlowResult.toJson`
+  and `VariableUsage.toJson`) keys to `snake_case` (`start_line`, `end_line`,
+  `is_cleanly_extractable`, `enclosing_score`, `slice_score_in_place`,
+  `slice_score_at_root`, `estimated_enclosing_score_after`,
+  `extraction_warnings`, `suggested_signature`, `is_mutated`,
+  `declaration_line`, and `mutation_line`) to match `cognitive_complexity`,
+  `file_split`, and `shallow`.
 - `file_split`: Eliminated super-linear cone-merge overhead on dense
   many-declaration files, guarded against plans that extract 100% of top-level
   declarations, skips Tier-3 `part` fallback cuts that would leave less than 25%
   of the file behind, adds `largestResultingFileLines`, `meetsTarget`, and
-  `hasSurvivingCoupledScc` (`largest_resulting_file_lines` and `meets_target` in
-  `--format json`) to `FileSplitReport`, and prints oversized-declaration notes
-  on extracted cuts as well as surviving declarations.
+  `hasSurvivingCoupledScc` (`largest_resulting_file_lines`, `meets_target`, and
+  `has_surviving_coupled_scc` in `--format json`) to `FileSplitReport`, and
+  prints oversized-declaration notes on extracted cuts as well as surviving
+  declarations.
 - `shallow`: Weights multi-arm `switch` expressions and `switch` statements by
   `max(0, armCount - 1)` when computing `statement_count` so lookup-table
   helpers with 3+ arms are no longer flagged as `MICRO_HELPER`.

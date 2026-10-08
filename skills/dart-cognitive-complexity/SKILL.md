@@ -191,11 +191,13 @@ Run the statement-level data-flow analyzer on candidate line slices:
 dart run cognitive_complexity:data_flow@^1.0.0 lib/src/my_file.dart:45-80
 ```
 
-Inspect the complexity impact (`enclosingScore`, `sliceScoreInPlace`,
-`sliceScoreAtRoot`, `estimatedEnclosingScoreAfter`) and honor any
-`extractionWarnings` (high parameter count `>= 5` inputs, low complexity payoff,
-or shallow signature-to-complexity ratio) by flattening in place with Patterns
-A/B instead of extracting a shallow helper:
+Inspect the complexity impact (`enclosing_score`, `slice_score_in_place`,
+`slice_score_at_root`, `estimated_enclosing_score_after` in JSON;
+`DataFlowResult.enclosingScore`, `sliceScoreInPlace`, `sliceScoreAtRoot`,
+`estimatedEnclosingScoreAfter` in Dart) and honor any `extraction_warnings`
+(high parameter count `>= 5` inputs, low complexity payoff, or shallow
+signature-to-complexity ratio) by flattening in place with Patterns A/B instead
+of extracting a shallow helper:
 
 - **Pattern A (Dart 3 Switch Expressions)**: Replace nested `if-else` ladders
   with exhaustive table-driven `switch` expressions (single base penalty).
@@ -203,13 +205,13 @@ A/B instead of extracting a shallow helper:
   returns (`if (!cond) return;`).
 - **Pattern C (3-Tier `data_flow` Extraction)**:
   1. **Tier 1 — Pure Functional Decomposition (First Choice)**: For slices with
-     `2+` live outputs, `<= 4` inputs, and `sliceScoreAtRoot >= 3`, extract a
+     `2+` live outputs, `<= 4` inputs, and `slice_score_at_root >= 3`, extract a
      pure private top-level or `static` function returning the synthesized Dart
      3 named record (`final (:data, :errors) = _step(input);`). Never create
      single-use `_XxxResult` dataclasses for private slices.
   2. **Tier 2 — Standard Helper Extraction (Second Choice)**: For slices with
-     `<= 1` output, `<= 3` inputs, and `sliceScoreAtRoot >= 3`, extract a pure
-     private top-level or static helper.
+     `<= 1` output, `<= 3` inputs, and `slice_score_at_root >= 3`, extract a
+     pure private top-level or static helper.
   3. **Tier 3 — Encapsulated Method Object (Last Resort)**: Permitted ONLY when
      `data_flow` on 2+ candidate slices shows `>= 3` intersecting `mutations`
      variables—read [`references/method-object.md`](references/method-object.md)

@@ -5,6 +5,8 @@ import 'package:analytica/analyzer.dart';
 import 'package:checks/checks.dart';
 import 'package:cognitive_complexity/cognitive_complexity.dart';
 import 'package:cognitive_complexity/src/file_split/cli.dart' as file_split_cli;
+import 'package:cognitive_complexity/src/file_split/file_split_analyzer.dart'
+    show analyzeResolvedUnit;
 import 'package:path/path.dart' as p;
 import 'package:test/test.dart';
 
@@ -795,9 +797,8 @@ $leaves
       final helper = AnalysisContextHelper(includedPaths: [absPath]);
       final unitResult = await helper.getRequiredResolvedUnit(absPath);
 
-      const analyzer = FileSplitAnalyzer();
       final sw = Stopwatch()..start();
-      final report = analyzer.analyzeResolvedUnit(
+      final report = analyzeResolvedUnit(
         unitResult,
         displayPath: file.path,
         targetLines: 400,
@@ -842,8 +843,7 @@ class MainTap extends BaseTap {
         final helper = AnalysisContextHelper(includedPaths: [absPath]);
         final unitResult = await helper.getRequiredResolvedUnit(absPath);
 
-        const analyzer = FileSplitAnalyzer();
-        final report = analyzer.analyzeResolvedUnit(
+        final report = analyzeResolvedUnit(
           unitResult,
           displayPath: file.path,
           targetLines: 80,
@@ -926,6 +926,7 @@ $padHalf
       );
       check(coupledReport.clusters).isEmpty();
       check(coupledReport.hasSurvivingCoupledScc).isTrue();
+      check(coupledReport.toJson()['has_surviving_coupled_scc']).equals(true);
       check(coupledReport.meetsTarget).isFalse();
       final coupledText = coupledReport.formatText();
       check(coupledText).contains(

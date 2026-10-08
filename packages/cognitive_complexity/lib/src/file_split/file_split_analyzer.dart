@@ -68,74 +68,74 @@ class FileSplitAnalyzer {
         ),
       );
     }
-    return reports;
+    return List.unmodifiable(reports);
   }
+}
 
-  /// Analyzes an already-resolved [unitResult].
-  FileSplitReport analyzeResolvedUnit(
-    ResolvedUnitResult unitResult, {
-    String? displayPath,
-    int targetLines = 800,
-    int minClusterLines = 40,
-    bool? useParts,
-  }) {
-    final pathStr = displayPath ?? unitResult.path;
-    final totalLines = unitResult.lineInfo.lineCount;
-    final populated = harvestDeclarationUnits(
-      unitResult.unit,
-      unitResult.lineInfo,
-    );
+/// Analyzes an already-resolved [unitResult].
+FileSplitReport analyzeResolvedUnit(
+  ResolvedUnitResult unitResult, {
+  String? displayPath,
+  int targetLines = 800,
+  int minClusterLines = 40,
+  bool? useParts,
+}) {
+  final pathStr = displayPath ?? unitResult.path;
+  final totalLines = unitResult.lineInfo.lineCount;
+  final populated = harvestDeclarationUnits(
+    unitResult.unit,
+    unitResult.lineInfo,
+  );
 
-    if (populated.length <= 1 && useParts != true) {
-      return FileSplitReport(
-        filePath: pathStr,
-        totalLines: totalLines,
-        declarationCount: populated.length,
-        lcom4Islands: populated.isEmpty ? 0 : 1,
-        sccCount: populated.length,
-        maxTopologicalDepth: 0,
-        clusters: const [],
-        survivingDeclarations: populated.values.toList(),
-        targetLines: targetLines,
-        useParts: useParts,
-      );
-    }
-
-    final pinnedGroups = fuseHardPinnedPeers(populated);
-    final sccs = computeTarjanSccs(pinnedGroups, populated);
-    final sccDag = buildCondensationDag(sccs, populated);
-    final depths = computeTopologicalDepths(sccs.length, sccDag);
-    final maxDepth = depths.values.fold(0, math.max);
-    final islands = computeWeaklyConnectedIslands(sccs.length, sccDag);
-
-    final planner = _ExtractionCutPlanner(
-      filePath: pathStr,
-      totalLines: totalLines,
-      targetLines: targetLines,
-      minClusterLines: minClusterLines,
-      useParts: useParts,
-      declsByName: populated,
-      sccs: sccs,
-      dag: sccDag,
-      depths: depths,
-      islands: islands,
-    );
-    final (:clusters, :surviving, :hasSurvivingCoupledScc) = planner.plan();
-
+  if (populated.length <= 1 && useParts != true) {
     return FileSplitReport(
       filePath: pathStr,
       totalLines: totalLines,
       declarationCount: populated.length,
-      lcom4Islands: islands.length,
-      sccCount: sccs.length,
-      maxTopologicalDepth: maxDepth,
-      clusters: clusters,
-      survivingDeclarations: surviving,
-      hasSurvivingCoupledScc: hasSurvivingCoupledScc,
+      lcom4Islands: populated.isEmpty ? 0 : 1,
+      sccCount: populated.length,
+      maxTopologicalDepth: 0,
+      clusters: const [],
+      survivingDeclarations: List.unmodifiable(populated.values),
       targetLines: targetLines,
       useParts: useParts,
     );
   }
+
+  final pinnedGroups = fuseHardPinnedPeers(populated);
+  final sccs = computeTarjanSccs(pinnedGroups, populated);
+  final sccDag = buildCondensationDag(sccs, populated);
+  final depths = computeTopologicalDepths(sccs.length, sccDag);
+  final maxDepth = depths.values.fold(0, math.max);
+  final islands = computeWeaklyConnectedIslands(sccs.length, sccDag);
+
+  final planner = _ExtractionCutPlanner(
+    filePath: pathStr,
+    totalLines: totalLines,
+    targetLines: targetLines,
+    minClusterLines: minClusterLines,
+    useParts: useParts,
+    declsByName: populated,
+    sccs: sccs,
+    dag: sccDag,
+    depths: depths,
+    islands: islands,
+  );
+  final (:clusters, :surviving, :hasSurvivingCoupledScc) = planner.plan();
+
+  return FileSplitReport(
+    filePath: pathStr,
+    totalLines: totalLines,
+    declarationCount: populated.length,
+    lcom4Islands: islands.length,
+    sccCount: sccs.length,
+    maxTopologicalDepth: maxDepth,
+    clusters: List.unmodifiable(clusters),
+    survivingDeclarations: List.unmodifiable(surviving),
+    hasSurvivingCoupledScc: hasSurvivingCoupledScc,
+    targetLines: targetLines,
+    useParts: useParts,
+  );
 }
 
 typedef _ScoredCone = ({Set<int> cone, int lines, int crossings});
@@ -838,17 +838,18 @@ class _ExtractionCutPlanner {
         tier: tier,
         topologicalDepth: clusterDepth,
         isDisjointIsland: isDisjointIsland,
-        declarations: decls,
-        absorbedPrivateHelpers: absorbed,
-        privateTopLevelsToWiden: privTopToWiden,
-        privateMembersToWiden: privMembersToWiden,
-        requiredImports: {
-          for (final d in decls) ...d.requiredImportDirectives,
-        }.toList()..sort(),
-        exportedPublicSymbols: [
+        declarations: List.unmodifiable(decls),
+        absorbedPrivateHelpers: List.unmodifiable(absorbed),
+        privateTopLevelsToWiden: List.unmodifiable(privTopToWiden),
+        privateMembersToWiden: List.unmodifiable(privMembersToWiden),
+        requiredImports: List.unmodifiable(
+          {for (final d in decls) ...d.requiredImportDirectives}.toList()
+            ..sort(),
+        ),
+        exportedPublicSymbols: List.unmodifiable([
           for (final d in decls)
             if (d.isPublic) d.name,
-        ],
+        ]),
         rationale:
             rationale ??
             _buildRationale(isDisjointIsland, tier, clusterDepth, decls),

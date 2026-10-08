@@ -231,16 +231,16 @@ dart run cognitive_complexity:data_flow@^1.0.0 lib/src/my_file.dart:45-80
 ```
 
 Its report (`inputs`, `mutations`, live `outputs`, control-flow escapes,
-complexity impact `enclosingScore` / `sliceScoreInPlace` / `sliceScoreAtRoot` /
-`estimatedEnclosingScoreAfter`, `extractionWarnings`, and a synthesized Dart 3
-record signature) selects the tier. If `extractionWarnings` warns about high
-parameter count (`>= 5` inputs), low complexity payoff, or a shallow
-signature-to-complexity ratio, flatten in place with Patterns A/B instead of
-extracting a shallow pass-through helper:
+complexity impact `enclosing_score` / `slice_score_in_place` /
+`slice_score_at_root` / `estimated_enclosing_score_after`,
+`extraction_warnings`, and a synthesized Dart 3 record signature) selects the
+tier. If `extraction_warnings` warns about high parameter count (`>= 5` inputs),
+low complexity payoff, or a shallow signature-to-complexity ratio, flatten in
+place with Patterns A/B instead of extracting a shallow pass-through helper:
 
 1. **Tier 1 — Pure Functional Decomposition (First Choice)**:
    - **Selection**: Cleanly extractable slice with 2+ live outputs, `<= 4`
-     inputs, and `sliceScoreAtRoot >= 3`.
+     inputs, and `slice_score_at_root >= 3`.
    - **Idiom**: Extract a pure file-private top-level function (`_parseHeader`,
      `_validateItem`) or `static` method returning the synthesized Dart 3 named
      record signature verbatim (`final (:data, :errors) = _stepOne(input);`).
@@ -253,7 +253,7 @@ extracting a shallow pass-through helper:
      method) to guarantee referential transparency.
 2. **Tier 2 — Standard Helper Extraction (Second Choice)**:
    - **Selection**: Cleanly extractable slice with `<= 1` live output, `<= 3`
-     inputs, and `sliceScoreAtRoot >= 3`.
+     inputs, and `slice_score_at_root >= 3`.
    - **Idiom**: Extract a pure private top-level function or private helper
      method returning that single value.
 3. **Control-Flow Escapes & Loop Bodies**:

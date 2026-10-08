@@ -13,7 +13,6 @@ void main() {
           const VariableUsage(
             name: 'token',
             type: 'String',
-            declarationOffset: 0,
             declarationLine: 1,
           ),
         ],
@@ -30,7 +29,6 @@ void main() {
           const VariableUsage(
             name: 'token',
             type: 'String',
-            declarationOffset: 0,
             declarationLine: 1,
           ),
         ],
@@ -45,20 +43,10 @@ void main() {
     test('Synthesizes single return type when 1 output is present', () {
       final sig = synthesizer.synthesize(
         inputs: [
-          const VariableUsage(
-            name: 'raw',
-            type: 'String',
-            declarationOffset: 0,
-            declarationLine: 1,
-          ),
+          const VariableUsage(name: 'raw', type: 'String', declarationLine: 1),
         ],
         outputs: [
-          const VariableUsage(
-            name: 'parsed',
-            type: 'int',
-            declarationOffset: 50,
-            declarationLine: 3,
-          ),
+          const VariableUsage(name: 'parsed', type: 'int', declarationLine: 3),
         ],
         methodName: '_parseNumber',
       );
@@ -69,18 +57,12 @@ void main() {
     test('Synthesizes Future<T> for single async return type', () {
       final sig = synthesizer.synthesize(
         inputs: [
-          const VariableUsage(
-            name: 'url',
-            type: 'String',
-            declarationOffset: 0,
-            declarationLine: 1,
-          ),
+          const VariableUsage(name: 'url', type: 'String', declarationLine: 1),
         ],
         outputs: [
           const VariableUsage(
             name: 'data',
             type: 'Map<String, dynamic>',
-            declarationOffset: 50,
             declarationLine: 3,
           ),
         ],
@@ -99,28 +81,20 @@ void main() {
           const VariableUsage(
             name: 'token',
             type: 'String',
-            declarationOffset: 0,
             declarationLine: 1,
           ),
-          const VariableUsage(
-            name: 'retries',
-            type: 'int',
-            declarationOffset: 10,
-            declarationLine: 2,
-          ),
+          const VariableUsage(name: 'retries', type: 'int', declarationLine: 2),
         ],
         outputs: [
           const VariableUsage(
             name: 'isAuthenticated',
             type: 'bool',
             isMutated: true,
-            declarationOffset: 20,
             declarationLine: 3,
           ),
           const VariableUsage(
             name: 'currentUser',
             type: 'User?',
-            declarationOffset: 60,
             declarationLine: 5,
           ),
         ],
@@ -137,18 +111,8 @@ void main() {
       final sig = synthesizer.synthesize(
         inputs: [],
         outputs: [
-          const VariableUsage(
-            name: 'a',
-            type: 'int',
-            declarationOffset: 10,
-            declarationLine: 2,
-          ),
-          const VariableUsage(
-            name: 'b',
-            type: 'String',
-            declarationOffset: 20,
-            declarationLine: 3,
-          ),
+          const VariableUsage(name: 'a', type: 'int', declarationLine: 2),
+          const VariableUsage(name: 'b', type: 'String', declarationLine: 3),
         ],
         methodName: '_compute',
         isAsync: true,
@@ -160,18 +124,8 @@ void main() {
       final sig = synthesizer.synthesize(
         inputs: [],
         outputs: [
-          const VariableUsage(
-            name: '_x',
-            type: 'int',
-            declarationOffset: 10,
-            declarationLine: 2,
-          ),
-          const VariableUsage(
-            name: 'x',
-            type: 'String',
-            declarationOffset: 20,
-            declarationLine: 3,
-          ),
+          const VariableUsage(name: '_x', type: 'int', declarationLine: 2),
+          const VariableUsage(name: 'x', type: 'String', declarationLine: 3),
         ],
         methodName: '_extracted',
       );
@@ -185,18 +139,8 @@ void main() {
         final sig = synthesizer.synthesize(
           inputs: [],
           outputs: [
-            const VariableUsage(
-              name: '_',
-              type: 'int',
-              declarationOffset: 10,
-              declarationLine: 2,
-            ),
-            const VariableUsage(
-              name: '__',
-              type: 'String',
-              declarationOffset: 20,
-              declarationLine: 3,
-            ),
+            const VariableUsage(name: '_', type: 'int', declarationLine: 2),
+            const VariableUsage(name: '__', type: 'String', declarationLine: 3),
           ],
           methodName: '_extracted',
         );
@@ -211,16 +155,10 @@ void main() {
         final sig = synthesizer.synthesize(
           inputs: [],
           outputs: [
-            const VariableUsage(
-              name: '_',
-              type: 'int',
-              declarationOffset: 10,
-              declarationLine: 2,
-            ),
+            const VariableUsage(name: '_', type: 'int', declarationLine: 2),
             const VariableUsage(
               name: 'val',
               type: 'String',
-              declarationOffset: 20,
               declarationLine: 3,
             ),
           ],
