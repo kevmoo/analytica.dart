@@ -43,6 +43,6 @@
 - Follow [`doc/release.md`](doc/release.md). In short: drop `-wip` in
   `pubspec.yaml` and `CHANGELOG.md`, run
   `dart run tool/bin/release_check.dart --fix` to bump every skill pin and run
-  the `tool/` test gate in one step, open a `release(<pkg>)` PR, then push an
-  **annotated** tag (`git tag -m … <pkg>-vX.Y.Z`) after merge to trigger
-  publishing.
+  the `tool/` test gate in one step, open a `release(<pkg>)` PR, then run
+  `gh release create <pkg>-vX.Y.Z` after merge to create the GitHub Release and
+  trigger publishing.

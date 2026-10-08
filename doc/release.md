@@ -30,9 +30,9 @@ Generic pre-flight tooling that only formats/analyzes does not catch this.
    ```
 
    This rewrites every drifted `@^…` pin for packages at a release version,
-   re-validates, runs `dart test` in `tool/`, and prints the tag command for
-   step 5. Review the rewritten files in `git diff` — the only expected churn is
-   `@^old` → `@^new`.
+   re-validates, runs `dart test` in `tool/`, and prints the `gh release create`
+   command for step 5. Review the rewritten files in `git diff` — the only
+   expected churn is `@^old` → `@^new`.
 
 3. **Update skill prose, if the release adds flags or output.** Edits to
    `skills/*/SKILL.md` that describe new CLI surface must land in this same PR
@@ -42,17 +42,23 @@ Generic pre-flight tooling that only formats/analyzes does not catch this.
 4. **Open the PR** as `release(<pkg>): <x.y.z>` and let CI go green. Run
    `kscripts pr-check` locally first if available.
 
-5. **Tag the merge commit.** After the squash lands on `main`:
+5. **Create the GitHub Release.** After the squash lands on `main`, create a
+   GitHub Release (using the command printed by `release_check.dart`, or the
+   `Publish tag (post-merge)` link in the PR's `## Package publishing` bot
+   comment):
 
    ```bash
    git fetch origin
-   git tag -m "<pkg> x.y.z" <pkg>-vx.y.z $(git rev-parse origin/main)
-   git push origin <pkg>-vx.y.z
+   awk '/^## x\.y\.z$/{f=1;next}/^## /{if(f)exit}f' packages/<pkg>/CHANGELOG.md | \
+     gh release create <pkg>-vx.y.z \
+       --target $(git rev-parse origin/main) \
+       --title "package:<pkg> vx.y.z" \
+       --notes-file -
    ```
 
-   The tag **must be annotated** (`-m`). A global `tag.gpgsign = true` git
-   config turns every tag into a signed, annotated tag, and without `-m` git
-   opens an editor — which hangs or fails in non-interactive shells.
+   Using `gh release create` (rather than pushing a bare `git tag`) atomically
+   creates both the formatted GitHub Release entry and the remote tag that
+   triggers [`Publish`](../.github/workflows/publish.yaml).
 
 6. **Confirm publication.**
 

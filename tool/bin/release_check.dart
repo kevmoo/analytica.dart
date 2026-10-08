@@ -9,7 +9,7 @@
 /// `AGENTS.md`, and `evals/*.json` drift from that release. With `--fix`,
 /// rewrites drifted constraints in place. Finishes by running `dart test` in
 /// `tool/` (the same gate CI runs via `validate_skills.yaml`) and prints the
-/// annotated-tag command for every package that is at a release version.
+/// `gh release create` command for every package that is at a release version.
 library;
 
 import 'dart:io';
@@ -87,7 +87,7 @@ int _run({
 
   final testsOk = !runTests || _runToolTests(repoRoot);
 
-  _printTagCommands(packages, onlyPackage);
+  _printReleaseCommands(packages, onlyPackage);
   return errors.isEmpty && testsOk ? 0 : 1;
 }
 
@@ -186,7 +186,7 @@ bool _runToolTests(Directory repoRoot) {
   return ok;
 }
 
-void _printTagCommands(
+void _printReleaseCommands(
   Map<String, PackageReleaseInfo> packages,
   String? onlyPackage,
 ) {
@@ -197,15 +197,24 @@ void _printTagCommands(
   if (releasable.isEmpty) return;
 
   stdout
-    ..writeln('\nPackages at a release version (tag after the PR merges):')
     ..writeln(
-      '  Tags must be annotated (-m); the Publish workflow is tag-triggered.',
+      '\nPackages at a release version '
+      '(create GitHub Release after PR merges):',
+    )
+    ..writeln(
+      '  gh release create publishes both the GitHub Release and the tag that '
+      'triggers Publish:',
     );
   for (final pkg in releasable) {
-    final tag = '${pkg.name}-v${pkg.pubspecVersion}';
+    final version = pkg.pubspecVersion;
+    final escapedVersion = version.replaceAll('.', r'\.');
+    final tag = '${pkg.name}-v$version';
+    final title = 'package:${pkg.name} v$version';
     stdout.writeln(
-      '  git tag -m "${pkg.name} ${pkg.pubspecVersion}" $tag '
-      '\$(git rev-parse origin/main) && git push origin $tag',
+      "  git fetch origin && awk '/^## $escapedVersion\$/{f=1;next}"
+      "/^## /{if(f)exit}f' packages/${pkg.name}/CHANGELOG.md | "
+      'gh release create $tag --target \$(git rev-parse origin/main) '
+      '--title "$title" --notes-file -',
     );
   }
 }
