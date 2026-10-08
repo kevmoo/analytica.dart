@@ -5,15 +5,7 @@ import 'complexity_analyzer.dart';
 
 /// Describes the delta trajectory of a function's cognitive complexity score
 /// or file/declaration line count.
-enum DeltaStatus {
-  added,
-  increased,
-  improved,
-  unchanged,
-  removed;
-
-  String get label => name.toUpperCase();
-}
+enum DeltaStatus { added, increased, improved, unchanged, removed }
 
 /// Represents the comparison between historical and current file line counts.
 class FileLineDelta {
@@ -138,6 +130,7 @@ class ComplexityDelta {
     'new_score': newScore,
     if (oldLines != null) 'old_lines': oldLines,
     if (newLines != null) 'new_lines': newLines,
+    if (oldLines != null || newLines != null) 'line_delta': lineDelta,
     'delta': delta,
     'status': status.name,
     'violation': isViolation(
@@ -307,6 +300,19 @@ class DeltaSummary {
   }
 }
 
+/// Creates a [DeltaAnalyzer] backed by [gitService] for unit testing.
+DeltaAnalyzer createDeltaAnalyzerForTesting({
+  ComplexityAnalyzer? analyzer,
+  GitDiffService? gitService,
+  String? workingDirectory,
+  PathFilter? pathFilter,
+}) => DeltaAnalyzer._(
+  analyzer: analyzer,
+  gitService: gitService,
+  workingDirectory: workingDirectory,
+  pathFilter: pathFilter,
+);
+
 /// Evaluates git diffs to calculate cognitive complexity score deltas and
 /// optional file/declaration line deltas.
 class DeltaAnalyzer {
@@ -316,10 +322,20 @@ class DeltaAnalyzer {
 
   DeltaAnalyzer({
     ComplexityAnalyzer? analyzer,
+    String? workingDirectory,
+    PathFilter? pathFilter,
+  }) : this._(
+         analyzer: analyzer,
+         workingDirectory: workingDirectory,
+         pathFilter: pathFilter,
+       );
+
+  DeltaAnalyzer._({
+    ComplexityAnalyzer? analyzer,
     GitDiffService? gitService,
     String? workingDirectory,
     PathFilter? pathFilter,
-  }) : pathFilter = pathFilter ?? PathFilter.defaults,
+  }) : pathFilter = pathFilter ?? analyzer?.pathFilter ?? PathFilter.defaults,
        _analyzer =
            analyzer ??
            ComplexityAnalyzer(pathFilter: pathFilter ?? PathFilter.defaults),
@@ -398,8 +414,8 @@ class DeltaAnalyzer {
       baseRef: baseRef,
       targetRef: 'HEAD',
       filesAnalyzed: modFiles.length,
-      deltas: allDeltas,
-      fileDeltas: allFileDeltas,
+      deltas: List.unmodifiable(allDeltas),
+      fileDeltas: List.unmodifiable(allFileDeltas),
     );
   }
 
@@ -487,6 +503,6 @@ class DeltaAnalyzer {
       );
     }
 
-    return deltas;
+    return List.unmodifiable(deltas);
   }
 }

@@ -64,12 +64,15 @@ void runFlow(String token) {
       await proc.shouldExit(0);
 
       final jsonMap = jsonDecode(stdout) as Map<String, dynamic>;
-      check(jsonMap['enclosing']).equals('runFlow');
-      check(jsonMap['startLine']).equals(4);
-      check(jsonMap['endLine']).equals(6);
-      check(jsonMap['isCleanlyExtractable']).equals(true);
+      check(jsonMap['enclosing_declaration']).equals('runFlow');
+      check(jsonMap['start_line']).equals(4);
+      check(jsonMap['end_line']).equals(6);
+      check(jsonMap['is_cleanly_extractable']).equals(true);
+      final mutations = (jsonMap['mutations'] as List<dynamic>)
+          .cast<Map<String, dynamic>>();
+      check(mutations.single['first_mutation_line']).equals(4);
       check(
-        jsonMap['suggestedSignature'] as String,
+        jsonMap['suggested_signature'] as String,
       ).contains('({bool isValid, int retries})');
     });
 
@@ -132,9 +135,9 @@ void process(int a) {
       await proc.shouldExit(0);
 
       final jsonMap = jsonDecode(stdout) as Map<String, dynamic>;
-      check(jsonMap['enclosing']).equals('process');
-      check(jsonMap['startLine']).equals(3);
-      check(jsonMap['endLine']).equals(4);
+      check(jsonMap['enclosing_declaration']).equals('process');
+      check(jsonMap['start_line']).equals(3);
+      check(jsonMap['end_line']).equals(4);
     });
   });
 
@@ -188,8 +191,8 @@ void process(int a) {
       await proc.shouldExit(0);
 
       final jsonMap = jsonDecode(stdout) as Map<String, dynamic>;
-      check(jsonMap['enclosing']).equals('process');
-      check(jsonMap['isCleanlyExtractable']).equals(true);
+      check(jsonMap['enclosing_declaration']).equals('process');
+      check(jsonMap['is_cleanly_extractable']).equals(true);
     });
   });
 }

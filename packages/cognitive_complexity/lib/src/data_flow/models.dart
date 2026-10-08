@@ -6,7 +6,6 @@ class VariableUsage {
   final String name;
   final String type;
   final bool isMutated;
-  final int declarationOffset;
   final int declarationLine;
   final int? firstMutationLine;
 
@@ -14,7 +13,6 @@ class VariableUsage {
     required this.name,
     required this.type,
     this.isMutated = false,
-    required this.declarationOffset,
     required this.declarationLine,
     this.firstMutationLine,
   });
@@ -22,9 +20,9 @@ class VariableUsage {
   Map<String, dynamic> toJson() => {
     'name': name,
     'type': type,
-    'isMutated': isMutated,
-    'declarationLine': declarationLine,
-    if (firstMutationLine != null) 'mutationLine': firstMutationLine,
+    'is_mutated': isMutated,
+    'declaration_line': declarationLine,
+    if (firstMutationLine != null) 'first_mutation_line': firstMutationLine,
   };
 }
 
@@ -99,19 +97,20 @@ class DataFlowResult {
 
   Map<String, dynamic> toJson() => {
     'file': filePath,
-    'startLine': startLine,
-    'endLine': endLine,
-    'enclosing': enclosingDeclaration,
-    'isCleanlyExtractable': isCleanlyExtractable,
-    'enclosingScore': enclosingScore,
-    'sliceScoreInPlace': sliceScoreInPlace,
-    'extractedHelperScore': sliceScoreAtRoot,
-    'estimatedEnclosingScoreAfter': estimatedEnclosingScoreAfter,
+    'start_line': startLine,
+    'end_line': endLine,
+    'enclosing_declaration': enclosingDeclaration,
+    'is_cleanly_extractable': isCleanlyExtractable,
+    'enclosing_score': enclosingScore,
+    'slice_score_in_place': sliceScoreInPlace,
+    'slice_score_at_root': sliceScoreAtRoot,
+    'estimated_enclosing_score_after': estimatedEnclosingScoreAfter,
     'inputs': inputs.map((e) => e.toJson()).toList(),
     'mutations': mutations.map((e) => e.toJson()).toList(),
     'outputs': outputs.map((e) => e.toJson()).toList(),
     'escapes': escapes.map((e) => e.toJson()).toList(),
-    if (extractionWarnings.isNotEmpty) 'extractionWarnings': extractionWarnings,
-    'suggestedSignature': suggestedSignature,
+    if (extractionWarnings.isNotEmpty)
+      'extraction_warnings': extractionWarnings,
+    'suggested_signature': suggestedSignature,
   };
 }

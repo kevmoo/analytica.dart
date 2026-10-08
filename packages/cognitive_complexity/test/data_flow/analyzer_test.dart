@@ -558,5 +558,87 @@ void orchestrate(int a, int b, int c, int d, int e) {
         ),
       ).isTrue();
     });
+
+    test(
+      'Marks inputs as mutated when reassigned via pattern assignment',
+      () async {
+        const code = '''
+void swapAndPrint(int a, int b) {
+  print(a);
+  // Target: Lines 4-5
+  (a, b) = (b, a);
+  print(a + b);
+}
+''';
+        final result = await analyzer.analyzeSource(
+          sourceCode: code,
+          startLine: 4,
+          endLine: 4,
+        );
+        final inputsByName = {for (final i in result.inputs) i.name: i};
+        check(inputsByName['a']!.isMutated).isTrue();
+        check(inputsByName['a']!.firstMutationLine).equals(4);
+        check(inputsByName['b']!.isMutated).isTrue();
+        check(inputsByName['b']!.firstMutationLine).equals(4);
+      },
+    );
+
+    test(
+      'Includes transitive type parameter bounds in synthesized signature',
+      () async {
+        const code = '''
+void compareItems<T extends Comparable<U>, U>(T item) {
+  // Target: Line 3
+  print(item);
+}
+''';
+        final result = await analyzer.analyzeSource(
+          sourceCode: code,
+          startLine: 3,
+          endLine: 3,
+        );
+        check(
+          result.suggestedSignature,
+        ).equals('void _extracted<T extends Comparable<U>, U>(T item)');
+      },
+    );
+
+    test('Ignores await inside nested closure while detecting collection '
+        'await-for', () async {
+      const syncWithNestedAsync = '''
+void buildCallback(Future<int> fut) {
+  // Target: Lines 3-5
+  final cb = () async {
+    return await fut;
+  };
+  print(cb);
+}
+''';
+      final syncResult = await analyzer.analyzeSource(
+        sourceCode: syncWithNestedAsync,
+        startLine: 3,
+        endLine: 5,
+      );
+      check(syncResult.suggestedSignature).not((it) => it.contains('async'));
+      check(
+        syncResult.suggestedSignature,
+      ).not((it) => it.contains('Future<Future'));
+
+      const collectionAwaitFor = '''
+Future<void> collectStream(Stream<int> stream) async {
+  // Target: Line 3
+  final values = [await for (final x in stream) x * 2];
+  print(values);
+}
+''';
+      final asyncResult = await analyzer.analyzeSource(
+        sourceCode: collectionAwaitFor,
+        startLine: 3,
+        endLine: 3,
+      );
+      check(
+        asyncResult.suggestedSignature,
+      ).equals('Future<List<int>> _extracted(Stream<int> stream) async');
+    });
   });
 }

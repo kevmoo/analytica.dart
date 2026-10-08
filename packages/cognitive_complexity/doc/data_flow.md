@@ -15,12 +15,16 @@ analyzer evaluates:
   mutated within the slice.
 - **Outputs**: Variables declared or mutated inside the slice that remain live
   and are read downstream.
-- **Control Flow Escapes**: Identifies out-of-scope jumps (`return`, labeled
-  `break` / `continue`, `yield`, unhandled `rethrow`, and escaping asynchronous
-  closure mutations).
+- **Control Flow Escapes**: Identifies out-of-scope jumps (`return`, unlabeled
+  or labeled `break` / `continue` targeting a loop or label outside the slice,
+  `yield`, unhandled `rethrow`, outer-variable mutations inside nested closures,
+  and constructor initializer expressions).
+- **Complexity Impact & Warnings**: Computes enclosing declaration complexity,
+  in-place vs. root slice complexity, estimated enclosing complexity after
+  extraction, and guardrails against high-arity or low-payoff extractions.
 - **Synthesized Signature**: Automatically generates an idiomatic Dart 3 Record
   return signature (e.g. `({String name, int count})`) when multiple variables
-  are live downstream.
+  are live downstream, preserving referenced generic type parameters.
 
 ## CLI Usage
 
@@ -29,10 +33,10 @@ The `data_flow` executable is included in the package.
 ### 1. On-Demand Execution
 
 ```bash
-# Default JSON output
+# Default JSON output (pass range inline or via --lines=45-80)
 dart run cognitive_complexity:data_flow@ lib/src/my_file.dart:45-80
 
-# Human-readable terminal report
+# Human-readable terminal report (optional --sdk-path overrides auto-discovery)
 dart run cognitive_complexity:data_flow@ --format=text lib/src/my_file.dart:45-80
 ```
 
@@ -58,7 +62,7 @@ Add `cognitive_complexity` to your dependencies in `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  cognitive_complexity: ^0.2.3
+  cognitive_complexity: ^1.0.0
 ```
 
 ### Example

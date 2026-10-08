@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:analytica/analyzer.dart';
 import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/dart/ast/visitor.dart';
@@ -40,19 +42,25 @@ _extractInitialUnits(CompilationUnit unit, LineInfo lineInfo) {
     final startLoc = lineInfo.getLocation(member.offset);
     final endLoc = lineInfo.getLocation(member.end);
     final metrics = _measureDeclarationMetrics(member, lineInfo);
+    final prev = units[info.name];
     units[info.name] = DeclarationUnit(
       name: info.name,
       kind: info.kind,
-      startLine: startLoc.lineNumber,
-      endLine: endLoc.lineNumber,
+      startLine: prev == null
+          ? startLoc.lineNumber
+          : math.min(prev.startLine, startLoc.lineNumber),
+      endLine: prev == null
+          ? endLoc.lineNumber
+          : math.max(prev.endLine, endLoc.lineNumber),
       isPublic: !info.name.startsWith('_'),
-      isSealed: info.isSealed,
-      staticMethodCount: metrics.staticCount,
-      staticMethodLines: metrics.staticLines,
-      stringLiteralLines: metrics.stringLines,
-      memberCount: metrics.memberCount,
-      overrideMemberCount: metrics.overrideCount,
-      supertypeLabel: metrics.supertypeLabel,
+      isSealed: info.isSealed || (prev?.isSealed ?? false),
+      staticMethodCount: (prev?.staticMethodCount ?? 0) + metrics.staticCount,
+      staticMethodLines: (prev?.staticMethodLines ?? 0) + metrics.staticLines,
+      stringLiteralLines: (prev?.stringLiteralLines ?? 0) + metrics.stringLines,
+      memberCount: (prev?.memberCount ?? 0) + metrics.memberCount,
+      overrideMemberCount:
+          (prev?.overrideMemberCount ?? 0) + metrics.overrideCount,
+      supertypeLabel: prev?.supertypeLabel ?? metrics.supertypeLabel,
       outgoingIntraFileRefs: const {},
       privateMemberAccessesByTarget: const {},
       requiredImportDirectives: const {},
@@ -227,12 +235,24 @@ Map<String, DeclarationUnit> _populateDeclarationEdges(
     final info = _describeCompilationUnitMember(member);
     if (info == null || !initial.containsKey(info.name)) continue;
 
-    extractedByDecl[info.name] = _extractMemberRefs(
+    final nextRefs = _extractMemberRefs(
       member,
       info.name,
       elementToDeclName,
       importMap,
     );
+    final existingRefs = extractedByDecl[info.name];
+    if (existingRefs == null) {
+      extractedByDecl[info.name] = nextRefs;
+    } else {
+      existingRefs.outgoing.addAll(nextRefs.outgoing);
+      existingRefs.reqImports.addAll(nextRefs.reqImports);
+      for (final entry in nextRefs.privAccess.entries) {
+        existingRefs.privAccess
+            .putIfAbsent(entry.key, () => <String>{})
+            .addAll(entry.value);
+      }
+    }
     _detectHardPins(
       member,
       info.name,
@@ -316,10 +336,19 @@ DeclarationUnit _mergeUnitWithRefs(
   memberCount: base.memberCount,
   overrideMemberCount: base.overrideMemberCount,
   supertypeLabel: base.supertypeLabel,
-  outgoingIntraFileRefs: refs?.outgoing ?? const {},
-  privateMemberAccessesByTarget: refs?.privAccess ?? const {},
-  requiredImportDirectives: refs?.reqImports ?? const {},
-  hardPinnedPeers: hardPins,
+  outgoingIntraFileRefs: refs == null
+      ? const {}
+      : Set.unmodifiable(refs.outgoing),
+  privateMemberAccessesByTarget: refs == null || refs.privAccess.isEmpty
+      ? const {}
+      : Map.unmodifiable({
+          for (final entry in refs.privAccess.entries)
+            entry.key: Set.unmodifiable(entry.value),
+        }),
+  requiredImportDirectives: refs == null
+      ? const {}
+      : Set.unmodifiable(refs.reqImports),
+  hardPinnedPeers: hardPins.isEmpty ? const {} : Set.unmodifiable(hardPins),
 );
 
 void _detectHardPins(

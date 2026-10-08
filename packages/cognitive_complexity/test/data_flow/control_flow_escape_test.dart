@@ -314,5 +314,27 @@ class Point {
         result.escapes.map((e) => e.type.name).toList(),
       ).contains('constructorInitializerEscape');
     });
+
+    test(
+      'Yield inside a nested generator closure is NOT a yieldEscape',
+      () async {
+        const code = '''
+void buildGenerator(int n) {
+  // Target: Lines 3-5
+  final gen = () sync* {
+    yield n;
+  };
+  print(gen().toList());
+}
+''';
+        final result = await analyzer.analyzeSource(
+          sourceCode: code,
+          startLine: 3,
+          endLine: 5,
+        );
+        check(result.isCleanlyExtractable).isTrue();
+        check(result.escapes).isEmpty();
+      },
+    );
   });
 }

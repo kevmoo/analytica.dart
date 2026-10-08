@@ -12,9 +12,15 @@ overly complex logic easy, reliable, and repeatable by implementing the
   guards (`when` clauses), and collection control flow structures.
 - **Deterministic Engine**: Calculates complexity algorithmically without LLM
   calls, external network requests, or token latency.
-- **Statement Data-Flow Analysis**: Evaluates variable inputs, mutations, and
-  downstream live outputs for arbitrary statement slices to power automated
-  method extraction.
+- **Statement Data-Flow Analysis (`data_flow`)**: Evaluates variable inputs,
+  mutations, and downstream live outputs for arbitrary statement slices to power
+  automated method extraction.
+- **Acyclic File Decomposition (`file_split`)**: Analyzes intra-file declaration
+  dependencies, LCOM4 cohesion islands, and strongly connected components to
+  recommend clean standalone library or `part` cuts.
+- **Shallow Helper Detection (`shallow`)**: Detects single-caller pass-through
+  micro-helpers and high-arity parameter clumps, simulating exact caller
+  Cognitive Complexity after re-inlining.
 - **Git Diff Analysis & Ratchet**: Compares working copy changes against a
   target base ref to isolate complexity deltas (Δ) in modified functions.
 - **Lightweight GitHub Action**: Exposes workflow annotations and markdown

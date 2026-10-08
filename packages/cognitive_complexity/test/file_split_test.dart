@@ -5,6 +5,8 @@ import 'package:analytica/analyzer.dart';
 import 'package:checks/checks.dart';
 import 'package:cognitive_complexity/cognitive_complexity.dart';
 import 'package:cognitive_complexity/src/file_split/cli.dart' as file_split_cli;
+import 'package:cognitive_complexity/src/file_split/file_split_analyzer.dart'
+    show analyzeResolvedUnit;
 import 'package:path/path.dart' as p;
 import 'package:test/test.dart';
 
@@ -795,9 +797,8 @@ $leaves
       final helper = AnalysisContextHelper(includedPaths: [absPath]);
       final unitResult = await helper.getRequiredResolvedUnit(absPath);
 
-      const analyzer = FileSplitAnalyzer();
       final sw = Stopwatch()..start();
-      final report = analyzer.analyzeResolvedUnit(
+      final report = analyzeResolvedUnit(
         unitResult,
         displayPath: file.path,
         targetLines: 400,
@@ -842,8 +843,7 @@ class MainTap extends BaseTap {
         final helper = AnalysisContextHelper(includedPaths: [absPath]);
         final unitResult = await helper.getRequiredResolvedUnit(absPath);
 
-        const analyzer = FileSplitAnalyzer();
-        final report = analyzer.analyzeResolvedUnit(
+        final report = analyzeResolvedUnit(
           unitResult,
           displayPath: file.path,
           targetLines: 80,
@@ -926,6 +926,7 @@ $padHalf
       );
       check(coupledReport.clusters).isEmpty();
       check(coupledReport.hasSurvivingCoupledScc).isTrue();
+      check(coupledReport.toJson()['has_surviving_coupled_scc']).equals(true);
       check(coupledReport.meetsTarget).isFalse();
       final coupledText = coupledReport.formatText();
       check(coupledText).contains(
@@ -1037,6 +1038,62 @@ class CyclePeer {
             .allMatches(tier3Text)
             .length;
         check(directiveMatches).equals(1);
+      },
+    );
+
+    test(
+      'merges top-level getter/setter pair spans and outgoing references, and '
+      'falls back cleanly on underscore-only declaration names',
+      () async {
+        const analyzer = FileSplitAnalyzer();
+        final pairFile = File(p.join(tempDir.path, 'getter_setter_pair.dart'));
+        final pad = List.generate(25, (i) => '  final f$i = $i;').join('\n');
+        pairFile.writeAsStringSync('''
+class ReaderDep {
+  int read() => 1;
+$pad
+}
+
+class WriterDep {
+  void write(int v) {}
+$pad
+}
+
+final ReaderDep _reader = ReaderDep();
+final WriterDep _writer = WriterDep();
+
+int get sharedProp => _reader.read();
+
+set sharedProp(int value) {
+  _writer.write(value);
+}
+
+void _() {
+  $pad
+}
+''');
+
+        final report = await analyzer.analyzeFile(
+          pairFile.path,
+          targetLines: 30,
+          minClusterLines: 15,
+        );
+        final allDecls = [
+          ...report.survivingDeclarations,
+          for (final c in report.clusters) ...c.declarations,
+        ];
+        final prop = allDecls.singleWhere((d) => d.name == 'sharedProp');
+        // Both getter (_reader) and setter (_writer) outgoing refs are kept,
+        // and the line range spans from the getter start through setter end.
+        check(prop.outgoingIntraFileRefs).contains('_reader');
+        check(prop.outgoingIntraFileRefs).contains('_writer');
+        check(prop.lineCount).isGreaterOrEqual(4);
+
+        // No cluster suggested filename may degenerate to bare `.dart`.
+        for (final cluster in report.clusters) {
+          check(cluster.suggestedFileName).not((it) => it.equals('.dart'));
+          check(cluster.suggestedFileName).endsWith('.dart');
+        }
       },
     );
   });

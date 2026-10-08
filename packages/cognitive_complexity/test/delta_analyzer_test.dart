@@ -4,7 +4,7 @@ import 'package:analytica/git.dart';
 import 'package:checks/checks.dart';
 import 'package:cognitive_complexity/cognitive_complexity.dart';
 import 'package:cognitive_complexity/src/complexity/delta_analyzer.dart'
-    show compareBySignificance;
+    show compareBySignificance, createDeltaAnalyzerForTesting;
 import 'package:cognitive_complexity/src/complexity/github_reporter.dart';
 import 'package:test/scaffolding.dart';
 
@@ -281,7 +281,7 @@ void main() {
           },
         );
 
-        final analyzer = DeltaAnalyzer(gitService: fakeGit);
+        final analyzer = createDeltaAnalyzerForTesting(gitService: fakeGit);
         final summary = await analyzer.computeDeltas('main');
 
         check(summary.filesAnalyzed).equals(2);
@@ -325,7 +325,7 @@ void main() {
           },
         );
 
-        final analyzer = DeltaAnalyzer(gitService: fakeGit);
+        final analyzer = createDeltaAnalyzerForTesting(gitService: fakeGit);
         final summary = await analyzer.computeDeltas('main', failThreshold: 15);
 
         check(summary.deltas.map((d) => d.name).toList()).deepEquals([
@@ -447,6 +447,19 @@ void activeFunc(bool a) {
       final summaryMap = json['summary'] as Map<String, dynamic>;
       check(summaryMap['file_line_violations']).equals(1);
       check((json['file_deltas'] as List).length).equals(2);
+      final deltasList = json['deltas'] as List;
+      check(
+        (deltasList.single as Map<String, dynamic>)['line_delta'],
+      ).equals(10);
+
+      // DeltaAnalyzer inherits analyzer.pathFilter when pathFilter is omitted.
+      final customFilter = PathFilter(excludePatterns: ['custom_ignored/**']);
+      final inheritedDelta = DeltaAnalyzer(
+        analyzer: ComplexityAnalyzer(pathFilter: customFilter),
+      );
+      check(
+        inheritedDelta.pathFilter.isExcluded('custom_ignored/a.dart'),
+      ).isTrue();
 
       // GitHubReporter renders file and declaration line limit violations
       final ghOut = StringBuffer();
