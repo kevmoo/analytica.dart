@@ -1,7 +1,7 @@
 ## 1.1.0-wip
 
 - `file_split`: name cuts by their type cluster, keep sibling types together,
-  and warn on inherited import cycles (#182):
+  and flag inherited import cycles (#182):
   - A cut whose public type declarations (class, enum, extension type, typedef,
     mixin; at least two) make up `>= 50%` of its naming lines is named
     `<stem>_models.dart` instead of after its longest declaration.
@@ -9,12 +9,17 @@
     left in the source file are pulled into a cut that moves a sibling, when
     that stays within `--target-lines` and adds no boundary crossings; otherwise
     the cut gets a `sibling type(s) … left in …` note.
-  - A cut whose copied imports include a library that imports or re-exports the
-    source file (directly or through one re-export hop) gets an
-    `inherited import cycle` warning, and the plan header counts them.
-  - New `SplitCluster.notes` / `SplitCluster.warnings` (JSON `notes` /
-    `warnings`, emitted when non-empty) and `DeclarationUnit.representationType`
-    (JSON `representation_type`).
+  - A cut whose copied imports include a barrel that re-exports the source file
+    (directly or through one re-export hop) gets an `inherited barrel cycle`
+    warning, and the plan header counts them.
+  - A copied import whose library merely imports the source file (an existing
+    cycle the cut carries over) is informational: listed under
+    `inherited_cycles` in JSON and summarized as one
+    `carries over N existing import cycle(s) (informational)` line in text.
+  - New `SplitCluster.notes` / `SplitCluster.warnings` /
+    `SplitCluster.inheritedCycles` (JSON `notes` / `warnings` /
+    `inherited_cycles`, emitted when non-empty) and
+    `DeclarationUnit.representationType` (JSON `representation_type`).
 
 ## 1.0.0
 

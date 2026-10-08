@@ -127,8 +127,13 @@ class SplitCluster {
   final List<String> notes;
 
   /// Problems the cut inherits from the source file, e.g. a copied import
-  /// that re-exports the source file (an inherited import cycle).
+  /// that re-exports the source file (an inherited barrel cycle).
   final List<String> warnings;
+
+  /// Informational: copied imports whose library already imports the source
+  /// file (directly or through one re-export hop), so the cut carries over an
+  /// import cycle the source file already has. `via` describes the link.
+  final List<({String import, String via})> inheritedCycles;
 
   const SplitCluster({
     required this.suggestedFileName,
@@ -145,6 +150,7 @@ class SplitCluster {
     this.agentDirective,
     this.notes = const [],
     this.warnings = const [],
+    this.inheritedCycles = const [],
   });
 
   int get totalLines => declarations.fold(0, (sum, d) => sum + d.lineCount);
@@ -176,6 +182,10 @@ class SplitCluster {
     'zero_churn_directive': zeroChurnExportDirective,
     if (notes.isNotEmpty) 'notes': notes,
     if (warnings.isNotEmpty) 'warnings': warnings,
+    if (inheritedCycles.isNotEmpty)
+      'inherited_cycles': [
+        for (final c in inheritedCycles) {'import': c.import, 'via': c.via},
+      ],
   };
 
   void _writeText(StringBuffer buf, int cutIndex, FileSplitReport report) {
@@ -358,6 +368,13 @@ class FileSplitReport {
       'largest resulting file: ~$largestResultingFileLines lines$targetNote, '
       '$cycleNote, 0 caller churn) ===',
     );
+    final infoCycles = clusters.fold(0, (s, c) => s + c.inheritedCycles.length);
+    if (infoCycles > 0) {
+      buf.writeln(
+        'Note: carries over $infoCycles existing import cycle(s) '
+        '(informational)',
+      );
+    }
     for (var i = 0; i < clusters.length; i++) {
       clusters[i]._writeText(buf, i + 1, this);
     }

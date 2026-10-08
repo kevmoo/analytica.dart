@@ -121,7 +121,7 @@ FileSplitReport analyzeResolvedUnit(
     dag: sccDag,
     depths: depths,
     islands: islands,
-    importCycleWarnings: inheritedImportCycleWarnings(unitResult),
+    importCycles: inheritedImportCycles(unitResult),
   );
   final (:clusters, :surviving, :hasSurvivingCoupledScc) = planner.plan();
 
@@ -170,8 +170,8 @@ class _ExtractionCutPlanner {
   final Map<int, int> depths;
   final List<Set<int>> islands;
 
-  /// Inherited-cycle warnings keyed by the import directive source text.
-  final Map<String, String> importCycleWarnings;
+  /// Inherited import cycles keyed by the import directive source text.
+  final Map<String, InheritedImportCycle> importCycles;
 
   final String stem;
   final extractedSccs = <int>{};
@@ -196,7 +196,7 @@ class _ExtractionCutPlanner {
     required this.dag,
     required this.depths,
     required this.islands,
-    this.importCycleWarnings = const {},
+    this.importCycles = const {},
   }) : stem = p.basenameWithoutExtension(filePath),
        usedFileNames = <String>{p.basename(filePath)},
        _sccLineCounts = [
@@ -878,6 +878,8 @@ class _ExtractionCutPlanner {
       for (final d in decls) ...d.requiredImportDirectives,
     }.toList()..sort();
 
+    final cycles = splitInheritedCycles(requiredImports, importCycles);
+
     return SplitCluster(
       suggestedFileName: fileName,
       tier: tier,
@@ -897,9 +899,8 @@ class _ExtractionCutPlanner {
           _buildRationale(isDisjointIsland, tier, clusterDepth, decls),
       agentDirective: directive,
       notes: List.unmodifiable(notes),
-      warnings: List.unmodifiable([
-        for (final imp in requiredImports) ?importCycleWarnings[imp],
-      ]),
+      warnings: cycles.warnings,
+      inheritedCycles: cycles.info,
     );
   }
 

@@ -273,8 +273,10 @@ $options''');
       check(cut.requiredImports).deepEquals(["import '../gh_clean.dart';"]);
       check(cut.warnings).deepEquals([
         "cut imports '../gh_clean.dart', which re-exports "
-            'github_queries.dart (inherited import cycle)',
+            'github_queries.dart; import the defining library directly to '
+            'avoid an inherited barrel cycle',
       ]);
+      check(cut.inheritedCycles).isEmpty();
 
       final out = StringBuffer();
       final code = await file_split_cli.runFileSplitCli([
@@ -309,7 +311,67 @@ $options''');
         ..contains('1 inherited import cycle warning(s)');
     });
 
-    test('warns through one re-export hop that imports the source', () async {
+    test(
+      'warns through one re-export hop that re-exports the source',
+      () async {
+        writeFile('gh_clean.dart', '''
+export 'hub.dart';
+
+$options''');
+        writeFile('hub.dart', "export 'gh_clean/github_queries.dart';\n");
+        final source = writeFile(
+          'gh_clean/github_queries.dart',
+          queries("import '../gh_clean.dart';"),
+        );
+
+        final cut = await analyzeQueries(source.path);
+        check(cut.warnings).deepEquals([
+          "cut imports '../gh_clean.dart', which re-exports hub.dart, which "
+              're-exports github_queries.dart; import the defining library '
+              'directly to avoid an inherited barrel cycle',
+        ]);
+        check(cut.inheritedCycles).isEmpty();
+      },
+    );
+
+    test('reports a plain back-import as informational', () async {
+      writeFile('gh_clean.dart', '''
+import 'gh_clean/github_queries.dart';
+
+$options
+void touch() => print(runQueries);
+''');
+      final source = writeFile(
+        'gh_clean/github_queries.dart',
+        queries("import '../gh_clean.dart';"),
+      );
+
+      final cut = await analyzeQueries(source.path);
+      check(cut.warnings).isEmpty();
+      check(cut.inheritedCycles).deepEquals([
+        (import: '../gh_clean.dart', via: 'imports github_queries.dart'),
+      ]);
+      final json = cut.toJson();
+      check(json.containsKey('warnings')).isFalse();
+      check(json['inherited_cycles'] as List).deepEquals([
+        {'import': '../gh_clean.dart', 'via': 'imports github_queries.dart'},
+      ]);
+
+      final textOut = StringBuffer();
+      await file_split_cli.runFileSplitCli([
+        '--target-lines',
+        '60',
+        '--min-cluster-lines',
+        '20',
+        source.path,
+      ], out: textOut);
+      check(textOut.toString())
+        ..contains('carries over 1 existing import cycle(s) (informational)')
+        ..contains('0 circular deps')
+        ..not((it) => it.contains('Warning:'));
+    });
+
+    test('a back-import through a re-export hop is informational', () async {
       writeFile('gh_clean.dart', '''
 export 'hub.dart';
 
@@ -325,9 +387,12 @@ void touch() => print(runQueries);
       );
 
       final cut = await analyzeQueries(source.path);
-      check(cut.warnings).deepEquals([
-        "cut imports '../gh_clean.dart', which re-exports hub.dart, which "
-            'imports github_queries.dart (inherited import cycle)',
+      check(cut.warnings).isEmpty();
+      check(cut.inheritedCycles).deepEquals([
+        (
+          import: '../gh_clean.dart',
+          via: 're-exports hub.dart, which imports github_queries.dart',
+        ),
       ]);
     });
 
@@ -344,7 +409,10 @@ void touch() => print(runQueries);
         cut.requiredImports,
       ).deepEquals(["import '../gh_clean_options.dart';"]);
       check(cut.warnings).isEmpty();
-      check(cut.toJson().containsKey('warnings')).isFalse();
+      check(cut.inheritedCycles).isEmpty();
+      final json = cut.toJson();
+      check(json.containsKey('warnings')).isFalse();
+      check(json.containsKey('inherited_cycles')).isFalse();
     });
   });
 }

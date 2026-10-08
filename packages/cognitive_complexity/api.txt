@@ -204,11 +204,12 @@ package:cognitive_complexity/cognitive_complexity.dart:
     formatText (method: String Function({bool onlySafe}))
     toJson (method: Map<String, dynamic> Function({bool onlySafe}))
   SplitCluster (class extends Object):
-    new (const constructor: SplitCluster Function({required List<String> absorbedPrivateHelpers, String? agentDirective, required List<DeclarationUnit> declarations, required List<String> exportedPublicSymbols, required bool isDisjointIsland, List<String> notes, required List<String> privateMembersToWiden, required List<String> privateTopLevelsToWiden, required String rationale, required List<String> requiredImports, required String suggestedFileName, required SplitTier tier, required int topologicalDepth, List<String> warnings}))
+    new (const constructor: SplitCluster Function({required List<String> absorbedPrivateHelpers, String? agentDirective, required List<DeclarationUnit> declarations, required List<String> exportedPublicSymbols, List<({String import, String via})> inheritedCycles, required bool isDisjointIsland, List<String> notes, required List<String> privateMembersToWiden, required List<String> privateTopLevelsToWiden, required String rationale, required List<String> requiredImports, required String suggestedFileName, required SplitTier tier, required int topologicalDepth, List<String> warnings}))
     absorbedPrivateHelpers (getter: List<String>)
     agentDirective (getter: String?)
     declarations (getter: List<DeclarationUnit>)
     exportedPublicSymbols (getter: List<String>)
+    inheritedCycles (getter: List<({String import, String via})>)
     isDisjointIsland (getter: bool)
     notes (getter: List<String>)
     privateMembersToWiden (getter: List<String>)
