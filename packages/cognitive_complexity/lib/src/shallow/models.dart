@@ -14,14 +14,15 @@ enum ShallowClassification {
   /// score, and does not count toward `--fail-on-safe-inline`.
   zeroHeadroom('ZERO_HEADROOM'),
 
-  /// Inlining would keep the caller below the ceiling, but the helper is one
-  /// step of a sequence: another callee of the same caller, declared in the
-  /// same file and enclosing type, shares `>= 2` leading camelCase name tokens
-  /// with it, two or more share its leading verb, or one shares its verb and
-  /// arity (one-line pass-throughs skip the arity test). Inlining one step
-  /// while its siblings stay extracted breaks the sequence's symmetry, so it
-  /// is reported separately, is not absorbed into the caller's cumulative
-  /// score, and does not count toward `--fail-on-safe-inline`.
+  /// The helper is one step of a sequence, whatever inlining it would cost:
+  /// another callee of the same caller, declared in the same file and
+  /// enclosing type, shares `>= 2` leading camelCase name tokens with it, two
+  /// or more share its leading verb, or one shares its verb and arity (both
+  /// spanning more than one line). Calls on another receiver are ignored.
+  /// Inlining one step while its siblings stay extracted breaks the
+  /// sequence's symmetry, so it is reported separately, is not absorbed into
+  /// the caller's cumulative score, and does not count toward
+  /// `--fail-on-safe-inline`.
   siblingStep('SIBLING_STEP'),
 
   /// Inlining pushes the caller's Cognitive Complexity modestly above the

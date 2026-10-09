@@ -162,8 +162,11 @@ void _sendTwo(String p, String q) {
       check(
         classOf(report, '_sendTwo'),
       ).equals(ShallowClassification.safeInline);
+    });
 
-      const passThrough = '''
+    test('rule (c): a one-line sibling does not make a multi-line helper a '
+        'step, and vice versa', () {
+      const code = '''
 String sniff(String p) => p;
 void run(String p) {
   _getDefault(p);
@@ -175,13 +178,153 @@ String _getCurrent(String p) {
   return v.isEmpty ? p : v;
 }
 ''';
-      final passReport = ShallowAnalyzer().analyzeCode(passThrough);
+      final report = ShallowAnalyzer().analyzeCode(code);
       check(
-        classOf(passReport, '_getDefault'),
+        classOf(report, '_getDefault'),
       ).equals(ShallowClassification.safeInline);
       check(
-        classOf(passReport, '_getCurrent'),
-      ).equals(ShallowClassification.siblingStep);
+        classOf(report, '_getCurrent'),
+      ).equals(ShallowClassification.safeInline);
+    });
+
+    test('rule (c): two multi-line verb+arity siblings are both steps', () {
+      const code = '''
+void run(String p) {
+  _getDefault(p);
+  _getCurrent(p);
+}
+String _getDefault(String p) {
+  final v = p.toLowerCase();
+  return v.isEmpty ? 'main' : v;
+}
+String _getCurrent(String p) {
+  final v = p.trim();
+  return v.isEmpty ? p : v;
+}
+''';
+      final report = ShallowAnalyzer().analyzeCode(code);
+      check(
+        _finding(report, '_getDefault').siblingSteps,
+      ).deepEquals(['_getCurrent']);
+      check(
+        _finding(report, '_getCurrent').siblingSteps,
+      ).deepEquals(['_getDefault']);
+    });
+
+    test('a sibling step whose caller crosses the ceiling stays '
+        'SIBLING_STEP', () {
+      // `run` scores 14; `_readProcEnviron` adds +4 at depth 1 (would be
+      // FLATTEN_AND_INLINE), `_readProcCwd` adds 0.
+      final code =
+          '''
+int run(int a, int b) {
+  var t = 0;
+  if (a > 0) {
+    t += _readProcEnviron(a);
+  }
+  t += _readProcCwd(b);
+${_ifs(13)}
+  return t;
+}
+int _readProcEnviron(int a) {
+  if (a > 1) return 1;
+  if (a > 2) return 2;
+  return 0;
+}
+int _readProcCwd(int b) {
+  return b + 1;
+}
+''';
+      final report = ShallowAnalyzer().analyzeCode(code);
+      final env = _finding(report, '_readProcEnviron');
+      check(env.inlinedCallerScore).equals(18);
+      check(env.classification).equals(ShallowClassification.siblingStep);
+      check(env.siblingSteps).deepEquals(['_readProcCwd']);
+      check(
+        _finding(report, '_readProcCwd').siblingSteps,
+      ).deepEquals(['_readProcEnviron']);
+    });
+
+    test('earlier SAFE_INLINEs pushing siblings to or past the ceiling keep '
+        'SIBLING_STEP', () {
+      // `run` scores 9. Structural `_alpha` (+1) and `_omega` (+2) simulate
+      // first and are absorbed (12); `_readProcEnviron` (+3) then lands on
+      // 15 and `_readProcCwd` (+4) on 16.
+      final code =
+          '''
+bool run(int a, int b, int c, int d, int e) {
+  var t = 0;
+  final x = _alpha(a, b, c, d, e);
+  final y = _omega(a, b, c, d, e);
+  final env = _readProcEnviron(a, b, c, d, e);
+  final cwd = _readProcCwd(a, b, c, d, e);
+${_ifs(9)}
+  return x == y == env == cwd == (t > 0);
+}
+bool _alpha(int a, int b, int c, int d, int e) {
+  return a > 1 || a < -9 + b + c + d + e;
+}
+bool _omega(int a, int b, int c, int d, int e) {
+  return b > 1 && b < 9 || b == 20 + a + c + d + e;
+}
+bool _readProcEnviron(int a, int b, int c, int d, int e) {
+  return a > 1 && b > 2 || c > 3 && d > e;
+}
+bool _readProcCwd(int a, int b, int c, int d, int e) {
+  return a > 1 && b > 2 || c > 3 && d > 4 || e > 5;
+}
+''';
+      final report = ShallowAnalyzer().analyzeCode(code);
+      check(classOf(report, '_omega')).equals(ShallowClassification.safeInline);
+      final env = _finding(report, '_readProcEnviron');
+      check(env.inlinedCallerScore).equals(15);
+      check(env.classification).equals(ShallowClassification.siblingStep);
+      check(env.siblingSteps).deepEquals(['_readProcCwd']);
+      final cwd = _finding(report, '_readProcCwd');
+      check(cwd.classification).equals(ShallowClassification.siblingStep);
+      check(cwd.siblingSteps).deepEquals(['_readProcEnviron']);
+    });
+
+    test('receiver-qualified calls are not siblings', () {
+      const code = '''
+class Other {
+  int parse(String s) => s.length;
+}
+int parse(String s) {
+  final t = s.trim();
+  return int.parse(t);
+}
+int useParse(String s) => parse(s) + parse(s);
+int _parseHeader(String s) {
+  final h = s.split(':').first;
+  return h.length;
+}
+int run(String s, Other other) => other.parse(s) + _parseHeader(s);
+''';
+      final report = ShallowAnalyzer().analyzeCode(code);
+      check(
+        classOf(report, '_parseHeader'),
+      ).equals(ShallowClassification.safeInline);
+    });
+
+    test('this-qualified calls still count as siblings', () {
+      const code = '''
+class Reader {
+  int run(String s) => this._parseBody(s) + _parseHeader(s);
+  int _parseBody(String s) {
+    final b = s.split(':').last;
+    return b.length;
+  }
+  int _parseHeader(String s) {
+    final h = s.split(':').first;
+    return h.length;
+  }
+}
+''';
+      final report = ShallowAnalyzer().analyzeCode(code);
+      check(
+        _finding(report, 'Reader._parseHeader').siblingSteps,
+      ).deepEquals(['_parseBody']);
     });
 
     test('siblings must share the caller, file, and enclosing type', () {
@@ -259,15 +402,16 @@ void _formatY(int a, int b, int c, int d, int e, int f) {
       check(formatY.callerCumulativeBefore).equals(9);
       check(formatY.inlinedCallerScore).equals(13);
       check(formatY.classification).equals(ShallowClassification.safeInline);
+      // Over the ceiling on its own, but still a step of the sequence.
       check(
         byName['_readProcY']!.classification,
-      ).equals(ShallowClassification.loadBearing);
-      check(byName['_readProcY']!.siblingSteps).isEmpty();
+      ).equals(ShallowClassification.siblingStep);
+      check(byName['_readProcY']!.siblingSteps).deepEquals(['_readProcX']);
 
-      check(report.siblingStepCount).equals(1);
+      check(report.siblingStepCount).equals(2);
       check(report.safeInlineCount).equals(1);
       final json = report.toJson();
-      check(json['sibling_step_count']).equals(1);
+      check(json['sibling_step_count']).equals(2);
       final jsonStep = (json['findings'] as List)
           .cast<Map<String, dynamic>>()
           .singleWhere((f) => f['name'] == '_readProcX');
@@ -275,7 +419,7 @@ void _formatY(int a, int b, int c, int d, int e, int f) {
       check(jsonStep['sibling_steps'] as List).deepEquals(['_readProcY']);
 
       final text = report.formatText();
-      check(text).contains('1 SIBLING_STEP with same-stem siblings kept');
+      check(text).contains('2 SIBLING_STEP with same-stem siblings kept');
       check(text).contains(
         'siblings=[_readProcY] stay extracted '
         '-> keep the sequence symmetric',
@@ -301,3 +445,10 @@ void _formatY(int a, int b, int c, int d, int e, int f) {
     });
   });
 }
+
+ShallowFinding _finding(ShallowReport report, String name) =>
+    report.findings.singleWhere((f) => f.name == name);
+
+/// [n] top-level `if` statements on `a`, each scoring +1.
+String _ifs(int n) =>
+    List.generate(n, (i) => '  if (a == ${i + 1}) t++;').join('\n');

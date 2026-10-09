@@ -459,13 +459,15 @@ class ShallowAnalyzer {
   static String _stripUnderscore(String name) =>
       name.startsWith('_') ? name.substring(1) : name;
 
-  /// Names invoked or torn off from each production caller.
+  /// Names invoked or torn off from each production caller, excluding calls
+  /// on another receiver (`other.parse()`), which cannot be same-file steps.
   static Map<ShallowDeclNode, Set<String>> _indexCalleesByCaller(
     Iterable<ShallowCallSite> calls,
   ) {
     final callees = <ShallowDeclNode, Set<String>>{};
     for (final call in calls) {
-      if (call.caller case final caller? when !call.isTestFile) {
+      if (call.caller case final caller?
+          when !call.isTestFile && !call.isQualified) {
         callees.putIfAbsent(caller, () => {}).add(call.calleeName);
       }
     }
@@ -506,7 +508,7 @@ class ShallowAnalyzer {
         ) ||
         (decl.bodyLines > 1 &&
             siblings.values.any(
-              (s) => s.parameterCount == decl.parameterCount,
+              (s) => s.bodyLines > 1 && s.parameterCount == decl.parameterCount,
             ));
     return fires ? (siblings.keys.toList()..sort()) : const [];
   }
@@ -534,10 +536,10 @@ class ShallowAnalyzer {
     required bool hasAbsorbedChildren,
     required bool hasSiblingSteps,
   }) {
+    // A sibling step stays extracted whatever inlining it would cost.
+    if (hasSiblingSteps) return ShallowClassification.siblingStep;
     if (inlinedCallerScore < maxCallerScore) {
-      return hasSiblingSteps
-          ? ShallowClassification.siblingStep
-          : ShallowClassification.safeInline;
+      return ShallowClassification.safeInline;
     }
     if (inlinedCallerScore == maxCallerScore) {
       return ShallowClassification.zeroHeadroom;
