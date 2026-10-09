@@ -84,7 +84,10 @@ Run the CLI directly (requires Dart SDK **3.12.0+**, verify via
   Without positional targets, `shallow` scans `lib/` in the current directory
   (pass `lib/ bin/` or package paths explicitly for CLI tools and monorepos).
   Its findings (like `file_split` plans) are prompts for judgment, never a queue
-  to clear or a CI gate; see Section 5.3 before acting on any of them.
+  to clear or a CI gate; see Section 5.3 before acting on any of them. This
+  framing applies to consumer repos: a package may keep its own dogfood
+  `--fail-on-safe-inline` CI step (this repo does), and never remove an existing
+  CI gate without an explicit ask.
 
 ---
 
