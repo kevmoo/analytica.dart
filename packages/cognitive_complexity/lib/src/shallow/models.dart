@@ -3,16 +3,34 @@ library;
 
 /// Classification of a single-caller shallow helper based on simulated caller
 /// Cognitive Complexity after inlining.
-enum ShallowClassification {
+///
+/// This is a closed set of constants, not an `enum`: new values may be added in
+/// minor releases. `switch` statements and expressions over it must include a
+/// default (`_`) arm.
+final class ShallowClassification {
+  const ShallowClassification._(this.name, this.label);
+
+  /// Identifier of this value (`safeInline`, `zeroHeadroom`, ...).
+  final String name;
+
+  /// Label used in text and JSON output (`SAFE_INLINE`, ...).
+  final String label;
+
   /// Inlining keeps the caller's Cognitive Complexity strictly below the
   /// maximum caller complexity ceiling (`< maxCallerScore`, default `15`).
-  safeInline('SAFE_INLINE'),
+  static const safeInline = ShallowClassification._(
+    'safeInline',
+    'SAFE_INLINE',
+  );
 
   /// Inlining lands the caller exactly on the ceiling (`== maxCallerScore`).
   /// The inline is legal but spends the caller's last point of budget, so it
   /// is reported separately, is not absorbed into the caller's cumulative
   /// score, and does not count toward `--fail-on-safe-inline`.
-  zeroHeadroom('ZERO_HEADROOM'),
+  static const zeroHeadroom = ShallowClassification._(
+    'zeroHeadroom',
+    'ZERO_HEADROOM',
+  );
 
   /// The helper is one step of a sequence, whatever inlining it would cost:
   /// another callee of the same caller, declared in the same file and
@@ -23,20 +41,38 @@ enum ShallowClassification {
   /// sequence's symmetry, so it is reported separately, is not absorbed into
   /// the caller's cumulative score, and does not count toward
   /// `--fail-on-safe-inline`.
-  siblingStep('SIBLING_STEP'),
+  static const siblingStep = ShallowClassification._(
+    'siblingStep',
+    'SIBLING_STEP',
+  );
 
   /// Inlining pushes the caller's Cognitive Complexity modestly above the
   /// ceiling (`maxCallerScore + 1 .. maxCallerScore + 7`); flattening a guard
   /// clause or branch allows clean inlining.
-  flattenAndInline('FLATTEN_AND_INLINE'),
+  static const flattenAndInline = ShallowClassification._(
+    'flattenAndInline',
+    'FLATTEN_AND_INLINE',
+  );
 
   /// Inlining pushes the caller's Cognitive Complexity significantly above the
   /// ceiling (`> maxCallerScore + 7`); the helper is load-bearing for
   /// complexity, so prefer grouping parameters into a value object or record.
-  loadBearing('LOAD_BEARING');
+  static const loadBearing = ShallowClassification._(
+    'loadBearing',
+    'LOAD_BEARING',
+  );
 
-  final String label;
-  const ShallowClassification(this.label);
+  /// All values, in report order (safest first).
+  static const List<ShallowClassification> values = [
+    safeInline,
+    zeroHeadroom,
+    siblingStep,
+    flattenAndInline,
+    loadBearing,
+  ];
+
+  @override
+  String toString() => 'ShallowClassification.$name';
 }
 
 /// Represents a single-caller helper function or method flagged as a shallow

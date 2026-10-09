@@ -3,25 +3,54 @@ library;
 
 /// The 3-Tier File Decomposition classification (analogous to `data_flow`'s
 /// 3-Tier Function Decomposition Rubric).
-enum SplitTier {
+///
+/// This is a closed set of constants, not an `enum`: new values may be added in
+/// minor releases. `switch` statements and expressions over it must include a
+/// default (`_`) arm.
+final class SplitTier {
+  const SplitTier._(this.name, this.label);
+
+  /// Identifier of this value (`tier1CleanLibrary`, ...), used as the JSON
+  /// `tier` value.
+  final String name;
+
+  /// Human-readable label used in text output and as JSON `tier_label`.
+  final String label;
+
   /// Tier 1: Disjoint island (`LCOM4 >= 2`) or leaf-first DAG layer with
   /// 0 circular edges within the plan, 0 `sealed` boundary violations, and 0
   /// cross-cut `_private` widenings (all private helpers are single-dominator
   /// absorbed). Cycles inherited through copied imports are reported
   /// separately (`SplitCluster.warnings` / `SplitCluster.inheritedCycles`).
-  tier1CleanLibrary('Tier 1: Clean Library Split (import + export show)'),
+  static const tier1CleanLibrary = SplitTier._(
+    'tier1CleanLibrary',
+    'Tier 1: Clean Library Split (import + export show)',
+  );
 
   /// Tier 2: One-way acyclic DAG cut that requires widening 1–3 shared
   /// `_private` helpers/members to `@internal` inside `lib/src/`.
-  tier2InternalWidening('Tier 2: Controlled @internal Widening Split'),
+  static const tier2InternalWidening = SplitTier._(
+    'tier2InternalWidening',
+    'Tier 2: Controlled @internal Widening Split',
+  );
 
   /// Tier 3: Inseparable SCC cycle, massive `sealed` hierarchy, or dense
   /// cross-class `_private` member web (`>= 3` members) requiring `part` /
   /// `part of` (or interface inversion).
-  tier3PartDirective('Tier 3: Library part / part of Split (Gated)');
+  static const tier3PartDirective = SplitTier._(
+    'tier3PartDirective',
+    'Tier 3: Library part / part of Split (Gated)',
+  );
 
-  final String label;
-  const SplitTier(this.label);
+  /// All values, from cleanest to most invasive split.
+  static const List<SplitTier> values = [
+    tier1CleanLibrary,
+    tier2InternalWidening,
+    tier3PartDirective,
+  ];
+
+  @override
+  String toString() => 'SplitTier.$name';
 }
 
 /// A single top-level declaration within an analyzed Dart source file.
