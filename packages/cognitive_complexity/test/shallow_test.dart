@@ -352,9 +352,9 @@ void _reportDelta(int a, int b, int c, int d, int e, int f, int g) {
       _stepA(a, b, c, d, e, f, g, a);
     }
   }
-  _stepB(a, b, c, d, e, f, g);
-  _stepC(a, b, c, d, e, f);
-  _stepD(a, b, c, d, e);
+  _sumB(a, b, c, d, e, f, g);
+  _logC(a, b, c, d, e, f);
+  _emitD(a, b, c, d, e);
 }
 
 void _reportRegular(int a, int b, int c, int d, int e, int f) {
@@ -373,19 +373,19 @@ void _stepA(int a, int b, int c, int d, int e, int f, int g, int h) {
   }
 }
 
-void _stepB(int a, int b, int c, int d, int e, int f, int g) {
+void _sumB(int a, int b, int c, int d, int e, int f, int g) {
   if (a > 0 && b > 0) {
     print(c + d + e + f + g);
   }
 }
 
-void _stepC(int a, int b, int c, int d, int e, int f) {
+void _logC(int a, int b, int c, int d, int e, int f) {
   if (a > 0 && b > 0) {
     print(c + d + e + f);
   }
 }
 
-void _stepD(int a, int b, int c, int d, int e) {
+void _emitD(int a, int b, int c, int d, int e) {
   if (a > 0 && b > 0) {
     print(c + d + e);
   }
@@ -396,13 +396,13 @@ void _stepD(int a, int b, int c, int d, int e) {
 
         final byName = {for (final f in report.findings) f.name: f};
         check(
-          byName['_stepB']!.classification,
+          byName['_sumB']!.classification,
         ).equals(ShallowClassification.safeInline);
         check(
-          byName['_stepC']!.classification,
+          byName['_logC']!.classification,
         ).equals(ShallowClassification.safeInline);
         check(
-          byName['_stepD']!.classification,
+          byName['_emitD']!.classification,
         ).equals(ShallowClassification.safeInline);
         check(
           byName['_stepA']!.classification,
@@ -425,21 +425,21 @@ void _stepD(int a, int b, int c, int d, int e) {
 void _caller(int a, int b, int c, int d, int e, int f) {
   if (a > 0) {
     if (b > 0) {
-      _h1(a, b, c, d, e, f);
-      _h2(a, b, c, d, e, f);
-      _h3(a, b, c, d, e, f);
+      _alpha(a, b, c, d, e, f);
+      _beta(a, b, c, d, e, f);
+      _gamma(a, b, c, d, e, f);
     }
   }
 }
-void _h1(int a, int b, int c, int d, int e, int f) { if (true) print(1); }
-void _h2(int a, int b, int c, int d, int e, int f) { if (true) print(2); }
-void _h3(int a, int b, int c, int d, int e, int f) { if (true) print(3); }
+void _alpha(int a, int b, int c, int d, int e, int f) { if (true) print(1); }
+void _beta(int a, int b, int c, int d, int e, int f) { if (true) print(2); }
+void _gamma(int a, int b, int c, int d, int e, int f) { if (true) print(3); }
 ''';
       final analyzer = ShallowAnalyzer();
       final report = analyzer.analyzeCode(code);
 
       final byName = {for (final f in report.findings) f.name: f};
-      check(byName.keys).unorderedEquals(['_h1', '_h2', '_h3']);
+      check(byName.keys).unorderedEquals(['_alpha', '_beta', '_gamma']);
       for (final f in byName.values) {
         check(f.callerBaseScore).equals(3);
         check(
@@ -447,11 +447,11 @@ void _h3(int a, int b, int c, int d, int e, int f) { if (true) print(3); }
         ).equals(f.callerCumulativeBefore + f.inlinedDeltaScore);
         check(f.classification).equals(ShallowClassification.safeInline);
       }
-      check(byName['_h1']!.callerCumulativeBefore).equals(3);
-      check(byName['_h2']!.callerCumulativeBefore).equals(6);
-      check(byName['_h3']!.callerCumulativeBefore).equals(9);
+      check(byName['_alpha']!.callerCumulativeBefore).equals(3);
+      check(byName['_beta']!.callerCumulativeBefore).equals(6);
+      check(byName['_gamma']!.callerCumulativeBefore).equals(9);
 
-      final h2Json = byName['_h2']!.toJson();
+      final h2Json = byName['_beta']!.toJson();
       check(h2Json['caller_base_score']).equals(3);
       check(h2Json['caller_cumulative_before']).equals(6);
       check(h2Json.containsKey('caller_score')).isFalse();

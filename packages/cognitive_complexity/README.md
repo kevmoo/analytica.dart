@@ -135,6 +135,26 @@ Options:
 
 ### `shallow` CLI Options
 
+Each finding is classified by the caller's simulated Cognitive Complexity after
+inlining. Treat findings as prompts to review, not a gate to clear:
+
+- `SAFE_INLINE`: the caller stays below `--max-caller-cc`.
+- `ZERO_HEADROOM`: the caller lands exactly on `--max-caller-cc`.
+- `SIBLING_STEP`: the helper is one step of a sequence, whatever inlining it
+  would cost. Another callee of the same caller, in the same file and enclosing
+  type, shares 2+ leading camelCase name tokens with it (`_readProcEnviron` /
+  `_readProcCwd`), two or more share its leading verb, or one shares its verb
+  and arity (both must span more than one line). Calls on another receiver
+  (`other.parse()`) don't count. The `Facts:` line names the siblings. Inline
+  all of them or none.
+- `FLATTEN_AND_INLINE`: the caller lands up to 7 points over the ceiling;
+  flatten a guard clause first.
+- `LOAD_BEARING`: the helper carries real complexity; keep it.
+
+Only `SAFE_INLINE` counts toward `--only-safe` and `--fail-on-safe-inline`.
+`ZERO_HEADROOM` and `SIBLING_STEP` helpers are also not absorbed into the
+caller's running score when later siblings are simulated.
+
 <!-- CLI_README_START shallow -->
 
 ```console

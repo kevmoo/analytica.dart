@@ -150,6 +150,10 @@ class ShallowCallSite {
   final bool isTestFile;
   final bool isTearOff;
 
+  /// Whether the call has an explicit receiver other than `this`
+  /// (`other.parse()`), so it may target a different declaration.
+  final bool isQualified;
+
   const ShallowCallSite({
     required this.caller,
     required this.filePath,
@@ -159,6 +163,7 @@ class ShallowCallSite {
     required this.nestingDepth,
     required this.isTestFile,
     required this.isTearOff,
+    this.isQualified = false,
   });
 }
 
@@ -437,7 +442,15 @@ class ShallowFileCollector extends RecursiveAstVisitor<void> {
 
   @override
   void visitMethodInvocation(MethodInvocation node) {
-    _recordCallSite(node, node.methodName.name, isTearOff: false);
+    _recordCallSite(
+      node,
+      node.methodName.name,
+      isTearOff: false,
+      isQualified: switch (node.realTarget) {
+        null || ThisExpression() => false,
+        _ => true,
+      },
+    );
     super.visitMethodInvocation(node);
   }
 
@@ -467,6 +480,7 @@ class ShallowFileCollector extends RecursiveAstVisitor<void> {
     AstNode siteNode,
     String calleeName, {
     required bool isTearOff,
+    bool isQualified = false,
   }) {
     final caller = _currentDecl;
     final depth = caller != null ? nestingDepthAt(siteNode, caller.node) : 0;
@@ -480,6 +494,7 @@ class ShallowFileCollector extends RecursiveAstVisitor<void> {
         nestingDepth: depth,
         isTestFile: isTestFile,
         isTearOff: isTearOff,
+        isQualified: isQualified,
       ),
     );
   }

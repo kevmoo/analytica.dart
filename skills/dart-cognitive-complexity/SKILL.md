@@ -28,6 +28,10 @@ branch counts.
   Not `0`**). Functions exceeding 15 points mandate architectural refactoring.
   Once a function reaches `<= 15`, **stop decomposing**—never shred a `12`-point
   function into single-caller pass-through micro-helpers just to chase `0`.
+- **Stop Rule**: Only declarations scoring **above** the threshold are work
+  items. When the max score is `<= threshold`, report "done, nothing required"
+  and stop. Further refactors (re-inlining, file splits, style edits) are
+  optional and need an explicit user ask.
 - **Extracted Helper Depth & Parameter Cap**: Pure extracted helpers must take
   `<= 4` parameters (`<= 3` preferred) and carry genuine internal depth
   (`sliceScoreAtRoot >= 3` or reused across `2+` call sites).
@@ -72,14 +76,18 @@ Run the CLI directly (requires Dart SDK **3.12.0+**, verify via
   > inspects `lib/`. For CLI tools and applications with entrypoints in `bin/`
   > (or `tool/`), pass target directories explicitly:
   > `dart run cognitive_complexity@^1.0.0 --threshold 15 lib/ bin/`
-- **Scope 4 — Shallow Helper Audit (Over-Extraction & Re-Inlining)**:
+- **Optional Review Aid — Shallow Helper Audit (Advisory Only)**:
   ```bash
   dart run cognitive_complexity:shallow@^1.0.0 lib/
   dart run cognitive_complexity:shallow@^1.0.0 lib/ bin/
-  dart run cognitive_complexity:shallow@^1.0.0 --git-diff origin/main --fail-on-safe-inline lib/
   ```
   Without positional targets, `shallow` scans `lib/` in the current directory
   (pass `lib/ bin/` or package paths explicitly for CLI tools and monorepos).
+  Its findings (like `file_split` plans) are prompts for judgment, never a queue
+  to clear or a CI gate; see Section 5.3 before acting on any of them. This
+  framing applies to consumer repos: a package may keep its own dogfood
+  `--fail-on-safe-inline` CI step (this repo does), and never remove an existing
+  CI gate without an explicit ask.
 
 ---
 
@@ -87,42 +95,39 @@ Run the CLI directly (requires Dart SDK **3.12.0+**, verify via
 
 When threshold breaches are detected, **do not mutate code immediately** unless
 given an explicit upfront remediation directive or running in an unattended
-automated harness (`evalin` / subagent).
+automated harness (`evalin` / subagent). When there are **no** breaches (max
+score `<= threshold`), apply the Stop Rule: report that nothing is required,
+make no source edits, and skip Stage 2.
 
 ### Stage 1: Read-Only Audit & Reporting (Mandatory Stop)
 
 1. **Mandatory Persistent Artifact**: Create `complexity_triage_report.md` in
-   `<appDataDir>/brain/<conversation-id>/` containing two structured audit
-   tables:
-   - **Core Cognitive Complexity Outliers (`> 15` Prod / `> 40` Test)**: Listing
-     each flagged function, clickable file path with code snippets, current
-     score vs. ceiling (sorted descending by score), recommended pattern (A–F),
-     and unit test status.
-   - **Shallow Helpers (Pattern G — Over-Extracted Single-Caller Helpers)**:
-     Listing findings from `cognitive_complexity:shallow` (`SAFE_INLINE`,
-     `ZERO_HEADROOM`, `FLATTEN_AND_INLINE`, `LOAD_BEARING`):
+   `<appDataDir>/brain/<conversation-id>/` containing:
+   - **Core Cognitive Complexity Outliers (`> 15` Prod / `> 40` Test)** — the
+     only work items: each flagged function, clickable file path with code
+     snippets, current score vs. ceiling (sorted descending by score),
+     recommended pattern (A–F), and unit test status.
+   - **Optional: Shallow Helper Notes (Advisory, Not Work Items)**: If you ran
+     `cognitive_complexity:shallow`, list its findings (`SAFE_INLINE`,
+     `ZERO_HEADROOM`, `FLATTEN_AND_INLINE`, `LOAD_BEARING`) for review:
 
-     | Classification    | Helper Declaration       | Sole Caller                         | Helper Metrics               | Caller CC (`Before -> After`) | Est. Saved | Recommended Remediation                                                                                            |
-     | :---------------- | :----------------------- | :---------------------------------- | :--------------------------- | :---------------------------: | :--------: | :----------------------------------------------------------------------------------------------------------------- |
-     | **`SAFE_INLINE`** | [`_helper`](file:///...) | [`caller`](file:///...) (`depth=0`) | `params=6`, `LOC=18`, `CC=2` |   `0 (base 0) -> 2` (`+2`)    |   `~12L`   | **Re-inline (Pattern G)**: Inlining eliminates pass-through plumbing while keeping caller in Target Zone (`< 15`). |
-     - **Guidance on Choosing the Right Shallow Remediation**:
-       - **Re-inline (`SAFE_INLINE`)**: Re-inline single-caller helpers directly
-         into their sole caller when `CallerCCAfter < 15` (especially
-         `MICRO_HELPER`s or `HIGH_ARITY` helpers where inlining deletes
-         parameter plumbing and restores localized reading flow).
-       - **Zero Headroom (`ZERO_HEADROOM`)**: `CallerCCAfter == 15`. Legal to
-         inline, but it leaves the caller no budget; trim the caller first
-         (Patterns A/B) or leave extracted. Not counted by
-         `--fail-on-safe-inline`.
-       - **Parameter Record**: For sibling helpers sharing high-arity parameter
-         clumps (`HIGH_ARITY`), synthesize a shared Dart 3 named record rather
-         than passing 5+ separate arguments or packing ad-hoc inline records.
-       - **Existing State Object**: If helper parameters are a subset of an
-         existing domain model or state object, pass that instance directly.
-       - **Flatten & Inline (`FLATTEN_AND_INLINE`)**: Flatten nested
-         conditionals in the helper using Patterns A/B before or while inlining.
-2. **Visible Chat Pre-Render**: Render a high-level summary (including shallow
-   helper counts and top complexity outliers) and a clickable link to
+     | Classification    | Helper Declaration       | Sole Caller                         | Helper Metrics               | Caller CC (`Before -> After`) | Suggested Review                                                                                                           |
+     | :---------------- | :----------------------- | :---------------------------------- | :--------------------------- | :---------------------------: | :------------------------------------------------------------------------------------------------------------------------- |
+     | **`SAFE_INLINE`** | [`_helper`](file:///...) | [`caller`](file:///...) (`depth=0`) | `params=6`, `LOC=18`, `CC=2` |   `0 (base 0) -> 2` (`+2`)    | **Review: consider re-inlining if** the helper is pure plumbing, has no same-shape siblings, and its name adds no meaning. |
+     - **Reading Shallow Classifications**:
+       - **`SAFE_INLINE`** (`CallerCCAfter < 15`): Inlining is _possible_
+         without breaching the caller's budget. It is not a recommendation;
+         apply the Section 5.3 keep/revert heuristics first.
+       - **`ZERO_HEADROOM`** (`CallerCCAfter == 15`): Inlining would leave the
+         caller no budget; leave extracted.
+       - **`HIGH_ARITY` / Parameter Record**: For sibling helpers sharing
+         high-arity parameter clumps, a shared Dart 3 named record (or an
+         existing domain/state object that already holds those values) usually
+         beats inlining.
+       - **`FLATTEN_AND_INLINE`**: Only relevant when the caller is itself a
+         work item; flatten with Patterns A/B as part of that fix.
+2. **Visible Chat Pre-Render**: Render a high-level summary (top complexity
+   outliers, plus any advisory shallow notes) and a clickable link to
    `complexity_triage_report.md` in visible chat BEFORE invoking the
    confirmation gate.
 3. **Outlier-First Mandate**: Prioritize the highest-scoring declaration in the
@@ -138,12 +143,9 @@ offer:
 1. **(Recommended) Refactor Primary Outlier First**: Target the single
    highest-scoring declaration, decompose to `<= 15`, verify tests, and show
    diffs.
-2. **Re-inline Safe Shallow Helpers**: Batch re-inline `SAFE_INLINE` helpers
-   into their sole callers (`Pattern G`), deleting pass-through signatures while
-   keeping all callers `<= 15`.
-3. **Selective Batch Refactor**: Remediate the top N highest-scoring functions
+2. **Selective Batch Refactor**: Remediate the top N highest-scoring functions
    in descending order.
-4. **Report-Only / Exit**: Acknowledge scores without code mutation.
+3. **Report-Only / Exit**: Acknowledge scores without code mutation.
 
 ---
 
@@ -255,26 +257,64 @@ of extracting a shallow helper:
     internal invariants, OR when standalone `lib/src/` files would require
     widening visibility and risk leaking internal types via unscoped
     `export 'src/...';` directives.
-- **Pattern G (Re-Inlining Shallow Single-Caller Helpers — `shallow`)**: Run
-  `dart run cognitive_complexity:shallow@^1.0.0 lib/` to detect single-caller
-  pass-through helpers (`HIGH_ARITY`, `MICRO_HELPER`, `SIG_HEAVY`,
-  `CROSS_FILE_SINGLE_CALLER`). Re-inline `SAFE_INLINE` findings
-  (`CallerCCAfter < 15`) directly into their sole caller, treat `ZERO_HEADROOM`
-  (`== 15`) as "trim the caller first", and flatten + inline
-  `FLATTEN_AND_INLINE` findings using Patterns A/B. A `Facts:` line
-  (`shared_param_signature_with`, `params_subset_of_existing_type` in JSON)
-  points at the Parameter Record or Existing State Object remedy instead of
-  inlining; `HIGH_ARITY` counts inline record parameters by field count, so
-  packing arguments into an ad-hoc record is not an escape.
+  - `file_split` plans are advisory: the cuts are dependency-correct, but the
+    suggested file name follows one declaration. Name each new file by what it
+    actually holds (Section 5.3).
+- **Pattern G (Advisory Shallow-Helper Review — `shallow`)**: Optionally run
+  `dart run cognitive_complexity:shallow@^1.0.0 lib/` to list single-caller
+  helpers (`HIGH_ARITY`, `MICRO_HELPER`, `SIG_HEAVY`,
+  `CROSS_FILE_SINGLE_CALLER`). A `SAFE_INLINE` finding means inlining would not
+  breach the caller's budget, not that it should happen; most well-named helpers
+  should stay. Consider inlining only pure plumbing that passes every Section
+  5.3 check. A `Facts:` line (`shared_param_signature_with`,
+  `params_subset_of_existing_type` in JSON) points at a Parameter Record or
+  Existing State Object remedy instead of inlining; `HIGH_ARITY` counts inline
+  record parameters by field count, so packing arguments into an ad-hoc record
+  is not an escape.
+
+### 5.3 Keep / Revert Heuristics
+
+**KEEP** (these reliably improve code):
+
+- De-duplication of repeated logic.
+- Guard clauses and flattening (Patterns A/B).
+- Named step helpers that turn a long function into a readable sequence.
+
+**DON'T**:
+
+- Inline a helper whose same-shape siblings stay extracted (e.g. inlining
+  `_readEnviron` while `_readCmdline` / `_readCwd` remain helpers).
+- Inline a helper whose name or doc comment carries meaning the call site would
+  lose. Watch for inlined bodies whose early `return` now skips later caller
+  logic.
+- Make style-only edits to code you are not otherwise fixing.
+- Split files without a cohesive name. Name a file by what it holds, put shared
+  types in a `models`-style file, and never create import cycles or barrel files
+  (`export ... show` re-export lists) when direct imports work.
+
+### 5.4 Hot Loops: Benchmark Before Splitting
+
+For per-element inner loops (pixel, module, byte, or token kernels), splitting
+into helpers can cost real throughput even on AOT. Benchmark before and after
+any split. Prefer leaving the kernel inline with a declaration-level suppression
+on the line immediately preceding the declaration, plus a reason:
+
+```dart
+// Hot per-module kernel: splitting into helpers benchmarked slower on AOT.
+// cognitive_complexity:ignore
+int _scoreModules(List<int> modules, int size) {
+  // ...
+}
+```
 
 ---
 
 ## 6. Verification & Public API Surface Guardrails
 
-1. **Complexity & Shallow-Helper Audit**: Run
-   `dart run cognitive_complexity@^1.0.0 --fail-threshold 15 <refactored files>`
-   and
-   `dart run cognitive_complexity:shallow@^1.0.0 --fail-on-safe-inline <refactored files>`.
+1. **Complexity Check**: Run
+   `dart run cognitive_complexity@^1.0.0 --fail-threshold 15 <refactored files>`.
+   Optionally run `dart run cognitive_complexity:shallow@^1.0.0 <files>` as a
+   review aid (Section 5.3); its findings never block.
 2. **Mandatory `api_summary` Public API Surface Verification Gate**: Whenever a
    refactor extracts helpers across files or touches `lib/` exports:
    ```bash
@@ -290,6 +330,10 @@ of extracting a shallow helper:
    `duplicate_ignore` (an `// ignore:` copied onto both the caller and the
    extracted helper), `unused_import`, or `directives_ordering` behind, so
    resolve every info before committing.
-4. **PR & Commit Provenance**: In interactive sessions, ask the user before
+4. **Blind Self-Review (Diffs `> ~300` Changed Lines)**: Before finishing, have
+   a fresh agent or human reviewer, given only the before/after trees and the
+   diff (no tool output or scores), judge whether each change is an improvement.
+   Revert hunks judged neutral or worse.
+5. **PR & Commit Provenance**: In interactive sessions, ask the user before
    appending the standardized Tool Provenance & Complexity Delta block from
    [`references/refactoring_recipes.md`](references/refactoring_recipes.md#3-pull-request--commit-provenance-template).
