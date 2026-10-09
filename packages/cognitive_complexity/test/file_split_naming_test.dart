@@ -184,19 +184,13 @@ enum Mode { fast, slow }
 
 enum Level { low, high }
 
-int helperOne(Mode m) {
-${List.generate(30, (i) => '  final h$i = $i;').join('\n')}
-  return m.index;
-}
-
-int buildPlan(Level l) {
-  final x = helperOne(Mode.fast);
-${List.generate(30, (i) => '  final b$i = $i;').join('\n')}
-  return x + l.index;
+int buildPlan(Level l, Mode m) {
+${List.generate(50, (i) => '  final b$i = $i;').join('\n')}
+  return m.index + l.index;
 }
 
 void main() {
-  print(buildPlan(Level.low));
+  print(buildPlan(Level.low, Mode.fast));
 ${List.generate(45, (i) => '  final m$i = $i;').join('\n')}
 }
 ''');
@@ -209,6 +203,9 @@ ${List.generate(45, (i) => '  final m$i = $i;').join('\n')}
       final cut = report.clusters.singleWhere(
         (c) => c.declarations.any((d) => d.name == 'buildPlan'),
       );
+      final names = cut.declarations.map((d) => d.name).toSet();
+      check(names.contains('Mode')).isTrue();
+      check(names.contains('Level')).isTrue();
       check(cut.suggestedFileName).equals('build_plan.dart');
     });
   });
@@ -308,7 +305,17 @@ $options''');
       ], out: textOut);
       check(textOut.toString())
         ..contains("Warning: cut imports '../gh_clean.dart', which re-exports")
-        ..contains('1 inherited import cycle warning(s)');
+        ..contains('0 circular deps, 0 caller churn')
+        ..contains(
+          'Note: 1 inherited barrel cycle warning(s), 0 existing import '
+          'cycle(s) carried over (informational)',
+        )
+        ..contains('0 circular imports within the plan')
+        ..contains('See Warning (inherited barrel import cycle).');
+      check(
+        cut.rationale,
+      ).endsWith('See Warning (inherited barrel import cycle).');
+      check(cut.tier).equals(SplitTier.tier1CleanLibrary);
     });
 
     test(
@@ -366,9 +373,13 @@ void touch() => print(runQueries);
         source.path,
       ], out: textOut);
       check(textOut.toString())
-        ..contains('carries over 1 existing import cycle(s) (informational)')
+        ..contains(
+          'Note: 0 inherited barrel cycle warning(s), 1 existing import '
+          'cycle(s) carried over (informational)',
+        )
         ..contains('0 circular deps')
-        ..not((it) => it.contains('Warning:'));
+        ..not((it) => it.contains('Warning:'))
+        ..not((it) => it.contains('See Warning'));
     });
 
     test('a back-import through a re-export hop is informational', () async {

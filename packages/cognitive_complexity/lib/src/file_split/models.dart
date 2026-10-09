@@ -5,8 +5,10 @@ library;
 /// 3-Tier Function Decomposition Rubric).
 enum SplitTier {
   /// Tier 1: Disjoint island (`LCOM4 >= 2`) or leaf-first DAG layer with
-  /// 0 circular edges, 0 `sealed` boundary violations, and 0 cross-cut
-  /// `_private` widenings (all private helpers are single-dominator absorbed).
+  /// 0 circular edges within the plan, 0 `sealed` boundary violations, and 0
+  /// cross-cut `_private` widenings (all private helpers are single-dominator
+  /// absorbed). Cycles inherited through copied imports are reported
+  /// separately (`SplitCluster.warnings` / `SplitCluster.inheritedCycles`).
   tier1CleanLibrary('Tier 1: Clean Library Split (import + export show)'),
 
   /// Tier 2: One-way acyclic DAG cut that requires widening 1–3 shared
@@ -358,21 +360,20 @@ class FileSplitReport {
     }
 
     final targetNote = meetsTarget ? '' : ' (target $targetLines not met)';
-    final cycleWarnings = clusters.fold(0, (s, c) => s + c.warnings.length);
-    final cycleNote = cycleWarnings == 0
-        ? '0 circular deps'
-        : '$cycleWarnings inherited import cycle warning(s)';
+    // The header counts cycles between the plan's own files, which the
+    // planner never creates; inherited cycles go on the Note line below.
     buf.writeln(
       '=== RECOMMENDED EXTRACTION PLAN '
       '(Reduces $filePath: $totalLines -> ~$estimatedRemainingLines lines, '
       'largest resulting file: ~$largestResultingFileLines lines$targetNote, '
-      '$cycleNote, 0 caller churn) ===',
+      '0 circular deps, 0 caller churn) ===',
     );
-    final infoCycles = clusters.fold(0, (s, c) => s + c.inheritedCycles.length);
-    if (infoCycles > 0) {
+    final barrel = clusters.fold(0, (s, c) => s + c.warnings.length);
+    final carried = clusters.fold(0, (s, c) => s + c.inheritedCycles.length);
+    if (barrel + carried > 0) {
       buf.writeln(
-        'Note: carries over $infoCycles existing import cycle(s) '
-        '(informational)',
+        'Note: $barrel inherited barrel cycle warning(s), $carried existing '
+        'import cycle(s) carried over (informational)',
       );
     }
     for (var i = 0; i < clusters.length; i++) {

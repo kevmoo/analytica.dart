@@ -878,7 +878,11 @@ class _ExtractionCutPlanner {
       for (final d in decls) ...d.requiredImportDirectives,
     }.toList()..sort();
 
-    final cycles = splitInheritedCycles(requiredImports, importCycles);
+    final cycles = applyInheritedCycles(
+      requiredImports,
+      importCycles,
+      rationale ?? _buildRationale(isDisjointIsland, tier, clusterDepth, decls),
+    );
 
     return SplitCluster(
       suggestedFileName: fileName,
@@ -894,9 +898,7 @@ class _ExtractionCutPlanner {
         for (final d in decls)
           if (d.isPublic) d.name,
       ]),
-      rationale:
-          rationale ??
-          _buildRationale(isDisjointIsland, tier, clusterDepth, decls),
+      rationale: cycles.rationale,
       agentDirective: directive,
       notes: List.unmodifiable(notes),
       warnings: cycles.warnings,
@@ -906,24 +908,40 @@ class _ExtractionCutPlanner {
 
   /// Pulls public leaf types that share a sibling key (see [_siblingKey])
   /// with a leaf type already moved by a cut into that cut, when doing so
-  /// keeps the cut within budget and adds no boundary crossings. Siblings that
-  /// cannot follow are reported in the cut's notes.
+  /// keeps the cut within budget and adds no boundary crossings. Once every
+  /// cut has pulled, siblings still left in the source file are reported in
+  /// the notes of the first cut that moves a type of the same key.
   void _keepSiblingTypesTogether() {
+    final keysByCut = [
+      for (var i = 0; i < clusters.length; i++)
+        _specs[i].isDisjointIsland ? const <String>{} : _siblingKeysOf(i),
+    ];
+    final pulledByCut = [
+      for (var i = 0; i < clusters.length; i++)
+        _pullSiblings(_specs[i].sccIndices, keysByCut[i]),
+    ];
+    final noted = <String>{};
     for (var i = 0; i < clusters.length; i++) {
-      if (!_specs[i].isDisjointIsland) _keepSiblingsWithCut(i);
+      final leftBehind = [
+        for (final name in _unextractedSiblings(keysByCut[i]))
+          if (noted.add(name)) name,
+      ];
+      _rebuildWithSiblings(i, pulledByCut[i], leftBehind);
     }
   }
 
-  void _keepSiblingsWithCut(int i) {
-    final spec = _specs[i];
-    final keys = {
-      for (final d in clusters[i].declarations)
-        if (d.outgoingIntraFileRefs.isEmpty) ?_siblingKey(d),
-    };
-    if (keys.isEmpty) return;
-    final (:pulled, :leftBehind) = _pullSiblings(spec.sccIndices, keys);
-    if (pulled.isEmpty && leftBehind.isEmpty) return;
+  Set<String> _siblingKeysOf(int i) => {
+    for (final d in clusters[i].declarations)
+      if (d.outgoingIntraFileRefs.isEmpty) ?_siblingKey(d),
+  };
 
+  void _rebuildWithSiblings(
+    int i,
+    Map<int, String> pulled,
+    List<String> leftBehind,
+  ) {
+    if (pulled.isEmpty && leftBehind.isEmpty) return;
+    final spec = _specs[i];
     final namingSccs = spec.namingSccs;
     final grown = (
       sccIndices: {...spec.sccIndices, ...pulled.keys},
@@ -949,39 +967,42 @@ class _ExtractionCutPlanner {
     );
   }
 
-  ({Map<int, String> pulled, List<String> leftBehind}) _pullSiblings(
-    Set<int> cut,
-    Set<String> keys,
-  ) {
+  /// Pulls the unextracted siblings matching [keys] that fit into [cut]: a
+  /// single-declaration SCC whose refs stay inside the grown cut, within
+  /// budget, adding no boundary crossings, and leaving the source non-empty.
+  Map<int, String> _pullSiblings(Set<int> cut, Set<String> keys) {
     final pulled = <int, String>{};
-    final leftBehind = <String>[];
+    if (keys.isEmpty) return pulled;
     for (var s = 0; s < sccs.length; s++) {
-      if (extractedSccs.contains(s)) continue;
-      final siblings = [
-        for (final name in sccs[s])
-          if (declsByName[name] case final d?
-              when keys.contains(_siblingKey(d)))
-            name,
-      ];
-      if (siblings.isEmpty) continue;
+      if (extractedSccs.contains(s) || _siblingsIn(s, keys).isEmpty) continue;
       final grown = {...cut, ...pulled.keys, s};
-      if (_canPullSibling(s, grown)) {
-        pulled[s] = siblings.single;
+      final fits =
+          sccs[s].length == 1 &&
+          extractedSccs.length + 1 < sccs.length &&
+          (dag[s] ?? const <int>{}).every(grown.contains) &&
+          _setLines(grown) <= targetLines &&
+          _crossingIndex.countCrossings(grown) <=
+              _crossingIndex.countCrossings(grown.difference({s}));
+      if (fits) {
+        pulled[s] = sccs[s].single;
         extractedSccs.add(s);
-      } else {
-        leftBehind.addAll(siblings);
       }
     }
-    return (pulled: pulled, leftBehind: leftBehind);
+    return pulled;
   }
 
-  bool _canPullSibling(int scc, Set<int> grown) =>
-      sccs[scc].length == 1 &&
-      extractedSccs.length + 1 < sccs.length &&
-      (dag[scc] ?? const <int>{}).every(grown.contains) &&
-      _setLines(grown) <= targetLines &&
-      _crossingIndex.countCrossings(grown) <=
-          _crossingIndex.countCrossings(grown.difference({scc}));
+  /// Declarations matching [keys] in SCCs that no cut moves.
+  List<String> _unextractedSiblings(Set<String> keys) => [
+    if (keys.isNotEmpty)
+      for (var s = 0; s < sccs.length; s++)
+        if (!extractedSccs.contains(s)) ..._siblingsIn(s, keys),
+  ];
+
+  List<String> _siblingsIn(int scc, Set<String> keys) => [
+    for (final name in sccs[scc])
+      if (declsByName[name] case final d? when keys.contains(_siblingKey(d)))
+        name,
+  ];
 
   /// Groups value-like public types that belong together: extension types by
   /// representation type, and enums. `null` for every other declaration.
@@ -1108,7 +1129,8 @@ class _ExtractionCutPlanner {
   /// Whether [decls] form a type cluster: at least two public type
   /// declarations make up at least half of their lines, and either the
   /// longest public declaration is not a type (so the cut would otherwise be
-  /// named after a function) or no single type holds half of the type lines.
+  /// named after a function) or no single type holds more than half of the
+  /// type lines.
   bool _isTypeCluster(List<DeclarationUnit> decls) {
     final types = [
       for (final d in decls)
@@ -1120,7 +1142,7 @@ class _ExtractionCutPlanner {
     if (typeLines * 2 < allLines) return false;
     final dominant = _dominantDeclaration(decls);
     return !_typeKinds.contains(dominant.kind) ||
-        dominant.lineCount * 2 < typeLines;
+        dominant.lineCount * 2 <= typeLines;
   }
 
   /// The public declaration with the most lines (ties go to the earliest in
