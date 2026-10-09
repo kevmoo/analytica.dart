@@ -1,8 +1,12 @@
 ## 2.0.0-wip
 
-- **Breaking:** `ShallowClassification` gained `siblingStep`. Exhaustive
-  `switch` statements or expressions over `ShallowClassification` need a new
-  arm.
+- **Breaking:** `ShallowClassification` (which gains `siblingStep`, below),
+  `SplitTier`, and `ControlFlowEscapeType` are now `final` classes with
+  `static const` values instead of enums, so new values can be added in minor
+  releases. There is no exhaustiveness guarantee: `switch` statements and
+  expressions over them need a default (`_`) arm. `.index` is removed; `name`,
+  `values`, `toString()`, `label` (where it existed), and `==` on the constants
+  behave as before.
 - `shallow`: a helper is now classified `SIBLING_STEP` when it is one step of a
   sequence: another callee of the same caller, declared in the same file and
   enclosing type, shares `>= 2` leading camelCase name tokens with it

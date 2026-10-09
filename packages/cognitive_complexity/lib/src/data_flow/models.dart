@@ -27,14 +27,40 @@ class VariableUsage {
 }
 
 /// Identifies control flow jumps/escapes that affect functional extraction.
-enum ControlFlowEscapeType {
-  earlyReturn,
-  loopBreak,
-  loopContinue,
-  yieldEscape,
-  rethrowEscape,
-  closureEscape,
-  constructorInitializerEscape,
+///
+/// This is a closed set of constants, not an `enum`: new values may be added in
+/// minor releases. `switch` statements and expressions over it must include a
+/// default (`_`) arm.
+final class ControlFlowEscapeType {
+  const ControlFlowEscapeType._(this.name);
+
+  /// Identifier of this value (`earlyReturn`, ...), used as the JSON `type`
+  /// value.
+  final String name;
+
+  static const earlyReturn = ControlFlowEscapeType._('earlyReturn');
+  static const loopBreak = ControlFlowEscapeType._('loopBreak');
+  static const loopContinue = ControlFlowEscapeType._('loopContinue');
+  static const yieldEscape = ControlFlowEscapeType._('yieldEscape');
+  static const rethrowEscape = ControlFlowEscapeType._('rethrowEscape');
+  static const closureEscape = ControlFlowEscapeType._('closureEscape');
+  static const constructorInitializerEscape = ControlFlowEscapeType._(
+    'constructorInitializerEscape',
+  );
+
+  /// All values.
+  static const List<ControlFlowEscapeType> values = [
+    earlyReturn,
+    loopBreak,
+    loopContinue,
+    yieldEscape,
+    rethrowEscape,
+    closureEscape,
+    constructorInitializerEscape,
+  ];
+
+  @override
+  String toString() => 'ControlFlowEscapeType.$name';
 }
 
 /// Represents a control flow escape found inside an extracted code block.

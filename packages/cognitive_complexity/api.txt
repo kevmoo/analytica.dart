@@ -152,14 +152,16 @@ package:cognitive_complexity/cognitive_complexity.dart:
     analyzeCode (method: ShallowReport Function(String, {String filePath}))
     analyzePath (method: ShallowReport Function(String))
     analyzePaths (method: ShallowReport Function(List<String>, {Set<String>? modifiedFilesFilter}))
-  ShallowClassification (enum):
-    flattenAndInline (enum constant: ShallowClassification)
-    loadBearing (enum constant: ShallowClassification)
-    safeInline (enum constant: ShallowClassification)
-    siblingStep (enum constant: ShallowClassification)
+  ShallowClassification (class extends Object, final):
+    flattenAndInline (static const getter: ShallowClassification)
+    loadBearing (static const getter: ShallowClassification)
+    safeInline (static const getter: ShallowClassification)
+    siblingStep (static const getter: ShallowClassification)
     values (static const getter: List<ShallowClassification>)
-    zeroHeadroom (enum constant: ShallowClassification)
+    zeroHeadroom (static const getter: ShallowClassification)
     label (getter: String)
+    name (getter: String)
+    toString (method: String Function())
   ShallowFinding (class extends Object):
     new (const constructor: ShallowFinding Function({required int bodyLines, required int callLine, required int callNestingDepth, required int callerBaseScore, required int callerCumulativeBefore, required String callerFilePath, required String callerName, required String callerZone, required ShallowClassification classification, required int effectiveParameterCount, required int endLine, required int estimatedLinesSaved, required String filePath, required int headroomAfterInline, required int inlinedCallerScore, required int inlinedCallerScoreIsolated, required int inlinedDeltaScore, required String name, required int namedParameterCount, required int parameterCount, required String? paramsSubsetOfExistingType, required List<String> reasons, required int score, required int sharedParamCount, required String? sharedParamSignatureWith, List<String> siblingSteps, required int signatureLines, required int simulationIndex, required int startLine, required int statementCount}))
     bodyLines (getter: int)
@@ -226,12 +228,14 @@ package:cognitive_complexity/cognitive_complexity.dart:
     warnings (getter: List<String>)
     zeroChurnExportDirective (getter: String?)
     toJson (method: Map<String, dynamic> Function())
-  SplitTier (enum):
-    tier1CleanLibrary (enum constant: SplitTier)
-    tier2InternalWidening (enum constant: SplitTier)
-    tier3PartDirective (enum constant: SplitTier)
+  SplitTier (class extends Object, final):
+    tier1CleanLibrary (static const getter: SplitTier)
+    tier2InternalWidening (static const getter: SplitTier)
+    tier3PartDirective (static const getter: SplitTier)
     values (static const getter: List<SplitTier>)
     label (getter: String)
+    name (getter: String)
+    toString (method: String Function())
   ComplexityComposition (type alias for ({int booleanOps, int branches, int maxDepth, int nesting}))
 package:cognitive_complexity/data_flow.dart:
   ControlFlowEscape (class extends Object):
@@ -240,15 +244,17 @@ package:cognitive_complexity/data_flow.dart:
     line (getter: int)
     type (getter: ControlFlowEscapeType)
     toJson (method: Map<String, dynamic> Function())
-  ControlFlowEscapeType (enum):
-    closureEscape (enum constant: ControlFlowEscapeType)
-    constructorInitializerEscape (enum constant: ControlFlowEscapeType)
-    earlyReturn (enum constant: ControlFlowEscapeType)
-    loopBreak (enum constant: ControlFlowEscapeType)
-    loopContinue (enum constant: ControlFlowEscapeType)
-    rethrowEscape (enum constant: ControlFlowEscapeType)
+  ControlFlowEscapeType (class extends Object, final):
+    closureEscape (static const getter: ControlFlowEscapeType)
+    constructorInitializerEscape (static const getter: ControlFlowEscapeType)
+    earlyReturn (static const getter: ControlFlowEscapeType)
+    loopBreak (static const getter: ControlFlowEscapeType)
+    loopContinue (static const getter: ControlFlowEscapeType)
+    rethrowEscape (static const getter: ControlFlowEscapeType)
     values (static const getter: List<ControlFlowEscapeType>)
-    yieldEscape (enum constant: ControlFlowEscapeType)
+    yieldEscape (static const getter: ControlFlowEscapeType)
+    name (getter: String)
+    toString (method: String Function())
   DataFlowAnalyzer (class extends Object):
     new (const constructor: DataFlowAnalyzer Function({String? sdkPath}))
     sdkPath (getter: String?)

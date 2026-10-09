@@ -750,7 +750,7 @@ Comparator<ShallowFinding> _buildFindingComparator(
     if (existing == null || rank < existing) groupRank[key] = rank;
   }
   return (a, b) {
-    final classCmp = a.classification.index.compareTo(b.classification.index);
+    final classCmp = _classificationOrder(a).compareTo(_classificationOrder(b));
     if (classCmp != 0) return classCmp;
     final aKey = _callerKey(a);
     final bKey = _callerKey(b);
@@ -881,3 +881,8 @@ List<_RawCandidate> _orderBottomUp(List<_RawCandidate> candidates) {
   }
   return ordered;
 }
+
+/// Report order of [f]'s classification: its position in
+/// [ShallowClassification.values] (safest first).
+int _classificationOrder(ShallowFinding f) =>
+    ShallowClassification.values.indexOf(f.classification);
