@@ -1,6 +1,8 @@
 /// Data models for the resolved-AST file decomposition (`file_split`) advisor.
 library;
 
+import '../version.dart';
+
 /// The 3-Tier File Decomposition classification (analogous to `data_flow`'s
 /// 3-Tier Function Decomposition Rubric).
 ///
@@ -340,7 +342,7 @@ class FileSplitReport {
   bool get meetsTarget => largestResultingFileLines <= targetLines;
 
   Map<String, dynamic> toJson() => {
-    'schema_version': 1,
+    'schema_version': reportSchemaVersion,
     'file': filePath,
     'total_lines': totalLines,
     'target_lines': targetLines,
