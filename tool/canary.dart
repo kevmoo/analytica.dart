@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'dart:io';
 
 const repos = [
@@ -23,7 +22,7 @@ const repos = [
 ];
 
 void main(List<String> args) async {
-  String outDir = Directory.current.path;
+  var outDir = Directory.current.path;
   if (args.contains('--out')) {
     final idx = args.indexOf('--out');
     if (idx + 1 < args.length) {
@@ -32,19 +31,20 @@ void main(List<String> args) async {
   }
 
   final workDir = Directory.systemTemp.createTempSync('canary_');
-  print('Working in \${workDir.path}...');
+  print('Working in ${workDir.path}...');
+  print('Output will be in $outDir');
 
   // Clone
   for (final repo in repos) {
-    print('Cloning \$repo...');
+    print('Cloning $repo...');
     final result = await Process.run('git', [
       'clone',
       '--depth=1',
-      'https://github.com/kevmoo/\$repo.git',
-      '\${workDir.path}/\$repo',
+      'https://github.com/kevmoo/$repo.git',
+      '${workDir.path}/$repo',
     ]);
     if (result.exitCode != 0) {
-      print('Failed to clone \$repo: \${result.stderr}');
+      print('Failed to clone $repo: ${result.stderr}');
     }
   }
 

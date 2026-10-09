@@ -1,6 +1,5 @@
 import 'package:checks/checks.dart';
 import 'package:cognitive_complexity/cognitive_complexity.dart';
-import 'package:cognitive_complexity/src/shallow/cli.dart';
 import 'package:test/test.dart';
 
 void main() {
@@ -87,24 +86,16 @@ void run(int x) {
     test('crossing the ceiling flips classification', () {
       // 15 is the default ceiling.
       final code1 =
-          '''
-void _doX(int x) { if (x > 1) print(x); }
+          '''void _doX(int x) { if (x > 1) print(x); }
 void run(int x) {
   _doX(x);
-''' +
-          List.generate(13, (i) => '  if (x == \$i) print(x);').join('\n') +
-          '''
-}
+${List.generate(13, (i) => '  if (x == \$i) print(x);').join('\n')}}
 ''';
       final code2 =
-          '''
-void _doX(int x) { if (x > 1) print(x); }
+          '''void _doX(int x) { if (x > 1) print(x); }
 void run(int x) {
   _doX(x);
-''' +
-          List.generate(14, (i) => '  if (x == \$i) print(x);').join('\n') +
-          '''
-}
+${List.generate(14, (i) => '  if (x == \$i) print(x);').join('\n')}}
 ''';
       final r1 = ShallowAnalyzer().analyzeCode(code1);
       final r2 = ShallowAnalyzer().analyzeCode(code2);
