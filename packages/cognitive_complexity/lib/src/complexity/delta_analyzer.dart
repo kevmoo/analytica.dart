@@ -263,6 +263,7 @@ class DeltaSummary {
         .where((f) => f.isViolation(maxFileLines: maxFileLines))
         .toList();
     return {
+      'schema_version': 1,
       'base_ref': baseRef,
       'target_ref': targetRef,
       'summary': {

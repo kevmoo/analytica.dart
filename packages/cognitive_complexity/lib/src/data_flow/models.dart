@@ -122,6 +122,7 @@ class DataFlowResult {
       (enclosingScore - sliceScoreInPlace).clamp(0, enclosingScore);
 
   Map<String, dynamic> toJson() => {
+    'schema_version': 1,
     'file': filePath,
     'start_line': startLine,
     'end_line': endLine,

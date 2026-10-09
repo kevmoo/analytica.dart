@@ -271,6 +271,7 @@ class ShallowReport {
               .toList()
         : findings;
     return {
+      'schema_version': 1,
       'declarations_scanned': declarationsScanned,
       'max_caller_cc': maxCallerScore,
       'max_params': maxParams,

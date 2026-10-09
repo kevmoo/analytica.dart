@@ -340,6 +340,7 @@ class FileSplitReport {
   bool get meetsTarget => largestResultingFileLines <= targetLines;
 
   Map<String, dynamic> toJson() => {
+    'schema_version': 1,
     'file': filePath,
     'total_lines': totalLines,
     'target_lines': targetLines,
