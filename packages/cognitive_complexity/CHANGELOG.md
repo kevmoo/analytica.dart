@@ -18,6 +18,31 @@
   gets looser. Adds `ShallowFinding.siblingSteps` (`sibling_steps` in JSON),
   `ShallowReport.siblingStepCount` (`sibling_step_count`), a header count, and a
   `Facts: siblings=[...] stay extracted` line.
+- `file_split`: name cuts by their type cluster, keep sibling types together,
+  and flag inherited import cycles (#182):
+  - A cut whose public type declarations (class, enum, extension type, typedef,
+    mixin; at least two) make up `>= 50%` of its naming lines is named
+    `<stem>_models.dart` instead of after its longest declaration, unless a
+    single type holds more than half of the type lines.
+  - After planning, public leaf enums and same-representation extension types
+    left in the source file are pulled into a cut that moves a sibling, when
+    that stays within `--target-lines` and adds no boundary crossings. Siblings
+    no cut can take get one `sibling type(s) … left in …` note.
+  - A cut whose copied imports include a barrel that re-exports the source file
+    (directly or through any one re-export hop) gets a warning suggesting moving
+    the declarations the cut uses out of the barrel, and its rationale notes
+    that "0 circular imports" holds only within the plan.
+  - A copied import whose library merely imports the source file (an existing
+    cycle the cut carries over) is informational: listed under
+    `inherited_cycles` in JSON.
+  - Text output adds one
+    `Note: N inherited barrel cycle warning(s), M existing import cycle(s) carried over (informational)`
+    line under the plan header; the header's `0 circular deps` covers the plan's
+    own files.
+  - New `SplitCluster.notes` / `SplitCluster.warnings` /
+    `SplitCluster.inheritedCycles` (JSON `notes` / `warnings` /
+    `inherited_cycles`, emitted when non-empty) and
+    `DeclarationUnit.representationType` (JSON `representation_type`).
 
 ## 1.0.0
 

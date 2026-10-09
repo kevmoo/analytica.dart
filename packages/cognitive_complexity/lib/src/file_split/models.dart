@@ -5,8 +5,10 @@ library;
 /// 3-Tier Function Decomposition Rubric).
 enum SplitTier {
   /// Tier 1: Disjoint island (`LCOM4 >= 2`) or leaf-first DAG layer with
-  /// 0 circular edges, 0 `sealed` boundary violations, and 0 cross-cut
-  /// `_private` widenings (all private helpers are single-dominator absorbed).
+  /// 0 circular edges within the plan, 0 `sealed` boundary violations, and 0
+  /// cross-cut `_private` widenings (all private helpers are single-dominator
+  /// absorbed). Cycles inherited through copied imports are reported
+  /// separately (`SplitCluster.warnings` / `SplitCluster.inheritedCycles`).
   tier1CleanLibrary('Tier 1: Clean Library Split (import + export show)'),
 
   /// Tier 2: One-way acyclic DAG cut that requires widening 1–3 shared
@@ -44,6 +46,10 @@ class DeclarationUnit {
   /// `implements A, B` or `extends X` for classes that declare one; mixins
   /// (`with`) are not reported.
   final String? supertypeLabel;
+
+  /// The representation type of an `extension type` (e.g. `String`), or
+  /// `null` for every other kind.
+  final String? representationType;
   final Set<String> outgoingIntraFileRefs;
   final Map<String, Set<String>> privateMemberAccessesByTarget;
   final Set<String> requiredImportDirectives;
@@ -62,6 +68,7 @@ class DeclarationUnit {
     this.memberCount = 0,
     this.overrideMemberCount = 0,
     this.supertypeLabel,
+    this.representationType,
     required this.outgoingIntraFileRefs,
     required this.privateMemberAccessesByTarget,
     required this.requiredImportDirectives,
@@ -92,6 +99,7 @@ class DeclarationUnit {
     if (memberCount > 0) 'member_count': memberCount,
     if (overrideMemberCount > 0) 'override_member_count': overrideMemberCount,
     if (supertypeLabel != null) 'supertype': supertypeLabel,
+    if (representationType != null) 'representation_type': representationType,
     'outgoing_refs': outgoingIntraFileRefs.toList()..sort(),
     if (privateMemberAccessesByTarget.isNotEmpty)
       'private_member_accesses': {
@@ -116,6 +124,19 @@ class SplitCluster {
   final String rationale;
   final String? agentDirective;
 
+  /// Informational notes, e.g. sibling types kept with this cut or left in
+  /// the source file.
+  final List<String> notes;
+
+  /// Problems the cut inherits from the source file, e.g. a copied import
+  /// that re-exports the source file (an inherited barrel cycle).
+  final List<String> warnings;
+
+  /// Informational: copied imports whose library already imports the source
+  /// file (directly or through one re-export hop), so the cut carries over an
+  /// import cycle the source file already has. `via` describes the link.
+  final List<({String import, String via})> inheritedCycles;
+
   const SplitCluster({
     required this.suggestedFileName,
     required this.tier,
@@ -129,6 +150,9 @@ class SplitCluster {
     required this.exportedPublicSymbols,
     required this.rationale,
     this.agentDirective,
+    this.notes = const [],
+    this.warnings = const [],
+    this.inheritedCycles = const [],
   });
 
   int get totalLines => declarations.fold(0, (sum, d) => sum + d.lineCount);
@@ -158,6 +182,12 @@ class SplitCluster {
     'required_imports': requiredImports,
     'exported_public_symbols': exportedPublicSymbols,
     'zero_churn_directive': zeroChurnExportDirective,
+    if (notes.isNotEmpty) 'notes': notes,
+    if (warnings.isNotEmpty) 'warnings': warnings,
+    if (inheritedCycles.isNotEmpty)
+      'inherited_cycles': [
+        for (final c in inheritedCycles) {'import': c.import, 'via': c.via},
+      ],
   };
 
   void _writeText(StringBuffer buf, int cutIndex, FileSplitReport report) {
@@ -184,12 +214,18 @@ class SplitCluster {
                 'be decomposed further once extracted]';
       buf.writeln('    $note');
     }
+    for (final note in notes) {
+      buf.writeln('    [Note: $note]');
+    }
     _writeWidenings(buf);
     if (requiredImports.isNotEmpty) {
       buf.writeln('  Required Imports for $suggestedFileName:');
       for (final imp in requiredImports) {
         buf.writeln('    $imp');
       }
+    }
+    for (final warning in warnings) {
+      buf.writeln('  Warning: $warning');
     }
     final bridge = zeroChurnExportDirective;
     if (bridge != null) {
@@ -324,12 +360,22 @@ class FileSplitReport {
     }
 
     final targetNote = meetsTarget ? '' : ' (target $targetLines not met)';
+    // The header counts cycles between the plan's own files, which the
+    // planner never creates; inherited cycles go on the Note line below.
     buf.writeln(
       '=== RECOMMENDED EXTRACTION PLAN '
       '(Reduces $filePath: $totalLines -> ~$estimatedRemainingLines lines, '
       'largest resulting file: ~$largestResultingFileLines lines$targetNote, '
       '0 circular deps, 0 caller churn) ===',
     );
+    final barrel = clusters.fold(0, (s, c) => s + c.warnings.length);
+    final carried = clusters.fold(0, (s, c) => s + c.inheritedCycles.length);
+    if (barrel + carried > 0) {
+      buf.writeln(
+        'Note: $barrel inherited barrel cycle warning(s), $carried existing '
+        'import cycle(s) carried over (informational)',
+      );
+    }
     for (var i = 0; i < clusters.length; i++) {
       clusters[i]._writeText(buf, i + 1, this);
     }
