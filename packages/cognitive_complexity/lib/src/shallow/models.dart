@@ -1,7 +1,7 @@
 /// Immutable data models for single-caller shallow function analysis.
 library;
 
-import '../version.dart';
+import '../schema_version.dart';
 
 /// Classification of a single-caller shallow helper based on simulated caller
 /// Cognitive Complexity after inlining.

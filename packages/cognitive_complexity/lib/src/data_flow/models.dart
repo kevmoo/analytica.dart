@@ -1,7 +1,7 @@
 /// Immutable data models for data flow analysis.
 library;
 
-import '../version.dart';
+import '../schema_version.dart';
 
 /// Represents the usage of a variable across data-flow bounds.
 class VariableUsage {

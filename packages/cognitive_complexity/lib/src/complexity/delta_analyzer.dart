@@ -1,7 +1,7 @@
 import 'package:analytica/git.dart';
 import 'package:pool/pool.dart';
 
-import '../version.dart';
+import '../schema_version.dart';
 import 'complexity_analyzer.dart';
 
 /// Describes the delta trajectory of a function's cognitive complexity score

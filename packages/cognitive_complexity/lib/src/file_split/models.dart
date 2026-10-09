@@ -1,7 +1,7 @@
 /// Data models for the resolved-AST file decomposition (`file_split`) advisor.
 library;
 
-import '../version.dart';
+import '../schema_version.dart';
 
 /// The 3-Tier File Decomposition classification (analogous to `data_flow`'s
 /// 3-Tier Function Decomposition Rubric).
