@@ -1,3 +1,24 @@
+## 2.0.0-wip
+
+- **Breaking:** `ShallowClassification` gained `siblingStep`. Exhaustive
+  `switch` statements or expressions over `ShallowClassification` need a new
+  arm.
+- `shallow`: a helper is now classified `SIBLING_STEP` when it is one step of a
+  sequence: another callee of the same caller, declared in the same file and
+  enclosing type, shares `>= 2` leading camelCase name tokens with it
+  (`_readProcEnviron` / `_readProcCwd`), two or more share its leading verb
+  (`_filterIgnored` / `_filterWorkspace` / `_filterOutdated`), or one shares its
+  verb and arity (`_reportStaleShim` / `_reportUnknownSubcommand`). The
+  verb-and-arity test needs both helpers to span more than one line. Calls on
+  another receiver (`other.parse()`) are not siblings. `SIBLING_STEP` takes
+  precedence over the score-based classifications, so a step that would cost the
+  caller its headroom is still reported with its siblings. Like `ZERO_HEADROOM`,
+  `SIBLING_STEP` helpers are not absorbed into the caller's cumulative score and
+  do not count toward `--fail-on-safe-inline` or `--only-safe`, so the gate only
+  gets looser. Adds `ShallowFinding.siblingSteps` (`sibling_steps` in JSON),
+  `ShallowReport.siblingStepCount` (`sibling_step_count`), a header count, and a
+  `Facts: siblings=[...] stay extracted` line.
+
 ## 1.0.0
 
 - **Breaking**: Pruned legacy backward-compatibility aliases, re-export shims,
