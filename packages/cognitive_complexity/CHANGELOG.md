@@ -1,4 +1,4 @@
-## 2.0.0-wip
+## 2.0.0
 
 - **Breaking:** `ShallowClassification` (which gains `siblingStep`, below),
   `SplitTier`, and `ControlFlowEscapeType` are now `final` classes with

@@ -38,7 +38,7 @@
   `pub.dev`.
 - **Pinned Version Formats in Skills**: Always format remote execution commands
   in `SKILL.md` with explicit SemVer constraints matching published versions
-  (e.g. `dart run cognitive_complexity@^1.0.0`, `dart run dedupe@^0.1.1`,
+  (e.g. `dart run cognitive_complexity@^2.0.0`, `dart run dedupe@^0.1.1`,
   `dart run undead@^0.1.2`).
 
 ## Releasing a Package
