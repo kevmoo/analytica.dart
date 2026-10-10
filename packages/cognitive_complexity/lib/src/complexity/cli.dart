@@ -5,6 +5,7 @@ import 'dart:math';
 import 'package:analytica/analytica.dart';
 import 'package:args/args.dart';
 
+import '../schema_version.dart';
 import 'complexity_analyzer.dart';
 import 'delta_analyzer.dart';
 import 'github_reporter.dart';
@@ -359,6 +360,7 @@ int _handleRegularMode({
         maxFileLines == null
             ? declarationsJson
             : {
+                'schema_version': reportSchemaVersion,
                 'declarations': declarationsJson,
                 'files': fileMetrics
                     .where((f) => f.isViolation(maxFileLines: maxFileLines))

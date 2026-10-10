@@ -227,6 +227,7 @@ void complexFunc(int a) {
       );
       final fileJsonLine = await fileJsonProc.stdout.next;
       check(fileJsonLine)
+        ..contains('"schema_version":1')
         ..contains('"declarations":')
         ..contains('"files":')
         ..contains('"violation":true');

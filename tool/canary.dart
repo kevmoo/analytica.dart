@@ -236,33 +236,51 @@ Future<List<_SweepTarget>> _resolveTargets({
   if (!skipConsumers) {
     final siblingRoot = reposDirOpt ?? p.dirname(repoRoot);
     for (final repo in consumerRepos) {
-      final localDir = Directory(p.join(siblingRoot, repo));
-      if (localDir.existsSync()) {
-        targets.add((label: repo, path: localDir.path));
-      } else {
-        final clonePath = p.join(workDir.path, 'repos', repo);
-        final res = await Process.run('git', [
-          'clone',
-          '--depth=1',
-          'https://github.com/kevmoo/$repo.git',
-          clonePath,
-        ]);
-        if (res.exitCode == 0) {
-          targets.add((label: repo, path: clonePath));
-        }
-      }
+      targets.add(await _resolveConsumerRepo(repo, siblingRoot, workDir));
     }
   }
   for (final spec in extraSpecs) {
     final eq = spec.indexOf('=');
-    if (eq > 0) {
-      targets.add((
-        label: spec.substring(0, eq),
-        path: p.canonicalize(spec.substring(eq + 1)),
-      ));
+    if (eq <= 0 || eq == spec.length - 1) {
+      throw ArgumentError.value(
+        spec,
+        '--extra',
+        'Expected <label>=<path> format.',
+      );
     }
+    final resolvedPath = p.canonicalize(spec.substring(eq + 1));
+    if (!Directory(resolvedPath).existsSync()) {
+      throw ArgumentError.value(
+        spec,
+        '--extra',
+        'Directory does not exist: $resolvedPath',
+      );
+    }
+    targets.add((label: spec.substring(0, eq), path: resolvedPath));
   }
   return targets;
+}
+
+Future<_SweepTarget> _resolveConsumerRepo(
+  String repo,
+  String siblingRoot,
+  Directory workDir,
+) async {
+  final localDir = Directory(p.join(siblingRoot, repo));
+  if (localDir.existsSync()) {
+    return (label: repo, path: localDir.path);
+  }
+  final clonePath = p.join(workDir.path, 'repos', repo);
+  final res = await Process.run('git', [
+    'clone',
+    '--depth=1',
+    'https://github.com/kevmoo/$repo.git',
+    clonePath,
+  ]);
+  if (res.exitCode != 0) {
+    throw StateError('Failed to clone kevmoo/$repo: ${res.stderr}');
+  }
+  return (label: repo, path: clonePath);
 }
 
 class _TargetCanaryResult {
