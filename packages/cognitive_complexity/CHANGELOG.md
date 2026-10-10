@@ -49,8 +49,8 @@
     `DeclarationUnit.representationType` (JSON `representation_type`).
 - JSON reports (`ShallowReport.toJson`, `FileSplitReport.toJson`,
   `DataFlowResult.toJson`, `DeltaSummary.toJson`, and `cognitive_complexity`
-  `--max-file-lines --format json`) now include `'schema_version': 1` at the
-  top level.
+  `--max-file-lines --format json`) now include `'schema_version': 1` at the top
+  level.
 
 ## 1.0.0
 
