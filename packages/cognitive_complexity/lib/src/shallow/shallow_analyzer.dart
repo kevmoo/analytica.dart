@@ -289,10 +289,21 @@ class ShallowAnalyzer {
     }
     final enclosingType = decl.enclosingType;
     if (enclosingType != null &&
-        !enclosingType.startsWith('_') &&
         !enclosingType.startsWith('<') &&
-        !decl.isPrivate &&
-        caller.enclosingType != enclosingType) {
+        caller.enclosingType != enclosingType &&
+        (!decl.isPrivate || !decl.isStatic)) {
+      return true;
+    }
+    if (!decl.isPrivate &&
+        caller.normalizedFilePath != decl.normalizedFilePath &&
+        decl.effectiveParameterCount <= 2 &&
+        decl.bodyLines > 4) {
+      return true;
+    }
+    if (decl.score == 0 &&
+        caller.score == 0 &&
+        decl.bodyLines >= 5 &&
+        caller.bodyLines < decl.bodyLines) {
       return true;
     }
     return caller.normalizedFilePath != decl.normalizedFilePath &&
@@ -356,7 +367,7 @@ class ShallowAnalyzer {
           score: c.decl.score,
           callerFilePath: c.call.filePath,
           callerName: c.caller.qualifiedName,
-          callerZone: zoneOf(c.caller.normalizedFilePath),
+          callerZone: _zoneOf(c.caller.normalizedFilePath),
           callLine: c.call.line,
           callNestingDepth: c.call.nestingDepth,
           callerBaseScore: c.caller.score,
@@ -596,8 +607,8 @@ class ShallowAnalyzer {
   /// (`bin/`, `test/`, `tool/`, `example/`, `web/`). Such edges are normal
   /// package layering, not a shallow extraction.
   bool _isLibraryToConsumerEdge(ShallowDeclNode decl, ShallowDeclNode caller) {
-    if (zoneOf(decl.normalizedFilePath) != 'lib') return false;
-    final callerZone = zoneOf(caller.normalizedFilePath);
+    if (_zoneOf(decl.normalizedFilePath) != 'lib') return false;
+    final callerZone = _zoneOf(caller.normalizedFilePath);
     return callerZone != 'lib' && callerZone != 'other';
   }
 
@@ -634,7 +645,7 @@ class ShallowAnalyzer {
     }
 
     for (final pkgRoot in packageRoots) {
-      for (final sibling in knownZones) {
+      for (final sibling in _knownZones) {
         final sibDir = Directory(p.join(pkgRoot, sibling));
         _collectDirEntries(
           entriesByAbs,
@@ -741,4 +752,26 @@ bool _isPublicLibEntryPath(List<String> normParts, String absPath) {
   final absParts = p.split(absPath);
   final absLibIdx = absParts.lastIndexOf('lib');
   return absLibIdx >= 0 && absLibIdx == absParts.length - 2;
+}
+
+const _knownZones = {
+  'lib',
+  'bin',
+  'test',
+  'tool',
+  'example',
+  'web',
+  'benchmark',
+};
+
+/// Classifies a normalized relative Dart file path by its package layout
+/// directory: `lib`, `bin`, `test`, `tool`, `example`, `web`, `benchmark`, or
+/// `other` when no such segment is present. The last matching segment wins so
+/// nested packages (`tool/lib/x.dart`) resolve to their own layout directory.
+String _zoneOf(String normalizedFilePath) {
+  final segments = p.split(normalizedFilePath);
+  for (var i = segments.length - 2; i >= 0; i--) {
+    if (_knownZones.contains(segments[i])) return segments[i];
+  }
+  return 'other';
 }

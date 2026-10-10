@@ -1,5 +1,3 @@
-import 'package:path/path.dart' as p;
-
 import 'ast_collector.dart';
 import 'models.dart';
 
@@ -49,29 +47,6 @@ class RawCandidate {
     required this.paramsSubsetOfExistingType,
     required this.siblingSteps,
   });
-}
-
-/// Standard Dart package layout directories scanned for cross-zone call sites.
-const knownZones = {
-  'lib',
-  'bin',
-  'test',
-  'tool',
-  'example',
-  'web',
-  'benchmark',
-};
-
-/// Classifies a normalized relative Dart file path by its package layout
-/// directory: `lib`, `bin`, `test`, `tool`, `example`, `web`, `benchmark`, or
-/// `other` when no such segment is present. The last matching segment wins so
-/// nested packages (`tool/lib/x.dart`) resolve to their own layout directory.
-String zoneOf(String normalizedFilePath) {
-  final segments = p.split(normalizedFilePath);
-  for (var i = segments.length - 2; i >= 0; i--) {
-    if (knownZones.contains(segments[i])) return segments[i];
-  }
-  return 'other';
 }
 
 /// Builds the report ordering: classification, then caller groups ranked by

@@ -198,13 +198,21 @@ template.
   inside an `async` function solely to dodge `CatchClause` scoring, and never
   preserve or introduce zero-allocation fast-path regressions (e.g., allocating
   a new collection before an early-return fast path).
+- **Forbid Multi-Pass Loop Splitting & `.expand` Metric Gaming**: Never split a
+  single loop (or nested loop) into multiple sequential loops over the same
+  collection or chain `.expand((c) => c)` / `.forEach(...)` solely to shed loop
+  nesting depth.
 
 ### 5.2 In-Place Flattening First (Patterns A & B Before `data_flow` Extraction)
 
 **Always apply in-place flattening (Patterns A and B) before extracting any
 single-caller helper**—especially for borderline violations (`CC 16–22`), where
 eliminating `1–2` levels of nesting drops the score to `<= 15` with zero new
-functions and zero parameter plumbing:
+functions and zero parameter plumbing. If a `CC 16–22` function owes its
+remaining complexity to a nested loop that cannot be flattened in a **single
+pass** using `continue`/`return` guards or `switch` expressions, extract a
+cohesive `LOAD_BEARING` helper for the inner loop or validation pass rather than
+splitting the loop into two passes:
 
 - **Pattern A (Dart 3 Switch Expressions)**: Replace nested `if-else` ladders
   with exhaustive table-driven `switch` expressions (single base penalty).
@@ -284,6 +292,16 @@ signature-to-complexity ratio):
     internal invariants, OR when standalone `lib/src/` files would require
     widening visibility and risk leaking internal types via unscoped
     `export 'src/...';` directives.
+  - **Breaking Model/Enum Dispatch Back-Edges**: When data models/enums are
+    fused into a single giant SCC with a parser/service class because an `enum`
+    or model class defines a dispatch method calling the parser/service, move
+    that dispatch method to an `extension` in the surviving file so the models
+    extract cleanly into `<stem>_models.dart`.
+  - **Zero Uncalled Factories / Constructor Parity**: Whenever extracting
+    `<stem>_models.dart` or adding a convenience factory (`Foo.fromBar(...)`),
+    verify with `rg` that every newly added factory is called by the surviving
+    file and never leave an inline constructor call with divergent field values
+    alongside an unused factory.
   - `file_split` plans are advisory: the cuts are dependency-correct, but the
     suggested file name follows one declaration. Name each new file by what it
     actually holds (Section 5.3).

@@ -201,6 +201,31 @@ class MyWidget {
       final report = ShallowAnalyzer().analyzeCode(code);
       check(report.findings).isEmpty();
     });
+
+    test('Exempts methods on a private class _HelperClass called once from a '
+        'different class MainService in the same file', () {
+      const code = '''
+class _HelperClass {
+  final List<int> samples;
+  _HelperClass(this.samples);
+
+  List<int> buildTopHotFunctions(int limit) =>
+      samples.take(limit).toList();
+
+  int _privateInstanceStep(int scale) => samples.length * scale;
+}
+
+class MainService {
+  List<int> process(List<int> raw) {
+    final helper = _HelperClass(raw);
+    final scaled = helper._privateInstanceStep(2);
+    return helper.buildTopHotFunctions(scaled);
+  }
+}
+''';
+      final report = ShallowAnalyzer().analyzeCode(code);
+      check(report.findings).isEmpty();
+    });
   });
 
   group('ShallowAnalyzer & CLI (filesystem)', () {
@@ -585,8 +610,8 @@ void _h2(int a, int b, int c, int d, int e, int f) {
       check(out.toString()).contains('[ZERO_HEADROOM]');
     });
 
-    test('MICRO_HELPER catches formatter-wrapped helpers with <= 2 statements '
-        'but not 3-statement helpers of the same length', () {
+    test('MICRO_HELPER flags <= 2 statement helpers up to 15 body lines '
+        'but exempts CC=0 formatters called by shorter CC=0 templates', () {
       const code = '''
 void _caller(int a, int b) {
   if (a > 0) {
@@ -594,6 +619,15 @@ void _caller(int a, int b) {
     _threeStatements(b);
   }
 }
+
+String linkForEntry(String key, String value) =>
+    '<a href="\$value">\${_prettyName(key)}</a>';
+
+String _prettyName(String input) => input
+    .split('_')
+    .where((part) => part.isNotEmpty)
+    .map((part) => part.toUpperCase())
+    .join(' ');
 
 void _wrapped(int value) {
   final label = value.toString() +
@@ -669,10 +703,12 @@ void _plain(int a, int b, int c, int d) {
     });
 
     test('suppresses CROSS_FILE_SINGLE_CALLER for lib/ helpers whose only '
-        'caller is in bin/, but keeps it for lib/ -> lib/ edges', () async {
-      // `wideHelper` has 4 statements and CC 3, so it is neither MICRO_HELPER
-      // nor HIGH_ARITY nor SIG_HEAVY: only CROSS_FILE_SINGLE_CALLER can flag
-      // it. `tinyHelper` is a MICRO_HELPER regardless of caller zone.
+        'caller is in bin/ and for 7-line 2-param cross-file validators, '
+        'but keeps it for >= 3-param lib/ -> lib/ edges', () async {
+      // `wideHelper` has 3 params, 7 body lines, and CC 3, so only
+      // CROSS_FILE_SINGLE_CALLER flags it. `checkValidOptions` has 2 params
+      // and 7 body lines (CC 2), so it is NOT flagged. `tinyHelper` is 1 body
+      // line and 3 params.
       const helpers = '''
 int wideHelper(int a, int b, int c) {
   var total = a;
@@ -680,6 +716,15 @@ int wideHelper(int a, int b, int c) {
   if (c > 0) total += c;
   if (a < 0) total = -total;
   return total;
+}
+
+void checkValidOptions(int a, int b) {
+  if (a < 0) {
+    throw ArgumentError.value(a, 'a', 'must be non-negative');
+  }
+  if (b < a) {
+    throw ArgumentError.value(b, 'b', 'must be >= a');
+  }
 }
 
 int tinyHelper(int a, int b, int c) => a + b + c;
@@ -699,6 +744,7 @@ void main(List<String> args) {
 
 void _runCommand(int n) {
   if (n > 0) {
+    checkValidOptions(n, n);
     print(wideHelper(n, n, n));
     print(tinyHelper(n, n, n));
   }
@@ -716,6 +762,7 @@ import 'helpers.dart';
 
 void _runService(int n) {
   if (n > 0) {
+    checkValidOptions(n, n);
     print(wideHelper(n, n, n));
     print(tinyHelper(n, n, n));
   }
