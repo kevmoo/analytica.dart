@@ -1,3 +1,8 @@
+## 0.1.5-wip
+
+- Refactor `isNativeOrEntryPoint` and `findFlutterExecutable` to reduce
+  cognitive complexity (`<= 15`).
+
 ## 0.1.4
 
 - Fix `GitDiffParser.parse` to handle single-quote file paths and oversized hunk
