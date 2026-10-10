@@ -1,6 +1,8 @@
 /// Immutable data models for data flow analysis.
 library;
 
+import '../schema_version.dart';
+
 /// Represents the usage of a variable across data-flow bounds.
 class VariableUsage {
   final String name;
@@ -122,6 +124,7 @@ class DataFlowResult {
       (enclosingScore - sliceScoreInPlace).clamp(0, enclosingScore);
 
   Map<String, dynamic> toJson() => {
+    'schema_version': reportSchemaVersion,
     'file': filePath,
     'start_line': startLine,
     'end_line': endLine,

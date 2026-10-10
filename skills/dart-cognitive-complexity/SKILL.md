@@ -183,11 +183,40 @@ template.
 - **Require Pure Top-Level / Static Helpers**: Extract **pure file-private
   top-level functions** (`_validateItem(...)`, `_parseHeader(...)`) or `static`
   methods on existing domain types with explicit inputs and immutable return
-  values (Dart 3 named records or value types).
+  values (Dart 3 named records with `<= 3` fields or value types).
+- **Forbid Callback Trampolines & Closure-Wrapped Mutable Locals**: Never
+  extract a helper that accepts a callback closure
+  (`String Function(Object?) pp` or `bool Function() isAborted`) just to call
+  back into a local recursive function or read a mutable local variable in the
+  caller, and never slice a `try/catch` out of a retry loop with a `null`
+  sentinel return. If a function relies on a nested recursive closure, promote
+  the recursive closure itself (or a stateless private formatter/printer helper
+  with `const` configuration fields) rather than passing recursion trampolines
+  into extracted branch helpers.
+- **Forbid `.catchError(...)` Metric Gaming in `async` Functions**: Never
+  replace idiomatic `try { await ... } catch (e, s)` with `.catchError(...)`
+  inside an `async` function solely to dodge `CatchClause` scoring, and never
+  preserve or introduce zero-allocation fast-path regressions (e.g., allocating
+  a new collection before an early-return fast path).
 
-### 5.2 Deterministic 3-Tier Decomposition (`data_flow`) & Pattern Summary
+### 5.2 In-Place Flattening First (Patterns A & B Before `data_flow` Extraction)
 
-Run the statement-level data-flow analyzer on candidate line slices:
+**Always apply in-place flattening (Patterns A and B) before extracting any
+single-caller helper**—especially for borderline violations (`CC 16–22`), where
+eliminating `1–2` levels of nesting drops the score to `<= 15` with zero new
+functions and zero parameter plumbing:
+
+- **Pattern A (Dart 3 Switch Expressions)**: Replace nested `if-else` ladders
+  with exhaustive table-driven `switch` expressions (single base penalty).
+- **Pattern B (Guard Clause Inversion & `else` Removal)**: Invert nested
+  preconditions into early returns (`if (!cond) return;`), drop `else` after
+  `return`/`break`/`continue`/`throw`, merge nested `if` conditions, and
+  eliminate redundant post-`try` null checks only when doing so does not widen
+  the `try` block around user-supplied callbacks whose exceptions must not be
+  caught.
+
+Only when a declaration **still** exceeds `15` after exhausting Patterns A and
+B, run the statement-level data-flow analyzer on candidate line slices:
 
 ```bash
 dart run cognitive_complexity:data_flow@^1.0.0 lib/src/my_file.dart:45-80
@@ -198,22 +227,20 @@ Inspect the complexity impact (`enclosing_score`, `slice_score_in_place`,
 `DataFlowResult.enclosingScore`, `sliceScoreInPlace`, `sliceScoreAtRoot`,
 `estimatedEnclosingScoreAfter` in Dart) and honor any `extraction_warnings`
 (high parameter count `>= 5` inputs, low complexity payoff, or shallow
-signature-to-complexity ratio) by flattening in place with Patterns A/B instead
-of extracting a shallow helper:
+signature-to-complexity ratio):
 
-- **Pattern A (Dart 3 Switch Expressions)**: Replace nested `if-else` ladders
-  with exhaustive table-driven `switch` expressions (single base penalty).
-- **Pattern B (Guard Clause Inversion)**: Invert nested preconditions into early
-  returns (`if (!cond) return;`).
 - **Pattern C (3-Tier `data_flow` Extraction)**:
   1. **Tier 1 — Pure Functional Decomposition (First Choice)**: For slices with
-     `2+` live outputs, `<= 4` inputs, and `slice_score_at_root >= 3`, extract a
-     pure private top-level or `static` function returning the synthesized Dart
-     3 named record (`final (:data, :errors) = _step(input);`). Never create
-     single-use `_XxxResult` dataclasses for private slices.
+     `2+` live outputs (`<= 3` record fields), `<= 4` inputs, and
+     `slice_score_at_root >= 3`, extract a pure private top-level or `static`
+     function returning the synthesized Dart 3 named record
+     (`final (:data, :errors) = _step(input);`). Never create single-use
+     `_XxxResult` dataclasses or `> 3`-field anonymous return records for
+     private slices.
   2. **Tier 2 — Standard Helper Extraction (Second Choice)**: For slices with
      `<= 1` output, `<= 3` inputs, and `slice_score_at_root >= 3`, extract a
-     pure private top-level or static helper.
+     pure private top-level or static helper (never a `void` helper that mutates
+     a caller's `Map`/`List` in place for only one of several parallel steps).
   3. **Tier 3 — Encapsulated Method Object (Last Resort)**: Permitted ONLY when
      `data_flow` on 2+ candidate slices shows `>= 3` intersecting `mutations`
      variables—read [`references/method-object.md`](references/method-object.md)

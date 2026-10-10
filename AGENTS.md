@@ -25,6 +25,9 @@
 - Run `dart analyze --fatal-infos` across the workspace.
 - Update `CHANGELOG.md` in the affected package under
   `packages/<package_name>/CHANGELOG.md` before landing.
+- **Red-Team Policy for Heuristics**: Before merging any heuristic PR, perform
+  an adversarial probe pass (~20 min of writing probe fixtures to break the
+  heuristic). Every confirmed probe must become a test case.
 
 ## Skill / Package Synchronization Invariant
 

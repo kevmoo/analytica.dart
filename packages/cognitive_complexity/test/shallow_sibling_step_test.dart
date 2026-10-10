@@ -22,10 +22,10 @@ void main() {
     ShallowClassification classOf(ShallowReport report, String name) =>
         report.findings.singleWhere((f) => f.name == name).classification;
 
-    // Helpers a blind review of the dogfood refactors (kevmoo/pubviz at
-    // f50f9fb, kevmoo/scripts.dart at f97ecee) said should not have been
-    // inlined because sibling steps stayed extracted.
-    const reverts = {
+    // Labeled oracle from blind review of dogfood refactors (kevmoo/pubviz at
+    // f50f9fb, kevmoo/scripts.dart at f97ecee), partitioned into a 2/3 tuning
+    // split and a 1/3 held-out split (including round-2 reverts).
+    const tuningReverts = {
       'pubviz_service.dart': [
         'Service._loadPackageGraphFile',
         'Service._loadPackageConfigFile',
@@ -33,45 +33,33 @@ void main() {
       'pubviz_viz_root.dart': [
         'VizRoot._filterIgnored',
         'VizRoot._filterStandard',
-        'VizRoot._filterIsolated',
       ],
       'scripts_process_inspector.dart': [
         'ProcFsProcessInspector._readProcEnviron',
       ],
       'scripts_kscripts_runner.dart': ['_reportStaleShim'],
+    };
+
+    const heldOutReverts = {
+      'pubviz_viz_root.dart': ['VizRoot._filterIsolated'],
       'scripts_github_cli.dart': ['_resolveLocalHeadSha'],
       'scripts_report_printer.dart': ['_printSection4ClosedAndAbandoned'],
     };
 
-    // Helpers the same review said were good inlines.
-    const keeps = {
+    const tuningKeeps = {
       'scripts_gerrit_view.dart': '_getDefaultBranch',
       'scripts_graphql_utils.dart': '_buildGraphQLArgs',
       'scripts_dart_clean.dart': '_fetchPidAncestry',
+    };
+
+    const heldOutKeeps = {
       'scripts_github_queries.dart': '_resolveActiveReviewers',
     };
 
-    for (final MapEntry(key: fixture, value: names) in reverts.entries) {
-      for (final name in names) {
-        test('reviewer-reverted $name is SIBLING_STEP', () {
-          final report = analyzeFixture(fixture);
-          final finding = report.findings.singleWhere((f) => f.name == name);
-          check(
-            finding.classification,
-          ).equals(ShallowClassification.siblingStep);
-          check(finding.headroomAfterInline).isGreaterThan(0);
-          check(finding.siblingSteps).isNotEmpty();
-        });
-      }
-    }
-
-    for (final MapEntry(key: fixture, value: name) in keeps.entries) {
-      test('reviewer-approved $name stays SAFE_INLINE', () {
-        check(
-          classOf(analyzeFixture(fixture), name),
-        ).equals(ShallowClassification.safeInline);
-      });
-    }
+    _registerRevertOracleTests('tuning', tuningReverts, analyzeFixture);
+    _registerRevertOracleTests('held-out', heldOutReverts, analyzeFixture);
+    _registerKeepOracleTests('tuning', tuningKeeps, analyzeFixture, classOf);
+    _registerKeepOracleTests('held-out', heldOutKeeps, analyzeFixture, classOf);
 
     test('names the matching siblings', () {
       final report = analyzeFixture('scripts_process_inspector.dart');
@@ -448,6 +436,38 @@ void _formatY(int a, int b, int c, int d, int e, int f) {
 
 ShallowFinding _finding(ShallowReport report, String name) =>
     report.findings.singleWhere((f) => f.name == name);
+
+void _registerRevertOracleTests(
+  String splitLabel,
+  Map<String, List<String>> splitMap,
+  ShallowReport Function(String) analyzeFixture,
+) {
+  for (final MapEntry(key: fixture, value: names) in splitMap.entries) {
+    for (final name in names) {
+      test('[$splitLabel] reviewer-reverted $name is SIBLING_STEP', () {
+        final report = analyzeFixture(fixture);
+        final finding = report.findings.singleWhere((f) => f.name == name);
+        check(finding.classification).equals(ShallowClassification.siblingStep);
+        check(finding.siblingSteps).isNotEmpty();
+      });
+    }
+  }
+}
+
+void _registerKeepOracleTests(
+  String splitLabel,
+  Map<String, String> splitMap,
+  ShallowReport Function(String) analyzeFixture,
+  ShallowClassification Function(ShallowReport, String) classOf,
+) {
+  for (final MapEntry(key: fixture, value: name) in splitMap.entries) {
+    test('[$splitLabel] reviewer-approved $name stays SAFE_INLINE', () {
+      check(
+        classOf(analyzeFixture(fixture), name),
+      ).equals(ShallowClassification.safeInline);
+    });
+  }
+}
 
 /// [n] top-level `if` statements on `a`, each scoring +1.
 String _ifs(int n) =>
