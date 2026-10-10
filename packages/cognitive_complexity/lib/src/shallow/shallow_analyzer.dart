@@ -9,6 +9,7 @@ import 'package:path/path.dart' as p;
 import '../complexity/cognitive_complexity_visitor.dart';
 import 'ast_collector.dart';
 import 'models.dart';
+import 'shallow_analyzer_helpers.dart';
 
 /// Analyzes Dart files and directories to detect single-caller shallow helper
 /// functions and simulate their exact caller Cognitive Complexity when inlined.
@@ -37,7 +38,7 @@ class ShallowAnalyzer {
     Set<String>? modifiedFilesFilter,
   }) {
     final fileEntries = _discoverScanFiles(targetPaths, modifiedFilesFilter);
-    final parsedUnits = <({_ScanFileEntry entry, ParseStringResult parsed})>[];
+    final parsedUnits = <({ScanFileEntry entry, ParseStringResult parsed})>[];
     final conditionalFiles = <String>{};
     final exportTracker = ExportedSurfaceTracker();
 
@@ -98,7 +99,7 @@ class ShallowAnalyzer {
       conditionalFiles: conditionalFiles,
     );
 
-    final entry = _ScanFileEntry(
+    final entry = ScanFileEntry(
       absPath: filePath,
       displayPath: filePath,
       normalizedPath: normPath,
@@ -114,7 +115,7 @@ class ShallowAnalyzer {
   }
 
   ShallowReport _evaluateParsedUnits({
-    required List<({_ScanFileEntry entry, ParseStringResult parsed})>
+    required List<({ScanFileEntry entry, ParseStringResult parsed})>
     parsedUnits,
     required Set<String> conditionalFiles,
     required ExportedSurfaceTracker exportTracker,
@@ -155,7 +156,7 @@ class ShallowAnalyzer {
       declsByFile.putIfAbsent(d.normalizedFilePath, () => []).add(d);
     }
 
-    final rawCandidates = <_RawCandidate>[];
+    final rawCandidates = <RawCandidate>[];
     var scannedCount = 0;
     for (final decl in allDecls) {
       if (!decl.isInRequestedTargets) continue;
@@ -172,7 +173,7 @@ class ShallowAnalyzer {
     }
 
     final findings = _resolveCumulativeCandidates(rawCandidates);
-    findings.sort(_buildFindingComparator(findings));
+    findings.sort(buildFindingComparator(findings));
     return ShallowReport(
       findings: List.unmodifiable(findings),
       declarationsScanned: scannedCount,
@@ -181,7 +182,7 @@ class ShallowAnalyzer {
     );
   }
 
-  _RawCandidate? _evaluateCandidate({
+  RawCandidate? _evaluateCandidate({
     required ShallowDeclNode decl,
     required Map<String, List<ShallowCallSite>> callsByName,
     required Map<String, List<ShallowDeclNode>> declsByName,
@@ -230,7 +231,7 @@ class ShallowAnalyzer {
         (decl.parameterCount >= 3 ? decl.parameterCount + 1 : 2);
     final facts = _computeParameterFacts(decl, sameFileDecls, sameFileFields);
 
-    return _RawCandidate(
+    return RawCandidate(
       decl: decl,
       caller: caller,
       call: call,
@@ -299,11 +300,11 @@ class ShallowAnalyzer {
   }
 
   List<ShallowFinding> _resolveCumulativeCandidates(
-    List<_RawCandidate> rawCandidates,
+    List<RawCandidate> rawCandidates,
   ) {
-    final prioritized = List<_RawCandidate>.from(rawCandidates)
-      ..sort(_compareRawCandidates);
-    final ordered = _orderBottomUp(prioritized);
+    final prioritized = List<RawCandidate>.from(rawCandidates)
+      ..sort(compareRawCandidates);
+    final ordered = orderBottomUp(prioritized);
     final effectiveScore = <ShallowDeclNode, int>{};
     final absorbedChildren =
         <ShallowDeclNode, List<({ShallowDeclNode decl, int relativeDepth})>>{};
@@ -355,7 +356,7 @@ class ShallowAnalyzer {
           score: c.decl.score,
           callerFilePath: c.call.filePath,
           callerName: c.caller.qualifiedName,
-          callerZone: _zoneOf(c.caller.normalizedFilePath),
+          callerZone: zoneOf(c.caller.normalizedFilePath),
           callLine: c.call.line,
           callNestingDepth: c.call.nestingDepth,
           callerBaseScore: c.caller.score,
@@ -595,16 +596,16 @@ class ShallowAnalyzer {
   /// (`bin/`, `test/`, `tool/`, `example/`, `web/`). Such edges are normal
   /// package layering, not a shallow extraction.
   bool _isLibraryToConsumerEdge(ShallowDeclNode decl, ShallowDeclNode caller) {
-    if (_zoneOf(decl.normalizedFilePath) != 'lib') return false;
-    final callerZone = _zoneOf(caller.normalizedFilePath);
+    if (zoneOf(decl.normalizedFilePath) != 'lib') return false;
+    final callerZone = zoneOf(caller.normalizedFilePath);
     return callerZone != 'lib' && callerZone != 'other';
   }
 
-  List<_ScanFileEntry> _discoverScanFiles(
+  List<ScanFileEntry> _discoverScanFiles(
     List<String> targetPaths,
     Set<String>? modifiedFilesFilter,
   ) {
-    final entriesByAbs = <String, _ScanFileEntry>{};
+    final entriesByAbs = <String, ScanFileEntry>{};
     final packageRoots = <String>{};
 
     for (final target in targetPaths) {
@@ -633,7 +634,7 @@ class ShallowAnalyzer {
     }
 
     for (final pkgRoot in packageRoots) {
-      for (final sibling in _knownZones) {
+      for (final sibling in knownZones) {
         final sibDir = Directory(p.join(pkgRoot, sibling));
         _collectDirEntries(
           entriesByAbs,
@@ -651,7 +652,7 @@ class ShallowAnalyzer {
   }
 
   void _collectDirEntries(
-    Map<String, _ScanFileEntry> entriesByAbs,
+    Map<String, ScanFileEntry> entriesByAbs,
     Directory dir, {
     required String baseDir,
     required bool isRequested,
@@ -672,7 +673,7 @@ class ShallowAnalyzer {
   }
 
   void _addFileEntry(
-    Map<String, _ScanFileEntry> entriesByAbs,
+    Map<String, ScanFileEntry> entriesByAbs,
     File file, {
     required bool isRequested,
     required Set<String>? modifiedFilesFilter,
@@ -697,7 +698,7 @@ class ShallowAnalyzer {
     final existing = entriesByAbs[absPath];
     if (existing != null) {
       if (effectiveRequested && !existing.isInRequestedTargets) {
-        entriesByAbs[absPath] = _ScanFileEntry(
+        entriesByAbs[absPath] = ScanFileEntry(
           absPath: existing.absPath,
           displayPath: file.path,
           normalizedPath: existing.normalizedPath,
@@ -709,7 +710,7 @@ class ShallowAnalyzer {
       return;
     }
 
-    entriesByAbs[absPath] = _ScanFileEntry(
+    entriesByAbs[absPath] = ScanFileEntry(
       absPath: absPath,
       displayPath: isRequested ? file.path : displayPath,
       normalizedPath: normDisplay,
@@ -734,47 +735,6 @@ class ShallowAnalyzer {
   }
 }
 
-/// Builds the report ordering: classification, then caller groups ranked by
-/// their most significant finding, then the caller, then simulation order.
-/// Within one caller the printed order therefore matches the order in which
-/// siblings were absorbed, so a `Caller CC: N (base B)` line never precedes
-/// the sibling that produced `N`.
-Comparator<ShallowFinding> _buildFindingComparator(
-  List<ShallowFinding> findings,
-) {
-  final groupRank = <String, int>{};
-  for (final f in findings) {
-    final key = _callerKey(f);
-    final rank = _significanceRank(f);
-    final existing = groupRank[key];
-    if (existing == null || rank < existing) groupRank[key] = rank;
-  }
-  return (a, b) {
-    final classCmp = _classificationOrder(a).compareTo(_classificationOrder(b));
-    if (classCmp != 0) return classCmp;
-    final aKey = _callerKey(a);
-    final bKey = _callerKey(b);
-    final rankCmp = groupRank[aKey]!.compareTo(groupRank[bKey]!);
-    if (rankCmp != 0) return rankCmp;
-    final keyCmp = aKey.compareTo(bKey);
-    if (keyCmp != 0) return keyCmp;
-    return a.simulationIndex.compareTo(b.simulationIndex);
-  };
-}
-
-String _callerKey(ShallowFinding f) => '${f.callerFilePath}#${f.callerName}';
-
-/// `0` for arity/signature findings, `1` for findings that move the caller's
-/// score, `2` for `+0` micro-predicates.
-int _significanceRank(ShallowFinding f) {
-  if (f.reasons.any(
-    (r) => r.startsWith('HIGH_ARITY') || r.startsWith('SIG_HEAVY'),
-  )) {
-    return 0;
-  }
-  return f.inlinedDeltaScore != 0 ? 1 : 2;
-}
-
 bool _isPublicLibEntryPath(List<String> normParts, String absPath) {
   final libIdx = normParts.lastIndexOf('lib');
   if (libIdx >= 0 && libIdx == normParts.length - 2) return true;
@@ -782,107 +742,3 @@ bool _isPublicLibEntryPath(List<String> normParts, String absPath) {
   final absLibIdx = absParts.lastIndexOf('lib');
   return absLibIdx >= 0 && absLibIdx == absParts.length - 2;
 }
-
-class _ScanFileEntry {
-  final String absPath;
-  final String displayPath;
-  final String normalizedPath;
-  final bool isTestFile;
-  final bool isPublicEntryFile;
-  final bool isInRequestedTargets;
-
-  const _ScanFileEntry({
-    required this.absPath,
-    required this.displayPath,
-    required this.normalizedPath,
-    required this.isTestFile,
-    required this.isPublicEntryFile,
-    required this.isInRequestedTargets,
-  });
-}
-
-class _RawCandidate {
-  final ShallowDeclNode decl;
-  final ShallowDeclNode caller;
-  final ShallowCallSite call;
-  final int baseDeltaScore;
-  final int estimatedLinesSaved;
-  final List<String> reasons;
-  final String? sharedParamSignatureWith;
-  final int sharedParamCount;
-  final String? paramsSubsetOfExistingType;
-  final List<String> siblingSteps;
-
-  const _RawCandidate({
-    required this.decl,
-    required this.caller,
-    required this.call,
-    required this.baseDeltaScore,
-    required this.estimatedLinesSaved,
-    required this.reasons,
-    required this.sharedParamSignatureWith,
-    required this.sharedParamCount,
-    required this.paramsSubsetOfExistingType,
-    required this.siblingSteps,
-  });
-}
-
-const _knownZones = {
-  'lib',
-  'bin',
-  'test',
-  'tool',
-  'example',
-  'web',
-  'benchmark',
-};
-
-/// Classifies a normalized relative Dart file path by its package layout
-/// directory: `lib`, `bin`, `test`, `tool`, `example`, `web`, `benchmark`, or
-/// `other` when no such segment is present. The last matching segment wins so
-/// nested packages (`tool/lib/x.dart`) resolve to their own layout directory.
-String _zoneOf(String normalizedFilePath) {
-  final segments = p.split(normalizedFilePath);
-  for (var i = segments.length - 2; i >= 0; i--) {
-    if (_knownZones.contains(segments[i])) return segments[i];
-  }
-  return 'other';
-}
-
-int _compareRawCandidates(_RawCandidate a, _RawCandidate b) {
-  final aStructural = a.estimatedLinesSaved > 6;
-  final bStructural = b.estimatedLinesSaved > 6;
-  if (aStructural != bStructural) return aStructural ? -1 : 1;
-  final deltaCmp = a.baseDeltaScore.compareTo(b.baseDeltaScore);
-  if (deltaCmp != 0) return deltaCmp;
-  final savedCmp = b.estimatedLinesSaved.compareTo(a.estimatedLinesSaved);
-  if (savedCmp != 0) return savedCmp;
-  final fileCmp = a.decl.filePath.compareTo(b.decl.filePath);
-  if (fileCmp != 0) return fileCmp;
-  return a.decl.startLine.compareTo(b.decl.startLine);
-}
-
-List<_RawCandidate> _orderBottomUp(List<_RawCandidate> candidates) {
-  final ordered = <_RawCandidate>[];
-  final visited = <_RawCandidate>{};
-
-  void visit(_RawCandidate current) {
-    if (!visited.add(current)) return;
-    for (final child in candidates) {
-      if (identical(child.caller, current.decl)) {
-        visit(child);
-      }
-    }
-    ordered.add(current);
-  }
-
-  for (final c in candidates) {
-    visit(c);
-  }
-  return ordered;
-}
-
-/// Report order of [f]'s classification: its position in
-/// [ShallowClassification.values] (safest first).
-int _classificationOrder(ShallowFinding f) =>
-    ShallowClassification.values.indexOf(f.classification);

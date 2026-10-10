@@ -179,40 +179,22 @@ const _entryPointPragmas = {
 /// `@pragma('dart2js:noInline')`) are NOT treated as entrypoints.
 bool isNativeOrEntryPoint(AnnotatedNode node) {
   for (final meta in node.metadata) {
-    final rawName = meta.name.name;
-    final baseName = rawName.contains('.') ? rawName.split('.').last : rawName;
-    if (_nativeAnnotationNames.contains(baseName)) {
-      return true;
-    }
+    final baseName = meta.name.name.split('.').last;
     final constructorName = meta.constructorName?.name;
-    if (constructorName != null &&
+    if (_nativeAnnotationNames.contains(baseName) ||
         _nativeAnnotationNames.contains(constructorName)) {
       return true;
     }
-    if (baseName == 'pragma' || constructorName == 'pragma') {
-      final args = meta.arguments?.arguments;
-      if (args != null && args.isNotEmpty) {
-        final firstArg = args.first;
-        String? pragmaName;
-        if (firstArg is SimpleStringLiteral) {
-          pragmaName = firstArg.value;
-        } else if (firstArg is StringLiteral) {
-          pragmaName = firstArg.stringValue;
-        } else {
-          for (final entity in firstArg.childEntities) {
-            if (entity is SimpleStringLiteral) {
-              pragmaName = entity.value;
-              break;
-            } else if (entity is StringLiteral) {
-              pragmaName = entity.stringValue;
-              break;
-            }
-          }
-        }
-        if (pragmaName != null && _entryPointPragmas.contains(pragmaName)) {
-          return true;
-        }
-      }
+    if (baseName != 'pragma' && constructorName != 'pragma') continue;
+    final pragmaName = switch (meta.arguments?.arguments.firstOrNull) {
+      SimpleStringLiteral(:final value) => value,
+      StringLiteral(:final stringValue) => stringValue,
+      final AstNode n =>
+        n.childEntities.whereType<StringLiteral>().firstOrNull?.stringValue,
+      null => null,
+    };
+    if (_entryPointPragmas.contains(pragmaName)) {
+      return true;
     }
   }
   return false;

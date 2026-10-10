@@ -242,34 +242,26 @@ String get flutterExecutable {
 /// standard Flutter checkout directories.
 String? findFlutterExecutable({String? flutterRoot}) {
   final root = flutterRoot ?? Platform.environment['FLUTTER_ROOT'];
-  final exeName = Platform.isWindows ? 'flutter.bat' : 'flutter';
-
-  if (root != null && root.isNotEmpty) {
-    final candidate = p.join(root, 'bin', exeName);
-    if (File(candidate).existsSync()) return candidate;
-  }
-
-  final pathEnv = Platform.environment['PATH'];
-  if (pathEnv != null && pathEnv.isNotEmpty) {
-    final separator = Platform.isWindows ? ';' : ':';
-    for (final dir in pathEnv.split(separator)) {
-      if (dir.trim().isEmpty) continue;
-      final candidate = p.join(dir, exeName);
-      if (File(candidate).existsSync()) return candidate;
-    }
-  }
-
+  final pathEnv = Platform.environment['PATH'] ?? '';
   final home =
       Platform.environment['HOME'] ?? Platform.environment['USERPROFILE'];
-  if (home != null) {
-    final candidates = [
-      p.join(home, 'github', 'flutter', 'bin', exeName),
-      p.join(home, 'flutter', 'bin', exeName),
-      p.join(home, '.flutter', 'bin', exeName),
-    ];
-    for (final candidate in candidates) {
-      if (File(candidate).existsSync()) return candidate;
-    }
+  final separator = Platform.isWindows ? ';' : ':';
+  final exeName = Platform.isWindows ? 'flutter.bat' : 'flutter';
+
+  final searchDirs = <String>[
+    if (root != null && root.isNotEmpty) p.join(root, 'bin'),
+    for (final dir in pathEnv.split(separator))
+      if (dir.trim().isNotEmpty) dir,
+    if (home != null) ...[
+      p.join(home, 'github', 'flutter', 'bin'),
+      p.join(home, 'flutter', 'bin'),
+      p.join(home, '.flutter', 'bin'),
+    ],
+  ];
+
+  for (final dir in searchDirs) {
+    final candidate = p.join(dir, exeName);
+    if (File(candidate).existsSync()) return candidate;
   }
 
   return null;
