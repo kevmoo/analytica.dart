@@ -1,3 +1,4 @@
+import 'package:analytica/analyzer.dart';
 import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/dart/element/element.dart';
 
@@ -59,53 +60,34 @@ class JsInteropAdapter extends BaseFrameworkAdapter {
 
   @override
   bool isExternalBinding(Declaration node, Element? element) {
-    // 1. Check for external keyword on top-level function or variable.
-    if (node is FunctionDeclaration && node.externalKeyword != null) {
-      return true;
-    }
-    if (node is TopLevelVariableDeclaration && node.externalKeyword != null) {
-      return true;
+    if (hasAnyAnnotation(node, _jsInteropAnnotations)) return true;
+
+    if (node is! ExtensionTypeDeclaration) {
+      return switch (node) {
+        FunctionDeclaration(:final externalKeyword) ||
+        TopLevelVariableDeclaration(
+          :final externalKeyword,
+        ) => externalKeyword != null,
+        ClassDeclaration() ||
+        ExtensionDeclaration() ||
+        MixinDeclaration() ||
+        EnumDeclaration() => _hasExternalMember(node),
+        _ => false,
+      };
     }
 
-    // 2. Check for @JS, @staticInterop, @anonymous annotations.
-    for (final meta in node.metadata) {
-      final rawName = meta.name.name;
-      final baseName = rawName.contains('.')
-          ? rawName.split('.').last
-          : rawName;
-      final constructorName = meta.constructorName?.name;
-      if (_jsInteropAnnotations.contains(baseName) ||
-          _jsInteropAnnotations.contains(constructorName)) {
+    if (_hasExternalMember(node)) return true;
+    for (final child in node.childEntities) {
+      if (child is! AstNode) continue;
+      final kind = child.runtimeType.toString();
+      final isRep =
+          child is FormalParameterList ||
+          kind.contains('Representation') ||
+          kind.contains('PrimaryConstructor');
+      if (isRep && _hasJsRepresentationType(child.toSource())) {
         return true;
       }
     }
-
-    // 3. ExtensionTypeDeclaration: Check direct representation or external
-    // members.
-    if (node is ExtensionTypeDeclaration) {
-      if (_hasExternalMember(node)) return true;
-      for (final child in node.childEntities) {
-        if (child is FormalParameterList) {
-          final src = child.toSource();
-          if (_hasJsRepresentationType(src)) return true;
-        } else if (child is AstNode &&
-            (child.runtimeType.toString().contains('Representation') ||
-                child.runtimeType.toString().contains('PrimaryConstructor'))) {
-          final src = child.toSource();
-          if (_hasJsRepresentationType(src)) return true;
-        }
-      }
-    }
-
-    // 4. ClassDeclaration, ExtensionDeclaration, MixinDeclaration,
-    // EnumDeclaration: Check direct external members.
-    if (node is ClassDeclaration ||
-        node is ExtensionDeclaration ||
-        node is MixinDeclaration ||
-        node is EnumDeclaration) {
-      if (_hasExternalMember(node)) return true;
-    }
-
     return false;
   }
 

@@ -23,8 +23,10 @@
 
 - Run `dart format --output=none --set-exit-if-changed .` before committing.
 - Run `dart analyze --fatal-infos` across the workspace.
-- Update `CHANGELOG.md` in the affected package under
-  `packages/<package_name>/CHANGELOG.md` before landing.
+- Bump `pubspec.yaml` and `CHANGELOG.md` under `packages/<package_name>/` to
+  `-wip` when modifying a released package, but add `CHANGELOG.md` bullets
+  **only** for user-visible changes (leave `## <ver>-wip` empty or unchanged for
+  internal refactorings, complexity reductions, file splits, and tests).
 - **Red-Team Policy for Heuristics**: Before merging any heuristic PR, perform
   an adversarial probe pass (~20 min of writing probe fixtures to break the
   heuristic). Every confirmed probe must become a test case.

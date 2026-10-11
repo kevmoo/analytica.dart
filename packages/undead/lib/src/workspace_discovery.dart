@@ -133,55 +133,45 @@ class WorkspaceConsumerDiscovery {
     required List<String> productionRoots,
     required List<String> testRoots,
   }) {
-    if (depth > maxDepth) return;
-    if (!dir.existsSync()) return;
+    if (depth > maxDepth || !dir.existsSync()) return;
 
     final dirPath = p.normalize(p.absolute(dir.path));
-    final isTargetPkg = p.equals(dirPath, targetPackagePath);
-    var isSiblingPkg = false;
+    final pubspecFile = File(p.join(dirPath, 'pubspec.yaml'));
+    final isSiblingPkg =
+        !p.equals(dirPath, targetPackagePath) && pubspecFile.existsSync();
 
-    if (!isTargetPkg) {
-      final pubspecFile = File(p.join(dirPath, 'pubspec.yaml'));
-      if (pubspecFile.existsSync()) {
-        isSiblingPkg = true;
-        _inspectSiblingPackage(
-          packageDir: dir,
-          pubspecFile: pubspecFile,
+    if (isSiblingPkg) {
+      _inspectSiblingPackage(
+        packageDir: dir,
+        pubspecFile: pubspecFile,
+        targetPackageName: targetPackageName,
+        productionRoots: productionRoots,
+        testRoots: testRoots,
+      );
+    }
+
+    if (depth >= maxDepth) return;
+    try {
+      final entities = dir.listSync(followLinks: false);
+      for (final entity in entities) {
+        if (entity is! Directory) continue;
+        final baseName = p.basename(entity.path);
+        if (_isExcludedDirectory(baseName) ||
+            (isSiblingPkg && _packageInternalDirs.contains(baseName)) ||
+            p.equals(p.normalize(p.absolute(entity.path)), targetPackagePath)) {
+          continue;
+        }
+
+        _scanDirectory(
+          dir: entity,
+          depth: depth + 1,
+          targetPackagePath: targetPackagePath,
           targetPackageName: targetPackageName,
           productionRoots: productionRoots,
           testRoots: testRoots,
         );
       }
-    }
-
-    if (depth < maxDepth) {
-      try {
-        final entities = dir.listSync(followLinks: false);
-        for (final entity in entities) {
-          if (entity is! Directory) continue;
-          final baseName = p.basename(entity.path);
-          if (_isExcludedDirectory(baseName)) continue;
-          if (isSiblingPkg && _packageInternalDirs.contains(baseName)) {
-            continue;
-          }
-          if (p.equals(
-            p.normalize(p.absolute(entity.path)),
-            targetPackagePath,
-          )) {
-            continue;
-          }
-
-          _scanDirectory(
-            dir: entity,
-            depth: depth + 1,
-            targetPackagePath: targetPackagePath,
-            targetPackageName: targetPackageName,
-            productionRoots: productionRoots,
-            testRoots: testRoots,
-          );
-        }
-      } catch (_) {}
-    }
+    } catch (_) {}
   }
 
   void _inspectSiblingPackage({
