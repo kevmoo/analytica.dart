@@ -1,4 +1,4 @@
-## 2.0.1-wip
+## 2.0.1
 
 - Exempt non-static methods on private classes called across types, cross-file
   public/internal low-arity branching utility functions (`<= 2` parameters and
