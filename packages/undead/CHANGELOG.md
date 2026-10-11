@@ -1,11 +1,5 @@
 ## 0.1.3-wip
 
-- Refactor `FlutterAdapter.harvestRoots`,
-  `BuildRunnerAdapter.extractBuilderFactories`,
-  `JsInteropAdapter.isExternalBinding`, and
-  `WorkspaceConsumerDiscovery._scanDirectory` to reduce cognitive complexity
-  (`<= 15`).
-
 ## 0.1.2
 
 - Require `analytica` `^0.1.4`.
