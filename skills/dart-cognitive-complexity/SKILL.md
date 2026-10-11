@@ -51,8 +51,8 @@ Run the CLI directly (requires Dart SDK **3.12.0+**, verify via
 
 - **Scope 1 — Targeted (Specific File or Directory)**:
   ```bash
-  dart run cognitive_complexity@^2.0.0 --threshold 15 lib/src/auth/
-  dart run cognitive_complexity@^2.0.0 --threshold 15 --verbose lib/src/auth/
+  dart run cognitive_complexity@^2.0.1 --threshold 15 lib/src/auth/
+  dart run cognitive_complexity@^2.0.1 --threshold 15 --verbose lib/src/auth/
   ```
   `--verbose` / `-v` adds a `Breakdown` column (`branches`, `nesting`,
   `boolean_ops`, `max_depth`; also in JSON as `composition`) so a flat score-15
@@ -61,25 +61,25 @@ Run the CLI directly (requires Dart SDK **3.12.0+**, verify via
   `[test entrypoint]`.
 - **Scope 2 — Delta (PR, Branch, or Pre-Flight Audit)**:
   ```bash
-  dart run cognitive_complexity@^2.0.0 --git-diff origin/main --fail-threshold 15 --fail-on-increase
+  dart run cognitive_complexity@^2.0.1 --git-diff origin/main --fail-threshold 15 --fail-on-increase
   ```
 - **Scope 3 — Whole-Project (Default Naked Invocation)**: Invoking
   `cognitive_complexity` with zero positional paths automatically discovers
   package roots or workspace members and defaults to analyzing `lib/`:
   ```bash
-  dart run cognitive_complexity@^2.0.0 --threshold 15
-  dart run cognitive_complexity@^2.0.0 --threshold 40 test/
+  dart run cognitive_complexity@^2.0.1 --threshold 15
+  dart run cognitive_complexity@^2.0.1 --threshold 40 test/
   ```
   > [!NOTE]
   >
   > **CLI Package Caveat (`lib/ bin/`)**: Zero-argument auto-discovery only
   > inspects `lib/`. For CLI tools and applications with entrypoints in `bin/`
   > (or `tool/`), pass target directories explicitly:
-  > `dart run cognitive_complexity@^2.0.0 --threshold 15 lib/ bin/`
+  > `dart run cognitive_complexity@^2.0.1 --threshold 15 lib/ bin/`
 - **Optional Review Aid — Shallow Helper Audit (Advisory Only)**:
   ```bash
-  dart run cognitive_complexity:shallow@^2.0.0 lib/
-  dart run cognitive_complexity:shallow@^2.0.0 lib/ bin/
+  dart run cognitive_complexity:shallow@^2.0.1 lib/
+  dart run cognitive_complexity:shallow@^2.0.1 lib/ bin/
   ```
   Without positional targets, `shallow` scans `lib/` in the current directory
   (pass `lib/ bin/` or package paths explicitly for CLI tools and monorepos).
@@ -198,13 +198,21 @@ template.
   inside an `async` function solely to dodge `CatchClause` scoring, and never
   preserve or introduce zero-allocation fast-path regressions (e.g., allocating
   a new collection before an early-return fast path).
+- **Forbid Multi-Pass Loop Splitting & `.expand` Metric Gaming**: Never split a
+  single loop (or nested loop) into multiple sequential loops over the same
+  collection or chain `.expand((c) => c)` / `.forEach(...)` solely to shed loop
+  nesting depth.
 
 ### 5.2 In-Place Flattening First (Patterns A & B Before `data_flow` Extraction)
 
 **Always apply in-place flattening (Patterns A and B) before extracting any
 single-caller helper**—especially for borderline violations (`CC 16–22`), where
 eliminating `1–2` levels of nesting drops the score to `<= 15` with zero new
-functions and zero parameter plumbing:
+functions and zero parameter plumbing. If a `CC 16–22` function owes its
+remaining complexity to a nested loop that cannot be flattened in a **single
+pass** using `continue`/`return` guards or `switch` expressions, extract a
+cohesive `LOAD_BEARING` helper for the inner loop or validation pass rather than
+splitting the loop into two passes:
 
 - **Pattern A (Dart 3 Switch Expressions)**: Replace nested `if-else` ladders
   with exhaustive table-driven `switch` expressions (single base penalty).
@@ -219,7 +227,7 @@ Only when a declaration **still** exceeds `15` after exhausting Patterns A and
 B, run the statement-level data-flow analyzer on candidate line slices:
 
 ```bash
-dart run cognitive_complexity:data_flow@^2.0.0 lib/src/my_file.dart:45-80
+dart run cognitive_complexity:data_flow@^2.0.1 lib/src/my_file.dart:45-80
 ```
 
 Inspect the complexity impact (`enclosing_score`, `slice_score_in_place`,
@@ -255,7 +263,7 @@ signature-to-complexity ratio):
   flags.
 - **Pattern F (Acyclic File Decomposition & Load-Bearing Library Boundaries)**:
   Run
-  `dart run cognitive_complexity:file_split@^2.0.0 lib/src/large_file.dart --target-lines 300`
+  `dart run cognitive_complexity:file_split@^2.0.1 lib/src/large_file.dart --target-lines 300`
   for files `> 400` lines and select the library boundary tier. `--target-lines`
   is a physical-line budget for the surviving file; the planner cuts disjoint
   islands first, then sub-cone leaf groups out of the dominant island, names
@@ -284,11 +292,21 @@ signature-to-complexity ratio):
     internal invariants, OR when standalone `lib/src/` files would require
     widening visibility and risk leaking internal types via unscoped
     `export 'src/...';` directives.
+  - **Breaking Model/Enum Dispatch Back-Edges**: When data models/enums are
+    fused into a single giant SCC with a parser/service class because an `enum`
+    or model class defines a dispatch method calling the parser/service, move
+    that dispatch method to an `extension` in the surviving file so the models
+    extract cleanly into `<stem>_models.dart`.
+  - **Zero Uncalled Factories / Constructor Parity**: Whenever extracting
+    `<stem>_models.dart` or adding a convenience factory (`Foo.fromBar(...)`),
+    verify with `rg` that every newly added factory is called by the surviving
+    file and never leave an inline constructor call with divergent field values
+    alongside an unused factory.
   - `file_split` plans are advisory: the cuts are dependency-correct, but the
     suggested file name follows one declaration. Name each new file by what it
     actually holds (Section 5.3).
 - **Pattern G (Advisory Shallow-Helper Review — `shallow`)**: Optionally run
-  `dart run cognitive_complexity:shallow@^2.0.0 lib/` to list single-caller
+  `dart run cognitive_complexity:shallow@^2.0.1 lib/` to list single-caller
   helpers (`HIGH_ARITY`, `MICRO_HELPER`, `SIG_HEAVY`,
   `CROSS_FILE_SINGLE_CALLER`). A `SAFE_INLINE` finding means inlining would not
   breach the caller's budget, not that it should happen; most well-named helpers
@@ -339,8 +357,8 @@ int _scoreModules(List<int> modules, int size) {
 ## 6. Verification & Public API Surface Guardrails
 
 1. **Complexity Check**: Run
-   `dart run cognitive_complexity@^2.0.0 --fail-threshold 15 <refactored files>`.
-   Optionally run `dart run cognitive_complexity:shallow@^2.0.0 <files>` as a
+   `dart run cognitive_complexity@^2.0.1 --fail-threshold 15 <refactored files>`.
+   Optionally run `dart run cognitive_complexity:shallow@^2.0.1 <files>` as a
    review aid (Section 5.3); its findings never block.
 2. **Mandatory `api_summary` Public API Surface Verification Gate**: Whenever a
    refactor extracts helpers across files or touches `lib/` exports:

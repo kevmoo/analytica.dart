@@ -154,6 +154,10 @@ class ShallowCallSite {
   /// (`other.parse()`), so it may target a different declaration.
   final bool isQualified;
 
+  /// Whether the call site is embedded inside an [InterpolationExpression]
+  /// (`'...\${helper(...)}...'`).
+  final bool isInStringInterpolation;
+
   const ShallowCallSite({
     required this.caller,
     required this.filePath,
@@ -164,6 +168,7 @@ class ShallowCallSite {
     required this.isTestFile,
     required this.isTearOff,
     this.isQualified = false,
+    this.isInStringInterpolation = false,
   });
 }
 
@@ -495,8 +500,20 @@ class ShallowFileCollector extends RecursiveAstVisitor<void> {
         isTestFile: isTestFile,
         isTearOff: isTearOff,
         isQualified: isQualified,
+        isInStringInterpolation: _isInsideInterpolation(siteNode, caller?.node),
       ),
     );
+  }
+
+  bool _isInsideInterpolation(AstNode siteNode, AstNode? stopAt) {
+    for (
+      var cur = siteNode.parent;
+      cur != null && !identical(cur, stopAt);
+      cur = cur.parent
+    ) {
+      if (cur is InterpolationExpression) return true;
+    }
+    return false;
   }
 
   bool _isTearOffContext(SimpleIdentifier node) {

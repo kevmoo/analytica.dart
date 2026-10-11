@@ -31,27 +31,7 @@ class FlutterAdapter extends BaseFrameworkAdapter {
     try {
       final doc = loadYaml(pubspecContent);
       if (doc is Map) {
-        void extractPluginClasses(dynamic node) {
-          if (node is Map) {
-            for (final entry in node.entries) {
-              final key = entry.key?.toString();
-              if (key == 'pluginClass' || key == 'dartPluginClass') {
-                final val = entry.value?.toString().trim();
-                if (val != null && val.isNotEmpty) {
-                  results.add(val);
-                }
-              } else {
-                extractPluginClasses(entry.value);
-              }
-            }
-          } else if (node is List) {
-            for (final item in node) {
-              extractPluginClasses(item);
-            }
-          }
-        }
-
-        extractPluginClasses(doc['flutter']);
+        _collectPluginClasses(doc['flutter'], results);
       }
     } catch (_) {
       final nonCommentLines = pubspecContent
@@ -73,34 +53,46 @@ class FlutterAdapter extends BaseFrameworkAdapter {
       }
     }
 
-    // Discover main() in lib/main.dart & lib/main_*.dart
-    var hasFlutterMain = false;
-    for (final file in topology.publicLibFiles) {
-      if (PackageTopology.isFlutterEntrypoint(file)) {
-        hasFlutterMain = true;
-        break;
-      }
-    }
-    if (!hasFlutterMain) {
-      final libDir = Directory(p.join(packageDir.path, 'lib'));
-      if (libDir.existsSync()) {
-        for (final entity in libDir.listSync(followLinks: false)) {
-          if (entity is File && entity.path.endsWith('.dart')) {
-            final rel = p.relative(entity.path, from: packageDir.path);
-            if (PackageTopology.isFlutterEntrypoint(rel)) {
-              hasFlutterMain = true;
-              break;
-            }
-          }
-        }
-      }
-    }
-
-    if (hasFlutterMain) {
+    if (_hasFlutterMain(topology, packageDir)) {
       results.add('main');
     }
 
     return results;
+  }
+
+  static void _collectPluginClasses(Object? node, Set<String> results) {
+    if (node is List) {
+      for (final item in node) {
+        _collectPluginClasses(item, results);
+      }
+      return;
+    }
+    if (node is! Map) return;
+    for (final entry in node.entries) {
+      final key = entry.key?.toString();
+      if (key != 'pluginClass' && key != 'dartPluginClass') {
+        _collectPluginClasses(entry.value, results);
+        continue;
+      }
+      final val = entry.value?.toString().trim();
+      if (val != null && val.isNotEmpty) {
+        results.add(val);
+      }
+    }
+  }
+
+  static bool _hasFlutterMain(PackageTopology topology, Directory packageDir) {
+    if (topology.publicLibFiles.any(PackageTopology.isFlutterEntrypoint)) {
+      return true;
+    }
+    final libDir = Directory(p.join(packageDir.path, 'lib'));
+    if (!libDir.existsSync()) return false;
+    for (final entity in libDir.listSync(followLinks: false)) {
+      if (entity is! File || !entity.path.endsWith('.dart')) continue;
+      final rel = p.relative(entity.path, from: packageDir.path);
+      if (PackageTopology.isFlutterEntrypoint(rel)) return true;
+    }
+    return false;
   }
 
   @override
