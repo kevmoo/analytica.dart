@@ -216,7 +216,7 @@ class ShallowAnalyzer {
     final call = prodCalls.single;
     final caller = call.caller;
     if (caller == null || identical(caller, decl)) return null;
-    if (_isExemptCallerOrCrossFileFacade(decl, caller)) return null;
+    if (_isExemptCallerOrCrossFileFacade(decl, caller, call)) return null;
     if (_isInCallCycle(decl, caller, callsByName, declsByName)) return null;
 
     final reasons = _computeShallowReasons(decl, caller);
@@ -282,6 +282,7 @@ class ShallowAnalyzer {
   bool _isExemptCallerOrCrossFileFacade(
     ShallowDeclNode decl,
     ShallowDeclNode caller,
+    ShallowCallSite call,
   ) {
     if (caller.rawName == 'main' &&
         p.split(caller.normalizedFilePath).contains('bin')) {
@@ -297,13 +298,10 @@ class ShallowAnalyzer {
     if (!decl.isPrivate &&
         caller.normalizedFilePath != decl.normalizedFilePath &&
         decl.effectiveParameterCount <= 2 &&
-        decl.bodyLines > 4) {
+        decl.score > 0) {
       return true;
     }
-    if (decl.score == 0 &&
-        caller.score == 0 &&
-        decl.bodyLines >= 5 &&
-        caller.bodyLines < decl.bodyLines) {
+    if (decl.score == 0 && call.isInStringInterpolation && decl.bodyLines > 1) {
       return true;
     }
     return caller.normalizedFilePath != decl.normalizedFilePath &&

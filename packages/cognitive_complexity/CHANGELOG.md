@@ -3,9 +3,9 @@
 - Split `file_split_analyzer.dart` and `shallow_analyzer.dart` to `<= 800`
   lines.
 - Exempt non-static methods on private classes called across types, cross-file
-  public/internal low-arity utility functions (`<= 2` parameters and `> 4` body
-  lines), and pure `CC == 0` value formatters (`>= 5` body lines) called by
-  shorter `CC == 0` templates in `ShallowAnalyzer`.
+  public/internal low-arity branching utility functions (`<= 2` parameters and
+  `CC > 0`), and multi-line `CC == 0` value formatters embedded inside string
+  interpolations in `ShallowAnalyzer`.
 
 ## 2.0.0
 

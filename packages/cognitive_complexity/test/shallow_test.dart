@@ -610,9 +610,11 @@ void _h2(int a, int b, int c, int d, int e, int f) {
       check(out.toString()).contains('[ZERO_HEADROOM]');
     });
 
-    test('MICRO_HELPER flags <= 2 statement helpers up to 15 body lines '
-        'but exempts CC=0 formatters called by shorter CC=0 templates', () {
-      const code = '''
+    test(
+      'MICRO_HELPER flags <= 2 statement helpers up to 15 body lines '
+      'but exempts multi-line CC=0 formatters inside string interpolations',
+      () {
+        const code = '''
 void _caller(int a, int b) {
   if (a > 0) {
     _wrapped(a);
@@ -647,17 +649,18 @@ void _threeStatements(int value) {
   print(a + b);
 }
 ''';
-      final report = ShallowAnalyzer().analyzeCode(code);
-      final finding = report.findings.single;
-      check(finding.name).equals('_wrapped');
-      check(finding.bodyLines).equals(8);
-      check(finding.statementCount).equals(2);
-      check(finding.score).equals(0);
-      check(
-        finding.reasons,
-      ).deepEquals(['MICRO_HELPER(8 bodyL, 2 stmt, CC=0)']);
-      check(finding.toJson()['statement_count']).equals(2);
-    });
+        final report = ShallowAnalyzer().analyzeCode(code);
+        final finding = report.findings.single;
+        check(finding.name).equals('_wrapped');
+        check(finding.bodyLines).equals(8);
+        check(finding.statementCount).equals(2);
+        check(finding.score).equals(0);
+        check(
+          finding.reasons,
+        ).deepEquals(['MICRO_HELPER(8 bodyL, 2 stmt, CC=0)']);
+        check(finding.toJson()['statement_count']).equals(2);
+      },
+    );
 
     test('HIGH_ARITY counts record-typed parameters by their field count', () {
       const code = '''
@@ -703,12 +706,12 @@ void _plain(int a, int b, int c, int d) {
     });
 
     test('suppresses CROSS_FILE_SINGLE_CALLER for lib/ helpers whose only '
-        'caller is in bin/ and for 7-line 2-param cross-file validators, '
+        'caller is in bin/ and for <= 2-param branching cross-file helpers, '
         'but keeps it for >= 3-param lib/ -> lib/ edges', () async {
       // `wideHelper` has 3 params, 7 body lines, and CC 3, so only
       // CROSS_FILE_SINGLE_CALLER flags it. `checkValidOptions` has 2 params
-      // and 7 body lines (CC 2), so it is NOT flagged. `tinyHelper` is 1 body
-      // line and 3 params.
+      // and CC 2, so it is NOT flagged. `tinyHelper` is 1 body line, CC 0, and
+      // 3 params.
       const helpers = '''
 int wideHelper(int a, int b, int c) {
   var total = a;
