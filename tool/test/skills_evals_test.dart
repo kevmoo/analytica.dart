@@ -223,5 +223,54 @@ void main() {
         _verifyStructuralConsistency(rubricFiles, 'evals');
       },
     );
+
+    test('skills.sh.json groups all published skills', () {
+      final repoRoot = _getRepoRoot();
+      final skillsDir = Directory(p.join(repoRoot.path, 'skills'));
+      final actualSkills = skillsDir
+          .listSync()
+          .whereType<Directory>()
+          .where((dir) => File(p.join(dir.path, 'SKILL.md')).existsSync())
+          .map((dir) => p.basename(dir.path))
+          .toSet();
+
+      final configFile = File(p.join(repoRoot.path, 'skills.sh.json'));
+      expect(configFile.existsSync(), isTrue);
+
+      final decoded =
+          jsonDecode(configFile.readAsStringSync()) as Map<String, Object?>;
+      expect(
+        decoded[r'$schema'],
+        'https://skills.sh/schemas/skills.sh.schema.json',
+      );
+      expect(decoded['notGrouped'], 'bottom');
+
+      final groupings = (decoded['groupings'] as List<Object?>)
+          .cast<Map<String, Object?>>();
+      expect(groupings, isNotEmpty);
+
+      final groupedSkills = <String>{};
+      for (final group in groupings) {
+        expect(
+          group['title'],
+          isA<String>().having((s) => s.isNotEmpty, 'non-empty', isTrue),
+        );
+        expect(
+          group['description'],
+          isA<String>().having((s) => s.isNotEmpty, 'non-empty', isTrue),
+        );
+        final skills = (group['skills'] as List<Object?>).cast<String>();
+        expect(skills, isNotEmpty);
+        for (final skill in skills) {
+          expect(
+            groupedSkills.add(skill),
+            isTrue,
+            reason: 'Duplicate skill "$skill" in skills.sh.json',
+          );
+        }
+      }
+
+      expect(groupedSkills, equals(actualSkills));
+    });
   });
 }
