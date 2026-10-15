@@ -253,7 +253,13 @@ void main() {
       for (final group in groupings) {
         expect(
           group['title'],
-          isA<String>().having((s) => s.isNotEmpty, 'non-empty', isTrue),
+          isA<String>().having(
+            (s) =>
+                s.trim().isNotEmpty &&
+                s.trim().split(RegExp(r'\s+')).length <= 3,
+            '1-3 words',
+            isTrue,
+          ),
         );
         expect(
           group['description'],

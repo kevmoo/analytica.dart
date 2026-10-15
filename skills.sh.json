@@ -3,14 +3,14 @@
   "notGrouped": "bottom",
   "groupings": [
     {
-      "title": "Complexity & Decomposition",
+      "title": "Complexity",
       "description": "Skills for scoring and refactoring high cognitive complexity, data-flow coupling, and oversized Dart files.",
       "skills": [
         "dart-cognitive-complexity"
       ]
     },
     {
-      "title": "Duplication & Dead Code",
+      "title": "Duplication & Pruning",
       "description": "Skills for detecting structural code clones and pruning unreachable declarations across Dart packages.",
       "skills": [
         "dart-dedupe",
