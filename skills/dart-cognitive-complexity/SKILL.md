@@ -111,9 +111,9 @@ make no source edits, and skip Stage 2.
      `cognitive_complexity:shallow`, list its findings (`SAFE_INLINE`,
      `ZERO_HEADROOM`, `FLATTEN_AND_INLINE`, `LOAD_BEARING`) for review:
 
-     | Classification    | Helper Declaration       | Sole Caller                         | Helper Metrics               | Caller CC (`Before -> After`) | Suggested Review                                                                                                           |
-     | :---------------- | :----------------------- | :---------------------------------- | :--------------------------- | :---------------------------: | :------------------------------------------------------------------------------------------------------------------------- |
-     | **`SAFE_INLINE`** | [`_helper`](file:///...) | [`caller`](file:///...) (`depth=0`) | `params=6`, `LOC=18`, `CC=2` |   `0 (base 0) -> 2` (`+2`)    | **Review: consider re-inlining if** the helper is pure plumbing, has no same-shape siblings, and its name adds no meaning. |
+     | Classification    | Helper Declaration           | Sole Caller                             | Helper Metrics               | Caller CC (`Before -> After`) | Suggested Review                                                                                                           |
+     | :---------------- | :--------------------------- | :-------------------------------------- | :--------------------------- | :---------------------------: | :------------------------------------------------------------------------------------------------------------------------- |
+     | **`SAFE_INLINE`** | ``[`_helper`](file:///...)`` | ``[`caller`](file:///...)`` (`depth=0`) | `params=6`, `LOC=18`, `CC=2` |   `0 (base 0) -> 2` (`+2`)    | **Review: consider re-inlining if** the helper is pure plumbing, has no same-shape siblings, and its name adds no meaning. |
      - **Reading Shallow Classifications**:
        - **`SAFE_INLINE`** (`CallerCCAfter < 15`): Inlining is _possible_
          without breaching the caller's budget. It is not a recommendation;

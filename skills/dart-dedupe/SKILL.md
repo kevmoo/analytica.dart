@@ -211,7 +211,7 @@ confirmation gate.
 same step as an unrendered report without the report already existing on disk
 and in chat. The question prompt in `ask_question` should explicitly reference
 the generated triage artifact (e.g., "Based on the findings in
-[dedupe_triage_report.md](...)...").
+`[dedupe_triage_report.md](...)`...").
 
 Pause execution and prompt the user (via interactive choice or chat) to select
 the desired remediation scope:
