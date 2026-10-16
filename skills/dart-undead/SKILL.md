@@ -137,145 +137,63 @@ dart run undead@^0.1.2 --example-mode=demonstration
 > [!CAUTION]
 >
 > **Audit Before Deleting**: Never delete declarations autonomously without
-> reviewing safety invariants and verifying against the test suite.
+> reviewing safety invariants and verifying against the test suite. See
+> [`references/safety_and_provenance.md`](references/safety_and_provenance.md)
+> for full suppression placement examples, dynamic-entrypoint heuristics, and
+> the PR provenance template.
 
-### Invariant 1: Sealed Class Hierarchy Protection
-
-Direct subtypes of live `sealed` classes (via `extends`, `implements`, `with`,
-or `enum`) must **NEVER** be deleted, even if unreferenced elsewhere. Deleting a
-sealed subtype breaks Dart 3 exhaustive pattern matching across all `switch`
-expressions.
-
-### Invariant 2: Co-Invoked Test Hazard Protection
-
-When a test file invokes both live and dead declarations:
-
-- **Isolated Dead Tests**: Test blocks referencing _only_ dead code can be
-  safely pruned alongside the dead target.
-- **Co-Invoked Test Hazard**: When a single test function or widget test
-  exercises both live and dead code, **do not delete the test**. Refactor the
-  test body to remove only the dead assertions.
-
-### Invariant 3: Framework Entrypoints & Pragmas
-
-Ensure framework-specific roots are not falsely classified as dead:
-
-- **Build Runner**: Builder factories and generator entrypoints in `build.yaml`.
-- **VM Entrypoints**: Declarations annotated with `@pragma('vm:entry-point')`.
-- **JS Interop**: External JavaScript facades (`@JS()`). Pass
-  `--ignore-external-bindings` if pruning libraries with public interop headers.
-
-### Invariant 4: Custom Suppression Syntax
-
-To suppress intentional dead code or API placeholders without deleting:
-
-- **Declaration Level**: `// undead:ignore` (directly above the declaration; see
-  Placement Rules below).
-- **File Level**: `// undead:ignore_for_file` (below the copyright header; see
-  Placement Rules below).
-- _(Note: The standard `// ignore: unreachable_from_main` is strictly for the
-  built-in Dart analyzer lint rule; `pkg:undead` requires `// undead:ignore`)._
-
-**Placement Rules** (violations fail `dart analyze --fatal-infos` or style
-review):
-
-- **File-level**: Insert `// undead:ignore_for_file` **below** any copyright /
-  license header block and above the `library` directive or first `import`.
-  Never place it on line 1 above the copyright notice.
-- **Declaration-level**: Never insert `// undead:ignore` between an existing
-  `// ignore: <lint>` comment and its declaration. The analyzer only honors an
-  `// ignore:` comment on the line immediately preceding the declaration, so
-  detaching it produces `unnecessary_ignore` plus the original diagnostic (e.g.
-  `unreachable_from_main`). Place `// undead:ignore` **above** the `// ignore:`
-  line:
-
-  ```dart
-  // undead:ignore
-  // ignore: unreachable_from_main
-  Future<void> runTests(List<String> args) async { ... }
-  ```
-
-### Invariant 5: Dynamic Invocation & Non-AST Reference Check
-
-Static AST analysis (`pkg:undead`) only traces typed Dart import trees. It
-cannot see declarations referenced through runtime meta-programming:
-
-- Dynamic isolate spawners (`dart.runInIsolate`, `Isolate.spawnUri`)
-- Code-generation string templates (`'''import "package:.../foo.dart";'''`)
-- JS / WASM compilation targets and runtime asset bootstrap runners
-- Build hooks and `build.yaml` references
-- Framework extension hooks and plugin registries invoked by downstream runners
-  rather than by in-package call sites
-
-**Dynamic-Entrypoint Heuristics (Require Confirmation, Never Blind Delete):**
-
-Treat a zero-reference finding as a _suspected_ runtime entrypoint, not dead
-code, when it matches any of these patterns. Classify it as **KEEP** (protect
-with `// undead:ignore`) unless the user explicitly confirms removal:
-
-- **File names**: `*_run.dart`, `direct_run.dart`, `*_bootstrap.dart`,
-  `*_listener.dart`, `*_hook.dart`, `*_plugin.dart`.
-- **Declaration names**: `register*`, `initialize*`, `bootstrap*`, `plugin*`,
-  `custom*`, `install*`, `configure*` (e.g. `registerReporter`).
-- **Shape**: public top-level functions whose only parameters are callbacks or
-  factories, accepting a string key (`registerX(String name, Factory f)`), or
-  that spawn isolates / compile kernels / open ports.
-- **Context**: packages consumed as frameworks (test runners, build systems,
-  plugin hosts) where downstream packages are the real callers.
-
-**The Pre-Deletion Check Protocol:**
-
-1. Before deleting any candidate file or top-level declaration in `lib/src/`,
-   perform a literal string search (`grep_search "<filename_or_symbol>"`) across
-   the repository.
-2. If text matches exist outside the target file itself, **inspect and
-   understand the match context** before deleting:
-   - **KEEP**: The match is an active runtime string template, dynamic isolate
-     entrypoint, or compilation target. Protect it with `// undead:ignore`.
-   - **PRUNE**: The match is merely a doc comment, obsolete README reference, or
-     dead test fixture that should be deleted alongside the target.
-
-### Invariant 6: Monorepo & External Entrypoint Protection
-
-In multi-package workspaces where internal implementation libraries export
-entrypoints consumed by sibling CLI wrappers or test runners:
-
-- Include sibling packages and root integration test folders using
-  `--extra-roots` or enable `--workspace-discovery`.
-- If an unexported function is an intended external entrypoint, protect it with
-  `// undead:ignore` (and `// ignore: unreachable_from_main` if analyzer lint is
-  active, ordered per the Invariant 4 Placement Rules).
-
-### Invariant 7: Cohesive Subsystem Pruning
-
-When pruning dead code, avoid partial or purely cosmetic deletions that leave
-larger unreferenced subsystems intact:
-
-- Delete all verified unreferenced internal classes, functions, and files in
-  `lib/src/` (e.g., unreferenced listener classes, unused event sinks, obsolete
-  scaffold runners) in one cohesive pass.
-- Remove orphaned imports, associated dead private helpers, and obsolete test
-  fixtures concurrently.
-
-### Invariant 8: Deletion Hygiene (Comments Travel With Declarations)
-
-A deletion range must cover the **entire** declaration, including everything
-attached above it, so that nothing is left orphaned:
-
-- **Doc comments**: Remove the full preceding `///` block (and any `/** */`
-  block). An orphaned block at file head (before `library` / `import`
-  directives) triggers `dangling_library_doc_comments` under
-  `dart analyze --fatal-infos`, but an orphan stranded **between surviving
-  declarations produces no diagnostic at all** and silently re-attaches to the
-  next declaration — only a diff review catches it.
-- **Annotations and `// ignore:` comments**: Remove `@Deprecated(...)`,
-  `@visibleForTesting`, and any `// ignore: <lint>` lines that belonged to the
-  deleted declaration; a leftover `// ignore:` triggers `unnecessary_ignore`.
-- **Ignore comments on surviving neighbors**: When deleting one of several
-  adjacent declarations, do not leave two `// ignore:` lines stacked on the
-  survivor (`unnecessary_ignore` / `duplicate_ignore`).
-- **Blank lines**: Collapse the resulting double blank line so `dart format`
-  reports no changes.
+- **Invariant 1 — Sealed Class Hierarchy Protection**: Direct subtypes of live
+  `sealed` classes (`extends`, `implements`, `with`, or `enum`) must **NEVER**
+  be deleted, even if unreferenced elsewhere, to preserve exhaustive `switch`
+  matching.
+- **Invariant 2 — Co-Invoked Test Hazard Protection**: Test blocks referencing
+  _only_ dead code can be pruned alongside the target. When a single test
+  exercises both live and dead code, **do not delete the test**—remove only the
+  dead assertions.
+- **Invariant 3 — Framework Entrypoints & Pragmas**: Preserve `build.yaml`
+  builders, `@pragma('vm:entry-point')` declarations, and `@JS()` facades (pass
+  `--ignore-external-bindings` when pruning interop libraries).
+- **Invariant 4 — Custom Suppression Syntax & Placement**: Use
+  `// undead:ignore` (declaration-level) or `// undead:ignore_for_file`
+  (file-level; Note: `// ignore: unreachable_from_main` is only for the Dart
+  analyzer).
+  - **File-level**: Place `// undead:ignore_for_file` **below** any copyright
+    header and above `library` or the first `import` (never line 1 above
+    copyright).
+  - **Declaration-level**: Place `// undead:ignore` **above** any existing
+    `// ignore: <lint>` line so the analyzer lint comment remains immediately
+    adjacent to the declaration (avoiding `unnecessary_ignore`).
+- **Invariant 5 — Dynamic Invocation & Non-AST Reference Check**: `pkg:undead`
+  cannot see runtime meta-programming (`dart.runInIsolate`, `Isolate.spawnUri`,
+  codegen string templates, JS/WASM bootstrap targets, `build.yaml` hooks, or
+  downstream plugin registries).
+  - **Dynamic-Entrypoint Heuristics (Classify as KEEP with `// undead:ignore`
+    unless user confirms removal)**: Files matching `*_run.dart`,
+    `direct_run.dart`, `*_bootstrap.dart`, `*_listener.dart`, `*_hook.dart`,
+    `*_plugin.dart`; declarations named `register*`, `initialize*`,
+    `bootstrap*`, `plugin*`, `custom*`, `install*`, `configure*`; callback/
+    factory registrars (`registerX(String name, Factory f)`) or isolate/kernel/
+    port spawners; or framework host packages.
+  - **Pre-Deletion Check Protocol**: Run `grep_search "<filename_or_symbol>"`
+    across the repo before deleting any `lib/src/` file or declaration. Inspect
+    matches outside the target file: **KEEP** (protect with `// undead:ignore`)
+    if used in runtime templates/isolates/targets; **PRUNE** alongside the
+    target if only in doc comments, obsolete README references, or dead
+    fixtures.
+- **Invariant 6 — Monorepo & External Entrypoint Protection**: Use
+  `--extra-roots` or `--workspace-discovery` for sibling CLI wrappers/runners,
+  or protect intended external entrypoints with `// undead:ignore` (above
+  `// ignore: unreachable_from_main`).
+- **Invariant 7 — Cohesive Subsystem Pruning**: Delete all verified unreferenced
+  internal classes, functions, and files in `lib/src/` in one cohesive pass
+  along with orphaned imports, dead private helpers, and obsolete test fixtures.
+- **Invariant 8 — Deletion Hygiene (Comments Travel With Declarations)**: Remove
+  the full preceding `///` / `/** */` doc comment block (stranded blocks between
+  surviving declarations silently re-attach without analyzer warnings, and
+  file-head orphans trigger `dangling_library_doc_comments`), remove
+  `@Deprecated` / `@visibleForTesting` / `// ignore:` lines belonging to the
+  deleted declaration, avoid stacked `duplicate_ignore` on surviving neighbors,
+  and collapse double blank lines.
 
 ---
 
@@ -310,7 +228,7 @@ confirmation gate.
 same step as an unrendered report without the report already existing on disk
 and in chat. The question prompt in `ask_question` should explicitly reference
 the generated triage artifact (e.g., "Based on the findings in
-[undead_triage_report.md](...)...").
+`[undead_triage_report.md](...)`...").
 
 Pause execution and prompt the user (via interactive choice or chat) to select
 the desired remediation scope:
@@ -369,42 +287,12 @@ Always wrap code deletions in a strict test and analysis sandwich:
 
 ## 6. Pull Request & Commit Provenance Protocol
 
-When staging pruned code and preparing a commit message or Pull Request:
-
-### 1. User Confirmation Gate
-
-- **Interactive Sessions**: Before writing the PR description or commit body,
-  explicitly prompt the user in chat or via the harness confirmation tool (e.g.
-  `ask_question`) whether to include a **Tool Provenance & Reproduction block**.
-- **User Prompt Inclusion**: When the user explicitly requests inclusion (or
-  confirms via prompt), append the standardized markdown block below. In
-  unattended or automated workflows, output the summary to chat or step
-  summaries rather than modifying commit bodies without user confirmation.
-
-### 2. Standardized Provenance Block Format
-
-When confirmed by the user, include the following markdown block in the PR
-description or commit body so reviewers understand where the deletions
-originated and can rerun the reachability analysis locally:
-
-````markdown
-### 🤖 Tool Provenance & Reproduction
-
-Dead code detection and reachability analysis performed with
-[`undead`](https://pub.dev/packages/undead) (`v{version}`).
-
-To reproduce or re-run this reachability audit locally:
-
-```bash
-{exact_command_line}
-```
-````
-
-### 3. Version Resolution
-
-Determine the package version dynamically:
-
-- Check `pubspec.lock` in the workspace or run
-  `dart run undead@^0.1.2 --version`.
-- If invoked with a specific version constraint (e.g. `undead@^0.1.1`), use that
-  exact version.
+1. **User Confirmation Gate**: In interactive sessions, prompt the user in chat
+   or via `ask_question` before appending the **Tool Provenance & Reproduction
+   block** from
+   [`references/safety_and_provenance.md`](references/safety_and_provenance.md#2-pull-request--commit-provenance-protocol)
+   to the PR description or commit body. In unattended workflows, output the
+   summary to chat or step summaries without modifying commit bodies.
+2. **Version Resolution**: Check `pubspec.lock` in the workspace or run
+   `dart run undead@^0.1.2 --version` (or use the exact invoked version
+   constraint, e.g. `undead@^0.1.1`).

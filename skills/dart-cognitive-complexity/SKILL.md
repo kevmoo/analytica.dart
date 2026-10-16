@@ -108,24 +108,14 @@ make no source edits, and skip Stage 2.
      snippets, current score vs. ceiling (sorted descending by score),
      recommended pattern (A–F), and unit test status.
    - **Optional: Shallow Helper Notes (Advisory, Not Work Items)**: If you ran
-     `cognitive_complexity:shallow`, list its findings (`SAFE_INLINE`,
-     `ZERO_HEADROOM`, `FLATTEN_AND_INLINE`, `LOAD_BEARING`) for review:
-
-     | Classification    | Helper Declaration       | Sole Caller                         | Helper Metrics               | Caller CC (`Before -> After`) | Suggested Review                                                                                                           |
-     | :---------------- | :----------------------- | :---------------------------------- | :--------------------------- | :---------------------------: | :------------------------------------------------------------------------------------------------------------------------- |
-     | **`SAFE_INLINE`** | [`_helper`](file:///...) | [`caller`](file:///...) (`depth=0`) | `params=6`, `LOC=18`, `CC=2` |   `0 (base 0) -> 2` (`+2`)    | **Review: consider re-inlining if** the helper is pure plumbing, has no same-shape siblings, and its name adds no meaning. |
-     - **Reading Shallow Classifications**:
-       - **`SAFE_INLINE`** (`CallerCCAfter < 15`): Inlining is _possible_
-         without breaching the caller's budget. It is not a recommendation;
-         apply the Section 5.3 keep/revert heuristics first.
-       - **`ZERO_HEADROOM`** (`CallerCCAfter == 15`): Inlining would leave the
-         caller no budget; leave extracted.
-       - **`HIGH_ARITY` / Parameter Record**: For sibling helpers sharing
-         high-arity parameter clumps, a shared Dart 3 named record (or an
-         existing domain/state object that already holds those values) usually
-         beats inlining.
-       - **`FLATTEN_AND_INLINE`**: Only relevant when the caller is itself a
-         work item; flatten with Patterns A/B as part of that fix.
+     `cognitive_complexity:shallow`, list its findings (`SAFE_INLINE` where
+     `CallerCCAfter < 15`, `ZERO_HEADROOM` where `CallerCCAfter == 15`,
+     `HIGH_ARITY` / Parameter Record or existing state object,
+     `FLATTEN_AND_INLINE` when the caller is itself a work item, and
+     `LOAD_BEARING`) as advisory review notes, applying Section 5.3 keep/revert
+     heuristics first (see
+     [`references/file_split_and_shallow.md`](references/file_split_and_shallow.md#2-stage-1--pattern-g-shallow-helper-audit-shallow-advisory-only)
+     for the report table template and classification rules).
 2. **Visible Chat Pre-Render**: Render a high-level summary (top complexity
    outliers, plus any advisory shallow notes) and a clickable link to
    `complexity_triage_report.md` in visible chat BEFORE invoking the
@@ -171,7 +161,9 @@ offer:
 ## 5. Deep Modules & Refactoring Patterns
 
 See [`references/refactoring_recipes.md`](references/refactoring_recipes.md) for
-complete before/after code examples across Patterns A–F and the PR provenance
+before/after code examples across Patterns A–E and
+[`references/file_split_and_shallow.md`](references/file_split_and_shallow.md)
+for `file_split` (Pattern F), `shallow` (Pattern G), and the PR provenance
 template.
 
 ### 5.1 Deep Externally, Pure Internally (No Stateful `_Populator` / `_Runner` Classes)
@@ -184,24 +176,17 @@ template.
   top-level functions** (`_validateItem(...)`, `_parseHeader(...)`) or `static`
   methods on existing domain types with explicit inputs and immutable return
   values (Dart 3 named records with `<= 3` fields or value types).
-- **Forbid Callback Trampolines & Closure-Wrapped Mutable Locals**: Never
-  extract a helper that accepts a callback closure
-  (`String Function(Object?) pp` or `bool Function() isAborted`) just to call
-  back into a local recursive function or read a mutable local variable in the
-  caller, and never slice a `try/catch` out of a retry loop with a `null`
-  sentinel return. If a function relies on a nested recursive closure, promote
-  the recursive closure itself (or a stateless private formatter/printer helper
-  with `const` configuration fields) rather than passing recursion trampolines
-  into extracted branch helpers.
-- **Forbid `.catchError(...)` Metric Gaming in `async` Functions**: Never
-  replace idiomatic `try { await ... } catch (e, s)` with `.catchError(...)`
-  inside an `async` function solely to dodge `CatchClause` scoring, and never
-  preserve or introduce zero-allocation fast-path regressions (e.g., allocating
-  a new collection before an early-return fast path).
-- **Forbid Multi-Pass Loop Splitting & `.expand` Metric Gaming**: Never split a
-  single loop (or nested loop) into multiple sequential loops over the same
-  collection or chain `.expand((c) => c)` / `.forEach(...)` solely to shed loop
-  nesting depth.
+- **Forbid Callback Trampolines & Closure-Wrapped Mutable Locals**: Never pass
+  callback closures (`String Function(Object?) pp`, `bool Function() isAborted`)
+  into extracted helpers to call back into local recursive closures or read
+  mutable caller locals, and never slice `try/catch` out of a retry loop with a
+  `null` sentinel. Promote the recursive closure itself (or a `const` stateless
+  formatter/printer helper) instead.
+- **Forbid `.catchError(...)`, Multi-Pass Loop Splitting & `.expand` Gaming**:
+  Never replace `try { await ... } catch (e, s)` with `.catchError(...)` in
+  `async` functions to dodge `CatchClause` scoring, never introduce fast-path
+  allocation regressions, and never split a single loop into multiple sequential
+  loops or `.expand((c) => c)` / `.forEach(...)` chains to shed loop nesting.
 
 ### 5.2 In-Place Flattening First (Patterns A & B Before `data_flow` Extraction)
 
@@ -231,10 +216,9 @@ dart run cognitive_complexity:data_flow@^2.0.1 lib/src/my_file.dart:45-80
 ```
 
 Inspect the complexity impact (`enclosing_score`, `slice_score_in_place`,
-`slice_score_at_root`, `estimated_enclosing_score_after` in JSON;
-`DataFlowResult.enclosingScore`, `sliceScoreInPlace`, `sliceScoreAtRoot`,
-`estimatedEnclosingScoreAfter` in Dart) and honor any `extraction_warnings`
-(high parameter count `>= 5` inputs, low complexity payoff, or shallow
+`slice_score_at_root`, `estimated_enclosing_score_after`; see
+[`references/file_split_and_shallow.md`](references/file_split_and_shallow.md#1-anti-metric-gaming-guardrails--data_flow-schema-details))
+and honor any `extraction_warnings` (`>= 5` inputs, low payoff, or shallow
 signature-to-complexity ratio):
 
 - **Pattern C (3-Tier `data_flow` Extraction)**:
@@ -264,58 +248,31 @@ signature-to-complexity ratio):
 - **Pattern F (Acyclic File Decomposition & Load-Bearing Library Boundaries)**:
   Run
   `dart run cognitive_complexity:file_split@^2.0.1 lib/src/large_file.dart --target-lines 300`
-  for files `> 400` lines and select the library boundary tier. `--target-lines`
-  is a physical-line budget for the surviving file; the planner cuts disjoint
-  islands first, then sub-cone leaf groups out of the dominant island, names
-  each cut after its dominant public declaration, and skips Tier-3 `part`
-  fallback cuts that would leave `< 25%` of the pre-fallback file behind. The
-  header reports `largest resulting file: N lines` (appending
-  `(target M not met)` when `N > M`; `largest_resulting_file_lines` and
-  `meets_target` in `--format json`, which always emits an array of one report
-  per analyzed file). Oversized-declaration notes
-  (`implements X (n/m members are @override)`, static-promotion hints,
-  embedded-asset hints, and coupled-SCC vs. cohesive-island summaries) appear on
-  both `Move Declarations` in extracted cuts and `Surviving Declarations` — when
-  `>= 50%` of a class's members are `@override`, its size is bound by the
-  interface surface, so narrow the interface or split behind a delegate rather
-  than promoting statics.
+  for files `> 400` lines and select the library boundary tier (see
+  [`references/file_split_and_shallow.md`](references/file_split_and_shallow.md#3-pattern-f-acyclic-file-decomposition-library-boundaries--api_summary)
+  for full planner mechanics, JSON schema, and `@override >= 50%` interface
+  notes):
   - **Tier 1 (Default — Standalone `lib/src/<topic>.dart`, CLI
-    `[Cut N - Tier 1]`)**: Use when extracted helpers form a genuine sub-domain
-    with narrow parameter lists (`<= 3` args) and do **not** need private `_`
-    members or library-scoped modifiers of the parent class/library
-    (`[Cut N - Tier 2]` in `file_split` indicates a one-way acyclic cut that
-    requires widening `1–3` internal `_` helpers to `@internal` inside
+    `[Cut N - Tier 1]` / `[Cut N - Tier 2]`)**: Use when extracted helpers form
+    a sub-domain (`<= 3` args) without private `_` parent members or class
+    modifiers (`[Cut N - Tier 2]` widens `1–3` helpers to `@internal` in
     `lib/src/`).
-  - **Tier 2 (`part` / `part of`, CLI `[Cut N - Tier 3]`)**: Use when splitting
-    one cohesive domain where helpers share private `_` fields, private
-    constructors (`._()`), `sealed`/`final`/`interface`/`base` modifiers, or
-    internal invariants, OR when standalone `lib/src/` files would require
-    widening visibility and risk leaking internal types via unscoped
-    `export 'src/...';` directives.
-  - **Breaking Model/Enum Dispatch Back-Edges**: When data models/enums are
-    fused into a single giant SCC with a parser/service class because an `enum`
-    or model class defines a dispatch method calling the parser/service, move
-    that dispatch method to an `extension` in the surviving file so the models
-    extract cleanly into `<stem>_models.dart`.
-  - **Zero Uncalled Factories / Constructor Parity**: Whenever extracting
-    `<stem>_models.dart` or adding a convenience factory (`Foo.fromBar(...)`),
-    verify with `rg` that every newly added factory is called by the surviving
-    file and never leave an inline constructor call with divergent field values
-    alongside an unused factory.
-  - `file_split` plans are advisory: the cuts are dependency-correct, but the
-    suggested file name follows one declaration. Name each new file by what it
-    actually holds (Section 5.3).
+  - **Tier 2 (`part` / `part of`, CLI `[Cut N - Tier 3]`)**: Use when helpers
+    share private `_` fields, `._()` constructors, `sealed`/`final`/`interface`/
+    `base` modifiers, or when standalone files risk leaking internal types via
+    unscoped `export 'src/...';`.
+  - **Model/Enum Back-Edges & Factory Parity**: Move enum/model dispatch methods
+    to an `extension` in the surviving file so models extract cleanly into
+    `<stem>_models.dart`. Verify with `rg` that every new factory
+    (`Foo.fromBar(...)`) is called by the surviving file with no divergent
+    inline constructors. Name new files by what they hold (Section 5.3).
 - **Pattern G (Advisory Shallow-Helper Review — `shallow`)**: Optionally run
-  `dart run cognitive_complexity:shallow@^2.0.1 lib/` to list single-caller
+  `dart run cognitive_complexity:shallow@^2.0.1 lib/` to inspect single-caller
   helpers (`HIGH_ARITY`, `MICRO_HELPER`, `SIG_HEAVY`,
-  `CROSS_FILE_SINGLE_CALLER`). A `SAFE_INLINE` finding means inlining would not
-  breach the caller's budget, not that it should happen; most well-named helpers
-  should stay. Consider inlining only pure plumbing that passes every Section
-  5.3 check. A `Facts:` line (`shared_param_signature_with`,
-  `params_subset_of_existing_type` in JSON) points at a Parameter Record or
-  Existing State Object remedy instead of inlining; `HIGH_ARITY` counts inline
-  record parameters by field count, so packing arguments into an ad-hoc record
-  is not an escape.
+  `CROSS_FILE_SINGLE_CALLER`). Consider inlining `SAFE_INLINE` findings only for
+  pure plumbing that passes every Section 5.3 check; use Parameter Records or
+  existing state objects for `Facts:` (`shared_param_signature_with`,
+  `params_subset_of_existing_type`; inline record params count by field count).
 
 ### 5.3 Keep / Revert Heuristics
 
