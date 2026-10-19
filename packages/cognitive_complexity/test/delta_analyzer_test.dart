@@ -373,11 +373,16 @@ void complexFunc(bool a, bool b) {
       check(analyzer.analyzeCodeLineCount(ignoredFileCode)).isNull();
 
       const ignoredDeclCode = '''
-// cognitive_complexity:ignore
+// cognitive_complexity:ignore legacy state machine
 void ignoredFunc(bool a, bool b) {
   if (a) {
     if (b) {}
   }
+}
+
+// cognitive_complexity:ignore
+void ignoredNoReason(bool a) {
+  if (a) {}
 }
 
 void activeFunc(bool a) {
@@ -387,6 +392,43 @@ void activeFunc(bool a) {
       final partial = analyzer.analyzeCode(ignoredDeclCode);
       check(partial).length.equals(1);
       check(partial.first.name).equals('activeFunc');
+
+      final suppressed = analyzer.analyzeCodeSuppressed(
+        ignoredDeclCode,
+        filePath: 'lib/state.dart',
+      );
+      check(suppressed).length.equals(2);
+      check(suppressed[0].name).equals('ignoredFunc');
+      check(suppressed[0].score).equals(3);
+      check(suppressed[0].line).equals(2);
+      check(suppressed[0].ignoreReason).equals('legacy state machine');
+      check(
+        suppressed[0].formattedSummary,
+      ).equals('ignoredFunc (score: 3, reason: legacy state machine)');
+      check(suppressed[1].name).equals('ignoredNoReason');
+      check(suppressed[1].score).equals(1);
+      check(suppressed[1].ignoreReason).isNull();
+      check(
+        suppressed[1].formattedSummary,
+      ).equals('ignoredNoReason (score: 1, no reason)');
+
+      final deltaAnalyzer = DeltaAnalyzer(analyzer: analyzer);
+      final newlySuppressed = deltaAnalyzer.computeSuppressedDeltasForCode(
+        'void activeFunc(bool a) {\n  if (a) {}\n}\n',
+        ignoredDeclCode,
+        filePath: 'lib/state.dart',
+      );
+      check(
+        newlySuppressed.map((s) => s.name).toList(),
+      ).deepEquals(['ignoredFunc', 'ignoredNoReason']);
+      // Unchanged suppressions are not re-reported in diff mode.
+      check(
+        deltaAnalyzer.computeSuppressedDeltasForCode(
+          ignoredDeclCode,
+          ignoredDeclCode,
+          filePath: 'lib/state.dart',
+        ),
+      ).isEmpty();
 
       const summary = DeltaSummary(
         baseRef: 'HEAD~1',

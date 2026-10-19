@@ -91,6 +91,52 @@ class FunctionComplexity {
   String toString() => '$name ($filePath:L$startLine-$endLine): $score';
 }
 
+/// Represents a declaration suppressed via `// cognitive_complexity:ignore`
+/// along with its computed Cognitive Complexity score and optional reason.
+class SuppressedDeclaration {
+  final String filePath;
+  final String name;
+  final int startLine;
+  final int endLine;
+  final int score;
+  final String? ignoreReason;
+
+  const SuppressedDeclaration({
+    required this.filePath,
+    required this.name,
+    required this.startLine,
+    required this.endLine,
+    required this.score,
+    this.ignoreReason,
+  });
+
+  /// 1-based starting line number of the suppressed declaration.
+  int get line => startLine;
+
+  /// Total physical line span of this declaration (`endLine - startLine + 1`).
+  int get lineCount => endLine >= startLine ? endLine - startLine + 1 : 0;
+
+  /// Concise `name (score: X, reason: ...)` or `name (score: X, no reason)`
+  /// summary.
+  String get formattedSummary => ignoreReason != null
+      ? '$name (score: $score, reason: $ignoreReason)'
+      : '$name (score: $score, no reason)';
+
+  Map<String, dynamic> toJson() => {
+    'file': filePath,
+    'name': name,
+    'line': startLine,
+    'start_line': startLine,
+    'end_line': endLine,
+    'lines': lineCount,
+    'score': score,
+    'reason': ignoreReason,
+  };
+
+  @override
+  String toString() => '$formattedSummary  $filePath:L$startLine-$endLine';
+}
+
 /// Analyzes Dart files and directories to compute Cognitive Complexity scores
 /// and optional file/declaration line counts.
 class ComplexityAnalyzer {
@@ -134,13 +180,9 @@ class ComplexityAnalyzer {
         if (metric != null) metrics.add(metric);
       }
     } else if (dir.existsSync()) {
-      for (final entity in dir.listSync(recursive: true, followLinks: false)) {
-        if (entity is File && p.extension(entity.path) == '.dart') {
-          final relative = p.relative(entity.path, from: targetPath);
-          if (pathFilter.isExcluded(relative)) continue;
-          final metric = analyzeFileLineCount(entity.path);
-          if (metric != null) metrics.add(metric);
-        }
+      for (final entity in _dartFilesInDirectory(dir, targetPath)) {
+        final metric = analyzeFileLineCount(entity.path);
+        if (metric != null) metrics.add(metric);
       }
     } else {
       throw FileSystemException('Path does not exist', targetPath);
@@ -148,6 +190,40 @@ class ComplexityAnalyzer {
 
     metrics.sort((a, b) => b.lineCount.compareTo(a.lineCount));
     return metrics;
+  }
+
+  /// Analyzes declarations suppressed with `// cognitive_complexity:ignore`
+  /// under [targetPath].
+  List<SuppressedDeclaration> analyzePathSuppressed(String targetPath) {
+    final file = File(targetPath);
+    final dir = Directory(targetPath);
+    final suppressed = <SuppressedDeclaration>[];
+
+    if (file.existsSync()) {
+      if (p.extension(targetPath) == '.dart') {
+        suppressed.addAll(analyzeFileSuppressed(targetPath));
+      }
+    } else if (dir.existsSync()) {
+      for (final entity in _dartFilesInDirectory(dir, targetPath)) {
+        suppressed.addAll(analyzeFileSuppressed(entity.path));
+      }
+    } else {
+      throw FileSystemException('Path does not exist', targetPath);
+    }
+
+    suppressed.sort((a, b) => b.score.compareTo(a.score));
+    return suppressed;
+  }
+
+  Iterable<File> _dartFilesInDirectory(Directory dir, String targetPath) sync* {
+    for (final entity in dir.listSync(recursive: true, followLinks: false)) {
+      if (entity is File && p.extension(entity.path) == '.dart') {
+        final relative = p.relative(entity.path, from: targetPath);
+        if (!pathFilter.isExcluded(relative)) {
+          yield entity;
+        }
+      }
+    }
   }
 
   /// Computes the [FileLineMetric] for [filePath], or returns `null` if the
@@ -189,38 +265,34 @@ class ComplexityAnalyzer {
 
   List<FunctionComplexity> _analyzeDirectory(Directory dir, String targetPath) {
     final results = <FunctionComplexity>[];
-    for (final entity in dir.listSync(recursive: true, followLinks: false)) {
-      if (entity is File && p.extension(entity.path) == '.dart') {
-        final relative = p.relative(entity.path, from: targetPath);
-        if (pathFilter.isExcluded(relative)) {
-          continue;
-        }
-        results.addAll(analyzeFile(entity.path));
-      }
+    for (final entity in _dartFilesInDirectory(dir, targetPath)) {
+      results.addAll(analyzeFile(entity.path));
     }
     return results;
   }
 
   /// Analyzes a single Dart file at [filePath].
-  List<FunctionComplexity> analyzeFile(String filePath) {
+  List<FunctionComplexity> analyzeFile(String filePath) =>
+      _analyzeFileInternal(filePath).results;
+
+  /// Analyzes declarations suppressed with `// cognitive_complexity:ignore` in
+  /// a single Dart file at [filePath].
+  List<SuppressedDeclaration> analyzeFileSuppressed(String filePath) =>
+      _analyzeFileInternal(filePath).suppressedResults;
+
+  _DeclarationFinder _analyzeFileInternal(String filePath) {
     try {
       final result = parseFile(
         path: File(filePath).absolute.path,
         featureSet: _featureSet,
         throwIfDiagnostics: false,
       );
-      if (_directiveParser.hasIgnoreForFile(result.unit)) {
-        return [];
-      }
-
-      final finder = _DeclarationFinder(
+      return _runFinder(result.unit, result.lineInfo, filePath);
+    } catch (_) {
+      return _DeclarationFinder(
         filePath: filePath,
-        lineInfo: result.lineInfo,
+        lineInfo: LineInfo(const [0]),
       );
-      result.unit.accept(finder);
-      return finder.results;
-    } catch (e) {
-      return [];
     }
   }
 
@@ -228,21 +300,38 @@ class ComplexityAnalyzer {
   List<FunctionComplexity> analyzeCode(
     String code, {
     String filePath = '<memory>',
+  }) => _analyzeCodeInternal(code, filePath: filePath).results;
+
+  /// Analyzes declarations suppressed with `// cognitive_complexity:ignore` in
+  /// [code].
+  List<SuppressedDeclaration> analyzeCodeSuppressed(
+    String code, {
+    String filePath = '<memory>',
+  }) => _analyzeCodeInternal(code, filePath: filePath).suppressedResults;
+
+  _DeclarationFinder _analyzeCodeInternal(
+    String code, {
+    required String filePath,
   }) {
     final result = parseString(
       content: code,
       featureSet: _featureSet,
       throwIfDiagnostics: false,
     );
-    if (_directiveParser.hasIgnoreForFile(result.unit)) {
-      return [];
+    return _runFinder(result.unit, result.lineInfo, filePath);
+  }
+
+  _DeclarationFinder _runFinder(
+    CompilationUnit unit,
+    LineInfo lineInfo,
+    String filePath,
+  ) {
+    final finder = _DeclarationFinder(filePath: filePath, lineInfo: lineInfo);
+    if (_directiveParser.hasIgnoreForFile(unit)) {
+      return finder;
     }
-    final finder = _DeclarationFinder(
-      filePath: filePath,
-      lineInfo: result.lineInfo,
-    );
-    result.unit.accept(finder);
-    return finder.results;
+    unit.accept(finder);
+    return finder;
   }
 }
 
@@ -256,6 +345,7 @@ class _DeclarationFinder extends RecursiveAstVisitor<void> {
   final String filePath;
   final LineInfo lineInfo;
   final results = <FunctionComplexity>[];
+  final suppressedResults = <SuppressedDeclaration>[];
 
   _DeclarationFinder({required this.filePath, required this.lineInfo});
 
@@ -278,14 +368,27 @@ class _DeclarationFinder extends RecursiveAstVisitor<void> {
   /// carry initializers) with a single visitor so nothing outside the body
   /// proper is missed.
   void _record(String name, AstNode declarationNode, List<AstNode?> parts) {
-    if (_directiveParser.isDeclarationIgnored(declarationNode)) {
-      return;
-    }
     final visitor = CognitiveComplexityVisitor();
     visitor.visitAll(parts);
 
     final startLoc = lineInfo.getLocation(declarationNode.offset);
     final endLoc = lineInfo.getLocation(declarationNode.end);
+
+    if (_directiveParser.isDeclarationIgnored(declarationNode)) {
+      suppressedResults.add(
+        SuppressedDeclaration(
+          filePath: filePath,
+          name: name,
+          startLine: startLoc.lineNumber,
+          endLine: endLoc.lineNumber,
+          score: visitor.score,
+          ignoreReason: _directiveParser.declarationIgnoreReason(
+            declarationNode,
+          ),
+        ),
+      );
+      return;
+    }
 
     results.add(
       FunctionComplexity(

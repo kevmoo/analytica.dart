@@ -22,6 +22,7 @@ jobs:
       - name: Self-Dogfood Complexity Check
         uses: ./packages/cognitive_complexity
         with:
+          targets: packages tool
           diff-base: origin/${{ github.base_ref }}
           fail-threshold: 15
           fail-on-increase: true

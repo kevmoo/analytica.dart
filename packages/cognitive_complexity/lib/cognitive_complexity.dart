@@ -13,7 +13,8 @@ export 'src/complexity/complexity_analyzer.dart'
         ComplexityComposition,
         FileLineMetric,
         FunctionComplexity,
-        PathFilter;
+        PathFilter,
+        SuppressedDeclaration;
 export 'src/complexity/delta_analyzer.dart'
     show
         ComplexityDelta,

@@ -1,3 +1,20 @@
+## 2.0.2-wip
+
+- `data_flow`: Emit a deterministic `[ZERO_NESTING_GAIN]` extraction warning
+  when a proposed slice at `callNestingDepth == 0`
+  (`sliceScoreInPlace == sliceScoreAtRoot`) inside a borderline function
+  (`CC <= 22`) saves zero nesting penalty, advising in-place simplification
+  instead of 1:1 score shifting.
+- `shallow`: Report a `zero nesting discount` fact in `ShallowReport.formatText`
+  for `depth == 0` single-caller findings whose isolated inlined caller score is
+  `<= 22`.
+- `cognitive_complexity`: Compute complexity scores and capture optional
+  suppression reasons (`SuppressedDeclaration`) for declarations annotated with
+  `// cognitive_complexity:ignore` (#183). Suppressed declarations remain exempt
+  from failure threshold violations while surfacing in CLI text output
+  (`Suppressed declarations (N):`), `--format=json` (`suppressedDeclarations`),
+  and `--git-diff` reports when newly added or modified.
+
 ## 2.0.1
 
 - Exempt non-static methods on private classes called across types, cross-file

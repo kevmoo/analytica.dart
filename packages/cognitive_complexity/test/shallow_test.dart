@@ -142,6 +142,10 @@ void _depthZeroHelper(int a, int b, int c, int d, int e) {
         check(
           depthZeroFinding.classification,
         ).equals(ShallowClassification.loadBearing);
+        check(depthZeroReport.formatText()).contains(
+          'zero nesting discount (depth=0, delta=+6 == CC=6) -> simplify '
+          'caller in place instead of 1:1 score shifting',
+        );
       },
     );
 

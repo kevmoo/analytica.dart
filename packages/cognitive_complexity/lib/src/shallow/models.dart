@@ -364,5 +364,13 @@ class ShallowReport {
     if (f.siblingSteps.isNotEmpty)
       'siblings=[${f.siblingSteps.join(', ')}] stay extracted '
           '-> keep the sequence symmetric',
+    if (f.callNestingDepth == 0 &&
+        f.score > 0 &&
+        f.inlinedDeltaScore == f.score &&
+        f.inlinedCallerScoreIsolated <= 22 &&
+        f.siblingSteps.isEmpty)
+      'zero nesting discount (depth=0, delta=+${f.inlinedDeltaScore} == '
+          'CC=${f.score}) -> simplify caller in place instead of 1:1 score '
+          'shifting',
   ];
 }

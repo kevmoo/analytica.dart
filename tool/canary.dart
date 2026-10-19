@@ -75,8 +75,7 @@ Future<void> main(List<String> args) async {
       workDir: workDir,
     );
     final targets = await _resolveTargets(
-      repoRoot: repoRoot,
-      reposDirOpt: parsed['repos-dir'] as String?,
+      siblingRoot: (parsed['repos-dir'] as String?) ?? p.dirname(repoRoot),
       extraSpecs: parsed['extra'] as List<String>,
       skipConsumers: parsed['skip-consumers'] as bool,
       workDir: workDir,
@@ -226,15 +225,13 @@ String _writeBaselinePackageConfig({
 typedef _SweepTarget = ({String label, String path});
 
 Future<List<_SweepTarget>> _resolveTargets({
-  required String repoRoot,
-  required String? reposDirOpt,
+  required String siblingRoot,
   required List<String> extraSpecs,
   required bool skipConsumers,
   required Directory workDir,
 }) async {
   final targets = <_SweepTarget>[];
   if (!skipConsumers) {
-    final siblingRoot = reposDirOpt ?? p.dirname(repoRoot);
     for (final repo in consumerRepos) {
       targets.add(await _resolveConsumerRepo(repo, siblingRoot, workDir));
     }
@@ -432,8 +429,14 @@ void _checkCrashOrGateFlip(
 
 List<String> _diffComplexityJson(String v1Raw, String v2Raw) {
   if (v1Raw.isEmpty || v2Raw.isEmpty) return const [];
-  final v1List = (jsonDecode(v1Raw) as List).cast<Map<String, dynamic>>();
-  final v2List = (jsonDecode(v2Raw) as List).cast<Map<String, dynamic>>();
+  final v1Decoded = jsonDecode(v1Raw);
+  final v2Decoded = jsonDecode(v2Raw);
+  final v1List =
+      (v1Decoded is Map ? v1Decoded['declarations'] as List : v1Decoded as List)
+          .cast<Map<String, dynamic>>();
+  final v2List =
+      (v2Decoded is Map ? v2Decoded['declarations'] as List : v2Decoded as List)
+          .cast<Map<String, dynamic>>();
   final v1Map = {
     for (final d in v1List) '${d['file']}::${d['name']}': d['score'] as int,
   };
@@ -444,6 +447,18 @@ List<String> _diffComplexityJson(String v1Raw, String v2Raw) {
   for (final key in {...v1Map.keys, ...v2Map.keys}) {
     if (v1Map[key] != v2Map[key]) {
       diffs.add('`$key` score: ${v1Map[key]} -> ${v2Map[key]}');
+    }
+  }
+  if (v2Decoded is Map<String, dynamic>) {
+    final suppressed =
+        (v2Decoded['suppressedDeclarations'] as List? ?? const [])
+            .cast<Map<String, dynamic>>();
+    for (final s in suppressed) {
+      final reason = s['reason'] ?? 'no reason';
+      diffs.add(
+        '`${s['file']}::${s['name']}` suppressed '
+        '(score: ${s['score']}, reason: $reason)',
+      );
     }
   }
   return diffs;

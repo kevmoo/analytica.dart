@@ -574,5 +574,137 @@ int simplified(int a) {
         ..contains('2 -> del')
         ..not((r) => r.contains('['));
     });
+
+    test('Reports suppressed declarations in text, json, and --git-diff '
+        'modes without counting them as threshold violations', () async {
+      await d.dir('suppressed_project', [
+        d.dir('lib', [
+          d.file('app.dart', '''
+int cleanFunc(int a) {
+  if (a > 0) return 1;
+  return 0;
+}
+
+// cognitive_complexity:ignore -- generated parser table
+int suppressedWithReason(int a) {
+  if (a > 0) {
+    if (a > 1) {
+      if (a > 2) return 3;
+    }
+  }
+  return 0;
+}
+
+// cognitive_complexity:ignore
+int suppressedNoReason(int a) {
+  if (a > 0) {
+    if (a > 1) return 2;
+  }
+  return 0;
+}
+'''),
+        ]),
+      ]).create();
+
+      final repoDir = '${d.sandbox}/suppressed_project';
+
+      // 1. Standard CLI text mode: exits 0 even though suppressed functions
+      // exceed --fail-threshold 2, and prints Suppressed declarations (2):
+      final textProc = await TestProcess.start(Platform.resolvedExecutable, [
+        binPath,
+        '--fail-threshold',
+        '2',
+        repoDir,
+      ]);
+      final textOut = await textProc.stdoutStream().join('\n');
+      await textProc.shouldExit(0);
+      check(textOut)
+        ..contains('Suppressed declarations (2):')
+        ..contains(
+          'suppressedWithReason (score: 6, reason: generated parser table)',
+        )
+        ..contains('suppressedNoReason (score: 3, no reason)');
+
+      // 2. --format=json mode: includes suppressedDeclarations on file entries,
+      // top-level, and summary counts while keeping declarations clean
+      final jsonProc = await TestProcess.start(Platform.resolvedExecutable, [
+        binPath,
+        '--format',
+        'json',
+        repoDir,
+      ]);
+      final jsonOut = await jsonProc.stdoutStream().join('\n');
+      await jsonProc.shouldExit(0);
+      check(jsonOut)
+        ..contains('"suppressedDeclarations":2')
+        ..contains('"name":"suppressedWithReason"')
+        ..contains('"score":6')
+        ..contains('"reason":"generated parser table"')
+        ..contains('"name":"suppressedNoReason"')
+        ..contains('"reason":null');
+
+      // 3. --git-diff mode: surfaces newly added or modified suppressions
+      Future<void> git(List<String> args) async {
+        final res = await Process.run('git', args, workingDirectory: repoDir);
+        check(res.exitCode).equals(0);
+      }
+
+      await git(['init', '-b', 'main']);
+      await git(['config', 'user.name', 'Tester']);
+      await git(['config', 'user.email', 'test@example.com']);
+      await git(['config', 'commit.gpgsign', 'false']);
+      File('$repoDir/lib/app.dart').writeAsStringSync('''
+int cleanFunc(int a) {
+  if (a > 0) return 1;
+  return 0;
+}
+''');
+      await git(['add', '.']);
+      await git(['commit', '-m', 'Initial without suppressions']);
+
+      File('$repoDir/lib/app.dart').writeAsStringSync('''
+int cleanFunc(int a) {
+  if (a > 0) return 1;
+  return 0;
+}
+
+// cognitive_complexity:ignore: protocol compatibility
+int newlySuppressed(int a) {
+  if (a > 0) {
+    if (a > 1) {
+      if (a > 2) return 3;
+    }
+  }
+  return 0;
+}
+''');
+
+      final diffTextProc = await TestProcess.start(
+        Platform.resolvedExecutable,
+        [binPath, '--git-diff', 'main', '--fail-threshold', '2'],
+        workingDirectory: repoDir,
+        environment: {'GITHUB_WORKSPACE': repoDir},
+      );
+      final diffTextOut = await diffTextProc.stdoutStream().join('\n');
+      await diffTextProc.shouldExit(0);
+      check(diffTextOut)
+        ..contains('Suppressed declarations (1):')
+        ..contains(
+          'newlySuppressed (score: 6, reason: protocol compatibility)',
+        );
+
+      final diffJsonProc = await TestProcess.start(
+        Platform.resolvedExecutable,
+        [binPath, '--git-diff', 'main', '--format', 'json'],
+        workingDirectory: repoDir,
+        environment: {'GITHUB_WORKSPACE': repoDir},
+      );
+      final diffJsonOut = await diffJsonProc.stdoutStream().join('\n');
+      await diffJsonProc.shouldExit(0);
+      check(diffJsonOut)
+        ..contains('"suppressedDeclarations":1')
+        ..contains('"name":"newlySuppressed"')
+        ..contains('"reason":"protocol compatibility"');
+    });
   });
 }

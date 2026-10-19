@@ -221,6 +221,103 @@ Future<void> syncPayload(User? user, Payload? data) async {
 
 ---
 
+### 5-Step Pre-Extraction Simplification Checklist for Borderline Functions (`CC 16–22`)
+
+**Rule**: When a function is just over the threshold (`CC 16–22`, needing `-1`
+to `-7` points), you MUST exhaust all 5 in-place and cross-method
+simplifications before extracting ANY single-caller helper:
+
+1. **Cross-Method Deduplication (`FanIn >= 2`)**: Scan sibling methods in the
+   same class/file for repeated logic (`3+` branches) and extract a shared
+   helper called by `2+` methods.
+2. **Multi-Branch Local Closure Promotion**: If a function passes an inline
+   callback/closure (e.g. `onValue: (x) { ... }`) containing `3+` branches
+   (`if`/`switch`/`&&`), every branch inside that closure pays an extra `+1`
+   closure nesting penalty. Promote the closure to a named private method first.
+3. **Identical-Return Coalescing, Exception/Loop Guard Flattening & Tautological
+   Guard Removal**: Merge `if` branches or `switch` cases that return the exact
+   same value (`if (a || b) return x;` / `case A || B:`); coalesce
+   `on Ex { rethrow; } catch (e, s) { if (...) rethrow; }` into
+   `catch (e, s) { if (e is Ex || ...) rethrow; }`; hoist pre-loop null-reader
+   checks (`if (reader == null) return ...;`) and replace
+   `while (true) { ... if (!hasListener) break; }` with `while (hasListener)`;
+   remove redundant null/type checks on expressions whose static type is already
+   non-null or cast; and drop redundant `.toList()` calls after `.cast<T>()`
+   when an `Iterable<T>` suffices. Never slice a `try/catch` out of a retry loop
+   with a `null` sentinel return, or pass a caller's mutable state flag
+   (`bool isAborted`) by value into a helper that mutates it.
+4. **Twin-Block Loop Folding & Loop-Invariant Hoisting**: When two consecutive
+   blocks perform the same structural check on two values (e.g. `inputType` and
+   `outputType`, or `serializeConfig` and `deserializeConfig`), fold them into a
+   2-element collection loop (`for (final item in [?first, ?second])` or
+   `for (final t in {typeA, typeB})`). If a per-item method loops over
+   class-wide or outer-scope metadata on every call, hoist that loop to the
+   outer orchestrator.
+5. **Zero-Nesting-Gain & Asymmetric Extraction Ban**: Never extract a
+   single-caller helper at `callNestingDepth == 0` out of a borderline
+   `CC 16–22` function when `sliceScoreInPlace == sliceScoreAtRoot` (`0` net
+   file CC reduction), and never asymmetrically extract one arm of a peer
+   `Map`/`Iterable` or `switch` dispatch while leaving its twin inline.
+
+#### Before: Twin Blocks + Identical Returns + Tautological Casts
+
+```dart
+void registerCodecTypes(
+  TypeDescriptor? inputType,
+  TypeDescriptor? outputType,
+  Set<Uri> imports,
+) {
+  if (inputType != null && !inputType.isPrimitive) {
+    if (inputType.kind == TypeKind.scalar || inputType.kind == TypeKind.enumType) {
+      imports.add(inputType.libraryUri);
+    } else if (inputType.kind == TypeKind.alias) {
+      imports.add(inputType.libraryUri);
+    }
+    for (final arg in inputType.typeArguments.cast<TypeDescriptor>().toList()) {
+      if (arg is TypeDescriptor && !arg.isPrimitive) {
+        imports.add(arg.libraryUri);
+      }
+    }
+  }
+  if (outputType != null && !outputType.isPrimitive) {
+    if (outputType.kind == TypeKind.scalar || outputType.kind == TypeKind.enumType) {
+      imports.add(outputType.libraryUri);
+    } else if (outputType.kind == TypeKind.alias) {
+      imports.add(outputType.libraryUri);
+    }
+    for (final arg in outputType.typeArguments.cast<TypeDescriptor>().toList()) {
+      if (arg is TypeDescriptor && !arg.isPrimitive) {
+        imports.add(arg.libraryUri);
+      }
+    }
+  }
+}
+```
+
+#### After: Folded 2-Element Loop + Coalesced Condition + Tautological Guard Removed
+
+```dart
+void registerCodecTypes(
+  TypeDescriptor? inputType,
+  TypeDescriptor? outputType,
+  Set<Uri> imports,
+) {
+  for (final type in [?inputType, ?outputType]) {
+    if (type.isPrimitive) continue;
+    if (type.kind == TypeKind.scalar ||
+        type.kind == TypeKind.enumType ||
+        type.kind == TypeKind.alias) {
+      imports.add(type.libraryUri);
+    }
+    for (final arg in type.typeArguments.cast<TypeDescriptor>()) {
+      if (!arg.isPrimitive) imports.add(arg.libraryUri);
+    }
+  }
+}
+```
+
+---
+
 ### Pattern C: The 3-Tier Decomposition Rubric (Anti-Goodhart)
 
 Run the companion statement-level data-flow analyzer on each candidate line
@@ -411,6 +508,25 @@ Its classifications describe what is _possible_, not what to do:
   being fixed; flatten with Pattern A or B as part of that work.
 - **`LOAD_BEARING` (`HelperCC >= 5` or `CallerCCAfter > 22`)**: Keep extracted,
   or narrow its parameter list if `HIGH_ARITY`.
+
+---
+
+### Pattern H: Hot Inner Loops — Suppress Instead of Splitting (`// cognitive_complexity:ignore`)
+
+When a function is a tight nested inner loop—such as a **2D matrix/grid `row` /
+`col` scan**, neighbor/penalty scoring kernel, pixel/image buffer loop, module
+grid scan, or byte/token kernel—you **MUST NOT** extract per-cell or per-element
+helpers called inside the loop body (nor split a single 2D pass into multiple
+passes). Instead, you **MUST** keep the hot kernel inline and place
+`// cognitive_complexity:ignore <reason>` on the line immediately preceding the
+declaration:
+
+```dart
+// cognitive_complexity:ignore Hot 2D matrix neighbor-scoring kernel; keep inline to avoid per-cell call overhead.
+int _scoreModules(List<int> modules, int size) {
+  // Keep tight row/col loops inline.
+}
+```
 
 ---
 

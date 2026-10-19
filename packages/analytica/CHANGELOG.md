@@ -1,5 +1,9 @@
 ## 0.1.5-wip
 
+- Add `CommentDirectiveParser.declarationIgnoreReason` and
+  `CommentDirectiveParser.declarationIgnoreReasonFor` to extract optional
+  suppression reasons following `// <tool>:ignore` directives (#183).
+
 ## 0.1.4
 
 - Fix `GitDiffParser.parse` to handle single-quote file paths and oversized hunk
