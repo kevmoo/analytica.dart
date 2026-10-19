@@ -117,13 +117,15 @@ class DataFlowAnalyzer {
       isAsync: inBlockVisitor.hasAwait,
     );
 
-    final (:enclosingScore, :sliceScoreInPlace, :sliceScoreAtRoot) =
-        _computeComplexityImpact(enclosingNode, startOffset, endOffset);
+    final impact = _computeComplexityImpact(
+      enclosingNode,
+      startOffset,
+      endOffset,
+    );
     final warnings = _buildExtractionWarnings(
       inputCount: inputList.length,
       sliceLineCount: endLine - startLine + 1,
-      enclosingScore: enclosingScore,
-      sliceScoreInPlace: sliceScoreInPlace,
+      impact: impact,
     );
 
     return DataFlowResult(
@@ -137,9 +139,9 @@ class DataFlowAnalyzer {
       escapes: List.unmodifiable(escapes),
       suggestedSignature: signature,
       isCleanlyExtractable: escapes.isEmpty,
-      enclosingScore: enclosingScore,
-      sliceScoreInPlace: sliceScoreInPlace,
-      sliceScoreAtRoot: sliceScoreAtRoot,
+      enclosingScore: impact.enclosingScore,
+      sliceScoreInPlace: impact.sliceScoreInPlace,
+      sliceScoreAtRoot: impact.sliceScoreAtRoot,
       extractionWarnings: List.unmodifiable(warnings),
     );
   }
@@ -186,8 +188,7 @@ class DataFlowAnalyzer {
     }
   }
 
-  ({int enclosingScore, int sliceScoreInPlace, int sliceScoreAtRoot})
-  _computeComplexityImpact(
+  _ComplexityImpact _computeComplexityImpact(
     AstNode enclosingNode,
     int startOffset,
     int endOffset,
@@ -233,9 +234,9 @@ class DataFlowAnalyzer {
   List<String> _buildExtractionWarnings({
     required int inputCount,
     required int sliceLineCount,
-    required int enclosingScore,
-    required int sliceScoreInPlace,
+    required _ComplexityImpact impact,
   }) {
+    final (:enclosingScore, :sliceScoreInPlace, :sliceScoreAtRoot) = impact;
     final warnings = <String>[];
     if (inputCount >= 5) {
       warnings.add(
@@ -244,6 +245,19 @@ class DataFlowAnalyzer {
         'signature. Prefer keeping the slice inline if enclosing complexity '
         '($enclosingScore) is <= 15, choosing a coarser boundary with <= 4 '
         'inputs, or grouping cohesive state.',
+      );
+    }
+    if (sliceScoreInPlace > 0 &&
+        sliceScoreInPlace == sliceScoreAtRoot &&
+        enclosingScore <= 22) {
+      warnings.add(
+        '[ZERO_NESTING_GAIN] Extracting this slice at depth 0 out of a '
+        'borderline function (CC $enclosingScore <= 22) saves 0 nesting '
+        'penalty (in-place CC $sliceScoreInPlace == extracted CC '
+        '$sliceScoreAtRoot, 0 net complexity reduction). Simplify in place '
+        '(coalesce identical-return branches, remove tautological guards, '
+        'fold twin blocks into a 2-element loop, or hoist outer-scope loops) '
+        'instead of extracting a single-caller helper.',
       );
     }
     if (sliceScoreInPlace <= 2 && sliceLineCount <= 6) {
@@ -299,6 +313,12 @@ class DataFlowAnalyzer {
         .toList();
   }
 }
+
+typedef _ComplexityImpact = ({
+  int enclosingScore,
+  int sliceScoreInPlace,
+  int sliceScoreAtRoot,
+});
 
 class _OutermostSliceNodesCollector extends UnifyingAstVisitor<void> {
   final int startOffset;

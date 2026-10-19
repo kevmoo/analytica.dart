@@ -16,8 +16,10 @@ class CommentDirectiveParser {
         '//\\s*${RegExp.escape(toolName)}:ignore_for_file\\b',
       ),
       ignoreDeclarationPattern = RegExp(
-        '//\\s*${RegExp.escape(toolName)}:ignore\\b',
+        '//\\s*${RegExp.escape(toolName)}:ignore\\b(.*)\$',
       );
+
+  static final _leadingReasonSeparator = RegExp(r'^[\s:\-]+');
 
   /// Returns `true` if [unit] contains a file-level suppression directive
   /// (`// <tool>:ignore_for_file`) in its comments.
@@ -40,49 +42,62 @@ class CommentDirectiveParser {
   }
 
   /// Returns `true` if [node] is preceded by a `// <tool>:ignore` directive.
-  bool isDeclarationIgnored(AstNode node) {
+  bool isDeclarationIgnored(AstNode node) =>
+      _findDeclarationIgnore(node).ignored;
+
+  /// Returns the optional suppression reason following `// <tool>:ignore` on
+  /// [node] (stripping leading `:`, `-`, `--`, and whitespace), or `null` if
+  /// [node] is not ignored or no reason text was provided.
+  String? declarationIgnoreReason(AstNode node) =>
+      _findDeclarationIgnore(node).reason;
+
+  ({bool ignored, String? reason}) _findDeclarationIgnore(AstNode node) {
     // Check comments preceding the beginToken.
-    if (_commentsContainIgnore(node.beginToken.precedingComments)) {
-      return true;
-    }
+    final beginMatch = _matchIgnoreInComments(
+      node.beginToken.precedingComments,
+    );
+    if (beginMatch.ignored) return beginMatch;
 
     // If node is an annotated node, also check comments on each metadata token
     // and the first token after metadata.
     if (node is AnnotatedNode) {
       for (final meta in node.metadata) {
-        if (_commentsContainIgnore(meta.beginToken.precedingComments)) {
-          return true;
-        }
+        final metaMatch = _matchIgnoreInComments(
+          meta.beginToken.precedingComments,
+        );
+        if (metaMatch.ignored) return metaMatch;
       }
       final firstToken = node.firstTokenAfterCommentAndMetadata;
-      if (_commentsContainIgnore(firstToken.precedingComments)) {
-        return true;
-      }
+      final afterMetaMatch = _matchIgnoreInComments(
+        firstToken.precedingComments,
+      );
+      if (afterMetaMatch.ignored) return afterMetaMatch;
     }
 
     // If node is a VariableDeclaration inside a VariableDeclarationList,
     // also check the enclosing AnnotatedNode (TopLevelVariableDeclaration or
     // FieldDeclaration).
-    final parent = node.parent;
-    if (parent is VariableDeclarationList) {
-      final grandParent = parent.parent;
-      if (grandParent is AnnotatedNode && isDeclarationIgnored(grandParent)) {
-        return true;
-      }
+    if (node.parent case VariableDeclarationList(
+      parent: final AnnotatedNode grandParent,
+    )) {
+      return _findDeclarationIgnore(grandParent);
     }
 
-    return false;
+    return (ignored: false, reason: null);
   }
 
-  bool _commentsContainIgnore(Token? commentToken) {
+  ({bool ignored, String? reason}) _matchIgnoreInComments(Token? commentToken) {
     var current = commentToken;
     while (current != null) {
-      if (ignoreDeclarationPattern.hasMatch(current.lexeme)) {
-        return true;
+      final match = ignoreDeclarationPattern.firstMatch(current.lexeme);
+      if (match != null) {
+        final raw = match.group(1) ?? '';
+        final cleaned = raw.replaceFirst(_leadingReasonSeparator, '').trim();
+        return (ignored: true, reason: cleaned.isEmpty ? null : cleaned);
       }
       current = current.next;
     }
-    return false;
+    return (ignored: false, reason: null);
   }
 
   /// Static helper to check file-level suppression for a given [toolName].
@@ -98,4 +113,11 @@ class CommentDirectiveParser {
     AstNode node, {
     required String toolName,
   }) => CommentDirectiveParser(toolName).isDeclarationIgnored(node);
+
+  /// Static helper to extract the optional suppression reason following
+  /// `// <tool>:ignore` on [node] for a given [toolName].
+  static String? declarationIgnoreReasonFor(
+    AstNode node, {
+    required String toolName,
+  }) => CommentDirectiveParser(toolName).declarationIgnoreReason(node);
 }

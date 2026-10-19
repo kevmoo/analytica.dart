@@ -29,6 +29,16 @@ List<File> _findEvalsFiles(Directory baseDir) {
   }).toList();
 }
 
+Map<String, dynamic> _decodeJsonMap(File file) {
+  final decoded = jsonDecode(file.readAsStringSync());
+  expect(
+    decoded,
+    isA<Map<String, dynamic>>(),
+    reason: '${file.path} must be a JSON map.',
+  );
+  return decoded as Map<String, dynamic>;
+}
+
 void _verifyStructuralConsistency(List<File> files, String itemsKey) {
   Set<String>? expectedRootKeys;
   String? expectedRootKeysFilePath;
@@ -36,50 +46,42 @@ void _verifyStructuralConsistency(List<File> files, String itemsKey) {
   String? expectedItemFilePath;
 
   for (final file in files) {
-    final decoded = jsonDecode(file.readAsStringSync());
-    final decodedMap = switch (decoded) {
-      final Map<String, dynamic> map => map,
-      _ => fail('${file.path} must be a JSON map.'),
-    };
+    final decodedMap = _decodeJsonMap(file);
     final rootKeys = decodedMap.keys.toSet();
-    if (expectedRootKeys == null) {
-      expectedRootKeys = rootKeys;
-      expectedRootKeysFilePath = file.path;
-    } else {
-      expect(
-        rootKeys,
-        equals(expectedRootKeys),
-        reason:
-            '${file.path} root keys do not match consistency pattern. '
-            'Expected keys to match the first processed file '
-            '($expectedRootKeysFilePath).',
-      );
-    }
+    expectedRootKeys ??= rootKeys;
+    expectedRootKeysFilePath ??= file.path;
+    expect(
+      rootKeys,
+      equals(expectedRootKeys),
+      reason:
+          '${file.path} root keys do not match consistency pattern. '
+          'Expected keys to match the first processed file '
+          '($expectedRootKeysFilePath).',
+    );
 
     final itemsRaw = decodedMap[itemsKey];
-    final itemsList = switch (itemsRaw) {
-      final List<dynamic> list => list,
-      _ => fail('$itemsKey key in ${file.path} must be a List.'),
-    };
-    for (final item in itemsList) {
-      final itemMap = switch (item) {
-        final Map<String, dynamic> map => map,
-        _ => fail('Item in $itemsKey list in ${file.path} must be a JSON map.'),
-      };
-      final itemKeys = itemMap.keys.toSet();
-      if (expectedItemKeys == null) {
-        expectedItemKeys = itemKeys;
-        expectedItemFilePath = file.path;
-      } else {
-        expect(
-          itemKeys,
-          equals(expectedItemKeys),
-          reason:
-              'Item in ${file.path} keys do not match consistency pattern. '
-              'Expected item keys to match the first processed file '
-              '($expectedItemFilePath).',
-        );
-      }
+    expect(
+      itemsRaw,
+      isA<List<dynamic>>(),
+      reason: '$itemsKey key in ${file.path} must be a List.',
+    );
+    for (final item in itemsRaw as List<dynamic>) {
+      expect(
+        item,
+        isA<Map<String, dynamic>>(),
+        reason: 'Item in $itemsKey list in ${file.path} must be a JSON map.',
+      );
+      final itemKeys = (item as Map<String, dynamic>).keys.toSet();
+      expectedItemKeys ??= itemKeys;
+      expectedItemFilePath ??= file.path;
+      expect(
+        itemKeys,
+        equals(expectedItemKeys),
+        reason:
+            'Item in ${file.path} keys do not match consistency pattern. '
+            'Expected item keys to match the first processed file '
+            '($expectedItemFilePath).',
+      );
     }
   }
 }
@@ -109,10 +111,6 @@ void main() {
     test('all published skills with evals have an evals.json file', () {
       final repoRoot = _getRepoRoot();
       final skillsDir = Directory(p.join(repoRoot.path, 'skills'));
-      if (!skillsDir.existsSync()) {
-        return;
-      }
-
       final skillDirsWithEvals = skillsDir
           .listSync()
           .whereType<Directory>()
@@ -150,23 +148,16 @@ void main() {
         expect(evalsFiles, isNotEmpty);
 
         for (final file in evalsFiles) {
-          final decoded = jsonDecode(file.readAsStringSync());
-          final decodedMap = switch (decoded) {
-            final Map<String, dynamic> map => map,
-            _ => fail('${file.path} must be a JSON map.'),
-          };
+          final decodedMap = _decodeJsonMap(file);
+          final repoCriteriaRaw =
+              decodedMap['repo_criteria'] ?? const <Object?>[];
+          expect(
+            repoCriteriaRaw,
+            isA<List<dynamic>>(),
+            reason: 'repo_criteria in ${file.path} must be a List.',
+          );
 
-          final repoCriteriaRaw = decodedMap['repo_criteria'];
-          if (repoCriteriaRaw == null) {
-            continue;
-          }
-
-          final repoCriteriaList = switch (repoCriteriaRaw) {
-            final List<dynamic> list => list,
-            _ => fail('repo_criteria in ${file.path} must be a List.'),
-          };
-
-          for (final rubricPath in repoCriteriaList) {
+          for (final rubricPath in repoCriteriaRaw as List<dynamic>) {
             expect(rubricPath, isA<String>());
             final rubricFile = File(
               p.join(repoRoot.path, rubricPath as String),
@@ -179,11 +170,7 @@ void main() {
                   'exist at ${rubricFile.path}',
             );
 
-            final rubricDecoded = jsonDecode(rubricFile.readAsStringSync());
-            final rubricMap = switch (rubricDecoded) {
-              final Map<String, dynamic> map => map,
-              _ => fail('${rubricFile.path} must be a JSON map.'),
-            };
+            final rubricMap = _decodeJsonMap(rubricFile);
             expect(
               rubricMap['evals'],
               isA<List<dynamic>>(),
@@ -199,10 +186,6 @@ void main() {
       () {
         final repoRoot = _getRepoRoot();
         final rubricsDir = Directory(p.join(repoRoot.path, 'evals'));
-        if (!rubricsDir.existsSync()) {
-          return;
-        }
-
         final rubricFiles =
             rubricsDir
                 .listSync()
@@ -216,10 +199,7 @@ void main() {
                 .toList()
               ..sort((a, b) => a.path.compareTo(b.path));
 
-        if (rubricFiles.isEmpty) {
-          return;
-        }
-
+        expect(rubricFiles, isNotEmpty);
         _verifyStructuralConsistency(rubricFiles, 'evals');
       },
     );
@@ -237,8 +217,7 @@ void main() {
       final configFile = File(p.join(repoRoot.path, 'skills.sh.json'));
       expect(configFile.existsSync(), isTrue);
 
-      final decoded =
-          jsonDecode(configFile.readAsStringSync()) as Map<String, Object?>;
+      final decoded = _decodeJsonMap(configFile);
       expect(
         decoded[r'$schema'],
         'https://skills.sh/schemas/skills.sh.schema.json',
@@ -267,13 +246,13 @@ void main() {
         );
         final skills = (group['skills'] as List<Object?>).cast<String>();
         expect(skills, isNotEmpty);
-        for (final skill in skills) {
-          expect(
-            groupedSkills.add(skill),
-            isTrue,
-            reason: 'Duplicate skill "$skill" in skills.sh.json',
-          );
-        }
+        expect(skills.toSet(), hasLength(skills.length));
+        expect(
+          groupedSkills.intersection(skills.toSet()),
+          isEmpty,
+          reason: 'Duplicate skill in skills.sh.json',
+        );
+        groupedSkills.addAll(skills);
       }
 
       expect(groupedSkills, equals(actualSkills));

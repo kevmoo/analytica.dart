@@ -181,6 +181,7 @@ class DeltaSummary {
   final int filesAnalyzed;
   final List<ComplexityDelta> deltas;
   final List<FileLineDelta> fileDeltas;
+  final List<SuppressedDeclaration> suppressedDeclarations;
 
   const DeltaSummary({
     required this.baseRef,
@@ -188,6 +189,7 @@ class DeltaSummary {
     required this.filesAnalyzed,
     required this.deltas,
     this.fileDeltas = const [],
+    this.suppressedDeclarations = const [],
   });
 
   int get netDelta => deltas.fold(0, (sum, d) => sum + d.delta);
@@ -283,6 +285,10 @@ class DeltaSummary {
         ),
         if (maxFileLines != null && maxFileLines > 0)
           'file_line_violations': violatedFiles.length,
+        if (suppressedDeclarations.isNotEmpty) ...{
+          'suppressedDeclarations': suppressedDeclarations.length,
+          'suppressed_declarations': suppressedDeclarations.length,
+        },
       },
       'deltas': changedDeltas
           .map(
@@ -298,6 +304,10 @@ class DeltaSummary {
             .where((f) => f.status != DeltaStatus.unchanged)
             .map((f) => f.toJson(maxFileLines: maxFileLines))
             .toList(),
+      if (suppressedDeclarations.isNotEmpty)
+        'suppressedDeclarations': [
+          for (final s in suppressedDeclarations) s.toJson(),
+        ],
     };
   }
 }
@@ -368,6 +378,7 @@ class DeltaAnalyzer {
         .toList();
     final allDeltas = <ComplexityDelta>[];
     final allFileDeltas = <FileLineDelta>[];
+    final allSuppressed = <SuppressedDeclaration>[];
 
     final pool = Pool(8);
     final tasks = modFiles.map(
@@ -388,16 +399,26 @@ class DeltaAnalyzer {
           newContent,
           filePath: relPath,
         );
-        return (declDeltas: declDeltas, fileDelta: fileDelta);
+        final suppressedDeltas = computeSuppressedDeltasForCode(
+          oldContent,
+          newContent,
+          filePath: relPath,
+        );
+        return (
+          declDeltas: declDeltas,
+          fileDelta: fileDelta,
+          suppressedDeltas: suppressedDeltas,
+        );
       }),
     );
 
     final results = await Future.wait(tasks);
-    for (final (:declDeltas, :fileDelta) in results) {
+    for (final (:declDeltas, :fileDelta, :suppressedDeltas) in results) {
       allDeltas.addAll(declDeltas);
       if (fileDelta != null) {
         allFileDeltas.add(fileDelta);
       }
+      allSuppressed.addAll(suppressedDeltas);
     }
 
     allDeltas.sort(
@@ -411,6 +432,7 @@ class DeltaAnalyzer {
     );
 
     allFileDeltas.sort((a, b) => (b.newLines ?? 0).compareTo(a.newLines ?? 0));
+    allSuppressed.sort((a, b) => b.score.compareTo(a.score));
 
     return DeltaSummary(
       baseRef: baseRef,
@@ -418,7 +440,39 @@ class DeltaAnalyzer {
       filesAnalyzed: modFiles.length,
       deltas: List.unmodifiable(allDeltas),
       fileDeltas: List.unmodifiable(allFileDeltas),
+      suppressedDeclarations: List.unmodifiable(allSuppressed),
     );
+  }
+
+  /// Returns suppressed declarations in [newCode] that were newly added or
+  /// modified (in score, ignore reason, or line span) relative to [oldCode].
+  List<SuppressedDeclaration> computeSuppressedDeltasForCode(
+    String oldCode,
+    String newCode, {
+    String filePath = '<memory>',
+  }) {
+    final oldSuppressed = {
+      for (final s in _analyzer.analyzeCodeSuppressed(
+        oldCode,
+        filePath: filePath,
+      ))
+        s.name: s,
+    };
+    final newSuppressed = _analyzer.analyzeCodeSuppressed(
+      newCode,
+      filePath: filePath,
+    );
+    final changed = <SuppressedDeclaration>[];
+    for (final s in newSuppressed) {
+      final prev = oldSuppressed[s.name];
+      if (prev == null ||
+          prev.score != s.score ||
+          prev.ignoreReason != s.ignoreReason ||
+          prev.lineCount != s.lineCount) {
+        changed.add(s);
+      }
+    }
+    return List.unmodifiable(changed);
   }
 
   /// Computes the [FileLineDelta] between [oldCode] and [newCode], or returns

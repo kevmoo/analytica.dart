@@ -166,5 +166,65 @@ class Foo {}
       check(parser.isDeclarationIgnored(parsed.unit.declarations[0])).isFalse();
       check(parser.isDeclarationIgnored(parsed.unit.declarations[1])).isFalse();
     });
+
+    test(
+      'extracts optional suppression reason stripping leading separators',
+      () {
+        const source = '''
+// my_tool:ignore
+void bareIgnore() {}
+
+// my_tool:ignore 2D matrix neighbor-scoring hot loop
+void spaceReason() {}
+
+// my_tool:ignore: state machine dispatch table
+void colonReason() {}
+
+// my_tool:ignore - performance critical parser
+@pragma('vm:prefer-inline')
+void dashReason() {}
+
+@pragma('vm:prefer-inline')
+// my_tool:ignore -- bit-manipulation kernel
+void doubleDashAfterMeta() {}
+
+void notIgnored() {}
+''';
+        final parsed = parseString(
+          content: source,
+          featureSet: FeatureSet.latestLanguageVersion(),
+        );
+        final decls = parsed.unit.declarations;
+
+        check(parser.isDeclarationIgnored(decls[0])).isTrue();
+        check(parser.declarationIgnoreReason(decls[0])).isNull();
+
+        check(parser.isDeclarationIgnored(decls[1])).isTrue();
+        check(
+          parser.declarationIgnoreReason(decls[1]),
+        ).equals('2D matrix neighbor-scoring hot loop');
+
+        check(parser.isDeclarationIgnored(decls[2])).isTrue();
+        check(
+          parser.declarationIgnoreReason(decls[2]),
+        ).equals('state machine dispatch table');
+
+        check(parser.isDeclarationIgnored(decls[3])).isTrue();
+        check(
+          parser.declarationIgnoreReason(decls[3]),
+        ).equals('performance critical parser');
+
+        check(parser.isDeclarationIgnored(decls[4])).isTrue();
+        check(
+          CommentDirectiveParser.declarationIgnoreReasonFor(
+            decls[4],
+            toolName: 'my_tool',
+          ),
+        ).equals('bit-manipulation kernel');
+
+        check(parser.isDeclarationIgnored(decls[5])).isFalse();
+        check(parser.declarationIgnoreReason(decls[5])).isNull();
+      },
+    );
   });
 }

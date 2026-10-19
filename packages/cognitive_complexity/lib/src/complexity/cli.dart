@@ -335,16 +335,19 @@ int _handleRegularMode({
 }) {
   final analyzer = ComplexityAnalyzer(pathFilter: pathFilter);
   final allResults = <FunctionComplexity>[];
+  final allSuppressed = <SuppressedDeclaration>[];
   final fileMetrics = <FileLineMetric>[];
 
   for (final target in targets) {
     allResults.addAll(analyzer.analyzePath(target));
+    allSuppressed.addAll(analyzer.analyzePathSuppressed(target));
     if (maxFileLines != null) {
       fileMetrics.addAll(analyzer.analyzePathFileLines(target));
     }
   }
 
   allResults.sort((a, b) => b.score.compareTo(a.score));
+  allSuppressed.sort((a, b) => b.score.compareTo(a.score));
   final displayed = allResults
       .where(
         (r) =>
@@ -354,19 +357,9 @@ int _handleRegularMode({
       .toList();
 
   if (format == 'json') {
-    final declarationsJson = displayed.map((e) => e.toJson()).toList();
     out.writeln(
       jsonEncode(
-        maxFileLines == null
-            ? declarationsJson
-            : {
-                'schema_version': reportSchemaVersion,
-                'declarations': declarationsJson,
-                'files': fileMetrics
-                    .where((f) => f.isViolation(maxFileLines: maxFileLines))
-                    .map((f) => f.toJson(maxFileLines: maxFileLines))
-                    .toList(),
-              },
+        _encodeRegularJson(displayed, fileMetrics, allSuppressed, maxFileLines),
       ),
     );
   } else if (format == 'github') {
@@ -390,6 +383,7 @@ int _handleRegularMode({
       failThreshold,
       maxFileLines,
       maxFunctionLines,
+      suppressed: allSuppressed,
       verbose: verbose,
     );
   }
@@ -420,6 +414,50 @@ String _formatRegularError(int? failThreshold) => failThreshold != null
     : '\nError: One or more declarations or files exceeded the configured '
           'line limit.';
 
+Object _encodeRegularJson(
+  List<FunctionComplexity> displayed,
+  List<FileLineMetric> fileMetrics,
+  List<SuppressedDeclaration> allSuppressed,
+  int? maxFileLines,
+) {
+  final declarationsJson = displayed.map((e) => e.toJson()).toList();
+  if (maxFileLines == null && allSuppressed.isEmpty) {
+    return declarationsJson;
+  }
+  final suppressedByFile = <String, List<Map<String, dynamic>>>{};
+  for (final s in allSuppressed) {
+    (suppressedByFile[s.filePath] ??= []).add(s.toJson());
+  }
+  final violatedFiles = maxFileLines == null
+      ? const <FileLineMetric>[]
+      : fileMetrics
+            .where((f) => f.isViolation(maxFileLines: maxFileLines))
+            .toList();
+  final violatedByPath = {for (final f in violatedFiles) f.filePath: f};
+  final filePaths = <String>{...violatedByPath.keys, ...suppressedByFile.keys};
+  return {
+    'schema_version': reportSchemaVersion,
+    'summary': {
+      'declarations': declarationsJson.length,
+      'suppressedDeclarations': allSuppressed.length,
+      'suppressed_declarations': allSuppressed.length,
+    },
+    'declarations': declarationsJson,
+    if (allSuppressed.isNotEmpty)
+      'suppressedDeclarations': allSuppressed.map((s) => s.toJson()).toList(),
+    'files': [
+      for (final path in filePaths)
+        {
+          if (violatedByPath[path] case final metric?)
+            ...metric.toJson(maxFileLines: maxFileLines)
+          else
+            'file': path,
+          'suppressedDeclarations': ?suppressedByFile[path],
+        },
+    ],
+  };
+}
+
 void _printUsage(ArgParser parser, StringSink sink) {
   sink.writeln('Dart & Flutter Cognitive Complexity Calculator');
   sink.writeln();
@@ -444,6 +482,7 @@ void _printTextReport(
   int? failThreshold,
   int? maxFileLines,
   int? maxFunctionLines, {
+  List<SuppressedDeclaration> suppressed = const [],
   bool verbose = false,
 }) {
   final violatedFiles = maxFileLines != null
@@ -452,7 +491,7 @@ void _printTextReport(
             .toList()
       : const <FileLineMetric>[];
 
-  if (results.isEmpty && violatedFiles.isEmpty) {
+  if (results.isEmpty && violatedFiles.isEmpty && suppressed.isEmpty) {
     final msg = threshold > 0
         ? 'No declarations found with cognitive complexity >= $threshold.'
         : 'No Dart declarations analyzed.';
@@ -484,6 +523,19 @@ void _printTextReport(
   }
   if (violatedFiles.isNotEmpty) {
     _printRegularFileViolationRows(violatedFiles, maxFileLines!, sink);
+  }
+  _printSuppressedDeclarations(suppressed, sink);
+}
+
+void _printSuppressedDeclarations(
+  List<SuppressedDeclaration> suppressed,
+  StringSink sink,
+) {
+  if (suppressed.isEmpty) return;
+  sink.writeln();
+  sink.writeln('Suppressed declarations (${suppressed.length}):');
+  for (final s in suppressed) {
+    sink.writeln('  $s');
   }
 }
 
@@ -582,7 +634,9 @@ void _printDeltaTextReport(
             .toList()
       : const <FileLineDelta>[];
 
-  if (deltas.isEmpty && violatedFiles.isEmpty) {
+  if (deltas.isEmpty &&
+      violatedFiles.isEmpty &&
+      summary.suppressedDeclarations.isEmpty) {
     sink.writeln('No modified or newly added Dart declarations detected.');
     return;
   }
@@ -599,6 +653,7 @@ void _printDeltaTextReport(
   if (violatedFiles.isNotEmpty) {
     _printDeltaFileViolations(violatedFiles, maxFileLines!, sink);
   }
+  _printSuppressedDeclarations(summary.suppressedDeclarations, sink);
 
   final violations = summary.countViolations(
     failThreshold: failThreshold,

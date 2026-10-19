@@ -106,12 +106,14 @@ package:analytica/analyzer.dart:
     getRequiredResolvedUnit (method: Future<ResolvedUnitResult> Function(String))
     getResolvedUnit (method: Future<ResolvedUnitResult?> Function(String))
   CommentDirectiveParser (class extends Object):
+    declarationIgnoreReasonFor (static method: String? Function(AstNode, {required String toolName}))
     hasIgnoreForFileDirective (static method: bool Function(CompilationUnit, {String? sourceCode, required String toolName}))
     isDeclarationIgnoredFor (static method: bool Function(AstNode, {required String toolName}))
     new (constructor: CommentDirectiveParser Function(String))
     ignoreDeclarationPattern (getter: RegExp)
     ignoreForFilePattern (getter: RegExp)
     toolName (getter: String)
+    declarationIgnoreReason (method: String? Function(AstNode))
     hasIgnoreForFile (method: bool Function(CompilationUnit, [String?]))
     isDeclarationIgnored (method: bool Function(AstNode))
   ElementReferenceExtractor (class extends RecursiveAstVisitor<void>):

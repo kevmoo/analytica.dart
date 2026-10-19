@@ -559,6 +559,82 @@ void orchestrate(int a, int b, int c, int d, int e) {
       ).isTrue();
     });
 
+    test('Emits [ZERO_NESTING_GAIN] warning when root-level slice in '
+        'borderline (CC <= 22) function saves 0 nesting penalty', () async {
+      const code = '''
+String classifyScalar(String name, bool isNullable, bool isList, bool isMap) {
+  // Enclosing CC = 16 (borderline 16..22), slice at depth 0 has inPlace == atRoot.
+  if (isList && isMap) {
+    return 'collection';
+  }
+  // Target: Lines 7-21 (depth 0 slice with CC = 7 in place and 7 at root)
+  if (name == 'int' || name == 'double' || name == 'num') {
+    if (isNullable) {
+      return 'JSNumber?';
+    }
+    return 'JSNumber';
+  } else if (name == 'bool') {
+    if (isNullable) {
+      return 'JSBoolean?';
+    }
+    return 'JSBoolean';
+  }
+  if (name == 'String') {
+    if (isNullable && !isList) {
+      if (!isMap) {
+        return 'JSString?';
+      }
+    }
+    return 'JSString';
+  }
+  return 'JSAny';
+}
+''';
+      final result = await analyzer.analyzeSource(
+        sourceCode: code,
+        startLine: 7,
+        endLine: 21,
+      );
+      check(result.enclosingScore).isLessOrEqual(22);
+      check(result.sliceScoreInPlace).isGreaterThan(0);
+      check(result.sliceScoreInPlace).equals(result.sliceScoreAtRoot);
+      check(
+        result.extractionWarnings.any(
+          (w) =>
+              w.startsWith('[ZERO_NESTING_GAIN]') &&
+              w.contains('Simplify in place') &&
+              w.contains('coalesce identical-return branches'),
+        ),
+      ).isTrue();
+    });
+
+    test('Does not emit [ZERO_NESTING_GAIN] when slice is nested (inPlace > '
+        'atRoot) or enclosing CC > 22', () async {
+      const nestedCode = '''
+void nestedCaller(int a, int b) {
+  if (a > 0) {
+    // Target: Lines 4-6 (at depth 1: inPlace = 2, atRoot = 1)
+    if (b > 0) {
+      print(a + b);
+    }
+  }
+}
+''';
+      final nestedResult = await analyzer.analyzeSource(
+        sourceCode: nestedCode,
+        startLine: 4,
+        endLine: 6,
+      );
+      check(
+        nestedResult.sliceScoreInPlace,
+      ).isGreaterThan(nestedResult.sliceScoreAtRoot);
+      check(
+        nestedResult.extractionWarnings.any(
+          (w) => w.startsWith('[ZERO_NESTING_GAIN]'),
+        ),
+      ).isFalse();
+    });
+
     test(
       'Marks inputs as mutated when reassigned via pattern assignment',
       () async {

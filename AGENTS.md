@@ -9,6 +9,19 @@
   - `packages/dedupe`
   - `packages/undead`
 
+### Package Source Map (`packages/cognitive_complexity`)
+
+- `lib/src/complexity/`: `cli.dart`, `cognitive_complexity_visitor.dart`,
+  `complexity_analyzer.dart`, `delta_analyzer.dart`, `github_reporter.dart`
+- `lib/src/data_flow/`: `cli.dart`, `data_flow_analyzer.dart`, `models.dart`,
+  `signature_synthesizer.dart`, `visitors/in_block_visitor.dart`,
+  `visitors/post_block_visitor.dart`
+- `lib/src/file_split/`: `ast_declaration_harvester.dart`, `cli.dart`,
+  `cluster_builder.dart`, `cone_splitter.dart`, `file_split_analyzer.dart`,
+  `graph_topology.dart`, `inherited_import_cycles.dart`, `models.dart`
+- `lib/src/shallow/`: `ast_collector.dart`, `cli.dart`, `models.dart`,
+  `shallow_analyzer.dart`, `shallow_analyzer_helpers.dart`
+
 ## Testing Instructions
 
 - Leverage multi-core execution by running package test suites concurrently in
@@ -23,6 +36,13 @@
 
 - Run `dart format --output=none --set-exit-if-changed .` before committing.
 - Run `dart analyze --fatal-infos` across the workspace.
+- **Pre-PR Verification Sequence**: Always run in order:
+  1. `dart run tool/cli_readme.dart --write`
+  2. `npx prettier --write "**/*.md"`
+  3. `(cd tool && dart test)`
+  4. `git commit`
+  5. `kscripts pr-check` (note: `kscripts pr-check` exits with code 70 if the
+     working tree is dirty, so commit before running it).
 - Bump `pubspec.yaml` and `CHANGELOG.md` under `packages/<package_name>/` to
   `-wip` when modifying a released package, but add `CHANGELOG.md` bullets
   **only** for user-visible changes (leave `## <ver>-wip` empty or unchanged for
