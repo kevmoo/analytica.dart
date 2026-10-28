@@ -28,10 +28,11 @@ void main(List<String> args) {
 
   final parsed = parser.parse(args);
   if (parsed['help'] as bool) {
-    stdout.writeln(
-      'Usage: dart run tool/replay/summarize.dart [--dir <dir>] [<file_or_dir>...]',
-    );
-    stdout.writeln(parser.usage);
+    stdout
+      ..writeln(
+        'Usage: dart run tool/replay/summarize.dart [--dir <dir>] [<file_or_dir>...]',
+      )
+      ..writeln(parser.usage);
     return;
   }
 

@@ -34,9 +34,9 @@ void main() {
     await d.dir('cli_pkg', [
       d.file('pubspec.yaml', 'name: cli_pkg\nexecutables:\n  cli_pkg:\n'),
       d.dir('bin', [
-        d.file('cli_pkg.dart', '''
+        d.file('cli_pkg.dart', r'''
 void main(List<String> args) {
-  print('Usage: cli_pkg [options]\\n\\n--special    Special flag.');
+  print('Usage: cli_pkg [options]\n\n--special    Special flag.');
 }
 '''),
       ]),

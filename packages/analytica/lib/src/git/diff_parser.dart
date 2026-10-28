@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'models.dart';
 
 /// Parser for unified diff strings produced by `git diff` or `diff -u`.
+// ignore: avoid_classes_with_only_static_members, public API
 class GitDiffParser {
   static final RegExp _hunkHeaderPattern = RegExp(
     r'^@@\s+-(\d+)(?:,(\d+))?\s+\+(\d+)(?:,(\d+))?\s+@@(?:[ \t]+(.*))?$',

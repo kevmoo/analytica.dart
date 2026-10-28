@@ -33,9 +33,9 @@ void main() {
       test('extracts inline builder_factories from build.yaml', () async {
         await d.dir('inline_build_pkg', [
           d.file('pubspec.yaml', 'name: inline_build_pkg\n'),
-          d.file('build.yaml', '''
+          d.file('build.yaml', r'''
 targets:
-  \$default:
+  $default:
     builders:
       inline_build_pkg|builder:
         builder_factories: ["sampleBuilderFactory", "secondaryFactory"]
@@ -66,9 +66,9 @@ targets:
       test('extracts multi-line YAML list builder_factories', () async {
         await d.dir('multiline_build_pkg', [
           d.file('pubspec.yaml', 'name: multiline_build_pkg\n'),
-          d.file('build.yaml', '''
+          d.file('build.yaml', r'''
 targets:
-  \$default:
+  $default:
     builders:
       multiline_build_pkg|builder:
         builder_factories:
@@ -101,9 +101,9 @@ targets:
       test('handles comments and blank lines in build.yaml', () async {
         await d.dir('commented_build_pkg', [
           d.file('pubspec.yaml', 'name: commented_build_pkg\n'),
-          d.file('build.yaml', '''
+          d.file('build.yaml', r'''
 targets:
-  \$default:
+  $default:
     builders:
       commented_build_pkg|builder:
         # Builder factories configuration

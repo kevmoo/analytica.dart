@@ -7,9 +7,8 @@ import 'package:test/test.dart';
 import 'package:test_descriptor/test_descriptor.dart' as d;
 import 'package:undead/undead.dart';
 
-d.DirectoryDescriptor packageConfig(String pkgName) {
-  return d.dir('.dart_tool', [
-    d.file('package_config.json', '''
+d.DirectoryDescriptor packageConfig(String pkgName) => d.dir('.dart_tool', [
+  d.file('package_config.json', '''
 {
   "configVersion": 2,
   "packages": [
@@ -22,8 +21,7 @@ d.DirectoryDescriptor packageConfig(String pkgName) {
   ]
 }
 '''),
-  ]);
-}
+]);
 
 /// Custom user-defined adapter for a hypothetical microservice/testing framework.
 class CustomServerFrameworkAdapter extends BaseFrameworkAdapter {
@@ -34,20 +32,18 @@ class CustomServerFrameworkAdapter extends BaseFrameworkAdapter {
     required PackageTopology topology,
     required Directory packageDir,
     required String pubspecContent,
-  }) {
-    // Custom logic: Harvests customServerEntrypoint as an entrypoint root
-    return {'customServerEntrypoint'};
-  }
+  }) => // Custom logic: Harvests customServerEntrypoint as an entrypoint root
+  {
+    'customServerEntrypoint',
+  };
 
   @override
-  bool isTestCallSite(MethodInvocation node) {
-    return node.methodName.name == 'customTestRunner';
-  }
+  bool isTestCallSite(MethodInvocation node) =>
+      node.methodName.name == 'customTestRunner';
 
   @override
-  bool isTestHarnessSite(MethodInvocation node) {
-    return node.methodName.name == 'customBeforeEach';
-  }
+  bool isTestHarnessSite(MethodInvocation node) =>
+      node.methodName.name == 'customBeforeEach';
 
   @override
   bool isFrameworkEntryPoint(AnnotatedNode node, Element? element) {
@@ -174,9 +170,9 @@ flutter:
       android:
         pluginClass: AndroidPluginClass
 '''),
-          d.file('build.yaml', '''
+          d.file('build.yaml', r'''
 targets:
-  \$default:
+  $default:
     builders:
       empty_adapter_pkg|builder:
         builder_factories: ["builderFactory"]

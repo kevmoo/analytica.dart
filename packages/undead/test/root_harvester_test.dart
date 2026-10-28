@@ -4,9 +4,8 @@ import 'package:test_descriptor/test_descriptor.dart' as d;
 import 'package:undead/src/models.dart';
 import 'package:undead/src/root_harvester.dart';
 
-d.DirectoryDescriptor packageConfig(String pkgName) {
-  return d.dir('.dart_tool', [
-    d.file('package_config.json', '''
+d.DirectoryDescriptor packageConfig(String pkgName) => d.dir('.dart_tool', [
+  d.file('package_config.json', '''
 {
   "configVersion": 2,
   "packages": [
@@ -19,8 +18,7 @@ d.DirectoryDescriptor packageConfig(String pkgName) {
   ]
 }
 '''),
-  ]);
-}
+]);
 
 void main() {
   group('RootHarvester & PackageTopology', () {
@@ -57,9 +55,9 @@ flutter:
       android:
         dartPluginClass: SampleAndroidPlugin
 '''),
-        d.file('build.yaml', '''
+        d.file('build.yaml', r'''
 targets:
-  \$default:
+  $default:
     builders:
       sample_pkg|builder:
         builder_factories: ["sampleBuilderFactory", "secondaryFactory"]
@@ -167,9 +165,9 @@ targets:
       await d.dir('multiline_build_pkg', [
         packageConfig('multiline_build_pkg'),
         d.file('pubspec.yaml', 'name: multiline_build_pkg\n'),
-        d.file('build.yaml', '''
+        d.file('build.yaml', r'''
 targets:
-  \$default:
+  $default:
     builders:
       multiline_build_pkg|builder:
         builder_factories:
@@ -194,9 +192,9 @@ targets:
         await d.dir('commented_build_pkg', [
           packageConfig('commented_build_pkg'),
           d.file('pubspec.yaml', 'name: commented_build_pkg\n'),
-          d.file('build.yaml', '''
+          d.file('build.yaml', r'''
 targets:
-  \$default:
+  $default:
     builders:
       commented_build_pkg|builder:
         # Configuration for builder factories
@@ -248,7 +246,6 @@ dependencies:
 
       final options = UndeadOptions(
         packagePath: d.path('harvester_ws/packages/target_pkg'),
-        workspaceDiscovery: true,
       );
 
       final harvester = RootHarvester(options);

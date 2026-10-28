@@ -9,9 +9,8 @@ import 'package:test_descriptor/test_descriptor.dart' as d;
 import 'package:test_process/test_process.dart';
 import 'package:undead/src/cli.dart';
 
-d.DirectoryDescriptor packageConfig(String pkgName) {
-  return d.dir('.dart_tool', [
-    d.file('package_config.json', '''
+d.DirectoryDescriptor packageConfig(String pkgName) => d.dir('.dart_tool', [
+  d.file('package_config.json', '''
 {
   "configVersion": 2,
   "packages": [
@@ -24,8 +23,7 @@ d.DirectoryDescriptor packageConfig(String pkgName) {
   ]
 }
 '''),
-  ]);
-}
+]);
 
 void main() {
   late String binPath;
@@ -34,12 +32,13 @@ void main() {
     binPath = await resolvePackageExecutable('package:undead/undead.dart');
   });
 
-  Future<TestProcess> runUndead(List<String> args, {String? workingDirectory}) {
-    return TestProcess.start(Platform.resolvedExecutable, [
-      binPath,
-      ...args,
-    ], workingDirectory: workingDirectory);
-  }
+  Future<TestProcess> runUndead(
+    List<String> args, {
+    String? workingDirectory,
+  }) => TestProcess.start(Platform.resolvedExecutable, [
+    binPath,
+    ...args,
+  ], workingDirectory: workingDirectory);
 
   group('Undead CLI End-to-End', () {
     test('--help displays usage and exits 0', () async {

@@ -83,12 +83,12 @@ String replaceMarkedSection({
   required MarkedSection section,
   required String newInnerContent,
 }) {
-  final buffer = StringBuffer();
-  buffer.write(markdown.substring(0, section.startIndex));
-  buffer.writeln(section.startMarker);
-  buffer.writeln(newInnerContent.trim());
-  buffer.write(section.endMarker);
-  buffer.write(markdown.substring(section.endIndex));
+  final buffer = StringBuffer()
+    ..write(markdown.substring(0, section.startIndex))
+    ..writeln(section.startMarker)
+    ..writeln(newInnerContent.trim())
+    ..write(section.endMarker)
+    ..write(markdown.substring(section.endIndex));
   return buffer.toString();
 }
 

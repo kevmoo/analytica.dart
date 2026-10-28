@@ -12,104 +12,96 @@ import 'reachability_engine.dart';
 const String undeadVersion = '0.1.3-wip';
 
 /// Configures and parses CLI arguments for `pkg:undead`.
-ArgParser buildArgParser() {
-  return ArgParser()
-    ..addFormatOption(
-      allowed: ['markdown', 'json', 'github'],
-      defaultsTo: 'markdown',
-      help:
-          'Output formatting mode for stdout (json for agents/CI, markdown for humans).',
-    )
-    ..addOption(
-      'json-output',
-      valueHelp: 'path/to/report.json',
-      help:
-          'Write machine-readable JSON analysis report to the specified file '
-          '(recommended for agents and CI pipelines alongside human stdout).',
-    )
-    ..addOption(
-      'example-mode',
-      help: 'How code in example/ is treated during reachability analysis.',
-      allowed: ['demonstration', 'strict', 'skip'],
-      defaultsTo: 'demonstration',
-    )
-    ..addOption(
-      'mode',
-      abbr: 'm',
-      help: 'Package analysis mode.',
-      allowed: ['library', 'closed-app'],
-      defaultsTo: 'library',
-    )
-    ..addPathFilterOptions()
-    ..addFlag(
-      'include-generated',
-      help:
-          'Include generated files (*.g.dart, *.freezed.dart) in analysis '
-          '(deprecated: use --no-ignore-generated).',
-      defaultsTo: false,
-      hide: true,
-    )
-    ..addFlag(
-      'fail-on-undead',
-      help:
-          'Exit with non-zero code (1) if any undead declaration is detected.',
-      defaultsTo: false,
-    )
-    ..addOption(
-      'test-support-patterns',
-      help:
-          'Comma-separated naming wildcard patterns for test fixtures and '
-          'hooks.',
-      defaultsTo: 'Fake*,Mock*',
-    )
-    ..addOption(
-      'ignore-name-patterns',
-      help:
-          'Comma-separated naming wildcard patterns for declaration names to '
-          'ignore.',
-      defaultsTo: '',
-    )
-    ..addOption(
-      'extra-roots',
-      valueHelp: 'dir1,dir2',
-      help:
-          'Comma-separated list of additional root/test directories or '
-          'companion packages to include in reachability analysis.',
-      defaultsTo: '',
-    )
-    ..addFlag(
-      'ignore-external-bindings',
-      aliases: ['ignore-external-interop'],
-      help:
-          'Ignore unreferenced external platform and FFI/interop facade '
-          'declarations.',
-      defaultsTo: false,
-    )
-    ..addFlag(
-      'workspace-discovery',
-      defaultsTo: true,
-      help:
-          'Automatically discover and ingest consumer roots from sibling '
-          'packages in the enclosing workspace.',
-    )
-    ..addFlag(
-      'suggest-private',
-      help:
-          'Detect and suggest making internal lib/src declarations private if '
-          'only used within their declaring library.',
-      defaultsTo: false,
-    )
-    ..addSdkPathOption()
-    ..addFlag(
-      'pub-get',
-      negatable: false,
-      help:
-          'Automatically run "dart pub get" (or "flutter pub get") if '
-          'dependencies are unresolved.',
-    )
-    ..addHelpFlag()
-    ..addVersionFlag(help: 'Print undead version.');
-}
+ArgParser buildArgParser() => ArgParser()
+  ..addFormatOption(
+    allowed: ['markdown', 'json', 'github'],
+    help:
+        'Output formatting mode for stdout (json for agents/CI, markdown for humans).',
+  )
+  ..addOption(
+    'json-output',
+    valueHelp: 'path/to/report.json',
+    help:
+        'Write machine-readable JSON analysis report to the specified file '
+        '(recommended for agents and CI pipelines alongside human stdout).',
+  )
+  ..addOption(
+    'example-mode',
+    help: 'How code in example/ is treated during reachability analysis.',
+    allowed: ['demonstration', 'strict', 'skip'],
+    defaultsTo: 'demonstration',
+  )
+  ..addOption(
+    'mode',
+    abbr: 'm',
+    help: 'Package analysis mode.',
+    allowed: ['library', 'closed-app'],
+    defaultsTo: 'library',
+  )
+  ..addPathFilterOptions()
+  ..addFlag(
+    'include-generated',
+    help:
+        'Include generated files (*.g.dart, *.freezed.dart) in analysis '
+        '(deprecated: use --no-ignore-generated).',
+    hide: true,
+  )
+  ..addFlag(
+    'fail-on-undead',
+    help: 'Exit with non-zero code (1) if any undead declaration is detected.',
+  )
+  ..addOption(
+    'test-support-patterns',
+    help:
+        'Comma-separated naming wildcard patterns for test fixtures and '
+        'hooks.',
+    defaultsTo: 'Fake*,Mock*',
+  )
+  ..addOption(
+    'ignore-name-patterns',
+    help:
+        'Comma-separated naming wildcard patterns for declaration names to '
+        'ignore.',
+    defaultsTo: '',
+  )
+  ..addOption(
+    'extra-roots',
+    valueHelp: 'dir1,dir2',
+    help:
+        'Comma-separated list of additional root/test directories or '
+        'companion packages to include in reachability analysis.',
+    defaultsTo: '',
+  )
+  ..addFlag(
+    'ignore-external-bindings',
+    aliases: ['ignore-external-interop'],
+    help:
+        'Ignore unreferenced external platform and FFI/interop facade '
+        'declarations.',
+  )
+  ..addFlag(
+    'workspace-discovery',
+    defaultsTo: true,
+    help:
+        'Automatically discover and ingest consumer roots from sibling '
+        'packages in the enclosing workspace.',
+  )
+  ..addFlag(
+    'suggest-private',
+    help:
+        'Detect and suggest making internal lib/src declarations private if '
+        'only used within their declaring library.',
+  )
+  ..addSdkPathOption()
+  ..addFlag(
+    'pub-get',
+    negatable: false,
+    help:
+        'Automatically run "dart pub get" (or "flutter pub get") if '
+        'dependencies are unresolved.',
+  )
+  ..addHelpFlag()
+  ..addVersionFlag(help: 'Print undead version.');
 
 /// Main CLI runner for `pkg:undead`.
 class UndeadCliRunner {
@@ -127,22 +119,24 @@ class UndeadCliRunner {
     try {
       results = parser.parse(args);
     } on FormatException catch (e) {
-      errSink.writeln('Error: ${e.message}');
-      errSink.writeln();
-      errSink.writeln('Usage: undead [options] [target_path]');
-      errSink.writeln(parser.usage);
+      errSink
+        ..writeln('Error: ${e.message}')
+        ..writeln()
+        ..writeln('Usage: undead [options] [target_path]')
+        ..writeln(parser.usage);
       return ExitCode.usage.code;
     }
 
     if (results.flag('help')) {
-      outSink.writeln(
-        'undead - Reachability and dead declaration analysis for Dart '
-        'packages.',
-      );
-      outSink.writeln();
-      outSink.writeln('Usage: undead [options] [target_path]');
-      outSink.writeln();
-      outSink.writeln(parser.usage);
+      outSink
+        ..writeln(
+          'undead - Reachability and dead declaration analysis for Dart '
+          'packages.',
+        )
+        ..writeln()
+        ..writeln('Usage: undead [options] [target_path]')
+        ..writeln()
+        ..writeln(parser.usage);
       return ExitCode.success.code;
     }
 
@@ -242,8 +236,9 @@ class UndeadCliRunner {
       errSink.writeln('SDK Error: ${e.message}');
       return ExitCode.unavailable.code;
     } catch (e, stack) {
-      errSink.writeln('Analysis error: $e');
-      errSink.writeln(stack);
+      errSink
+        ..writeln('Analysis error: $e')
+        ..writeln(stack);
       return ExitCode.software.code;
     }
   }

@@ -63,7 +63,7 @@ class Foo {
     test('safely returns null for paths outside analysis context in '
         'getResolvedUnit', () async {
       final helper = AnalysisContextHelper(includedPaths: [pkgDir]);
-      final outsidePath = '/tmp/completely_outside.dart';
+      const outsidePath = '/tmp/completely_outside.dart';
 
       final result = await helper.getResolvedUnit(outsidePath);
       check(result).isNull();

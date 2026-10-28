@@ -34,7 +34,6 @@ void main() {
       final fence = formatCodeFence(
         content: 'Usage: tool [options]',
         header: r'$ tool --help',
-        language: 'console',
       );
 
       check(

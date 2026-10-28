@@ -60,7 +60,7 @@ class PackageContext {
     String? workingDir,
     String? packageRelativeDirectory,
   ) {
-    var dir = workingDir != null
+    final dir = workingDir != null
         ? Directory(workingDir).resolveSymbolicLinksSync()
         : Directory.current.resolveSymbolicLinksSync();
 
@@ -84,7 +84,7 @@ class PackageContext {
     return yaml != null && yaml.containsKey('workspace');
   }
 
-  static Map _readPubspecYaml(String dir) {
+  static Map<dynamic, dynamic> _readPubspecYaml(String dir) {
     final pubspecFile = File(p.join(dir, 'pubspec.yaml'));
     if (!pubspecFile.existsSync()) {
       throw StateError(
@@ -123,14 +123,16 @@ class PackageContext {
   static List<CliTarget> _discoverTargets(
     String dir,
     String pkgName,
-    Map pubspecYaml,
+    Map<dynamic, dynamic> pubspecYaml,
   ) =>
       _targetsFromExecutables(pubspecYaml) ??
       _targetFromDefaultBin(dir, pkgName) ??
       _targetsFromBinDirectory(dir, pkgName) ??
       const [];
 
-  static List<CliTarget>? _targetsFromExecutables(Map pubspecYaml) {
+  static List<CliTarget>? _targetsFromExecutables(
+    Map<dynamic, dynamic> pubspecYaml,
+  ) {
     final executables = pubspecYaml['executables'] as Map?;
     if (executables == null || executables.isEmpty) return null;
 
@@ -161,7 +163,6 @@ class PackageContext {
 
     return [
       CliTarget.executable(
-        id: '',
         executablePath: 'bin/$pkgName.dart',
         commandName: pkgName,
       ),
@@ -182,9 +183,7 @@ class PackageContext {
 
     if (dartFiles.length == 1) {
       final rel = p.relative(dartFiles.first.path, from: dir);
-      return [
-        CliTarget.executable(id: '', executablePath: rel, commandName: pkgName),
-      ];
+      return [CliTarget.executable(executablePath: rel, commandName: pkgName)];
     }
 
     return [

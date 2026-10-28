@@ -3,9 +3,8 @@ import 'package:test/test.dart';
 import 'package:test_descriptor/test_descriptor.dart' as d;
 import 'package:undead/undead.dart';
 
-d.DirectoryDescriptor packageConfig(String pkgName) {
-  return d.dir('.dart_tool', [
-    d.file('package_config.json', '''
+d.DirectoryDescriptor packageConfig(String pkgName) => d.dir('.dart_tool', [
+  d.file('package_config.json', '''
 {
   "configVersion": 2,
   "packages": [
@@ -18,8 +17,7 @@ d.DirectoryDescriptor packageConfig(String pkgName) {
   ]
 }
 '''),
-  ]);
-}
+]);
 
 void main() {
   group('ReachabilityEngine', () {
@@ -1384,9 +1382,9 @@ name: yaml_build_pkg
 environment:
   sdk: '^3.5.0'
 '''),
-        d.file('build.yaml', '''
+        d.file('build.yaml', r'''
 targets:
-  \$default:
+  $default:
     builders:
       yaml_build_pkg|builder:
         # Factories list:
@@ -2023,7 +2021,7 @@ void internalHelper() {}
           // Without suggestPrivate: internalHelper is live, 0 undead findings.
           final defaultReport = await analyzePackage(
             d.path('suggest_private_pkg'),
-            options: UndeadOptions(packagePath: '', suggestPrivate: false),
+            options: UndeadOptions(packagePath: ''),
           );
           check(defaultReport.undead).isEmpty();
           check(defaultReport.privateCandidatesFound).equals(0);

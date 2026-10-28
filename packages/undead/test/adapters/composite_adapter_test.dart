@@ -51,9 +51,9 @@ flutter:
       android:
         pluginClass: CompositeAndroidPlugin
 '''),
-          d.file('build.yaml', '''
+          d.file('build.yaml', r'''
 targets:
-  \$default:
+  $default:
     builders:
       composite_pkg|builder:
         builder_factories: ["compositeFactoryOne", "compositeFactoryTwo"]

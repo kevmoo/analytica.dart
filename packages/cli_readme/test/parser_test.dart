@@ -6,12 +6,12 @@ import 'package:test/test.dart';
 void main() {
   group('findMarkedSections', () {
     test('finds default untagged marker section', () {
-      const markdown = '''
+      const markdown = r'''
 # My Tool
 
 <!-- CLI_README_START -->
 ```console
-\$ my_tool --help
+$ my_tool --help
 Usage: my_tool
 ```
 <!-- CLI_README_END -->
@@ -31,18 +31,18 @@ More content.
     });
 
     test('finds multiple tagged marker sections', () {
-      const markdown = '''
+      const markdown = r'''
 # Multi Tool
 
 <!-- CLI_README_START client -->
 ```console
-\$ client --help
+$ client --help
 ```
 <!-- CLI_README_END client -->
 
 <!-- CLI_HELP_START server -->
 ```console
-\$ server --help
+$ server --help
 ```
 <!-- CLI_HELP_END server -->
 ''';

@@ -96,9 +96,8 @@ class FlutterAdapter extends BaseFrameworkAdapter {
   }
 
   @override
-  bool isTestCallSite(MethodInvocation node) {
-    return node.methodName.name == 'testWidgets';
-  }
+  bool isTestCallSite(MethodInvocation node) =>
+      node.methodName.name == 'testWidgets';
 
   @override
   bool isFrameworkEntryPoint(AnnotatedNode node, Element? element) {

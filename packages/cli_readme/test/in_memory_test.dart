@@ -16,12 +16,12 @@ void main() {
           help: 'Port to bind.',
         );
 
-      const expectedReadme = '''
+      const expectedReadme = r'''
 # Server Package
 
 <!-- CLI_README_START -->
 ```console
-\$ my_server --help
+$ my_server --help
 Usage: my_server [options]
 
 -h, --help    Print this help.
@@ -57,12 +57,12 @@ Usage: my_server [options]
           help: 'Enable verbose logging.',
         );
 
-      const staleReadme = '''
+      const staleReadme = r'''
 # My Tool
 
 <!-- CLI_README_START -->
 ```console
-\$ my_tool --help
+$ my_tool --help
 Usage: my_tool [options]
 
 -h, --help    Print this help.

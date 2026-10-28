@@ -75,9 +75,9 @@ PathFilter parsePathFilter(
       .map((e) => e.trim())
       .where((e) => e.isNotEmpty);
 
-  final ignoreGenerated = results.options.contains('ignore-generated')
-      ? results.flag('ignore-generated')
-      : true;
+  final ignoreGenerated =
+      !results.options.contains('ignore-generated') ||
+      results.flag('ignore-generated');
 
   return PathFilter(
     excludePatterns: [...defaultExcludes, ...userExcludes],

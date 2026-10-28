@@ -16,12 +16,7 @@ Future<void> main(List<String> rawArgs) async {
       defaultsTo: true,
       help: 'Verify that README is up to date (default: true).',
     )
-    ..addFlag(
-      'write',
-      negatable: true,
-      defaultsTo: false,
-      help: 'Write updated CLI help to README.',
-    )
+    ..addFlag('write', help: 'Write updated CLI help to README.')
     ..addOption(
       'package-dir',
       help: 'Path to package directory (defaults to current directory).',
@@ -35,10 +30,11 @@ Future<void> main(List<String> rawArgs) async {
   try {
     args = parser.parse(rawArgs);
   } on FormatException catch (e) {
-    stderr.writeln(e.message);
-    stderr.writeln();
-    stderr.writeln('Usage: cli_readme [options]');
-    stderr.writeln(parser.usage);
+    stderr
+      ..writeln(e.message)
+      ..writeln()
+      ..writeln('Usage: cli_readme [options]')
+      ..writeln(parser.usage);
     exit(64);
   }
 
@@ -80,8 +76,9 @@ Future<void> main(List<String> rawArgs) async {
     exit(0);
   }
 
-  stderr.writeln('❌ ${result.readmePath} CLI documentation is out of date:');
-  stderr.writeln();
+  stderr
+    ..writeln('❌ ${result.readmePath} CLI documentation is out of date:')
+    ..writeln();
 
   for (final targetResult in result.staleTargets) {
     final t = targetResult.target;

@@ -150,7 +150,7 @@ void main() {
     );
 
     test(
-      'resolves SDK from wrapper script with \$HOME and \${HOME} variable',
+      r'resolves SDK from wrapper script with $HOME and ${HOME} variable',
       () async {
         await d.dir('home_sdk', [
           d.dir('lib', [

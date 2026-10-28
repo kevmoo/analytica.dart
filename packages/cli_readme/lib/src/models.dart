@@ -87,7 +87,7 @@ class CliTarget {
   );
 
   static String _inferCommandName(String path) {
-    final file = path.split('/').last.split('\\').last;
+    final file = path.split('/').last.split(r'\').last;
     if (file.endsWith('.dart')) {
       return file.substring(0, file.length - 5);
     }

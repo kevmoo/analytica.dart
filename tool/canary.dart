@@ -57,8 +57,9 @@ Future<void> main(List<String> args) async {
 
   final parsed = parser.parse(args);
   if (parsed['help'] as bool) {
-    stdout.writeln('Usage: dart run tool/canary.dart [options]');
-    stdout.writeln(parser.usage);
+    stdout
+      ..writeln('Usage: dart run tool/canary.dart [options]')
+      ..writeln(parser.usage);
     return;
   }
 
@@ -91,14 +92,14 @@ Future<void> main(List<String> args) async {
       results: results,
       baselineRef: baselineRef,
     );
-    final reportFile = File(p.join(outDir.path, 'canary_report.md'));
-    reportFile.writeAsStringSync(reportMd);
-    final jsonFile = File(p.join(outDir.path, 'canary_results.json'));
-    jsonFile.writeAsStringSync(
-      const JsonEncoder.withIndent(
-        '  ',
-      ).convert([for (final r in results) r.toJson()]),
-    );
+    final reportFile = File(p.join(outDir.path, 'canary_report.md'))
+      ..writeAsStringSync(reportMd);
+    final jsonFile = File(p.join(outDir.path, 'canary_results.json'))
+      ..writeAsStringSync(
+        const JsonEncoder.withIndent(
+          '  ',
+        ).convert([for (final r in results) r.toJson()]),
+      );
     stdout.writeln('Wrote ${reportFile.path} and ${jsonFile.path}');
   } finally {
     workDir.deleteSync(recursive: true);

@@ -4,9 +4,9 @@ import 'package:test/test.dart';
 import 'package:test_descriptor/test_descriptor.dart' as d;
 import 'package:undead/undead.dart';
 
-d.DirectoryDescriptor packageConfig(String pkgName, {String? targetPkgPath}) {
-  return d.dir('.dart_tool', [
-    d.file('package_config.json', '''
+d.DirectoryDescriptor packageConfig(String pkgName, {String? targetPkgPath}) =>
+    d.dir('.dart_tool', [
+      d.file('package_config.json', '''
 {
   "configVersion": 2,
   "packages": [
@@ -25,8 +25,7 @@ d.DirectoryDescriptor packageConfig(String pkgName, {String? targetPkgPath}) {
   ]
 }
 '''),
-  ]);
-}
+    ]);
 
 void main() {
   group('WorkspaceConsumerDiscovery', () {

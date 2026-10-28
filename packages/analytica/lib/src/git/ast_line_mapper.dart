@@ -7,6 +7,7 @@ import 'models.dart';
 
 /// Utilities for mapping modified line ranges from git diffs to AST
 /// declarations.
+// ignore: avoid_classes_with_only_static_members, public API
 class AstLineMapper {
   /// Maps [ranges] to enclosing declarations in [unit].
   ///
@@ -51,7 +52,7 @@ class AstLineMapper {
     LineInfo lineInfo,
     List<LineRange> ranges,
   ) {
-    final all = mapDeclarations(unit, lineInfo, ranges, includeMembers: true);
+    final all = mapDeclarations(unit, lineInfo, ranges);
     return all
         .where(
           (m) =>
