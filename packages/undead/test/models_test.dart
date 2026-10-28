@@ -10,7 +10,6 @@ void main() {
         line: 12,
         column: 5,
         description: 'OldParser parses correctly',
-        coInvokedHazard: false,
       );
 
       final json = site.toJson();
@@ -99,7 +98,6 @@ void main() {
                 line: 3,
                 column: 3,
                 description: 'OldParser parses correctly',
-                coInvokedHazard: false,
               ),
             ],
           ),

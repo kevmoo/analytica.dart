@@ -3,6 +3,7 @@ import 'package:analyzer/dart/ast/ast.dart';
 
 /// Helper for parsing custom `// undead:ignore` and `// undead:ignore_for_file`
 /// comment suppression directives.
+// ignore: avoid_classes_with_only_static_members
 abstract final class CommentParser {
   static final CommentDirectiveParser _parser = CommentDirectiveParser(
     'undead',

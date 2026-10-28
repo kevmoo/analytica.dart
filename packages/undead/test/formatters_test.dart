@@ -40,7 +40,6 @@ void main() {
               line: 8,
               column: 3,
               description: 'parses old format',
-              coInvokedHazard: false,
             ),
           ],
         ),

@@ -116,7 +116,7 @@ void main() {
       check(caseInsensitive.matches('FAKESERVICE')).isTrue();
       check(caseInsensitive.matches('Other')).isFalse();
 
-      final caseSensitive = WildcardPattern('fake*', caseSensitive: true);
+      final caseSensitive = WildcardPattern('fake*');
       check(caseSensitive.matches('fakeService')).isTrue();
       check(caseSensitive.matches('FakeService')).isFalse();
     });

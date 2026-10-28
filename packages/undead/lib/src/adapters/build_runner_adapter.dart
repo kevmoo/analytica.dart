@@ -16,9 +16,7 @@ class BuildRunnerAdapter extends BaseFrameworkAdapter {
     required PackageTopology topology,
     required Directory packageDir,
     required String pubspecContent,
-  }) {
-    return extractBuilderFactories(packageDir.path);
-  }
+  }) => extractBuilderFactories(packageDir.path);
 
   /// Extracts builder factory identifiers declared in `build.yaml` at
   /// [packagePath].

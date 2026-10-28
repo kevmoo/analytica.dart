@@ -32,8 +32,7 @@ String formatCodeFence({
   String language = 'console',
   String? header,
 }) {
-  final buffer = StringBuffer();
-  buffer.writeln('```$language');
+  final buffer = StringBuffer()..writeln('```$language');
   if (header != null && header.isNotEmpty) {
     buffer.writeln(header.trimRight());
   }

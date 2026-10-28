@@ -111,7 +111,6 @@ class CliReadmeSync {
         diff = generateDiff(
           expected: normalizedExpected,
           actual: normalizedActual,
-          expectedHeader: 'expected (from CLI)',
           actualHeader: 'actual in README.md ($idLabel)',
         );
 
@@ -175,11 +174,11 @@ Future<void> expectReadmeHelpClean({
 
   final result = await syncer.verify();
   if (!result.isClean) {
-    final buffer = StringBuffer();
-    buffer.writeln(
-      'README CLI documentation in ${result.readmePath} is out of date.',
-    );
-    buffer.writeln();
+    final buffer = StringBuffer()
+      ..writeln(
+        'README CLI documentation in ${result.readmePath} is out of date.',
+      )
+      ..writeln();
 
     for (final targetResult in result.staleTargets) {
       final t = targetResult.target;
@@ -193,8 +192,9 @@ Future<void> expectReadmeHelpClean({
       buffer.writeln();
     }
 
-    buffer.writeln('To automatically update README.md, run:');
-    buffer.writeln('  dart run cli_readme --write');
+    buffer
+      ..writeln('To automatically update README.md, run:')
+      ..writeln('  dart run cli_readme --write');
 
     throw TestFailure(buffer.toString());
   }

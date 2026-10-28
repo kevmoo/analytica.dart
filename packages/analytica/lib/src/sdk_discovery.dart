@@ -280,18 +280,14 @@ bool isFlutterPackage(String packagePath) {
 }
 
 /// Whether [pubspecContent] indicates a Flutter package.
-bool isFlutterPubspec(String pubspecContent) {
-  return pubspecContent.contains('sdk: flutter') ||
-      pubspecContent.contains('package:flutter') ||
-      RegExp(r'^\s*flutter:\s*$', multiLine: true).hasMatch(pubspecContent);
-}
+bool isFlutterPubspec(String pubspecContent) =>
+    pubspecContent.contains('sdk: flutter') ||
+    pubspecContent.contains('package:flutter') ||
+    RegExp(r'^\s*flutter:\s*$', multiLine: true).hasMatch(pubspecContent);
 
 /// Whether [packagePath] contains a `.dart_tool/package_config.json` file.
-bool hasPackageConfig(String packagePath) {
-  return File(
-    p.join(packagePath, '.dart_tool', 'package_config.json'),
-  ).existsSync();
-}
+bool hasPackageConfig(String packagePath) =>
+    File(p.join(packagePath, '.dart_tool', 'package_config.json')).existsSync();
 
 /// Whether [packagePath] or any ancestor directory contains a
 /// `.dart_tool/package_config.json` file.

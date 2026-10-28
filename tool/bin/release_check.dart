@@ -211,6 +211,7 @@ void _printReleaseCommands(
     final tag = '${pkg.name}-v$version';
     final title = 'package:${pkg.name} v$version';
     stdout.writeln(
+      // ignore: missing_whitespace_between_adjacent_strings, awk program
       "  git fetch origin && awk '/^## $escapedVersion\$/{f=1;next}"
       "/^## /{if(f)exit}f' packages/${pkg.name}/CHANGELOG.md | "
       'gh release create $tag --target \$(git rev-parse origin/main) '

@@ -116,19 +116,20 @@ List<File> listPinSourceFiles(Directory repoRoot) {
 }
 
 /// Extracts every invocation in [text].
-List<PinSite> scanPinSites({required String text, required String sourcePath}) {
-  return [
-    for (final match in dartRunInvocationRegex.allMatches(text))
-      PinSite(
-        sourcePath: sourcePath,
-        line: text.substring(0, match.start).split('\n').length,
-        packageName: match.group(1)!,
-        executable: match.group(2) ?? match.group(1)!,
-        constraint: match.group(3),
-        matchedText: match.group(0)!,
-      ),
-  ];
-}
+List<PinSite> scanPinSites({
+  required String text,
+  required String sourcePath,
+}) => [
+  for (final match in dartRunInvocationRegex.allMatches(text))
+    PinSite(
+      sourcePath: sourcePath,
+      line: text.substring(0, match.start).split('\n').length,
+      packageName: match.group(1)!,
+      executable: match.group(2) ?? match.group(1)!,
+      constraint: match.group(3),
+      matchedText: match.group(0)!,
+    ),
+];
 
 /// Validates every invocation in [text] against [packages]: the executable
 /// must be declared and exist on disk, and the constraint must be exactly

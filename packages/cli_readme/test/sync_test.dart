@@ -14,12 +14,12 @@ void main() {
         ..addFlag('help', abbr: 'h', negatable: false, help: 'Print this help.')
         ..addOption('config', abbr: 'c', help: 'Path to config file.');
 
-      const staleReadme = '''
+      const staleReadme = r'''
 # Application
 
 <!-- CLI_README_START -->
 ```console
-\$ app --help
+$ app --help
 Usage: app [options]
 
 -h, --help    Old help text.
@@ -57,12 +57,12 @@ Usage: app [options]
       final parser = ArgParser()
         ..addFlag('help', abbr: 'h', negatable: false, help: 'Help.');
 
-      const cleanReadme = '''
+      const cleanReadme = r'''
 # Clean
 
 <!-- CLI_README_START -->
 ```console
-\$ clean --help
+$ clean --help
 Usage: clean [options]
 
 -h, --help    Help.
@@ -85,12 +85,12 @@ Usage: clean [options]
       final parser = ArgParser()
         ..addFlag('help', abbr: 'h', negatable: false, help: 'New Help.');
 
-      const staleReadme = '''
+      const staleReadme = r'''
 # Stale
 
 <!-- CLI_README_START -->
 ```console
-\$ stale --help
+$ stale --help
 Usage: stale [options]
 
 -h, --help    Old Help.

@@ -6,8 +6,8 @@ class MarkdownFormatter {
   const MarkdownFormatter();
 
   String format(UndeadReport report) {
-    final buffer = StringBuffer();
-    buffer.writeln('# Undead Code Analysis: `${report.package}`\n');
+    final buffer = StringBuffer()
+      ..writeln('# Undead Code Analysis: `${report.package}`\n');
 
     _writeSummary(buffer, report);
 
@@ -49,17 +49,16 @@ class MarkdownFormatter {
   }
 
   static void _writeSummary(StringBuffer buffer, UndeadReport report) {
-    buffer.writeln('### Summary\n');
-    buffer.writeln('| Metric | Count |');
-    buffer.writeln('| :--- | :--- |');
-    buffer.writeln(
-      '| **Total Declarations Scanned** | ${report.totalDeclarations} |',
-    );
-    buffer.writeln('| **Pure Undead** | ${report.pureUndeadFound} |');
-    buffer.writeln('| **Tested Undead** | ${report.testedUndeadFound} |');
-    buffer.writeln(
-      '| **Co-Invoked Hazards** | ${report.coInvokedHazardsFound} |',
-    );
+    buffer
+      ..writeln('### Summary\n')
+      ..writeln('| Metric | Count |')
+      ..writeln('| :--- | :--- |')
+      ..writeln(
+        '| **Total Declarations Scanned** | ${report.totalDeclarations} |',
+      )
+      ..writeln('| **Pure Undead** | ${report.pureUndeadFound} |')
+      ..writeln('| **Tested Undead** | ${report.testedUndeadFound} |')
+      ..writeln('| **Co-Invoked Hazards** | ${report.coInvokedHazardsFound} |');
     if (report.privateCandidatesFound > 0) {
       buffer.writeln(
         '| **Private Candidates** | ${report.privateCandidatesFound} |',
@@ -73,9 +72,10 @@ class MarkdownFormatter {
     List<UndeadFinding> findings,
   ) {
     if (findings.isEmpty) return;
-    buffer.writeln('## Pure Undead (Safe to Delete)\n');
-    buffer.writeln('| Symbol | Kind | Location | Suggested Action |');
-    buffer.writeln('| :--- | :--- | :--- | :--- |');
+    buffer
+      ..writeln('## Pure Undead (Safe to Delete)\n')
+      ..writeln('| Symbol | Kind | Location | Suggested Action |')
+      ..writeln('| :--- | :--- | :--- | :--- |');
     for (final z in findings) {
       final loc = '${z.file}:${z.line}:${z.column}';
       buffer.writeln(
@@ -90,11 +90,12 @@ class MarkdownFormatter {
     List<UndeadFinding> findings,
   ) {
     if (findings.isEmpty) return;
-    buffer.writeln('## Tested Undead (Orphan Tests)\n');
-    buffer.writeln(
-      '| Symbol | Kind | Location | Orphan Test Sites | Suggested Action |',
-    );
-    buffer.writeln('| :--- | :--- | :--- | :--- | :--- |');
+    buffer
+      ..writeln('## Tested Undead (Orphan Tests)\n')
+      ..writeln(
+        '| Symbol | Kind | Location | Orphan Test Sites | Suggested Action |',
+      )
+      ..writeln('| :--- | :--- | :--- | :--- | :--- |');
     for (final z in findings) {
       final loc = '${z.file}:${z.line}:${z.column}';
       final testSites = (z.orphanTests ?? [])
@@ -116,14 +117,13 @@ class MarkdownFormatter {
     List<UndeadFinding> findings,
   ) {
     if (findings.isEmpty) return;
-    buffer.writeln(
-      '## Co-Invoked Test Hazards (Manual Refactoring Required)\n',
-    );
-    buffer.writeln(
-      '| Symbol | Kind | Location | Co-Invoked Test Sites | '
-      'Suggested Action |',
-    );
-    buffer.writeln('| :--- | :--- | :--- | :--- | :--- |');
+    buffer
+      ..writeln('## Co-Invoked Test Hazards (Manual Refactoring Required)\n')
+      ..writeln(
+        '| Symbol | Kind | Location | Co-Invoked Test Sites | '
+        'Suggested Action |',
+      )
+      ..writeln('| :--- | :--- | :--- | :--- | :--- |');
     for (final z in findings) {
       final loc = '${z.file}:${z.line}:${z.column}';
       final testSites = (z.orphanTests ?? [])
@@ -145,9 +145,10 @@ class MarkdownFormatter {
     List<UndeadFinding> findings,
   ) {
     if (findings.isEmpty) return;
-    buffer.writeln('## Private Candidates (Suggest Library-Private)\n');
-    buffer.writeln('| Symbol | Kind | Location | Suggested Action |');
-    buffer.writeln('| :--- | :--- | :--- | :--- |');
+    buffer
+      ..writeln('## Private Candidates (Suggest Library-Private)\n')
+      ..writeln('| Symbol | Kind | Location | Suggested Action |')
+      ..writeln('| :--- | :--- | :--- | :--- |');
     for (final z in findings) {
       final loc = '${z.file}:${z.line}:${z.column}';
       buffer.writeln(

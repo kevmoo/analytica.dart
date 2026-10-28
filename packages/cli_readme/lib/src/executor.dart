@@ -27,12 +27,14 @@ Future<String> executeTarget(
 String _evaluateArgParser(CliTarget target) {
   final buffer = StringBuffer();
   if (target.description != null && target.description!.isNotEmpty) {
-    buffer.writeln(target.description!.trimRight());
-    buffer.writeln();
+    buffer
+      ..writeln(target.description!.trimRight())
+      ..writeln();
   }
-  buffer.writeln('Usage: ${target.commandName} [options]');
-  buffer.writeln();
-  buffer.write(target.argParser!.usage);
+  buffer
+    ..writeln('Usage: ${target.commandName} [options]')
+    ..writeln()
+    ..write(target.argParser!.usage);
   return normalizeText(buffer.toString());
 }
 
