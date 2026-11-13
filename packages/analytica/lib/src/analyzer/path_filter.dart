@@ -58,17 +58,24 @@ class PathFilter {
   /// generated file exclusion enabled.
   static final PathFilter defaults = PathFilter();
 
+  static const _ignoredSegments = {'.dart_tool', '.git', '.idea', '.vscode'};
+
+  static String _normalizeRelativePath(String rawPath) {
+    final rawParts = p.windows.split(rawPath);
+    final relativeParts = p.windows.isAbsolute(rawPath)
+        ? rawParts.skip(1)
+        : rawParts;
+    return p.posix.normalize(p.posix.joinAll(relativeParts));
+  }
+
   static String _normalizePattern(String raw) {
-    var pat = raw.trim().replaceAll(r'\', '/');
-    if (pat.startsWith('./')) {
-      pat = pat.substring(2);
-    }
-    if (pat.startsWith('/')) {
-      pat = pat.substring(1);
-    }
-    // If the pattern contains no slash, treat it as matching anywhere.
-    if (!pat.contains('/') && !pat.startsWith('**')) {
-      return '**/$pat';
+    final trimmed = raw.trim();
+    if (trimmed.isEmpty) return '';
+    final pat = _normalizeRelativePath(trimmed);
+    // If the pattern contains no directory segment, treat it as matching
+    // anywhere.
+    if (p.posix.split(pat) case [final single] when !single.startsWith('**')) {
+      return p.posix.join('**', single);
     }
     return pat;
   }
@@ -76,22 +83,10 @@ class PathFilter {
   /// Returns `true` if [relativePath] matches any active exclusion pattern or
   /// contains a standard ignored directory segment.
   bool isExcluded(String relativePath) {
-    final normalized = p.posix.normalize(relativePath).replaceAll(r'\', '/');
-    var clean = normalized;
-    if (clean.startsWith('./')) {
-      clean = clean.substring(2);
-    } else if (clean.startsWith('/')) {
-      clean = clean.substring(1);
-    }
-
-    final segments = clean.split('/');
-    if (segments.contains('.dart_tool') ||
-        segments.contains('.git') ||
-        segments.contains('.idea') ||
-        segments.contains('.vscode') ||
-        (segments.isNotEmpty && segments.first == 'build')) {
-      return true;
-    }
+    final clean = _normalizeRelativePath(relativePath);
+    final segments = p.posix.split(clean);
+    if (segments case ['build', ...]) return true;
+    if (segments.any(_ignoredSegments.contains)) return true;
 
     return WildcardPattern.anyMatch(_wildcards, clean);
   }

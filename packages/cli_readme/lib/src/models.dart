@@ -1,4 +1,5 @@
 import 'package:args/args.dart';
+import 'package:path/path.dart' as p;
 
 /// Represents a command-line target to document and verify in a README.
 class CliTarget {
@@ -87,11 +88,10 @@ class CliTarget {
   );
 
   static String _inferCommandName(String path) {
-    final file = path.split('/').last.split(r'\').last;
-    if (file.endsWith('.dart')) {
-      return file.substring(0, file.length - 5);
-    }
-    return file;
+    final file = p.windows.basename(p.posix.basename(path));
+    return p.posix.extension(file) == '.dart'
+        ? p.posix.withoutExtension(file)
+        : file;
   }
 }
 
