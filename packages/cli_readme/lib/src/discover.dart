@@ -142,9 +142,10 @@ class PackageContext {
     for (final entry in executables.entries) {
       final execName = entry.key.toString();
       final scriptValue = entry.value?.toString();
-      final scriptRelPath = (scriptValue != null && scriptValue.isNotEmpty)
-          ? 'bin/$scriptValue.dart'
-          : 'bin/$execName.dart';
+      final scriptName = (scriptValue != null && scriptValue.isNotEmpty)
+          ? scriptValue
+          : execName;
+      final scriptRelPath = p.join('bin', '$scriptName.dart');
 
       targets.add(
         CliTarget.executable(
@@ -163,7 +164,7 @@ class PackageContext {
 
     return [
       CliTarget.executable(
-        executablePath: 'bin/$pkgName.dart',
+        executablePath: p.join('bin', '$pkgName.dart'),
         commandName: pkgName,
       ),
     ];
@@ -176,7 +177,7 @@ class PackageContext {
     final dartFiles = binDir
         .listSync()
         .whereType<File>()
-        .where((f) => f.path.endsWith('.dart'))
+        .where((f) => p.extension(f.path) == '.dart')
         .toList();
 
     if (dartFiles.isEmpty) return null;

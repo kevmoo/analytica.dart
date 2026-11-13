@@ -61,14 +61,22 @@ void main() {
     });
 
     test('normalizes leading ./, /, and backslashes', () {
-      final filter = PathFilter(excludePatterns: ['/custom/**', './other/**']);
+      final filter = PathFilter(
+        excludePatterns: ['/custom/**', './other/**', r'win\sub\**'],
+      );
 
       check(filter.isExcluded(r'.\custom\sub\file.dart')).isTrue();
+      check(filter.isExcluded(r'.\.\custom\sub\file.dart')).isTrue();
       check(filter.isExcluded('./custom/sub/file.dart')).isTrue();
       check(filter.isExcluded('/custom/sub/file.dart')).isTrue();
+      check(filter.isExcluded(r'\custom\sub\file.dart')).isTrue();
       check(filter.isExcluded('custom/sub/file.dart')).isTrue();
       check(filter.isExcluded('other/sub/file.dart')).isTrue();
+      check(filter.isExcluded('win/sub/file.dart')).isTrue();
+      check(filter.isExcluded(r'win\.\sub\file.dart')).isTrue();
+      check(filter.isExcluded(r'win\\sub\\file.dart')).isTrue();
       check(filter.isExcluded(r'lib\src\model.g.dart')).isTrue();
+      check(filter.isExcluded(r'build\..\lib\src\service.dart')).isFalse();
     });
   });
 }
