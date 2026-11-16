@@ -47,7 +47,7 @@ Usage: cli_readme [options]
 
 Create `test/ensure_cli_readme_test.dart`:
 
-```dart
+```dart @example /test/ensure_cli_readme_test.dart
 import 'package:cli_readme/cli_readme.dart';
 import 'package:test/test.dart';
 
@@ -72,23 +72,25 @@ dart run cli_readme --write
 For large test suites where spawning a Dart subprocess is undesirable, pass a
 `CliTarget` with your `ArgParser`:
 
-```dart
+```dart @example example/readme_targets.dart#in-memory
 import 'package:args/args.dart';
 import 'package:cli_readme/cli_readme.dart';
-import 'package:my_package/src/options.dart';
 import 'package:test/test.dart';
 
 void main() {
-  test('readme', () => expectReadmeHelpClean(
-    targets: [
-      CliTarget(
-        id: 'main',
-        commandName: 'my_tool',
-        argParser: buildArgParser(),
-        description: 'My awesome command line tool.',
-      ),
-    ],
-  ));
+  test(
+    'readme',
+    () => expectReadmeHelpClean(
+      targets: [
+        CliTarget.parser(
+          id: 'main',
+          commandName: 'my_tool',
+          argParser: buildArgParser(),
+          description: 'My awesome command line tool.',
+        ),
+      ],
+    ),
+  );
 }
 ```
 
@@ -120,11 +122,22 @@ $ my_client --help
 <!-- CLI_README_END client -->
 ````
 
-```dart
-test('readme', () => expectReadmeHelpClean(
-  targets: [
-    CliTarget.executable(id: 'server', executablePath: 'bin/server.dart', commandName: 'my_server'),
-    CliTarget.executable(id: 'client', executablePath: 'bin/client.dart', commandName: 'my_client'),
-  ],
-));
+```dart @example example/readme_targets.dart#multiple-binaries
+test(
+  'readme',
+  () => expectReadmeHelpClean(
+    targets: [
+      CliTarget.executable(
+        id: 'server',
+        executablePath: 'bin/server.dart',
+        commandName: 'my_server',
+      ),
+      CliTarget.executable(
+        id: 'client',
+        executablePath: 'bin/client.dart',
+        commandName: 'my_client',
+      ),
+    ],
+  ),
+);
 ```

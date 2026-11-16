@@ -93,14 +93,11 @@ Usage: undead [options] [target_path]
 
 ### Library API
 
-```dart
+```dart @example example/example.dart
 import 'package:undead/undead.dart';
 
 void main() async {
-  final options = UndeadOptions(
-    packagePath: '.',
-    mode: AnalysisMode.library,
-  );
+  final options = UndeadOptions(packagePath: '.');
   final engine = UndeadEngine(options);
   final report = await engine.analyze();
 
