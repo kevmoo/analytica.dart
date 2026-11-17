@@ -67,7 +67,7 @@ dependencies:
 
 ### Example
 
-```dart
+```dart @example /example/data_flow.dart
 import 'package:cognitive_complexity/data_flow.dart';
 
 void main() async {

@@ -188,7 +188,7 @@ Options:
 
 Add `cognitive_complexity` to your `pubspec.yaml`:
 
-```dart
+```dart @example example/analyze_path.dart
 import 'package:cognitive_complexity/cognitive_complexity.dart';
 
 void main() {
@@ -196,7 +196,9 @@ void main() {
   final results = analyzer.analyzePath('lib');
 
   for (final res in results) {
-    print('${res.name}: score is ${res.score} (${res.filePath}:L${res.startLine})');
+    print(
+      '${res.name}: score is ${res.score} (${res.filePath}:L${res.startLine})',
+    );
   }
 }
 ```

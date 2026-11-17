@@ -104,7 +104,7 @@ Usage: dedupe [options] [target_path]
 
 ## Programmatic API
 
-```dart
+```dart @example example/programmatic_api.dart
 import 'package:dedupe/dedupe.dart';
 
 void main() async {
@@ -118,11 +118,18 @@ void main() async {
   final engine = DedupeEngine(options);
   final report = await engine.analyze();
 
-  print('Duplicate lines: ${report.summary.duplicateLines} (${report.summary.duplicationPercentage.toStringAsFixed(1)}%)');
+  final summary = report.summary;
+  print(
+    'Duplicate lines: ${summary.duplicateLines} '
+    '(${summary.duplicationPercentage.toStringAsFixed(1)}%)',
+  );
   print('Clusters found: ${report.clusters.length}');
 
   for (final cluster in report.clusters) {
-    print('Cluster ${cluster.id}: ~${cluster.estimatedLinesSaved} lines saved across ${cluster.instances.length} locations');
+    print(
+      'Cluster ${cluster.id}: ~${cluster.estimatedLinesSaved} lines saved '
+      'across ${cluster.instances.length} locations',
+    );
   }
 }
 ```

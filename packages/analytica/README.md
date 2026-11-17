@@ -1,7 +1,9 @@
 Shared utilities, SDK discovery, Git diff integration, and AST analysis helpers
 for Dart CLI tools and analyzers.
 
-> [!NOTE] This package provides foundational infrastructure for tools in the
+> [!NOTE]
+>
+> This package provides foundational infrastructure for tools in the
 > [`analytica.dart`](https://github.com/kevmoo/analytica.dart) monorepo (such as
 > [`pkg:cognitive_complexity`](https://pub.dev/packages/cognitive_complexity)
 > and `pkg:undead`). APIs are primarily tailored for internal tool composition
@@ -37,7 +39,7 @@ for Dart CLI tools and analyzers.
 
 ### SDK Discovery
 
-```dart
+```dart @example example/sdk_discovery.dart
 import 'package:analytica/sdk_discovery.dart';
 
 void main() {
@@ -50,11 +52,11 @@ void main() {
 
 ### Git Diff Parsing & AST Mapping
 
-```dart
+```dart @example example/git_diff.dart
 import 'package:analytica/git.dart';
 
 void main() async {
-  final diffs = await GitDiffService().getParsedDiff('origin/main');
+  final diffs = await const GitDiffService().getParsedDiff('origin/main');
 
   for (final fileDiff in diffs) {
     print('Modified file: ${fileDiff.path}');

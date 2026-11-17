@@ -1,3 +1,8 @@
+## 0.1.2-wip
+
+- The README programmatic API example is now sourced from
+  `example/programmatic_api.dart` and checked in CI.
+
 ## 0.1.1
 
 - Require `analytica` `^0.1.4`.
