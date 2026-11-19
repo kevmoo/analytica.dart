@@ -196,7 +196,7 @@ dependencies:
           packagePath: d.path('monorepo/packages/target_pkg'),
         );
 
-        check(roots.isNotEmpty).isTrue();
+        check(roots.isNotEmpty).isTrue;
 
         // Dual Root Ingestion:
         // lib/ files in consumer_prod and consumer_dev -> productionRoots
@@ -215,7 +215,7 @@ dependencies:
           ),
         );
         check(prodNorm).not(
-          (c) => c.contains(
+          .it()..contains(
             p.normalize(
               d.path('monorepo/packages/unrelated_pkg/lib/unrelated.dart'),
             ),
@@ -265,7 +265,7 @@ dependencies:
             packagePath: d.path('missing_config_repo/packages/target_pkg'),
           );
 
-          check(roots.isEmpty).isTrue();
+          check(roots.isEmpty).isTrue;
         },
       );
 
@@ -327,7 +327,7 @@ dependencies:
           packagePath: d.path('excluded_repo/packages/target_pkg'),
         );
 
-        check(roots.isEmpty).isTrue();
+        check(roots.isEmpty).isTrue;
       });
 
       test('collects files inside lib/src/build/ and other subdirectories '

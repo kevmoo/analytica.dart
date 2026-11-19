@@ -19,19 +19,19 @@ class Foo {}
         featureSet: FeatureSet.latestLanguageVersion(),
       );
 
-      check(parser.hasIgnoreForFile(result.unit)).isTrue();
+      check(parser.hasIgnoreForFile(result.unit)).isTrue;
       check(
         CommentDirectiveParser.hasIgnoreForFileDirective(
           result.unit,
           toolName: 'my_tool',
         ),
-      ).isTrue();
+      ).isTrue;
       check(
         CommentDirectiveParser.hasIgnoreForFileDirective(
           result.unit,
           toolName: 'other_tool',
         ),
-      ).isFalse();
+      ).isFalse;
     });
 
     test(
@@ -47,7 +47,7 @@ class Foo {}
           featureSet: FeatureSet.latestLanguageVersion(),
         );
 
-        check(parser.hasIgnoreForFile(result.unit)).isFalse();
+        check(parser.hasIgnoreForFile(result.unit)).isFalse;
       },
     );
 
@@ -72,23 +72,23 @@ class IgnoredAfterAnnotationClass {}
       );
 
       final decls = parsed.unit.declarations;
-      check(parser.isDeclarationIgnored(decls[0])).isTrue();
-      check(parser.isDeclarationIgnored(decls[1])).isFalse();
-      check(parser.isDeclarationIgnored(decls[2])).isTrue();
-      check(parser.isDeclarationIgnored(decls[3])).isTrue();
+      check(parser.isDeclarationIgnored(decls[0])).isTrue;
+      check(parser.isDeclarationIgnored(decls[1])).isFalse;
+      check(parser.isDeclarationIgnored(decls[2])).isTrue;
+      check(parser.isDeclarationIgnored(decls[3])).isTrue;
 
       check(
         CommentDirectiveParser.isDeclarationIgnoredFor(
           decls[0],
           toolName: 'my_tool',
         ),
-      ).isTrue();
+      ).isTrue;
       check(
         CommentDirectiveParser.isDeclarationIgnoredFor(
           decls[0],
           toolName: 'other_tool',
         ),
-      ).isFalse();
+      ).isFalse;
     });
 
     test('detects ignore_for_file on a file containing ONLY comments', () {
@@ -98,7 +98,7 @@ class IgnoredAfterAnnotationClass {}
         featureSet: FeatureSet.latestLanguageVersion(),
       );
 
-      check(parser.hasIgnoreForFile(parsed.unit)).isTrue();
+      check(parser.hasIgnoreForFile(parsed.unit)).isTrue;
     });
 
     test('detects ignore_for_file at trailing EOF position', () {
@@ -111,7 +111,7 @@ class Foo {}
         featureSet: FeatureSet.latestLanguageVersion(),
       );
 
-      check(parser.hasIgnoreForFile(parsed.unit)).isTrue();
+      check(parser.hasIgnoreForFile(parsed.unit)).isTrue;
     });
 
     test('detects ignore on TopLevelVariableDeclaration for inner '
@@ -133,19 +133,15 @@ int c = 3;
           parsed.unit.declarations[1] as TopLevelVariableDeclaration;
 
       // Outer declaration
-      check(parser.isDeclarationIgnored(topVar1)).isTrue();
-      check(parser.isDeclarationIgnored(topVar2)).isFalse();
+      check(parser.isDeclarationIgnored(topVar1)).isTrue;
+      check(parser.isDeclarationIgnored(topVar2)).isFalse;
 
       // Inner variable declarations
-      check(
-        parser.isDeclarationIgnored(topVar1.variables.variables[0]),
-      ).isTrue();
-      check(
-        parser.isDeclarationIgnored(topVar1.variables.variables[1]),
-      ).isTrue();
+      check(parser.isDeclarationIgnored(topVar1.variables.variables[0])).isTrue;
+      check(parser.isDeclarationIgnored(topVar1.variables.variables[1])).isTrue;
       check(
         parser.isDeclarationIgnored(topVar2.variables.variables[0]),
-      ).isFalse();
+      ).isFalse;
     });
 
     test('is immune to string literals containing directives', () {
@@ -162,9 +158,9 @@ class Foo {}
         featureSet: FeatureSet.latestLanguageVersion(),
       );
 
-      check(parser.hasIgnoreForFile(parsed.unit)).isFalse();
-      check(parser.isDeclarationIgnored(parsed.unit.declarations[0])).isFalse();
-      check(parser.isDeclarationIgnored(parsed.unit.declarations[1])).isFalse();
+      check(parser.hasIgnoreForFile(parsed.unit)).isFalse;
+      check(parser.isDeclarationIgnored(parsed.unit.declarations[0])).isFalse;
+      check(parser.isDeclarationIgnored(parsed.unit.declarations[1])).isFalse;
     });
 
     test(
@@ -196,25 +192,25 @@ void notIgnored() {}
         );
         final decls = parsed.unit.declarations;
 
-        check(parser.isDeclarationIgnored(decls[0])).isTrue();
-        check(parser.declarationIgnoreReason(decls[0])).isNull();
+        check(parser.isDeclarationIgnored(decls[0])).isTrue;
+        check(parser.declarationIgnoreReason(decls[0])).isNull;
 
-        check(parser.isDeclarationIgnored(decls[1])).isTrue();
+        check(parser.isDeclarationIgnored(decls[1])).isTrue;
         check(
           parser.declarationIgnoreReason(decls[1]),
         ).equals('2D matrix neighbor-scoring hot loop');
 
-        check(parser.isDeclarationIgnored(decls[2])).isTrue();
+        check(parser.isDeclarationIgnored(decls[2])).isTrue;
         check(
           parser.declarationIgnoreReason(decls[2]),
         ).equals('state machine dispatch table');
 
-        check(parser.isDeclarationIgnored(decls[3])).isTrue();
+        check(parser.isDeclarationIgnored(decls[3])).isTrue;
         check(
           parser.declarationIgnoreReason(decls[3]),
         ).equals('performance critical parser');
 
-        check(parser.isDeclarationIgnored(decls[4])).isTrue();
+        check(parser.isDeclarationIgnored(decls[4])).isTrue;
         check(
           CommentDirectiveParser.declarationIgnoreReasonFor(
             decls[4],
@@ -222,8 +218,8 @@ void notIgnored() {}
           ),
         ).equals('bit-manipulation kernel');
 
-        check(parser.isDeclarationIgnored(decls[5])).isFalse();
-        check(parser.declarationIgnoreReason(decls[5])).isNull();
+        check(parser.isDeclarationIgnored(decls[5])).isFalse;
+        check(parser.declarationIgnoreReason(decls[5])).isNull;
       },
     );
   });

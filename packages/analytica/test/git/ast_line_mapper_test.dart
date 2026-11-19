@@ -90,8 +90,8 @@ enum Status {
       final names = mapped.map((m) => m.name).toList();
       check(names).contains('topLevelFunc');
       check(names).contains('MyService.doWork');
-      check(names).not((n) => n.contains('MyService'));
-      check(names).not((n) => n.contains('Status'));
+      check(names).not(.it()..contains('MyService'));
+      check(names).not(.it()..contains('Status'));
     });
 
     test('findTypes only returns type declarations', () {
@@ -104,8 +104,8 @@ enum Status {
       final names = mapped.map((m) => m.name).toList();
       check(names).contains('MyService');
       check(names).contains('Status');
-      check(names).not((n) => n.contains('topLevelFunc'));
-      check(names).not((n) => n.contains('MyService.doWork'));
+      check(names).not(.it()..contains('topLevelFunc'));
+      check(names).not(.it()..contains('MyService.doWork'));
     });
 
     test('mapDiffToDeclarations maps using GitFileDiff', () {
@@ -140,13 +140,13 @@ enum Status {
         [const LineRange(1, 1)], // Comment line
       );
 
-      check(mapped).isEmpty();
+      check(mapped).isEmpty;
     });
 
     test('returns empty when range list is empty', () {
       check(
         AstLineMapper.mapDeclarations(parsed.unit, parsed.lineInfo, const []),
-      ).isEmpty();
+      ).isEmpty;
     });
   });
 }

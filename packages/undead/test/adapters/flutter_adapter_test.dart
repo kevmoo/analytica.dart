@@ -136,7 +136,7 @@ flutter:
         check(roots).contains('SampleAndroidPlugin');
         check(roots).contains('SampleIosPlugin');
         check(roots).contains('SampleWindowsPlugin');
-        check(roots).not((it) => it.contains('main'));
+        check(roots).not(.it()..contains('main'));
       });
 
       test('ignores commented-out pluginClass in pubspec.yaml', () {
@@ -169,7 +169,7 @@ flutter:
         );
 
         check(roots).contains('RealAndroidPlugin');
-        check(roots).not((it) => it.contains('CommentedAndroidPlugin'));
+        check(roots).not(.it()..contains('CommentedAndroidPlugin'));
       });
 
       test(
@@ -192,7 +192,7 @@ flutter:
             pubspecContent: 'name: sample\nversion: 1.0.0\n',
           );
 
-          check(roots).isEmpty();
+          check(roots).isEmpty;
         },
       );
     });
@@ -203,7 +203,7 @@ flutter:
           'void main() { testWidgets("renders widget", (tester) {}); }',
         );
         check(invocations).length.equals(1);
-        check(adapter.isTestCallSite(invocations.first)).isTrue();
+        check(adapter.isTestCallSite(invocations.first)).isTrue;
       });
 
       test('returns false for test, group, and other methods', () {
@@ -216,7 +216,7 @@ void main() {
 ''');
         check(invocations).length.equals(3);
         for (final invocation in invocations) {
-          check(adapter.isTestCallSite(invocation)).isFalse();
+          check(adapter.isTestCallSite(invocation)).isFalse;
         }
       });
     });
@@ -228,7 +228,7 @@ void main() {
         );
         check(invocations).length.equals(2);
         for (final invocation in invocations) {
-          check(adapter.isTestHarnessSite(invocation)).isFalse();
+          check(adapter.isTestHarnessSite(invocation)).isFalse;
         }
       });
     });
@@ -264,15 +264,15 @@ void unannotatedFunc() {}
             .toList();
 
         // Entrypoints
-        check(adapter.isFrameworkEntryPoint(declarations[0], null)).isTrue();
-        check(adapter.isFrameworkEntryPoint(declarations[1], null)).isTrue();
-        check(adapter.isFrameworkEntryPoint(declarations[2], null)).isTrue();
-        check(adapter.isFrameworkEntryPoint(declarations[3], null)).isTrue();
+        check(adapter.isFrameworkEntryPoint(declarations[0], null)).isTrue;
+        check(adapter.isFrameworkEntryPoint(declarations[1], null)).isTrue;
+        check(adapter.isFrameworkEntryPoint(declarations[2], null)).isTrue;
+        check(adapter.isFrameworkEntryPoint(declarations[3], null)).isTrue;
 
         // Non-entrypoints (optimization pragmas and unannotated)
-        check(adapter.isFrameworkEntryPoint(declarations[4], null)).isFalse();
-        check(adapter.isFrameworkEntryPoint(declarations[5], null)).isFalse();
-        check(adapter.isFrameworkEntryPoint(declarations[6], null)).isFalse();
+        check(adapter.isFrameworkEntryPoint(declarations[4], null)).isFalse;
+        check(adapter.isFrameworkEntryPoint(declarations[5], null)).isFalse;
+        check(adapter.isFrameworkEntryPoint(declarations[6], null)).isFalse;
       });
     });
   });

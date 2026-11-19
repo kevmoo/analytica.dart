@@ -106,7 +106,7 @@ void main() {
       check(orphanTests.length).equals(1);
       check(orphanTests.first.file).equals('test/old_parser_test.dart');
       check(orphanTests.first.description).equals('OldParser parses correctly');
-      check(orphanTests.first.coInvokedHazard).isFalse();
+      check(orphanTests.first.coInvokedHazard).isFalse;
     });
 
     test(
@@ -169,7 +169,7 @@ void main() {
         ).equals(SuggestedAction.manualRefactorHazard);
 
         final orphanTests = hazard.orphanTests!;
-        check(orphanTests.first.coInvokedHazard).isTrue();
+        check(orphanTests.first.coInvokedHazard).isTrue;
       },
     );
 
@@ -199,7 +199,7 @@ class UnusedCommentNode extends AstNode {}
       ]).create();
 
       final report = await analyzePackage(d.path('sealed_pkg'));
-      check(report.undead).isEmpty();
+      check(report.undead).isEmpty;
       check(report.pureUndeadFound).equals(0);
     });
 
@@ -309,7 +309,7 @@ void main() {
       ]).create();
 
       final report = await analyzePackage(d.path('example_demo_pkg'));
-      check(report.undead).isEmpty();
+      check(report.undead).isEmpty;
     });
 
     test('preserves platform-conditional import branches', () async {
@@ -513,8 +513,8 @@ set deadSetter(int v) {}
       check(names).contains('deadGetter');
       check(names).contains('deadSetter');
 
-      check(names).not((it) => it.contains('LiveEnum'));
-      check(names).not((it) => it.contains('liveTopVar'));
+      check(names).not(.it()..contains('LiveEnum'));
+      check(names).not(.it()..contains('liveTopVar'));
     });
 
     test('correctly distinguishes tested undead from co-invoked hazard in '
@@ -570,7 +570,7 @@ void main() {
       final orphanTests = undead.orphanTests!;
       check(orphanTests.length).equals(1);
       check(orphanTests.first.description).equals('isolated dead parser test');
-      check(orphanTests.first.coInvokedHazard).isFalse();
+      check(orphanTests.first.coInvokedHazard).isFalse;
     });
 
     test(
@@ -597,7 +597,7 @@ mixin SpecialResult on ResultType {}
         ]).create();
 
         final report = await analyzePackage(d.path('sealed_hierarchy_pkg'));
-        check(report.undead).isEmpty();
+        check(report.undead).isEmpty;
       },
     );
 
@@ -667,7 +667,7 @@ void main() {
       ]).create();
 
       final report = await analyzePackage(d.path('prefixed_meta_pkg'));
-      check(report.undead).isEmpty();
+      check(report.undead).isEmpty;
     });
 
     test('reaches extension operator overloads in expressions', () async {
@@ -756,10 +756,10 @@ int deadVar = 0;
         final report = await analyzePackage(d.path('prefix_postfix_pkg'));
         final names = report.undead.map((z) => z.name).toSet();
         check(names).contains('deadVar');
-        check(names).not((it) => it.contains('prefixMutated'));
-        check(names).not((it) => it.contains('prefixMutated2'));
-        check(names).not((it) => it.contains('postfixMutated'));
-        check(names).not((it) => it.contains('postfixMutated2'));
+        check(names).not(.it()..contains('prefixMutated'));
+        check(names).not(.it()..contains('prefixMutated2'));
+        check(names).not(.it()..contains('postfixMutated'));
+        check(names).not(.it()..contains('postfixMutated2'));
       },
     );
 
@@ -854,8 +854,8 @@ class DeadService {}
         final undeadNames = report.undead.map((z) => z.name).toSet();
         check(undeadNames).contains('DeadService');
         check(undeadNames).contains('unusedTopLevel');
-        check(undeadNames).not((it) => it.contains('LiveService'));
-        check(undeadNames).not((it) => it.contains('DevService'));
+        check(undeadNames).not(.it()..contains('LiveService'));
+        check(undeadNames).not(.it()..contains('DevService'));
       },
     );
 
@@ -915,7 +915,7 @@ void main() {
       final orphanTests = undead.orphanTests!;
       check(orphanTests.length).equals(1);
       check(orphanTests.first.description).equals('tests dead code only');
-      check(orphanTests.first.coInvokedHazard).isFalse();
+      check(orphanTests.first.coInvokedHazard).isFalse;
     });
 
     test(
@@ -1080,10 +1080,10 @@ class DeadAlias = BaseType with UnusedMixin;
       final undeadNames = report.undead.map((z) => z.name).toSet();
       check(undeadNames).contains('DeadAlias');
       check(undeadNames).contains('UnusedMixin');
-      check(undeadNames).not((it) => it.contains('LiveAlias'));
-      check(undeadNames).not((it) => it.contains('BaseType'));
-      check(undeadNames).not((it) => it.contains('UsedMixin'));
-      check(undeadNames).not((it) => it.contains('UsedInterface'));
+      check(undeadNames).not(.it()..contains('LiveAlias'));
+      check(undeadNames).not(.it()..contains('BaseType'));
+      check(undeadNames).not(.it()..contains('UsedMixin'));
+      check(undeadNames).not(.it()..contains('UsedInterface'));
 
       final deadAliasUndead = report.undead.firstWhere(
         (z) => z.name == 'DeadAlias',
@@ -1147,7 +1147,7 @@ void main() {
       final deadNames = report.undead.map((z) => z.name).toSet();
       check(deadNames).contains('DeadWidget');
       check(deadNames).contains('SoloDeadWidget');
-      check(deadNames).not((it) => it.contains('LiveWidget'));
+      check(deadNames).not(.it()..contains('LiveWidget'));
     });
 
     test('records reachability edges from compound null-aware and '
@@ -1263,8 +1263,8 @@ void noInlineDead() {}
       final deadNames = report.undead.map((z) => z.name).toSet();
       check(deadNames).contains('preferInlineDead');
       check(deadNames).contains('noInlineDead');
-      check(deadNames).not((it) => it.contains('vmEntryPoint'));
-      check(deadNames).not((it) => it.contains('IsolateUnsendableClass'));
+      check(deadNames).not(.it()..contains('vmEntryPoint'));
+      check(deadNames).not(.it()..contains('IsolateUnsendableClass'));
     });
 
     test('dynamic conditional import reachability does not seed dead '
@@ -1306,9 +1306,9 @@ class DeadFeatureService {}
       check(deadNames).contains('DeadFeatureService');
       check(deadNames).contains('DeadStubClass');
       check(deadNames).contains('DeadIoClass');
-      check(deadNames).not((it) => it.contains('LiveService'));
-      check(deadNames).not((it) => it.contains('LiveStubClass'));
-      check(deadNames).not((it) => it.contains('LiveIoClass'));
+      check(deadNames).not(.it()..contains('LiveService'));
+      check(deadNames).not(.it()..contains('LiveStubClass'));
+      check(deadNames).not(.it()..contains('LiveIoClass'));
     });
 
     test('gRPC *Stub naming is not test support and is detected as '
@@ -1441,7 +1441,7 @@ late int varA,
       final deadNames = report.undead.map((z) => z.name).toSet();
       check(deadNames).contains('varA');
       check(deadNames).contains('varC');
-      check(deadNames).not((it) => it.contains('varB'));
+      check(deadNames).not(.it()..contains('varB'));
     });
 
     test('test harness fixtures (setUp/tearDown) are recorded as orphan '
@@ -1553,9 +1553,9 @@ class DeadSubModuleItem {}
       final deadNames = report.undead.map((z) => z.name).toSet();
       check(deadNames).contains('DeadSubModuleItem');
       check(deadNames).contains('HiddenSubModule');
-      check(deadNames).not((it) => it.contains('Consumer'));
-      check(deadNames).not((it) => it.contains('FacadeRoot'));
-      check(deadNames).not((it) => it.contains('ExportedSubModule'));
+      check(deadNames).not(.it()..contains('Consumer'));
+      check(deadNames).not(.it()..contains('FacadeRoot'));
+      check(deadNames).not(.it()..contains('ExportedSubModule'));
     });
 
     test('zero-declaration internal conditional export facade preserves '
@@ -1611,8 +1611,8 @@ class DeadInternalService {}
       check(report.pureUndeadFound).equals(1);
       check(report.undead.single.name).equals('DeadInternalService');
       final deadNames = report.undead.map((z) => z.name).toSet();
-      check(deadNames).not((it) => it.contains('CallerService'));
-      check(deadNames).not((it) => it.contains('PlatformService'));
+      check(deadNames).not(.it()..contains('CallerService'));
+      check(deadNames).not(.it()..contains('PlatformService'));
     });
 
     test(
@@ -1653,17 +1653,17 @@ class DeadDartHelper {
         final canvasUndead = defaultReport.undead.firstWhere(
           (z) => z.name == 'DomCanvas',
         );
-        check(canvasUndead.isExternalBinding).isTrue();
+        check(canvasUndead.isExternalBinding).isTrue;
 
         final funcUndead = defaultReport.undead.firstWhere(
           (z) => z.name == 'topLevelJsFunc',
         );
-        check(funcUndead.isExternalBinding).isTrue();
+        check(funcUndead.isExternalBinding).isTrue;
 
         final dartUndead = defaultReport.undead.firstWhere(
           (z) => z.name == 'DeadDartHelper',
         );
-        check(dartUndead.isExternalBinding).isFalse();
+        check(dartUndead.isExternalBinding).isFalse;
 
         // 2. Run with ignoreExternalBindings: true.
         final options = UndeadOptions(
@@ -1889,7 +1889,7 @@ void main() {
         final report = await UndeadEngine(options).analyze();
         // deadAll is pureUndead
         check(report.pureUndeadFound).equals(1);
-        check(report.undead.any((z) => z.name == 'deadAll')).isTrue();
+        check(report.undead.any((z) => z.name == 'deadAll')).isTrue;
 
         // dirTestTarget is testedUndead (reached via companion test/ split)
         check(report.testedUndeadFound).equals(1);
@@ -1902,8 +1902,8 @@ void main() {
 
         // fileRootTarget and dirProdTarget are LIVE production roots!
         final undeadNames = report.undead.map((z) => z.name).toSet();
-        check(undeadNames).not((it) => it.contains('fileRootTarget'));
-        check(undeadNames).not((it) => it.contains('dirProdTarget'));
+        check(undeadNames).not(.it()..contains('fileRootTarget'));
+        check(undeadNames).not(.it()..contains('dirProdTarget'));
       },
     );
 
@@ -1984,7 +1984,7 @@ void runGen() {
         check(report.pureUndeadFound).equals(1);
         check(report.undead.single.name).equals('deadFunc');
         final undeadNames = report.undead.map((z) => z.name).toSet();
-        check(undeadNames).not((it) => it.contains('buildGenHelper'));
+        check(undeadNames).not(.it()..contains('buildGenHelper'));
       },
     );
 
@@ -2023,7 +2023,7 @@ void internalHelper() {}
             d.path('suggest_private_pkg'),
             options: UndeadOptions(packagePath: ''),
           );
-          check(defaultReport.undead).isEmpty();
+          check(defaultReport.undead).isEmpty;
           check(defaultReport.privateCandidatesFound).equals(0);
 
           // With suggestPrivate: internalHelper is flagged as privateCandidate.
@@ -2125,7 +2125,7 @@ class Consumer {
         );
 
         check(report.privateCandidatesFound).equals(0);
-        check(report.undead).isEmpty();
+        check(report.undead).isEmpty;
       });
 
       test('does not flag declarations referenced in test files', () async {
@@ -2174,7 +2174,7 @@ void main() {
 
         // testHelper is referenced in test/live_test.dart, so it must not be suggested for privatization.
         check(report.privateCandidatesFound).equals(0);
-        check(report.undead).isEmpty();
+        check(report.undead).isEmpty;
       });
     });
 

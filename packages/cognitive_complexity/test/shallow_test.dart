@@ -55,7 +55,7 @@ class OrderProcessor {
         check(finding.classification).equals(ShallowClassification.safeInline);
         check(
           finding.reasons.any((r) => r.startsWith('HIGH_ARITY(6 params)')),
-        ).isTrue();
+        ).isTrue;
       },
     );
 
@@ -203,7 +203,7 @@ class MyWidget {
 }
 ''';
       final report = ShallowAnalyzer().analyzeCode(code);
-      check(report.findings).isEmpty();
+      check(report.findings).isEmpty;
     });
 
     test('Exempts methods on a private class _HelperClass called once from a '
@@ -228,7 +228,7 @@ class MainService {
 }
 ''';
       final report = ShallowAnalyzer().analyzeCode(code);
-      check(report.findings).isEmpty();
+      check(report.findings).isEmpty;
     });
   });
 
@@ -359,7 +359,7 @@ int planSplits(List<int> nodes, Map<int, List<int>> edges) {
 
       final names = report.findings.map((f) => f.name).toList();
       check(names).contains('leafCrossFileHelper');
-      check(names.contains('computeScc')).isFalse();
+      check(names.contains('computeScc')).isFalse;
     });
 
     test(
@@ -483,7 +483,7 @@ void _gamma(int a, int b, int c, int d, int e, int f) { if (true) print(3); }
       final h2Json = byName['_beta']!.toJson();
       check(h2Json['caller_base_score']).equals(3);
       check(h2Json['caller_cumulative_before']).equals(6);
-      check(h2Json.containsKey('caller_score')).isFalse();
+      check(h2Json.containsKey('caller_score')).isFalse;
       check(h2Json['inlined_caller_score']).equals(9);
 
       final text = report.formatText();
@@ -706,7 +706,7 @@ void _plain(int a, int b, int c, int d) {
 
       final plain = byName['_plain']!;
       check(plain.effectiveParameterCount).equals(4);
-      check(plain.reasons.any((r) => r.startsWith('HIGH_ARITY'))).isFalse();
+      check(plain.reasons.any((r) => r.startsWith('HIGH_ARITY'))).isFalse;
     });
 
     test('suppresses CROSS_FILE_SINGLE_CALLER for lib/ helpers whose only '
@@ -786,9 +786,7 @@ void _runService(int n) {
       final tinyFromBin = binByName['tinyHelper']!;
       check(tinyFromBin.callerZone).equals('bin');
       check(tinyFromBin.callerName).equals('_runCommand');
-      check(
-        tinyFromBin.reasons.any((r) => r.startsWith('CROSS_FILE')),
-      ).isFalse();
+      check(tinyFromBin.reasons.any((r) => r.startsWith('CROSS_FILE'))).isFalse;
       check(tinyFromBin.toJson()['caller_zone']).equals('bin');
 
       final fromLib = analyzer.analyzePath('${d.sandbox}/lib_pkg/lib');
@@ -864,10 +862,8 @@ void _runService(int n) {
         check(finding.callerZone).equals(zone);
         check(finding.toJson()['caller_zone']).equals(zone);
         check(finding.callerName).equals('main');
-        check(finding.reasons.any((r) => r.startsWith('CROSS_FILE'))).isFalse();
-        check(
-          finding.reasons.any((r) => r.startsWith('MICRO_HELPER')),
-        ).isTrue();
+        check(finding.reasons.any((r) => r.startsWith('CROSS_FILE'))).isFalse;
+        check(finding.reasons.any((r) => r.startsWith('MICRO_HELPER'))).isTrue;
       }
     });
 
@@ -903,11 +899,11 @@ void _publishToDatastore(String host, String path, String token, String body,
       final http = byName['_publishViaHttp']!;
       check(http.sharedParamSignatureWith).equals('_publishToDatastore');
       check(http.sharedParamCount).equals(8);
-      check(http.paramsSubsetOfExistingType).isNull();
+      check(http.paramsSubsetOfExistingType).isNull;
       final json = http.toJson();
       check(json['shared_param_signature_with']).equals('_publishToDatastore');
       check(json['shared_param_count']).equals(8);
-      check(json['params_subset_of_existing_type']).isNull();
+      check(json['params_subset_of_existing_type']).isNull;
 
       check(
         byName['_publishToDatastore']!.sharedParamSignatureWith,
@@ -1224,7 +1220,7 @@ String _twoArmSwitch(int kind) => switch (kind) {
       final twoArm = report.findings.single;
       check(twoArm.statementCount).equals(2);
       check(twoArm.bodyLines).isGreaterThan(6);
-      check(twoArm.reasons.any((r) => r.startsWith('MICRO_HELPER'))).isTrue();
+      check(twoArm.reasons.any((r) => r.startsWith('MICRO_HELPER'))).isTrue;
     });
 
     test('switch statement arm counting ignores stacked empty case labels, '
@@ -1288,7 +1284,7 @@ int _pongBack(int n) => _pong(n - 1);
       // `_subPing` (2-cycle with `_ping`) and `_pongStep`/`_pongBack`
       // (3-cycle with `_pong`) each have a single static caller in their
       // cycle, so inlining any of them would fold recursion into the caller.
-      check(report.findings).isEmpty();
+      check(report.findings).isEmpty;
     });
 
     test('counts empty record () as 1 effective parameter and attributes '
@@ -1312,12 +1308,10 @@ String _withEmptyRecord(int a, int b, int c, int d, () empty) =>
       check(emptyRec.effectiveParameterCount).equals(5);
       check(
         emptyRec.reasons.any((r) => r.startsWith('HIGH_ARITY(5 params)')),
-      ).isTrue();
+      ).isTrue;
 
       final extMethod = byName['<extension on String>.shout']!;
-      check(
-        extMethod.reasons.any((r) => r.startsWith('MICRO_HELPER')),
-      ).isTrue();
+      check(extMethod.reasons.any((r) => r.startsWith('MICRO_HELPER'))).isTrue;
     });
   });
 }

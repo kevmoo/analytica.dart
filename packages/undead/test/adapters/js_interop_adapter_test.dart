@@ -30,15 +30,15 @@ void normalFunc() {}
         final declarations = result.unit.declarations;
 
         // wasm:export
-        check(adapter.isFrameworkEntryPoint(declarations[0], null)).isTrue();
+        check(adapter.isFrameworkEntryPoint(declarations[0], null)).isTrue;
         // wasm:export named
-        check(adapter.isFrameworkEntryPoint(declarations[1], null)).isTrue();
+        check(adapter.isFrameworkEntryPoint(declarations[1], null)).isTrue;
         // wasm:entry-point
-        check(adapter.isFrameworkEntryPoint(declarations[2], null)).isTrue();
+        check(adapter.isFrameworkEntryPoint(declarations[2], null)).isTrue;
         // dart2js:tryInline
-        check(adapter.isFrameworkEntryPoint(declarations[3], null)).isFalse();
+        check(adapter.isFrameworkEntryPoint(declarations[3], null)).isFalse;
         // normal
-        check(adapter.isFrameworkEntryPoint(declarations[4], null)).isFalse();
+        check(adapter.isFrameworkEntryPoint(declarations[4], null)).isFalse;
       });
     });
 
@@ -58,10 +58,10 @@ int regularVar = 10;
 
         final declarations = result.unit.declarations;
 
-        check(adapter.isExternalBinding(declarations[0], null)).isTrue();
-        check(adapter.isExternalBinding(declarations[1], null)).isTrue();
-        check(adapter.isExternalBinding(declarations[2], null)).isFalse();
-        check(adapter.isExternalBinding(declarations[3], null)).isFalse();
+        check(adapter.isExternalBinding(declarations[0], null)).isTrue;
+        check(adapter.isExternalBinding(declarations[1], null)).isTrue;
+        check(adapter.isExternalBinding(declarations[2], null)).isFalse;
+        check(adapter.isExternalBinding(declarations[3], null)).isFalse;
       });
 
       test('matches JS extension types and classes with external members', () {
@@ -114,27 +114,27 @@ extension PureDartExt on String {
         final declarations = result.unit.declarations;
 
         // DomHTMLCanvasElement
-        check(adapter.isExternalBinding(declarations[0], null)).isTrue();
+        check(adapter.isExternalBinding(declarations[0], null)).isTrue;
         // JSAnyExtension
-        check(adapter.isExternalBinding(declarations[1], null)).isTrue();
+        check(adapter.isExternalBinding(declarations[1], null)).isTrue;
         // JSUint8ArrayExtension
-        check(adapter.isExternalBinding(declarations[2], null)).isTrue();
+        check(adapter.isExternalBinding(declarations[2], null)).isTrue;
         // StandardStringExtension (non-JS)
-        check(adapter.isExternalBinding(declarations[3], null)).isFalse();
+        check(adapter.isExternalBinding(declarations[3], null)).isFalse;
         // NormalClass
-        check(adapter.isExternalBinding(declarations[4], null)).isFalse();
+        check(adapter.isExternalBinding(declarations[4], null)).isFalse;
         // ClassWithExternalMember
-        check(adapter.isExternalBinding(declarations[5], null)).isTrue();
+        check(adapter.isExternalBinding(declarations[5], null)).isTrue;
         // ClassWithJsParam (must NOT be treated as external binding)
-        check(adapter.isExternalBinding(declarations[6], null)).isFalse();
+        check(adapter.isExternalBinding(declarations[6], null)).isFalse;
         // ClassWithJsParamName (must NOT be treated as external binding)
-        check(adapter.isExternalBinding(declarations[7], null)).isFalse();
+        check(adapter.isExternalBinding(declarations[7], null)).isFalse;
         // PureDartExtWithJsParam (must NOT be treated as external binding)
-        check(adapter.isExternalBinding(declarations[8], null)).isFalse();
+        check(adapter.isExternalBinding(declarations[8], null)).isFalse;
         // CanvasExtWithExternal (has external member)
-        check(adapter.isExternalBinding(declarations[9], null)).isTrue();
+        check(adapter.isExternalBinding(declarations[9], null)).isTrue;
         // PureDartExt (normal extension)
-        check(adapter.isExternalBinding(declarations[10], null)).isFalse();
+        check(adapter.isExternalBinding(declarations[10], null)).isFalse;
       });
     });
   });
@@ -150,8 +150,8 @@ void myDartFunction() {}
       );
 
       final decls = result.unit.declarations;
-      check(composite.isExternalBinding(decls[0], null)).isTrue();
-      check(composite.isExternalBinding(decls[1], null)).isFalse();
+      check(composite.isExternalBinding(decls[0], null)).isTrue;
+      check(composite.isExternalBinding(decls[1], null)).isFalse;
     });
   });
 }

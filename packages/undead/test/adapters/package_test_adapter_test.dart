@@ -40,7 +40,7 @@ void main() {
 
         check(invocations).length.equals(3);
         for (final stmt in invocations) {
-          check(adapter.isTestCallSite(stmt)).isTrue();
+          check(adapter.isTestCallSite(stmt)).isTrue;
         }
       });
 
@@ -56,7 +56,7 @@ void main() {
 
         check(invocations).length.equals(5);
         for (final stmt in invocations) {
-          check(adapter.isTestCallSite(stmt)).isFalse();
+          check(adapter.isTestCallSite(stmt)).isFalse;
         }
       });
     });
@@ -75,7 +75,7 @@ void main() {
 
         check(invocations).length.equals(4);
         for (final stmt in invocations) {
-          check(adapter.isTestHarnessSite(stmt)).isTrue();
+          check(adapter.isTestHarnessSite(stmt)).isTrue;
         }
       });
 
@@ -90,7 +90,7 @@ void main() {
 
         check(invocations).length.equals(3);
         for (final stmt in invocations) {
-          check(adapter.isTestHarnessSite(stmt)).isFalse();
+          check(adapter.isTestHarnessSite(stmt)).isFalse;
         }
       });
     });
@@ -112,7 +112,7 @@ void main() {
           packageDir: Directory('/sample'),
           pubspecContent: 'name: sample\n',
         );
-        check(roots).isEmpty();
+        check(roots).isEmpty;
       });
 
       test('isFrameworkEntryPoint returns false', () {
@@ -122,7 +122,7 @@ void main() {
         final decl = result.unit.declarations
             .whereType<FunctionDeclaration>()
             .first;
-        check(adapter.isFrameworkEntryPoint(decl, null)).isFalse();
+        check(adapter.isFrameworkEntryPoint(decl, null)).isFalse;
       });
     });
   });

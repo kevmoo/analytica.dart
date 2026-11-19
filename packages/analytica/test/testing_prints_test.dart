@@ -17,7 +17,7 @@ void main() {
 
     test('returns empty string when nothing is printed', () async {
       final output = await capturePrints(() {});
-      check(output).isEmpty();
+      check(output).isEmpty;
     });
 
     test('captures asynchronous print statements', () async {

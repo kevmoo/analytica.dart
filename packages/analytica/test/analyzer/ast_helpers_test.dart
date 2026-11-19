@@ -55,7 +55,7 @@ class Container {
       check(extractNodeName(decls[2])).equals('MyEnum');
       check(extractNodeName(decls[3])).equals('MyMixin');
       check(extractNodeName(decls[4])).equals('MyExtension');
-      check(extractNodeName(decls[5])).isNull();
+      check(extractNodeName(decls[5])).isNull;
       check(extractNodeName(decls[6])).equals('MyExtType');
       check(extractNodeName(decls[7])).equals('MyTypedef');
       check(extractNodeName(decls[8])).equals('myFunction');
@@ -67,7 +67,7 @@ class Container {
       final collector = _Collector();
       parsed.unit.accept(collector);
 
-      check(extractNodeName(collector.constructors[0])).isNull();
+      check(extractNodeName(collector.constructors[0])).isNull;
       check(extractNodeName(collector.constructors[1])).equals('named');
       check(extractNodeName(collector.methods[0])).equals('myMethod');
     });
@@ -189,35 +189,35 @@ void funcF() {}
       final decls = parsed.unit.declarations;
       check(
         hasAnnotation(decls[0] as AnnotatedNode, 'visibleForTesting'),
-      ).isTrue();
-      check(hasAnnotation(decls[1] as AnnotatedNode, 'protected')).isTrue();
-      check(hasAnnotation(decls[2] as AnnotatedNode, 'pragma')).isTrue();
-      check(hasAnnotation(decls[3] as AnnotatedNode, 'Native')).isTrue();
+      ).isTrue;
+      check(hasAnnotation(decls[1] as AnnotatedNode, 'protected')).isTrue;
+      check(hasAnnotation(decls[2] as AnnotatedNode, 'pragma')).isTrue;
+      check(hasAnnotation(decls[3] as AnnotatedNode, 'Native')).isTrue;
       check(
         hasAnnotation(decls[4] as AnnotatedNode, 'visibleForTesting'),
-      ).isTrue();
+      ).isTrue;
       check(
         hasAnnotation(decls[5] as AnnotatedNode, 'visibleForTesting'),
-      ).isFalse();
+      ).isFalse;
 
       check(
         hasAnyAnnotation(decls[0] as AnnotatedNode, const [
           'visibleForTesting',
           'protected',
         ]),
-      ).isTrue();
+      ).isTrue;
       check(
         hasAnyAnnotation(decls[4] as AnnotatedNode, const [
           'visibleForTesting',
           'protected',
         ]),
-      ).isTrue();
+      ).isTrue;
       check(
         hasAnyAnnotation(decls[5] as AnnotatedNode, const [
           'visibleForTesting',
           'protected',
         ]),
-      ).isFalse();
+      ).isFalse;
     });
   });
 
@@ -260,14 +260,14 @@ class NormalService {}
         // etc.)
         for (var i = 0; i <= 8; i++) {
           final decl = parsed.unit.declarations[i] as AnnotatedNode;
-          check(isTestSupportDeclaration(decl)).isTrue();
+          check(isTestSupportDeclaration(decl)).isTrue;
         }
 
         // Declarations 9..12 (StubRepo, RepoStub, PaymentServiceStub,
         // NormalService) are NOT test support
         for (var i = 9; i <= 12; i++) {
           final decl = parsed.unit.declarations[i] as AnnotatedNode;
-          check(isTestSupportDeclaration(decl)).isFalse();
+          check(isTestSupportDeclaration(decl)).isFalse;
         }
       },
     );
@@ -328,29 +328,29 @@ void normalFn() {}
       // Explicit native / entrypoint pragmas: indices 0..8
       for (var i = 0; i <= 8; i++) {
         final decl = parsed.unit.declarations[i] as AnnotatedNode;
-        check(isNativeOrEntryPoint(decl)).isTrue();
+        check(isNativeOrEntryPoint(decl)).isTrue;
       }
 
       // Optimization hints & normal functions: indices 9..14
       for (var i = 9; i <= 14; i++) {
         final decl = parsed.unit.declarations[i] as AnnotatedNode;
-        check(isNativeOrEntryPoint(decl)).isFalse();
+        check(isNativeOrEntryPoint(decl)).isFalse;
       }
     });
   });
 
   group('isExcludedPath', () {
     test('identifies excluded directory segments', () {
-      check(isExcludedPath('.dart_tool/package_config.json')).isTrue();
-      check(isExcludedPath('.git/HEAD')).isTrue();
-      check(isExcludedPath('build/app/outputs')).isTrue();
-      check(isExcludedPath('build/flutter_assets/foo.png')).isTrue();
+      check(isExcludedPath('.dart_tool/package_config.json')).isTrue;
+      check(isExcludedPath('.git/HEAD')).isTrue;
+      check(isExcludedPath('build/app/outputs')).isTrue;
+      check(isExcludedPath('build/flutter_assets/foo.png')).isTrue;
 
-      check(isExcludedPath('lib/src/build/builder.dart')).isFalse();
-      check(isExcludedPath('packages/foo/build/bin.dart')).isFalse();
-      check(isExcludedPath('.github/workflows/ci.yml')).isFalse();
-      check(isExcludedPath('lib/builders/code_builder.dart')).isFalse();
-      check(isExcludedPath('lib/src/service.dart')).isFalse();
+      check(isExcludedPath('lib/src/build/builder.dart')).isFalse;
+      check(isExcludedPath('packages/foo/build/bin.dart')).isFalse;
+      check(isExcludedPath('.github/workflows/ci.yml')).isFalse;
+      check(isExcludedPath('lib/builders/code_builder.dart')).isFalse;
+      check(isExcludedPath('lib/src/service.dart')).isFalse;
     });
   });
 }

@@ -17,7 +17,7 @@ void sayHello(String name) {
 
         check(seq.filePath).equals('test.dart');
         check(seq.totalLines).isGreaterThan(2);
-        check(seq.tokens).isNotEmpty();
+        check(seq.tokens).isNotEmpty;
 
         final first = seq.tokens.first;
         check(first.originalLexeme).equals('void');
@@ -38,8 +38,8 @@ void test() {}
       final seq = tokenizer.tokenize(filePath: 'test.dart', content: code);
 
       for (final tok in seq.tokens) {
-        check(tok.originalLexeme).not((it) => it.startsWith('//'));
-        check(tok.originalLexeme).not((it) => it.startsWith('/*'));
+        check(tok.originalLexeme).not(.it()..startsWith('//'));
+        check(tok.originalLexeme).not(.it()..startsWith('/*'));
       }
     });
 
@@ -70,7 +70,7 @@ void testMethod() {
       check(commentLexemes).contains('// Leading comment');
       check(commentLexemes).contains('/// Leading doc comment');
       check(commentLexemes).contains('// Inner comment');
-      check(commentLexemes).any((it) => it.startsWith('/* Inner multi-line'));
+      check(commentLexemes).any(.it()..startsWith('/* Inner multi-line'));
       check(commentLexemes).contains('// Trailing comment');
 
       // Verify token ordering and locations

@@ -73,7 +73,7 @@ void main() {
       check(
         ranges['lib/src/util.dart']!.single,
       ).equals(const LineRange(12, 16));
-      check(ranges.containsKey('packages/other/lib/other.dart')).isFalse();
+      check(ranges.containsKey('packages/other/lib/other.dart')).isFalse;
     });
 
     test(
@@ -127,10 +127,10 @@ void main() {
 
         check(result.clusters.length).equals(1);
         final updatedCluster = result.clusters.first;
-        check(updatedCluster.intersectsDiff).isTrue();
-        check(updatedCluster.isNewlyIntroduced).isFalse();
-        check(updatedCluster.instances.first.inDiff).isTrue();
-        check(updatedCluster.instances.last.inDiff).isFalse();
+        check(updatedCluster.intersectsDiff).isTrue;
+        check(updatedCluster.isNewlyIntroduced).isFalse;
+        check(updatedCluster.instances.first.inDiff).isTrue;
+        check(updatedCluster.instances.last.inDiff).isFalse;
         check(result.diffDuplicationPercent).isNotNull();
         check(result.diffDuplicationPercent!).isGreaterThan(0.0);
       },
@@ -182,7 +182,7 @@ void main() {
         onlyChanged: true,
       );
 
-      check(result.clusters).isEmpty();
+      check(result.clusters).isEmpty;
       check(result.clustersOutsideDiff).equals(1);
     });
   });

@@ -25,7 +25,7 @@ void checkValue(int x) {
         endLine: 6,
       );
 
-      check(result.isCleanlyExtractable).isFalse();
+      check(result.isCleanlyExtractable).isFalse;
       check(result.escapes).length.equals(1);
       check(
         result.escapes.first.type,
@@ -52,8 +52,8 @@ void filterNumbers(List<int> numbers) {
         endLine: 6,
       );
 
-      check(result.isCleanlyExtractable).isTrue();
-      check(result.escapes).isEmpty();
+      check(result.isCleanlyExtractable).isTrue;
+      check(result.escapes).isEmpty;
       check(result.outputs.map((o) => o.name).toList()).deepEquals(['evens']);
     });
 
@@ -77,7 +77,7 @@ void searchLoop(List<String> items) {
         endLine: 6,
       );
 
-      check(result.isCleanlyExtractable).isFalse();
+      check(result.isCleanlyExtractable).isFalse;
       check(result.escapes).length.equals(1);
       check(result.escapes.first.type).equals(ControlFlowEscapeType.loopBreak);
       check(result.escapes.first.line).equals(5);
@@ -104,8 +104,8 @@ void internalLoop() {
         endLine: 8,
       );
 
-      check(result.isCleanlyExtractable).isTrue();
-      check(result.escapes).isEmpty();
+      check(result.isCleanlyExtractable).isTrue;
+      check(result.escapes).isEmpty;
     });
 
     test(
@@ -133,8 +133,8 @@ void handleSwitch(int code) {
           endLine: 10,
         );
 
-        check(result.isCleanlyExtractable).isTrue();
-        check(result.escapes).isEmpty();
+        check(result.isCleanlyExtractable).isTrue;
+        check(result.escapes).isEmpty;
       },
     );
 
@@ -163,7 +163,7 @@ void loopWithSwitch(List<int> items) {
           endLine: 10,
         );
 
-        check(result.isCleanlyExtractable).isFalse();
+        check(result.isCleanlyExtractable).isFalse;
         check(result.escapes).length.equals(1);
         check(
           result.escapes.first.type,
@@ -188,7 +188,7 @@ Iterable<int> countUp(int n) sync* {
         endLine: 5,
       );
 
-      check(result.isCleanlyExtractable).isFalse();
+      check(result.isCleanlyExtractable).isFalse;
       check(result.escapes).length.equals(1);
       check(
         result.escapes.first.type,
@@ -212,8 +212,8 @@ void testMethod() {
         startLine: 5,
         endLine: 7,
       );
-      check(result.isCleanlyExtractable).isFalse();
-      check(result.escapes).isNotEmpty();
+      check(result.isCleanlyExtractable).isFalse;
+      check(result.escapes).isNotEmpty;
     });
 
     test('VULN-07: rethrow outside catch scope', () async {
@@ -233,7 +233,7 @@ void testMethod() {
         startLine: 6,
         endLine: 7,
       );
-      check(result.isCleanlyExtractable).isFalse();
+      check(result.isCleanlyExtractable).isFalse;
     });
 
     test(
@@ -256,7 +256,7 @@ class Button {
           startLine: 4,
           endLine: 6,
         );
-        check(result.isCleanlyExtractable).isFalse();
+        check(result.isCleanlyExtractable).isFalse;
         check(
           result.escapes.map((e) => e.type.name).toList(),
         ).contains('closureEscape');
@@ -285,7 +285,7 @@ class Button {
           startLine: 5,
           endLine: 7,
         );
-        check(result.isCleanlyExtractable).isFalse();
+        check(result.isCleanlyExtractable).isFalse;
         check(
           result.escapes.map((e) => e.type.name).toList(),
         ).contains('closureEscape');
@@ -309,7 +309,7 @@ class Point {
         startLine: 6,
         endLine: 6,
       );
-      check(result.isCleanlyExtractable).isFalse();
+      check(result.isCleanlyExtractable).isFalse;
       check(
         result.escapes.map((e) => e.type.name).toList(),
       ).contains('constructorInitializerEscape');
@@ -332,8 +332,8 @@ void buildGenerator(int n) {
           startLine: 3,
           endLine: 5,
         );
-        check(result.isCleanlyExtractable).isTrue();
-        check(result.escapes).isEmpty();
+        check(result.isCleanlyExtractable).isTrue;
+        check(result.escapes).isEmpty;
       },
     );
   });

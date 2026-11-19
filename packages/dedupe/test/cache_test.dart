@@ -94,7 +94,7 @@ void main() {
         fileIndex: 0,
       );
 
-      check(cached).isNull();
+      check(cached).isNull;
     });
 
     test('getEntry returns null on options mismatch', () {
@@ -135,7 +135,7 @@ void main() {
         fileIndex: 0,
       );
 
-      check(cached).isNull();
+      check(cached).isNull;
     });
 
     test('pruneStale removes deleted files from cache', () {
@@ -169,9 +169,7 @@ void main() {
       // Prune with active set that does not contain lib/old.dart
       cache.pruneStale({'lib/new.dart'});
 
-      check(
-        cache.getEntry(relPath: 'lib/old.dart', contentHash: hash),
-      ).isNull();
+      check(cache.getEntry(relPath: 'lib/old.dart', contentHash: hash)).isNull;
     });
 
     test('pruneStale does not delete unrelated or malformed JSON files', () {
@@ -207,10 +205,10 @@ void main() {
       cache.pruneStale(<String>{});
 
       // All unrelated files must survive
-      check(configJson.existsSync()).isTrue();
-      check(malformedJson.existsSync()).isTrue();
-      check(arrayJson.existsSync()).isTrue();
-      check(nonCacheJson.existsSync()).isTrue();
+      check(configJson.existsSync()).isTrue;
+      check(malformedJson.existsSync()).isTrue;
+      check(arrayJson.existsSync()).isTrue;
+      check(nonCacheJson.existsSync()).isTrue;
     });
 
     test(
@@ -257,11 +255,11 @@ void main() {
         // Cache entry is gone
         check(
           cache.getEntry(relPath: 'lib/sample.dart', contentHash: hash),
-        ).isNull();
+        ).isNull;
 
         // Unrelated files remain untouched
-        check(configJson.existsSync()).isTrue();
-        check(notesTxt.existsSync()).isTrue();
+        check(configJson.existsSync()).isTrue;
+        check(notesTxt.existsSync()).isTrue;
       },
     );
     test('getEntry returns null on cache format version mismatch', () {
@@ -313,7 +311,7 @@ void main() {
         contentHash: hash,
         fileIndex: 0,
       );
-      check(cached).isNull();
+      check(cached).isNull;
     });
 
     test(
@@ -358,7 +356,7 @@ void main() {
             contentHash: hash,
             fileIndex: 0,
           ),
-        ).isNull();
+        ).isNull;
 
         final diffPkgCache = DedupeCacheManager(
           cacheDirPath: cacheDir,
@@ -373,7 +371,7 @@ void main() {
             contentHash: hash,
             fileIndex: 0,
           ),
-        ).isNull();
+        ).isNull;
 
         final sameCache = DedupeCacheManager(
           cacheDirPath: cacheDir,
@@ -436,7 +434,7 @@ void main() {
             contentHash: hash,
             fileIndex: 0,
           ),
-        ).isNull();
+        ).isNull;
 
         // Completely non-JSON data
         cacheFile.writeAsStringSync('not json content at all');
@@ -446,7 +444,7 @@ void main() {
             contentHash: hash,
             fileIndex: 0,
           ),
-        ).isNull();
+        ).isNull;
 
         // JSON array instead of map
         cacheFile.writeAsStringSync('[1, 2, 3]');
@@ -456,7 +454,7 @@ void main() {
             contentHash: hash,
             fileIndex: 0,
           ),
-        ).isNull();
+        ).isNull;
       },
     );
 
@@ -500,7 +498,7 @@ void main() {
         contentHash: hash,
         fileIndex: 0,
       );
-      check(cached).isNull();
+      check(cached).isNull;
     });
   });
 
@@ -580,7 +578,7 @@ void duplicateFunctionB() {
       final cacheFiles1 = Directory(
         cacheDir,
       ).listSync(recursive: true).whereType<File>().toList();
-      check(cacheFiles1).isNotEmpty();
+      check(cacheFiles1).isNotEmpty;
 
       final options2 = DedupeOptions(
         targetPath: tempDir.path,
@@ -596,7 +594,7 @@ void duplicateFunctionB() {
       final cacheFiles2 = Directory(
         cacheDir,
       ).listSync(recursive: true).whereType<File>().toList();
-      check(cacheFiles2).isEmpty();
+      check(cacheFiles2).isEmpty;
     });
 
     test('verifies real cache hit by poisoning a cached entry', () async {
@@ -618,7 +616,7 @@ void duplicateFunctionB() {
       final cacheFile = File(
         p.join(cacheDir, pathHash.substring(0, 2), '$pathHash.json'),
       );
-      check(cacheFile.existsSync()).isTrue();
+      check(cacheFile.existsSync()).isTrue;
 
       final data =
           jsonDecode(cacheFile.readAsStringSync()) as Map<String, dynamic>;

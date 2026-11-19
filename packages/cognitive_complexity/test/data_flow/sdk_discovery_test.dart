@@ -15,7 +15,7 @@ void main() {
         ]),
       ]).create();
 
-      check(isValidSdk('${d.sandbox}/sdk')).isTrue();
+      check(isValidSdk('${d.sandbox}/sdk')).isTrue;
     });
 
     test('accepts a root with lib/_internal and bin/dart', () async {
@@ -24,7 +24,7 @@ void main() {
         d.dir('bin', [d.file('dart', '')]),
       ]).create();
 
-      check(isValidSdk('${d.sandbox}/sdk')).isTrue();
+      check(isValidSdk('${d.sandbox}/sdk')).isTrue;
     });
 
     test('rejects an AOT app bundle (bin only, no lib/_internal)', () async {
@@ -32,7 +32,7 @@ void main() {
         d.dir('bin', [d.file('data_flow', '')]),
       ]).create();
 
-      check(isValidSdk('${d.sandbox}/bundle')).isFalse();
+      check(isValidSdk('${d.sandbox}/bundle')).isFalse;
     });
   });
 
@@ -99,13 +99,13 @@ void main() {
     test('returns null when the directory has no dart executable', () async {
       await d.dir('empty').create();
 
-      check(resolveSdkFromDir('${d.sandbox}/empty', 'dart')).isNull();
+      check(resolveSdkFromDir('${d.sandbox}/empty', 'dart')).isNull;
     });
 
     test('returns null for a dart binary outside any SDK', () async {
       await d.dir('stray', [d.file('dart', '')]).create();
 
-      check(resolveSdkFromDir('${d.sandbox}/stray', 'dart')).isNull();
+      check(resolveSdkFromDir('${d.sandbox}/stray', 'dart')).isNull;
     });
   });
 }

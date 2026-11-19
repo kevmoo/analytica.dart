@@ -86,7 +86,7 @@ ${lines('q', 40)}
               're-exports github_queries.dart; move the declarations this cut '
               'uses out of the barrel to break the cycle',
         ]);
-        check(cut.inheritedCycles).isEmpty();
+        check(cut.inheritedCycles).isEmpty;
       },
     );
   }
@@ -131,7 +131,7 @@ ${lines('r', 70)}
         (c) => c.declarations.any((d) => d.name == 'fb'),
       );
       check(fb.declarations.map((d) => d.name)).contains('C');
-      check(leftInNotes(report)).isEmpty();
+      check(leftInNotes(report)).isEmpty;
     });
 
     test('are noted once when no cut can take them', () async {
@@ -146,7 +146,7 @@ ${lines('r', 70)}
       );
       check(
         report.clusters.expand((c) => c.declarations).map((d) => d.name),
-      ).not((it) => it.contains('C'));
+      ).not(.it()..contains('C'));
       check(leftInNotes(report)).length.equals(1);
       check(leftInNotes(report).single).contains('sibling type(s) C left in');
     });

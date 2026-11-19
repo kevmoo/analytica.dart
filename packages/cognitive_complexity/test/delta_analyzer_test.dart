@@ -43,7 +43,7 @@ void main() {
       check(d.newScore).isNotNull().equals(2);
       check(d.delta).equals(-1);
       check(d.status).equals(DeltaStatus.improved);
-      check(d.isViolation(failThreshold: 15)).isFalse();
+      check(d.isViolation(failThreshold: 15)).isFalse;
     });
 
     test('Identifies increased complexity and flags failure on increase', () {
@@ -64,7 +64,7 @@ void main() {
       check(d.newScore).isNotNull().equals(3);
       check(d.delta).equals(3);
       check(d.status).equals(DeltaStatus.increased);
-      check(d.isViolation(failOnIncrease: true)).isTrue();
+      check(d.isViolation(failOnIncrease: true)).isTrue;
     });
 
     test('Threshold gates fail-on-increase when both are supplied', () {
@@ -80,11 +80,11 @@ void main() {
       final d = analyzer.computeDeltaForCode(oldCode, newCode).first;
       check(d.newScore).isNotNull().equals(3);
       // Within budget: the increase is reported but is not a violation.
-      check(d.isViolation(failOnIncrease: true, failThreshold: 15)).isFalse();
+      check(d.isViolation(failOnIncrease: true, failThreshold: 15)).isFalse;
       // Over budget: the increase is a violation.
-      check(d.isViolation(failOnIncrease: true, failThreshold: 2)).isTrue();
+      check(d.isViolation(failOnIncrease: true, failThreshold: 2)).isTrue;
       // No threshold: strict any-increase ratchet.
-      check(d.isViolation(failOnIncrease: true)).isTrue();
+      check(d.isViolation(failOnIncrease: true)).isTrue;
     });
 
     test('Identifies newly added and removed functions across diff', () {
@@ -96,13 +96,13 @@ void main() {
 
       final added = deltas.firstWhere((d) => d.name == 'addedFunc');
       check(added.status).equals(DeltaStatus.added);
-      check(added.oldScore).isNull();
+      check(added.oldScore).isNull;
       check(added.newScore).isNotNull().equals(1);
 
       final removed = deltas.firstWhere((d) => d.name == 'deletedFunc');
       check(removed.status).equals(DeltaStatus.removed);
       check(removed.oldScore).isNotNull().equals(1);
-      check(removed.newScore).isNull();
+      check(removed.newScore).isNull;
     });
 
     test('fail-on-increase ignores newly added functions', () {
@@ -117,8 +117,8 @@ void main() {
       check(added.status).equals(DeltaStatus.added);
       // A new function has no baseline to increase from; it is governed by
       // the fail threshold instead.
-      check(added.isViolation(failOnIncrease: true)).isFalse();
-      check(added.isViolation(failOnIncrease: true, failThreshold: 0)).isTrue();
+      check(added.isViolation(failOnIncrease: true)).isFalse;
+      check(added.isViolation(failOnIncrease: true, failThreshold: 0)).isTrue;
     });
   });
 
@@ -147,8 +147,8 @@ void main() {
         );
 
         reporter.printReport(deltaSummary: summary, failThreshold: 15);
-        check(outBuf.toString()).not((s) => s.contains('::warning'));
-        check(outBuf.toString()).not((s) => s.contains('::error'));
+        check(outBuf.toString()).not(.it()..contains('::warning'));
+        check(outBuf.toString()).not(.it()..contains('::error'));
       },
     );
 
@@ -258,8 +258,8 @@ void main() {
             '| 🗑️ | `deletedWithScore` | `lib/a.dart` | `-4` | '
             '4 -> _deleted_ |',
           )
-          ..not((s) => s.contains('addedZeroScore'))
-          ..not((s) => s.contains('deletedZeroScore'));
+          ..not(.it()..contains('addedZeroScore'))
+          ..not(.it()..contains('deletedZeroScore'));
       },
     );
   });
@@ -355,10 +355,10 @@ void main() {
       check(results.first.lineCount).isGreaterThan(80);
       check(
         results.first.isViolation(failThreshold: 15, maxFunctionLines: null),
-      ).isFalse();
+      ).isFalse;
       check(
         results.first.isViolation(failThreshold: 15, maxFunctionLines: 60),
-      ).isTrue();
+      ).isTrue;
 
       // File-level and declaration-level ignore directives
       const ignoredFileCode = '''
@@ -369,8 +369,8 @@ void complexFunc(bool a, bool b) {
   }
 }
 ''';
-      check(analyzer.analyzeCode(ignoredFileCode)).isEmpty();
-      check(analyzer.analyzeCodeLineCount(ignoredFileCode)).isNull();
+      check(analyzer.analyzeCode(ignoredFileCode)).isEmpty;
+      check(analyzer.analyzeCodeLineCount(ignoredFileCode)).isNull;
 
       const ignoredDeclCode = '''
 // cognitive_complexity:ignore legacy state machine
@@ -407,7 +407,7 @@ void activeFunc(bool a) {
       ).equals('ignoredFunc (score: 3, reason: legacy state machine)');
       check(suppressed[1].name).equals('ignoredNoReason');
       check(suppressed[1].score).equals(1);
-      check(suppressed[1].ignoreReason).isNull();
+      check(suppressed[1].ignoreReason).isNull;
       check(
         suppressed[1].formattedSummary,
       ).equals('ignoredNoReason (score: 1, no reason)');
@@ -428,7 +428,7 @@ void activeFunc(bool a) {
           ignoredDeclCode,
           filePath: 'lib/state.dart',
         ),
-      ).isEmpty();
+      ).isEmpty;
 
       const summary = DeltaSummary(
         baseRef: 'HEAD~1',
@@ -470,7 +470,7 @@ void activeFunc(bool a) {
           maxFunctionLines: null,
           failOnIncrease: true,
         ),
-      ).isTrue();
+      ).isTrue;
 
       check(
         summary.isClean(
@@ -479,7 +479,7 @@ void activeFunc(bool a) {
           maxFunctionLines: null,
           failOnIncrease: true,
         ),
-      ).isFalse();
+      ).isFalse;
 
       final json = summary.toJson(
         failThreshold: 15,
@@ -501,7 +501,7 @@ void activeFunc(bool a) {
       );
       check(
         inheritedDelta.pathFilter.isExcluded('custom_ignored/a.dart'),
-      ).isTrue();
+      ).isTrue;
 
       // GitHubReporter renders file and declaration line limit violations
       final ghOut = StringBuffer();

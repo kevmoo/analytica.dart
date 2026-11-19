@@ -44,7 +44,7 @@ Usage: my_server [options]
       );
 
       final result = await syncer.verify();
-      check(result.isClean).isTrue();
+      check(result.isClean).isTrue;
     });
 
     test('fails and reports diff when README options drift', () async {
@@ -81,7 +81,7 @@ Usage: my_tool [options]
       );
 
       final result = await syncer.verify();
-      check(result.isClean).isFalse();
+      check(result.isClean).isFalse;
       check(result.staleTargets).length.equals(1);
       final stale = result.staleTargets.first;
       check(stale.diff).isNotNull();

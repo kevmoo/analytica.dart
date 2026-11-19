@@ -106,9 +106,9 @@ void main() {
         inDiff: true,
       );
 
-      check(instance1 == instance2).isTrue();
+      check(instance1 == instance2).isTrue;
       check(instance1.hashCode).equals(instance2.hashCode);
-      check(instance1 == instanceDiff).isFalse();
+      check(instance1 == instanceDiff).isFalse;
 
       final json = instance1.toJson();
       check(json['filePath']).equals('lib/src/util.dart');
@@ -120,7 +120,7 @@ void main() {
       check(json['inDiff']).equals(true);
 
       final restored = CloneInstance.fromJson(json);
-      check(restored == instance1).isTrue();
+      check(restored == instance1).isTrue;
       check(restored.hashCode).equals(instance1.hashCode);
       check(restored.toString()).contains('lib/src/util.dart:10-25');
     });
@@ -185,9 +185,9 @@ void main() {
       );
 
       // Value semantics
-      check(cluster1 == cluster2).isTrue();
+      check(cluster1 == cluster2).isTrue;
       check(cluster1.hashCode).equals(cluster2.hashCode);
-      check(cluster1 == clusterDiff).isFalse();
+      check(cluster1 == clusterDiff).isFalse;
 
       // Defensive immutability: mutating source list does not affect cluster
       check(cluster1.instances.length).equals(2);
@@ -202,7 +202,7 @@ void main() {
       check(json['intersectsDiff']).equals(true);
 
       final restored = DuplicateCluster.fromJson(json);
-      check(restored == cluster1).isTrue();
+      check(restored == cluster1).isTrue;
       check(restored.hashCode).equals(cluster1.hashCode);
       expect(() => restored.instances.add(instance1), throwsUnsupportedError);
       check(restored.toString()).contains('Cluster cluster-1');
@@ -237,9 +237,9 @@ void main() {
         clusterCount: 2,
       );
 
-      check(metric1 == metric2).isTrue();
+      check(metric1 == metric2).isTrue;
       check(metric1.hashCode).equals(metric2.hashCode);
-      check(metric1 == metricDiff).isFalse();
+      check(metric1 == metricDiff).isFalse;
 
       final json = metric1.toJson();
       check(json['filePath']).equals('lib/foo.dart');
@@ -249,7 +249,7 @@ void main() {
       check(json['clusterCount']).equals(2);
 
       final restored = FileDuplicationMetric.fromJson(json);
-      check(restored == metric1).isTrue();
+      check(restored == metric1).isTrue;
       check(restored.hashCode).equals(metric1.hashCode);
       check(
         restored.toString(),
@@ -297,13 +297,13 @@ void main() {
         clustersOutsideDiff: 1,
       );
 
-      check(summary1 == summary2).isTrue();
+      check(summary1 == summary2).isTrue;
       check(summary1.hashCode).equals(summary2.hashCode);
-      check(summary1 == summaryDiff).isFalse();
+      check(summary1 == summaryDiff).isFalse;
 
       final json = summary1.toJson();
       final restored = DedupeSummary.fromJson(json);
-      check(restored == summary1).isTrue();
+      check(restored == summary1).isTrue;
       check(restored.hashCode).equals(summary1.hashCode);
       check(restored.toString()).contains('DedupeSummary(5 files, 2 clusters');
     });
@@ -347,9 +347,9 @@ void main() {
         fileMetrics: [],
       );
 
-      check(report1 == report2).isTrue();
+      check(report1 == report2).isTrue;
       check(report1.hashCode).equals(report2.hashCode);
-      check(report1 == reportDiff).isFalse();
+      check(report1 == reportDiff).isFalse;
 
       // Defensive immutability
       expect(
@@ -386,7 +386,7 @@ void main() {
       check(json['targetPath']).equals('packages/test');
 
       final restored = DedupeReport.fromJson(json);
-      check(restored == report1).isTrue();
+      check(restored == report1).isTrue;
       check(restored.hashCode).equals(report1.hashCode);
       expect(
         () => restored.clusters.add(
@@ -429,9 +429,9 @@ void main() {
         includePatterns: ['**/*.dart'],
       );
 
-      check(options1 == options2).isTrue();
+      check(options1 == options2).isTrue;
       check(options1.hashCode).equals(options2.hashCode);
-      check(options1 == optionsDiff).isFalse();
+      check(options1 == optionsDiff).isFalse;
 
       // Defensive immutability
       expect(() => options1.targets.add('bin'), throwsUnsupportedError);

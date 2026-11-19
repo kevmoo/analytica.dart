@@ -205,7 +205,7 @@ $pad
         err: StringBuffer(),
       );
       check(emptyCode).equals(0);
-      check(jsonDecode(emptyOut.toString())).isA<List<dynamic>>().isEmpty();
+      check(jsonDecode(emptyOut.toString())).isA<List<dynamic>>().isEmpty;
     });
 
     test('Merges sibling cones sharing private helpers to eliminate '
@@ -266,7 +266,7 @@ String _statusLabel() {
       check(rendererDeclNames.contains('TerminalRenderer')).equals(true);
       check(rendererDeclNames.contains('_statusLabel')).equals(true);
       check(rendererCluster.tier).equals(SplitTier.tier1CleanLibrary);
-      check(rendererCluster.privateTopLevelsToWiden).isEmpty();
+      check(rendererCluster.privateTopLevelsToWiden).isEmpty;
       check(
         rendererCluster.absorbedPrivateHelpers.contains('_statusLabel'),
       ).equals(true);
@@ -298,7 +298,7 @@ $padEngine
         file.path,
         targetLines: 35,
       );
-      check(defaultReport.clusters).isEmpty();
+      check(defaultReport.clusters).isEmpty;
       check(
         defaultReport.formatText(),
       ).contains('Explicitly ASK the user whether they prefer');
@@ -314,13 +314,13 @@ $padEngine
       check(
         partsReport.clusters.first.tier,
       ).equals(SplitTier.tier3PartDirective);
-      check(partsReport.clusters.first.agentDirective).isNull();
+      check(partsReport.clusters.first.agentDirective).isNull;
       check(
         partsReport.clusters.first.zeroChurnExportDirective,
       ).equals("part '${partsReport.clusters.first.suggestedFileName}';");
       check(
         partsReport.formatText(),
-      ).not((it) => it.contains('Explicitly ASK the user'));
+      ).not(.it()..contains('Explicitly ASK the user'));
 
       // 3. Explicit --no-use-parts (useParts: false): suppresses part/part of
       final noPartsReport = await analyzer.analyzeFile(
@@ -328,7 +328,7 @@ $padEngine
         targetLines: 35,
         useParts: false,
       );
-      check(noPartsReport.clusters).isEmpty();
+      check(noPartsReport.clusters).isEmpty;
       check(noPartsReport.formatText()).contains('--no-use-parts active');
     });
 
@@ -399,7 +399,7 @@ $overrides
       check(decl.memberCount).equals(7);
       check(decl.overrideMemberCount).equals(4);
       check(decl.staticMethodCount).equals(2);
-      check(decl.isInterfaceBound).isTrue();
+      check(decl.isInterfaceBound).isTrue;
       final json = decl.toJson();
       check(json['supertype']).equals('implements Store');
       check(json['member_count']).equals(7);
@@ -409,7 +409,7 @@ $overrides
         'implements Store (4/7 members are @override), so its size is '
         'bound by the interface surface;',
       );
-      check(text).not((it) => it.contains('can be promoted'));
+      check(text).not(.it()..contains('can be promoted'));
     });
 
     test('Reports `extends` facts but keeps the static-promotion hint when '
@@ -443,11 +443,11 @@ $pad
         (d) => d.name == 'Worker',
       );
       check(decl.supertypeLabel).equals('extends Base');
-      check(decl.isInterfaceBound).isFalse();
+      check(decl.isInterfaceBound).isFalse;
       final text = report.formatText();
       check(text).contains('extends Base (1/4 members are @override); ');
       check(text).contains('contains 2 static method(s)');
-      check(text).not((it) => it.contains('bound by the interface surface'));
+      check(text).not(.it()..contains('bound by the interface surface'));
     });
 
     test('Dynamically re-evaluates shared-tail diamond cones so surviving '
@@ -808,8 +808,8 @@ $leaves
 
       check(sw.elapsedMilliseconds).isLessThan(500);
       check(report.declarationCount).equals(321);
-      check(report.clusters).isNotEmpty();
-      check(report.survivingDeclarations).isNotEmpty();
+      check(report.clusters).isNotEmpty;
+      check(report.survivingDeclarations).isNotEmpty;
       check(
         report.survivingDeclarations.map((d) => d.name).toSet(),
       ).contains('createPaths');
@@ -883,8 +883,8 @@ $padSingle
         targetLines: 30,
         useParts: true,
       );
-      check(singleReport.clusters).isEmpty();
-      check(singleReport.meetsTarget).isFalse();
+      check(singleReport.clusters).isEmpty;
+      check(singleReport.meetsTarget).isFalse;
       check(
         singleReport.largestResultingFileLines,
       ).equals(singleReport.totalLines);
@@ -893,7 +893,7 @@ $padSingle
         'largest resulting file: ${singleReport.totalLines} lines '
         '(target 30 not met)',
       );
-      check(singleText).not((it) => it.contains('Explicitly ASK the user'));
+      check(singleText).not(.it()..contains('Explicitly ASK the user'));
 
       // 2. Coupled 2-class SCC (~50L) + tiny companion (~8L, < 25% of file):
       // skips the no-op Tier-3 fallback cut and emits a surviving coupled-SCC
@@ -924,10 +924,10 @@ $padHalf
         targetLines: 30,
         minClusterLines: 15,
       );
-      check(coupledReport.clusters).isEmpty();
-      check(coupledReport.hasSurvivingCoupledScc).isTrue();
+      check(coupledReport.clusters).isEmpty;
+      check(coupledReport.hasSurvivingCoupledScc).isTrue;
       check(coupledReport.toJson()['has_surviving_coupled_scc']).equals(true);
-      check(coupledReport.meetsTarget).isFalse();
+      check(coupledReport.meetsTarget).isFalse;
       final coupledText = coupledReport.formatText();
       check(coupledText).contains(
         'surviving declarations exceed target 30 lines across mutually '
@@ -973,7 +973,7 @@ $padPart
           minClusterLines: 15,
         );
         check(islandReport.clusters).length.equals(1);
-        check(islandReport.meetsTarget).isFalse();
+        check(islandReport.meetsTarget).isFalse;
         check(islandReport.largestResultingFileLines).isGreaterThan(35);
         final islandJson = islandReport.toJson();
         check(
@@ -1091,7 +1091,7 @@ void _() {
 
         // No cluster suggested filename may degenerate to bare `.dart`.
         for (final cluster in report.clusters) {
-          check(cluster.suggestedFileName).not((it) => it.equals('.dart'));
+          check(cluster.suggestedFileName).not(.it()..equals('.dart'));
           check(cluster.suggestedFileName).endsWith('.dart');
         }
       },

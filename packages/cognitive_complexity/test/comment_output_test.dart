@@ -152,7 +152,7 @@ void main() {
 
       check(shown).length.equals(3);
       // Only the three violations may occupy a three-row budget.
-      check(shown).every((line) => line.contains('🔴'));
+      check(shown).every(.it()..contains('🔴'));
     });
 
     test('omits the truncation footer when everything fits', () async {
@@ -162,7 +162,7 @@ void main() {
       ]);
 
       final comment = await File(commentPath).readAsString();
-      check(comment).not((c) => c.contains('most significant of'));
+      check(comment).not(.it()..contains('most significant of'));
     });
 
     test('annotates violations regardless of the cap', () async {
@@ -179,7 +179,7 @@ void main() {
     test('writes no comment file when --comment-output is omitted', () async {
       await runScanner([]);
 
-      check(File(commentPath).existsSync()).isFalse();
+      check(File(commentPath).existsSync()).isFalse;
       check(await File(summaryPath).readAsString()).contains('| 🔴 |');
     });
 
@@ -205,7 +205,7 @@ void main() {
         },
       );
       await process.shouldExit(0);
-      check(File(commentPath).existsSync()).isFalse();
+      check(File(commentPath).existsSync()).isFalse;
     });
 
     test(
@@ -242,7 +242,7 @@ void main() {
         );
         await process.shouldExit(0);
 
-        check(File(commentPath).existsSync()).isFalse();
+        check(File(commentPath).existsSync()).isFalse;
         // The improvements are still reported, just not as an email.
         final summary = await File(summaryPath).readAsString();
         check(summary).contains('**Improved**: 6');

@@ -161,7 +161,7 @@ targets:
           pubspecContent: 'name: no_build_yaml_pkg\n',
         );
 
-        check(roots).isEmpty();
+        check(roots).isEmpty;
       });
 
       test('returns empty set gracefully on malformed build.yaml', () async {
@@ -187,7 +187,7 @@ targets:
           pubspecContent: 'name: malformed_build_pkg\n',
         );
 
-        check(roots).isEmpty();
+        check(roots).isEmpty;
       });
     });
 
@@ -198,8 +198,8 @@ targets:
         );
         check(invocations).length.equals(2);
         for (final stmt in invocations) {
-          check(adapter.isTestCallSite(stmt)).isFalse();
-          check(adapter.isTestHarnessSite(stmt)).isFalse();
+          check(adapter.isTestCallSite(stmt)).isFalse;
+          check(adapter.isTestHarnessSite(stmt)).isFalse;
         }
       });
 
@@ -210,7 +210,7 @@ targets:
         final decl = result.unit.declarations
             .whereType<FunctionDeclaration>()
             .first;
-        check(adapter.isFrameworkEntryPoint(decl, null)).isFalse();
+        check(adapter.isFrameworkEntryPoint(decl, null)).isFalse;
       });
     });
   });

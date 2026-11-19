@@ -36,9 +36,11 @@ void main() {
         check(
           harvester.harvestTopology,
         ).throws<PackageResolutionException>().which(
-          (it) => it
-              .has((e) => e.message, 'message')
-              .contains('Missing .dart_tool/package_config.json'),
+          .it()
+            ..has(
+              'message',
+              (e) => e.message,
+            ).contains('Missing .dart_tool/package_config.json'),
         );
       },
     );
@@ -121,23 +123,21 @@ targets:
       final harvester = RootHarvester(options);
       final topology = harvester.harvestTopology();
 
-      check(topology.demonstrationFiles).isEmpty();
+      check(topology.demonstrationFiles).isEmpty;
     });
 
     test('identifies Flutter entrypoints correctly', () {
-      check(PackageTopology.isFlutterEntrypoint('lib/main.dart')).isTrue();
-      check(PackageTopology.isFlutterEntrypoint('lib/main_dev.dart')).isTrue();
+      check(PackageTopology.isFlutterEntrypoint('lib/main.dart')).isTrue;
+      check(PackageTopology.isFlutterEntrypoint('lib/main_dev.dart')).isTrue;
       check(
         PackageTopology.isFlutterEntrypoint('lib/main_production.dart'),
-      ).isTrue();
-      check(PackageTopology.isFlutterEntrypoint(r'lib\main.dart')).isTrue();
-      check(
-        PackageTopology.isFlutterEntrypoint(r'lib\main_prod.dart'),
-      ).isTrue();
+      ).isTrue;
+      check(PackageTopology.isFlutterEntrypoint(r'lib\main.dart')).isTrue;
+      check(PackageTopology.isFlutterEntrypoint(r'lib\main_prod.dart')).isTrue;
 
-      check(PackageTopology.isFlutterEntrypoint('lib/src/main.dart')).isFalse();
-      check(PackageTopology.isFlutterEntrypoint('bin/main.dart')).isFalse();
-      check(PackageTopology.isFlutterEntrypoint('lib/other.dart')).isFalse();
+      check(PackageTopology.isFlutterEntrypoint('lib/src/main.dart')).isFalse;
+      check(PackageTopology.isFlutterEntrypoint('bin/main.dart')).isFalse;
+      check(PackageTopology.isFlutterEntrypoint('lib/other.dart')).isFalse;
     });
 
     test('does not exclude lib/src/build/ source directory', () async {
@@ -158,7 +158,7 @@ targets:
       final topology = harvester.harvestTopology();
 
       check(topology.internalSrcFiles).contains('lib/src/build/builder.dart');
-      check(topology.allFiles).not((it) => it.contains('build/output.dart'));
+      check(topology.allFiles).not(.it()..contains('build/output.dart'));
     });
 
     test('extracts multi-line YAML builder_factories correctly', () async {

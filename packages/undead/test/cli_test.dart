@@ -201,7 +201,7 @@ environment:
 
       // json-output file was created and contains valid JSON payload
       final jsonFile = File(jsonOutPath);
-      check(jsonFile.existsSync()).isTrue();
+      check(jsonFile.existsSync()).isTrue;
       final decoded =
           jsonDecode(jsonFile.readAsStringSync()) as Map<String, dynamic>;
       check(decoded['package']).equals('cli_json_file_pkg');
@@ -486,7 +486,7 @@ void onlyUsedHere() {}
       final json1 = jsonDecode(out1) as Map<String, dynamic>;
       final summary1 = json1['summary'] as Map<String, dynamic>;
       check(summary1['privateCandidates']).equals(0);
-      check(json1['undead'] as List).isEmpty();
+      check(json1['undead'] as List).isEmpty;
 
       // 2. With --suggest-private, onlyUsedHere is a private candidate
       final proc2 = await runUndead([

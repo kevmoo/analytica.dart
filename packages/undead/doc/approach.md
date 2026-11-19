@@ -139,7 +139,7 @@ export 'src/live.dart';
   ]).create();
 
   final report = await analyzePackage(d.path('pkg'));
-  check(report.undead).single.which((it) => it
+  check(report.undead).single.which(.it()
     ..name.equals('deadFunc')
     ..classification.equals(UndeadClassification.pureUndead)
   );
