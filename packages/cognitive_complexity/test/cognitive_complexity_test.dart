@@ -627,7 +627,7 @@ void main() {
         inTest.map((r) => (r.name, r.isTestEntrypoint)),
       ).unorderedEquals([('main', true), ('helper', false)]);
       final inLib = analyzer.analyzeCode(code, filePath: 'lib/foo.dart');
-      check(inLib.every((r) => !r.isTestEntrypoint)).isTrue();
+      check(inLib.every((r) => !r.isTestEntrypoint)).isTrue;
     });
 
     test('toJson carries composition and is_test_entrypoint', () {

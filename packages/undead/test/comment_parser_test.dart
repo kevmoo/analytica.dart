@@ -16,7 +16,7 @@ class Foo {}
         featureSet: FeatureSet.latestLanguageVersion(),
       );
 
-      check(CommentParser.hasIgnoreForFile(result.unit, source)).isTrue();
+      check(CommentParser.hasIgnoreForFile(result.unit, source)).isTrue;
     });
 
     test('does NOT match standard analyzer ignore_for_file directives', () {
@@ -29,7 +29,7 @@ class Foo {}
         featureSet: FeatureSet.latestLanguageVersion(),
       );
 
-      check(CommentParser.hasIgnoreForFile(result.unit, source)).isFalse();
+      check(CommentParser.hasIgnoreForFile(result.unit, source)).isFalse;
     });
 
     test('detects // undead:ignore immediately preceding declaration', () {
@@ -47,8 +47,8 @@ class UnignoredClass {}
       final decl1 = result.unit.declarations[0];
       final decl2 = result.unit.declarations[1];
 
-      check(CommentParser.isDeclarationIgnored(decl1)).isTrue();
-      check(CommentParser.isDeclarationIgnored(decl2)).isFalse();
+      check(CommentParser.isDeclarationIgnored(decl1)).isTrue;
+      check(CommentParser.isDeclarationIgnored(decl2)).isFalse;
     });
 
     test('detects // undead:ignore before metadata annotations', () {
@@ -63,7 +63,7 @@ class DynamicAnnotatedClass {}
       );
 
       final decl = result.unit.declarations[0];
-      check(CommentParser.isDeclarationIgnored(decl)).isTrue();
+      check(CommentParser.isDeclarationIgnored(decl)).isTrue;
     });
 
     test('detects // undead:ignore between metadata and declaration token', () {
@@ -78,7 +78,7 @@ class DynamicAnnotatedClass {}
       );
 
       final decl = result.unit.declarations[0];
-      check(CommentParser.isDeclarationIgnored(decl)).isTrue();
+      check(CommentParser.isDeclarationIgnored(decl)).isTrue;
     });
 
     test('does NOT match standard // ignore: lint directives', () {
@@ -92,7 +92,7 @@ class Foo {}
       );
 
       final decl = result.unit.declarations[0];
-      check(CommentParser.isDeclarationIgnored(decl)).isFalse();
+      check(CommentParser.isDeclarationIgnored(decl)).isFalse;
     });
 
     test(
@@ -109,7 +109,7 @@ class Foo {}
           featureSet: FeatureSet.latestLanguageVersion(),
         );
 
-        check(CommentParser.hasIgnoreForFile(result.unit, source)).isFalse();
+        check(CommentParser.hasIgnoreForFile(result.unit, source)).isFalse;
       },
     );
   });

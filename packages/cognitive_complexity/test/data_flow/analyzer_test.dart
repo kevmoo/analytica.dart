@@ -24,11 +24,11 @@ void process(int a, String b) {
         endLine: 5,
       );
 
-      check(result.isCleanlyExtractable).isTrue();
+      check(result.isCleanlyExtractable).isTrue;
       check(result.enclosingDeclaration).equals('process');
       check(result.inputs.map((i) => i.name).toList()).deepEquals(['a', 'b']);
-      check(result.mutations).isEmpty();
-      check(result.outputs).isEmpty();
+      check(result.mutations).isEmpty;
+      check(result.outputs).isEmpty;
       check(
         result.suggestedSignature,
       ).equals('void _extracted(int a, String b)');
@@ -54,9 +54,9 @@ void counter() {
           endLine: 5,
         );
 
-        check(result.isCleanlyExtractable).isTrue();
+        check(result.isCleanlyExtractable).isTrue;
         check(result.inputs.map((i) => i.name).toList()).deepEquals(['count']);
-        check(result.inputs.first.isMutated).isTrue();
+        check(result.inputs.first.isMutated).isTrue;
         check(
           result.mutations.map((m) => m.name).toList(),
         ).deepEquals(['count']);
@@ -90,7 +90,7 @@ void authenticate(String token, int retry) {
           methodName: '_authenticate',
         );
 
-        check(result.isCleanlyExtractable).isTrue();
+        check(result.isCleanlyExtractable).isTrue;
         check(
           result.inputs.map((i) => i.name).toList(),
         ).deepEquals(['token', 'ok']);
@@ -153,8 +153,8 @@ void modify(Model m) {
 
         check(result.inputs.map((i) => i.name).toList()).deepEquals(['m']);
         // m is modified via property access, not reassigned
-        check(result.mutations).isEmpty();
-        check(result.outputs).isEmpty();
+        check(result.mutations).isEmpty;
+        check(result.outputs).isEmpty;
         check(result.suggestedSignature).equals('void _extracted(Model m)');
       },
     );
@@ -235,8 +235,8 @@ class App {
       );
 
       check(result.inputs.map((i) => i.name).toList()).deepEquals(['attempt']);
-      check(result.mutations).isEmpty();
-      check(result.outputs).isEmpty();
+      check(result.mutations).isEmpty;
+      check(result.outputs).isEmpty;
     });
 
     test('Handles slice extending to closing line of function', () async {
@@ -254,7 +254,7 @@ void helper(int x) {
         endLine: 4,
       );
 
-      check(result.isCleanlyExtractable).isTrue();
+      check(result.isCleanlyExtractable).isTrue;
       check(result.inputs.map((i) => i.name).toList()).deepEquals(['x']);
     });
     test('VULN-01: Pattern Assignment LHS Mutations', () async {
@@ -272,7 +272,7 @@ void testMethod(int a, int b) {
         startLine: 4,
         endLine: 4,
       );
-      check(result.isCleanlyExtractable).isTrue();
+      check(result.isCleanlyExtractable).isTrue;
       check(
         result.mutations.map((m) => m.name).toList()..sort(),
       ).deepEquals(['a', 'b']);
@@ -316,7 +316,7 @@ class CounterManager {
         startLine: 6,
         endLine: 7,
       );
-      check(result.suggestedSignature).not((it) => it.contains('{int _'));
+      check(result.suggestedSignature).not(.it()..contains('{int _'));
       check(result.suggestedSignature).contains('({int counter, int total})');
     });
 
@@ -433,7 +433,7 @@ void reset(List<int> items) {
           startLine: 5,
           endLine: 5,
         );
-        check(result.outputs).isEmpty();
+        check(result.outputs).isEmpty;
       },
     );
 
@@ -455,7 +455,7 @@ void perItem(List<int> items) {
       );
       // acc is re-initialized every iteration, so the slice's write never
       // survives the back edge.
-      check(result.outputs).isEmpty();
+      check(result.outputs).isEmpty;
     });
 
     test(
@@ -500,7 +500,7 @@ void rewrite(List<int> items) {
       );
       // item is re-bound from the iterator every iteration, so the slice's
       // write never survives the back edge.
-      check(result.outputs).isEmpty();
+      check(result.outputs).isEmpty;
     });
 
     test('VULN-10: Pattern variable declarations', () async {
@@ -518,7 +518,7 @@ void testMethod(List<int> list) {
         startLine: 4,
         endLine: 4,
       );
-      check(result.isCleanlyExtractable).isTrue();
+      check(result.isCleanlyExtractable).isTrue;
       check(
         result.outputs.map((o) => o.name).toList()..sort(),
       ).deepEquals(['a', 'b']);
@@ -556,7 +556,7 @@ void orchestrate(int a, int b, int c, int d, int e) {
         result.extractionWarnings.any(
           (w) => w.contains('High parameter count (6 inputs)'),
         ),
-      ).isTrue();
+      ).isTrue;
     });
 
     test('Emits [ZERO_NESTING_GAIN] warning when root-level slice in '
@@ -605,7 +605,7 @@ String classifyScalar(String name, bool isNullable, bool isList, bool isMap) {
               w.contains('Simplify in place') &&
               w.contains('coalesce identical-return branches'),
         ),
-      ).isTrue();
+      ).isTrue;
     });
 
     test('Does not emit [ZERO_NESTING_GAIN] when slice is nested (inPlace > '
@@ -632,7 +632,7 @@ void nestedCaller(int a, int b) {
         nestedResult.extractionWarnings.any(
           (w) => w.startsWith('[ZERO_NESTING_GAIN]'),
         ),
-      ).isFalse();
+      ).isFalse;
     });
 
     test(
@@ -652,9 +652,9 @@ void swapAndPrint(int a, int b) {
           endLine: 4,
         );
         final inputsByName = {for (final i in result.inputs) i.name: i};
-        check(inputsByName['a']!.isMutated).isTrue();
+        check(inputsByName['a']!.isMutated).isTrue;
         check(inputsByName['a']!.firstMutationLine).equals(4);
-        check(inputsByName['b']!.isMutated).isTrue();
+        check(inputsByName['b']!.isMutated).isTrue;
         check(inputsByName['b']!.firstMutationLine).equals(4);
       },
     );
@@ -695,10 +695,10 @@ void buildCallback(Future<int> fut) {
         startLine: 3,
         endLine: 5,
       );
-      check(syncResult.suggestedSignature).not((it) => it.contains('async'));
+      check(syncResult.suggestedSignature).not(.it()..contains('async'));
       check(
         syncResult.suggestedSignature,
-      ).not((it) => it.contains('Future<Future'));
+      ).not(.it()..contains('Future<Future'));
 
       const collectionAwaitFor = '''
 Future<void> collectStream(Stream<int> stream) async {

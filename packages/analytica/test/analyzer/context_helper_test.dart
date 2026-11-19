@@ -35,7 +35,7 @@ class Foo {
 
       final result = await helper.getResolvedUnit(filePath);
       check(result).isNotNull();
-      check(result!.exists).isTrue();
+      check(result!.exists).isTrue;
       check(result.unit.declarations.length).equals(1);
 
       final reqResult = await helper.getRequiredResolvedUnit(filePath);
@@ -53,7 +53,7 @@ class Foo {
       final missingPath = p.join(pkgDir, 'lib', 'missing.dart');
 
       final result = await helper.getResolvedUnit(missingPath);
-      check(result).isNull();
+      check(result).isNull;
 
       await check(
         helper.getRequiredResolvedUnit(missingPath),
@@ -66,7 +66,7 @@ class Foo {
       const outsidePath = '/tmp/completely_outside.dart';
 
       final result = await helper.getResolvedUnit(outsidePath);
-      check(result).isNull();
+      check(result).isNull;
     });
 
     test('throws ArgumentError on empty includedPaths', () {

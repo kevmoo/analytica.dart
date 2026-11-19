@@ -109,13 +109,13 @@ void main() {
 ''');
 
         // test, testWidgets, solo_test
-        check(composite.isTestCallSite(invocations[0])).isTrue();
-        check(composite.isTestCallSite(invocations[1])).isTrue();
-        check(composite.isTestCallSite(invocations[2])).isTrue();
+        check(composite.isTestCallSite(invocations[0])).isTrue;
+        check(composite.isTestCallSite(invocations[1])).isTrue;
+        check(composite.isTestCallSite(invocations[2])).isTrue;
 
         // group, otherMethod
-        check(composite.isTestCallSite(invocations[3])).isFalse();
-        check(composite.isTestCallSite(invocations[4])).isFalse();
+        check(composite.isTestCallSite(invocations[3])).isFalse;
+        check(composite.isTestCallSite(invocations[4])).isFalse;
       });
     });
 
@@ -131,9 +131,9 @@ void main() {
 }
 ''');
 
-        check(composite.isTestHarnessSite(invocations[0])).isTrue();
-        check(composite.isTestHarnessSite(invocations[1])).isTrue();
-        check(composite.isTestHarnessSite(invocations[2])).isFalse();
+        check(composite.isTestHarnessSite(invocations[0])).isTrue;
+        check(composite.isTestHarnessSite(invocations[1])).isTrue;
+        check(composite.isTestHarnessSite(invocations[2])).isFalse;
       });
     });
 
@@ -158,9 +158,9 @@ void inlineFunc() {}
             .whereType<FunctionDeclaration>()
             .toList();
 
-        check(composite.isFrameworkEntryPoint(decls[0], null)).isTrue();
-        check(composite.isFrameworkEntryPoint(decls[1], null)).isTrue();
-        check(composite.isFrameworkEntryPoint(decls[2], null)).isFalse();
+        check(composite.isFrameworkEntryPoint(decls[0], null)).isTrue;
+        check(composite.isFrameworkEntryPoint(decls[1], null)).isTrue;
+        check(composite.isFrameworkEntryPoint(decls[2], null)).isFalse;
       });
     });
   });

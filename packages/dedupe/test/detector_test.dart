@@ -165,18 +165,18 @@ int calculateValue(int first, int second) {
       const detector = CloneDetector(minTokens: 40, minLines: 4);
       final clusters = detector.detect([seq1, seq2]);
 
-      check(clusters).isEmpty();
+      check(clusters).isEmpty;
     });
 
     test('handles empty input sequences', () {
       const detector = CloneDetector();
-      check(detector.detect([])).isEmpty();
+      check(detector.detect([])).isEmpty;
 
       final emptySeq = const DartTokenizer().tokenize(
         filePath: 'empty.dart',
         content: '',
       );
-      check(detector.detect([emptySeq])).isEmpty();
+      check(detector.detect([emptySeq])).isEmpty;
     });
 
     test('detects intra-file duplicate blocks', () {
@@ -344,7 +344,7 @@ void multiBlockSequence() {
           final sig = c.instances
               .map((i) => '${i.filePath}:${i.startLine}-${i.endLine}')
               .join(';');
-          check(signatures.add(sig)).isTrue();
+          check(signatures.add(sig)).isTrue;
         }
       },
     );

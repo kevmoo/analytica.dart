@@ -40,8 +40,8 @@ int compute(int x) {
 
       await check(
         process.stdout,
-      ).emitsThrough((s) => s.contains('Score  Declaration'));
-      await check(process.stdout).emitsThrough((s) => s.contains('3  compute'));
+      ).emitsThrough(.it()..contains('Score  Declaration'));
+      await check(process.stdout).emitsThrough(.it()..contains('3  compute'));
       await process.shouldExit(0);
     });
 
@@ -70,7 +70,7 @@ class MyService {
         ]);
 
         await check(process.stdout).emitsThrough(
-          (s) => s
+          .it()
             ..contains('"name":"MyService.handle"')
             ..contains('"score":1'),
         );
@@ -116,14 +116,14 @@ void main() {
       ]);
       await check(
         text.stdout,
-      ).emitsThrough((s) => s.contains('Score  Breakdown'));
+      ).emitsThrough(.it()..contains('Score  Breakdown'));
       await check(text.stdout).emitsThrough(
-        (s) => s
+        .it()
           ..contains('6  br 3 nest 3 bool 0 depth 3  pyramid')
-          ..not((s) => s.contains('[test entrypoint]')),
+          ..not(.it()..contains('[test entrypoint]')),
       );
       await check(text.stdout).emitsThrough(
-        (s) => s
+        .it()
           ..contains('4  br 1 nest 2 bool 1 depth 3  main')
           ..endsWith('[test entrypoint]'),
       );
@@ -134,10 +134,10 @@ void main() {
         '${d.sandbox}/project_verbose/test',
       ]);
       await check(plain.stdout).emitsThrough(
-        (s) => s
+        .it()
           ..contains('4  main')
-          ..not((s) => s.contains('br '))
-          ..not((s) => s.contains('[test entrypoint]')),
+          ..not(.it()..contains('br '))
+          ..not(.it()..contains('[test entrypoint]')),
       );
       await plain.shouldExit(0);
 
@@ -149,12 +149,11 @@ void main() {
         '${d.sandbox}/project_verbose/test',
       ]);
       await check(json.stderr).emitsThrough(
-        (s) => s.contains(
-          '--verbose only affects --format=text without --git-diff',
-        ),
+        .it()
+          ..contains('--verbose only affects --format=text without --git-diff'),
       );
       await check(json.stdout).emitsThrough(
-        (s) => s
+        .it()
           ..contains(
             '"composition":{"branches":1,"nesting":2,"boolean_ops":1,'
             '"max_depth":3}',
@@ -190,10 +189,10 @@ void complexFunc(int a) {
 
       await check(
         process.stdout,
-      ).emitsThrough((s) => s.contains('[VIOLATION: score > 2]'));
+      ).emitsThrough(.it()..contains('[VIOLATION: score > 2]'));
       await check(
         process.stderr,
-      ).emitsThrough((s) => s.contains('exceeded the failure threshold (2)'));
+      ).emitsThrough(.it()..contains('exceeded the failure threshold (2)'));
       await process.shouldExit(1);
     });
 
@@ -217,7 +216,7 @@ void complexFunc(int a) {
         [binPath, '--format', 'json', target],
       );
       final defaultJsonLine = await defaultJsonProc.stdout.next;
-      check(defaultJsonLine.startsWith('[')).isTrue();
+      check(defaultJsonLine.startsWith('[')).isTrue;
       await defaultJsonProc.shouldExit(0);
 
       // 2. --max-file-lines in JSON format emits declarations + files object
@@ -244,12 +243,12 @@ void complexFunc(int a) {
         'github',
         target,
       ]);
-      await check(ghProc.stdout).emitsThrough(
-        (s) => s.contains('title=Declaration Line Limit Exceeded'),
-      );
       await check(
         ghProc.stdout,
-      ).emitsThrough((s) => s.contains('title=File Line Limit Exceeded'));
+      ).emitsThrough(.it()..contains('title=Declaration Line Limit Exceeded'));
+      await check(
+        ghProc.stdout,
+      ).emitsThrough(.it()..contains('title=File Line Limit Exceeded'));
       await ghProc.shouldExit(1);
 
       // 4. --max-function-lines in text format emits Lines and violations
@@ -323,7 +322,7 @@ workspace:
         check(output)
           ..contains('pkg_a/lib/a.dart')
           ..contains('pkg_b/lib/b.dart')
-          ..not((s) => s.contains('pkg_a/test/a_test.dart'));
+          ..not(.it()..contains('pkg_a/test/a_test.dart'));
       });
 
       test('packages/* monorepo scans lib/ but not test/', () async {
@@ -340,7 +339,7 @@ workspace:
         final output = await runJson('${d.sandbox}/mono');
         check(output)
           ..contains('packages/one/lib/one.dart')
-          ..not((s) => s.contains('one_test.dart'));
+          ..not(.it()..contains('one_test.dart'));
       });
 
       test('explicit targets override discovery verbatim', () async {
@@ -370,7 +369,7 @@ workspace:
         await proc.shouldExit(0);
         check(lines.join('\n'))
           ..contains('pkg_a/test/a_test.dart')
-          ..not((s) => s.contains('pkg_a/lib/a.dart'));
+          ..not(.it()..contains('pkg_a/lib/a.dart'));
       });
     });
 
@@ -450,11 +449,11 @@ int simplified(int a) {
           ..contains('addedComplex')
           ..contains('3 -> del')
           ..contains('deletedComplex  lib/app.dart')
-          ..not((s) => s.contains('deletedComplex  lib/app.dart [IMPROVED]'))
+          ..not(.it()..contains('deletedComplex  lib/app.dart [IMPROVED]'))
           ..contains('3 -> 1')
           ..contains('simplified      lib/app.dart:L8-11 [IMPROVED]')
-          ..not((s) => s.contains('zeroRemoved'))
-          ..not((s) => s.contains('zeroAdded'))
+          ..not(.it()..contains('zeroRemoved'))
+          ..not(.it()..contains('zeroAdded'))
           ..contains(
             'Summary: 1 added, 0 increased, 1 improved, 1 removed '
             '(Net Delta: -4 | Violations: 0)',
@@ -569,10 +568,10 @@ int simplified(int a) {
         ..endsWith('[IMPROVED]');
       check(rows[3])
         ..contains('1 -> 3')
-        ..not((r) => r.contains('['));
+        ..not(.it()..contains('['));
       check(rows[4])
         ..contains('2 -> del')
-        ..not((r) => r.contains('['));
+        ..not(.it()..contains('['));
     });
 
     test('Reports suppressed declarations in text, json, and --git-diff '

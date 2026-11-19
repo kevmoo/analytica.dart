@@ -24,7 +24,7 @@ void main() {
       check(deserialized.line).equals(site.line);
       check(deserialized.column).equals(site.column);
       check(deserialized.description).equals(site.description);
-      check(deserialized.coInvokedHazard).isFalse();
+      check(deserialized.coInvokedHazard).isFalse;
     });
 
     test('UndeadFinding serialization round-trip', () {
@@ -50,7 +50,7 @@ void main() {
       check(json['length']).equals(19);
       check(json['classification']).equals('pureUndead');
       check(json['suggestedAction']).equals('delete');
-      check(json.containsKey('orphanTests')).isFalse();
+      check(json.containsKey('orphanTests')).isFalse;
 
       final deserialized = UndeadFinding.fromJson(json);
       check(deserialized.id).equals(finding.id);
@@ -168,16 +168,16 @@ void main() {
     test('UndeadOptions default and custom values', () {
       final defaultOptions = UndeadOptions(packagePath: '/path/to/pkg');
       check(defaultOptions.testSupportPatterns).deepEquals(['Fake*', 'Mock*']);
-      check(defaultOptions.ignoreNamePatterns).isEmpty();
+      check(defaultOptions.ignoreNamePatterns).isEmpty;
       check(defaultOptions.format).equals(OutputFormat.markdown);
       check(defaultOptions.exampleMode).equals(ExampleMode.demonstration);
       check(defaultOptions.mode).equals(AnalysisMode.library);
-      check(defaultOptions.includeGenerated).isFalse();
-      check(defaultOptions.ignoreGenerated).isTrue();
-      check(defaultOptions.failOnUndead).isFalse();
-      check(defaultOptions.autoPubGet).isFalse();
-      check(defaultOptions.workspaceDiscovery).isTrue();
-      check(defaultOptions.suggestPrivate).isFalse();
+      check(defaultOptions.includeGenerated).isFalse;
+      check(defaultOptions.ignoreGenerated).isTrue;
+      check(defaultOptions.failOnUndead).isFalse;
+      check(defaultOptions.autoPubGet).isFalse;
+      check(defaultOptions.workspaceDiscovery).isTrue;
+      check(defaultOptions.suggestPrivate).isFalse;
 
       final customOptions = UndeadOptions(
         packagePath: '/path/to/pkg',
@@ -197,8 +197,8 @@ void main() {
       check(
         customOptions.extraRoots,
       ).deepEquals(['../companion_test', '/external/tests']);
-      check(customOptions.workspaceDiscovery).isFalse();
-      check(customOptions.suggestPrivate).isTrue();
+      check(customOptions.workspaceDiscovery).isFalse;
+      check(customOptions.suggestPrivate).isTrue;
     });
 
     test('UndeadReport deserializes camelCase JSON summary correctly', () {

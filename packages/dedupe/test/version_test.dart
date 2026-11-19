@@ -9,7 +9,7 @@ void main() {
       'package:dedupe/dedupe.dart',
       'pubspec.yaml',
     );
-    check(pubspecFile.existsSync()).isTrue();
+    check(pubspecFile.existsSync()).isTrue;
 
     final content = pubspecFile.readAsStringSync();
     final versionMatch = RegExp(

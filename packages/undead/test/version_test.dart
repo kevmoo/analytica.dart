@@ -10,7 +10,7 @@ void main() {
       'package:undead/undead.dart',
       'pubspec.yaml',
     );
-    check(pubspecFile.existsSync()).isTrue();
+    check(pubspecFile.existsSync()).isTrue;
 
     final content = pubspecFile.readAsStringSync();
     final doc = loadYaml(content) as YamlMap;

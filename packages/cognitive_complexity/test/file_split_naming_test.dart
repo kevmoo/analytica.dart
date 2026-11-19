@@ -155,12 +155,12 @@ void runGhView(Map<String, dynamic>? commits) {
       final surviving = report.survivingDeclarations.map((d) => d.name);
       check(surviving).contains('MergeStateStatus');
       check(cut.notes).any(
-        (it) => it
+        .it()
           ..contains('MergeableState')
           ..contains('kept with'),
       );
       check(cut.notes).any(
-        (it) => it
+        .it()
           ..contains('MergeStateStatus')
           ..contains('left in gh_view.dart'),
       );
@@ -204,8 +204,8 @@ ${List.generate(45, (i) => '  final m$i = $i;').join('\n')}
         (c) => c.declarations.any((d) => d.name == 'buildPlan'),
       );
       final names = cut.declarations.map((d) => d.name).toSet();
-      check(names.contains('Mode')).isTrue();
-      check(names.contains('Level')).isTrue();
+      check(names.contains('Mode')).isTrue;
+      check(names.contains('Level')).isTrue;
       check(cut.suggestedFileName).equals('build_plan.dart');
     });
   });
@@ -273,7 +273,7 @@ $options''');
             'github_queries.dart; move the declarations this cut uses out of '
             'the barrel to break the cycle',
       ]);
-      check(cut.inheritedCycles).isEmpty();
+      check(cut.inheritedCycles).isEmpty;
 
       final out = StringBuffer();
       final code = await file_split_cli.runFileSplitCli([
@@ -337,7 +337,7 @@ $options''');
               're-exports github_queries.dart; move the declarations this '
               'cut uses out of the barrel to break the cycle',
         ]);
-        check(cut.inheritedCycles).isEmpty();
+        check(cut.inheritedCycles).isEmpty;
       },
     );
 
@@ -354,12 +354,12 @@ void touch() => print(runQueries);
       );
 
       final cut = await analyzeQueries(source.path);
-      check(cut.warnings).isEmpty();
+      check(cut.warnings).isEmpty;
       check(cut.inheritedCycles).deepEquals([
         (import: '../gh_clean.dart', via: 'imports github_queries.dart'),
       ]);
       final json = cut.toJson();
-      check(json.containsKey('warnings')).isFalse();
+      check(json.containsKey('warnings')).isFalse;
       check(json['inherited_cycles'] as List).deepEquals([
         {'import': '../gh_clean.dart', 'via': 'imports github_queries.dart'},
       ]);
@@ -378,8 +378,8 @@ void touch() => print(runQueries);
           'cycle(s) carried over (informational)',
         )
         ..contains('0 circular deps')
-        ..not((it) => it.contains('Warning:'))
-        ..not((it) => it.contains('See Warning'));
+        ..not(.it()..contains('Warning:'))
+        ..not(.it()..contains('See Warning'));
     });
 
     test('a back-import through a re-export hop is informational', () async {
@@ -398,7 +398,7 @@ void touch() => print(runQueries);
       );
 
       final cut = await analyzeQueries(source.path);
-      check(cut.warnings).isEmpty();
+      check(cut.warnings).isEmpty;
       check(cut.inheritedCycles).deepEquals([
         (
           import: '../gh_clean.dart',
@@ -419,11 +419,11 @@ void touch() => print(runQueries);
       check(
         cut.requiredImports,
       ).deepEquals(["import '../gh_clean_options.dart';"]);
-      check(cut.warnings).isEmpty();
-      check(cut.inheritedCycles).isEmpty();
+      check(cut.warnings).isEmpty;
+      check(cut.inheritedCycles).isEmpty;
       final json = cut.toJson();
-      check(json.containsKey('warnings')).isFalse();
-      check(json.containsKey('inherited_cycles')).isFalse();
+      check(json.containsKey('warnings')).isFalse;
+      check(json.containsKey('inherited_cycles')).isFalse;
     });
   });
 }

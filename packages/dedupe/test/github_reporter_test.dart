@@ -198,14 +198,14 @@ void main() {
       check(out).contains('title=Code Duplication (cluster-logic)::');
       check(
         out,
-      ).not((it) => it.contains('title=Code Duplication (cluster-data)::'));
+      ).not(.it()..contains('title=Code Duplication (cluster-data)::'));
       check(
         out,
-      ).not((it) => it.contains('title=Code Duplication (cluster-boiler)::'));
+      ).not(.it()..contains('title=Code Duplication (cluster-boiler)::'));
 
       check(out).contains('### cluster-logic');
-      check(out).not((it) => it.contains('### cluster-data'));
-      check(out).not((it) => it.contains('### cluster-boiler'));
+      check(out).not(.it()..contains('### cluster-data'));
+      check(out).not(.it()..contains('### cluster-boiler'));
     });
 
     test('respects categoryFilter in annotations and markdown', () {
@@ -219,15 +219,15 @@ void main() {
       final out = buffer.toString();
       check(
         out,
-      ).not((it) => it.contains('title=Code Duplication (cluster-logic)::'));
+      ).not(.it()..contains('title=Code Duplication (cluster-logic)::'));
       check(out).contains('title=Code Duplication (cluster-data)::');
       check(
         out,
-      ).not((it) => it.contains('title=Code Duplication (cluster-boiler)::'));
+      ).not(.it()..contains('title=Code Duplication (cluster-boiler)::'));
 
-      check(out).not((it) => it.contains('### cluster-logic'));
+      check(out).not(.it()..contains('### cluster-logic'));
       check(out).contains('### cluster-data');
-      check(out).not((it) => it.contains('### cluster-boiler'));
+      check(out).not(.it()..contains('### cluster-boiler'));
     });
 
     test('respects bucketFilter in annotations and markdown', () {
@@ -241,14 +241,14 @@ void main() {
       final out = buffer.toString();
       check(
         out,
-      ).not((it) => it.contains('title=Code Duplication (cluster-logic)::'));
+      ).not(.it()..contains('title=Code Duplication (cluster-logic)::'));
       check(
         out,
-      ).not((it) => it.contains('title=Code Duplication (cluster-data)::'));
+      ).not(.it()..contains('title=Code Duplication (cluster-data)::'));
       check(out).contains('title=Code Duplication (cluster-boiler)::');
 
-      check(out).not((it) => it.contains('### cluster-logic'));
-      check(out).not((it) => it.contains('### cluster-data'));
+      check(out).not(.it()..contains('### cluster-logic'));
+      check(out).not(.it()..contains('### cluster-data'));
       check(out).contains('### cluster-boiler');
     });
 
@@ -261,7 +261,7 @@ void main() {
       reporter.report(report);
 
       final out = buffer.toString();
-      check(out).not((it) => it.contains('## 📁 File Breakdown'));
+      check(out).not(.it()..contains('## 📁 File Breakdown'));
       check(out).contains('## 📊 Summary');
       check(out).contains('### cluster-logic');
     });
@@ -277,8 +277,8 @@ void main() {
         reporter.report(report);
 
         final out = buffer.toString();
-        check(out).not((it) => it.contains('::warning'));
-        check(out).not((it) => it.contains('## 🔍 Duplicate Clusters'));
+        check(out).not(.it()..contains('::warning'));
+        check(out).not(.it()..contains('## 🔍 Duplicate Clusters'));
         check(out).contains('## 📊 Summary');
         check(out).contains('## 📁 File Breakdown');
       },
@@ -305,8 +305,8 @@ void main() {
       check(out).contains('title=Code Duplication (cluster-logic)::');
       check(
         out,
-      ).not((it) => it.contains('title=Code Duplication (cluster-data)::'));
-      check(out).not((it) => it.contains('## 📁 File Breakdown'));
+      ).not(.it()..contains('title=Code Duplication (cluster-data)::'));
+      check(out).not(.it()..contains('## 📁 File Breakdown'));
       check(out).contains('### cluster-logic');
     });
   });

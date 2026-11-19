@@ -23,7 +23,7 @@ void main() {
         'package:analytica/analytica.dart',
         'pubspec.yaml',
       );
-      check(file.existsSync()).isTrue();
+      check(file.existsSync()).isTrue;
       check(file.readAsStringSync()).contains('name: analytica');
     });
 

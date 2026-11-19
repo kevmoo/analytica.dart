@@ -221,7 +221,7 @@ int calc(int x) {
       ]);
       final outNoFiles = await procNoFiles.stdoutStream().join('\n');
       await procNoFiles.shouldExit(0);
-      check(outNoFiles).not((it) => it.contains('## 📁 File Breakdown'));
+      check(outNoFiles).not(.it()..contains('## 📁 File Breakdown'));
       check(outNoFiles).contains('## 📊 Summary');
       check(outNoFiles).contains('::warning');
 
@@ -235,8 +235,8 @@ int calc(int x) {
       ]);
       final outNoClusters = await procNoClusters.stdoutStream().join('\n');
       await procNoClusters.shouldExit(0);
-      check(outNoClusters).not((it) => it.contains('::warning'));
-      check(outNoClusters).not((it) => it.contains('## 🔍 Duplicate Clusters'));
+      check(outNoClusters).not(.it()..contains('::warning'));
+      check(outNoClusters).not(.it()..contains('## 🔍 Duplicate Clusters'));
       check(outNoClusters).contains('## 📊 Summary');
 
       // Test --category=data (when existing cluster is logic)
@@ -249,7 +249,7 @@ int calc(int x) {
       ]);
       final outCategory = await procCategory.stdoutStream().join('\n');
       await procCategory.shouldExit(0);
-      check(outCategory).not((it) => it.contains('::warning'));
+      check(outCategory).not(.it()..contains('::warning'));
       check(
         outCategory,
       ).contains('No duplicate clusters matched the current filter criteria.');
@@ -299,7 +299,7 @@ void runService(String config) {
       await proc.shouldExit(0);
 
       final file = File(jsonOutPath);
-      check(file.existsSync()).isTrue();
+      check(file.existsSync()).isTrue;
       final decoded =
           jsonDecode(file.readAsStringSync()) as Map<String, dynamic>;
       final summary = decoded['summary'] as Map<String, dynamic>;
@@ -507,7 +507,7 @@ void uniqueB() {
           d.path('in_proc_cache_flags_pkg'),
         ]);
         check(code1).equals(0);
-        check(Directory(customCache).existsSync()).isTrue();
+        check(Directory(customCache).existsSync()).isTrue;
         final decoded1 = jsonDecode(outSink.toString()) as Map<String, dynamic>;
         final summary1 = decoded1['summary'] as Map<String, dynamic>;
         check(summary1['filesAnalyzed']).equals(1);

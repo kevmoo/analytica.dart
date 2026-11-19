@@ -74,7 +74,7 @@ Footer
       check(updated).contains('```console\n\$ new_cmd --help\n```');
       check(updated).contains('# Title');
       check(updated).contains('Footer');
-      check(updated).not((it) => it.contains('OLD CONTENT'));
+      check(updated).not(.it()..contains('OLD CONTENT'));
     });
   });
 }

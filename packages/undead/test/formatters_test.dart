@@ -139,7 +139,7 @@ void main() {
       check(
         output,
       ).contains('🎉 **No undead declarations detected across package.**');
-      check(output).not((it) => it.contains('## Pure Undead'));
+      check(output).not(.it()..contains('## Pure Undead'));
     });
   });
 }

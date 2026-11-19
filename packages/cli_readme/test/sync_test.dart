@@ -38,7 +38,7 @@ Usage: app [options]
       );
 
       final result = await syncer.update();
-      check(result.hasModifications).isTrue();
+      check(result.hasModifications).isTrue;
 
       final updatedFile = File(p.join(d.path('update_pkg'), 'README.md'));
       final updatedContent = updatedFile.readAsStringSync();
@@ -48,7 +48,7 @@ Usage: app [options]
 
       // Re-verifying should now pass cleanly
       final reVerify = await syncer.verify();
-      check(reVerify.isClean).isTrue();
+      check(reVerify.isClean).isTrue;
     });
   });
 

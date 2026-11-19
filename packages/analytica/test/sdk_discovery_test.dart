@@ -15,8 +15,8 @@ void main() {
         ]),
       ]).create();
 
-      check(isValidSdk('${d.sandbox}/sdk')).isTrue();
-      check(isValidSdkPath('${d.sandbox}/sdk')).isTrue();
+      check(isValidSdk('${d.sandbox}/sdk')).isTrue;
+      check(isValidSdkPath('${d.sandbox}/sdk')).isTrue;
     });
 
     test('accepts a root with lib/libraries.json', () async {
@@ -24,8 +24,8 @@ void main() {
         d.dir('lib', [d.file('libraries.json', '{}')]),
       ]).create();
 
-      check(isValidSdk('${d.sandbox}/sdk_json')).isTrue();
-      check(isValidSdkPath('${d.sandbox}/sdk_json')).isTrue();
+      check(isValidSdk('${d.sandbox}/sdk_json')).isTrue;
+      check(isValidSdkPath('${d.sandbox}/sdk_json')).isTrue;
     });
 
     test(
@@ -37,8 +37,8 @@ void main() {
           ]),
         ]).create();
 
-        check(isValidSdk('${d.sandbox}/sdk_exp')).isTrue();
-        check(isValidSdkPath('${d.sandbox}/sdk_exp')).isTrue();
+        check(isValidSdk('${d.sandbox}/sdk_exp')).isTrue;
+        check(isValidSdkPath('${d.sandbox}/sdk_exp')).isTrue;
       },
     );
 
@@ -48,8 +48,8 @@ void main() {
         d.dir('bin', [d.file('dart', '')]),
       ]).create();
 
-      check(isValidSdk('${d.sandbox}/sdk')).isTrue();
-      check(isValidSdkPath('${d.sandbox}/sdk')).isTrue();
+      check(isValidSdk('${d.sandbox}/sdk')).isTrue;
+      check(isValidSdkPath('${d.sandbox}/sdk')).isTrue;
     });
 
     test('rejects an AOT app bundle (bin only, no lib/_internal)', () async {
@@ -57,8 +57,8 @@ void main() {
         d.dir('bin', [d.file('tool_exe', '')]),
       ]).create();
 
-      check(isValidSdk('${d.sandbox}/bundle')).isFalse();
-      check(isValidSdkPath('${d.sandbox}/bundle')).isFalse();
+      check(isValidSdk('${d.sandbox}/bundle')).isFalse;
+      check(isValidSdkPath('${d.sandbox}/bundle')).isFalse;
     });
   });
 
@@ -176,20 +176,20 @@ void main() {
 
         // Path regex handles $HOME and ${HOME}
         final scriptFile = File('${d.sandbox}/home_bin/dart');
-        check(scriptFile.existsSync()).isTrue();
+        check(scriptFile.existsSync()).isTrue;
       },
     );
 
     test('returns null when the directory has no dart executable', () async {
       await d.dir('empty').create();
 
-      check(resolveSdkFromDir('${d.sandbox}/empty', 'dart')).isNull();
+      check(resolveSdkFromDir('${d.sandbox}/empty', 'dart')).isNull;
     });
 
     test('returns null for a dart binary outside any SDK', () async {
       await d.dir('stray', [d.file('dart', '')]).create();
 
-      check(resolveSdkFromDir('${d.sandbox}/stray', 'dart')).isNull();
+      check(resolveSdkFromDir('${d.sandbox}/stray', 'dart')).isNull;
     });
   });
 
@@ -197,14 +197,14 @@ void main() {
     test('finds SDK in running environment', () {
       final path = findSdkPath();
       check(path).isNotNull();
-      check(isValidSdk(path!)).isTrue();
+      check(isValidSdk(path!)).isTrue;
       check(sdkPath).equals(path);
     });
 
     test('finds Dart executable', () {
       final exe = findDartExecutable();
       check(exe).isNotNull();
-      check(File(exe!).existsSync()).isTrue();
+      check(File(exe!).existsSync()).isTrue;
       check(dartExecutable).equals(exe);
     });
 
@@ -231,7 +231,7 @@ void main() {
 
         final invalidSdk = '${d.sandbox}/invalid_sdk';
         final exe = findDartExecutable(sdkPath: invalidSdk);
-        check(exe).isNull();
+        check(exe).isNull;
       },
     );
   });
@@ -272,7 +272,7 @@ dependencies:
 '''),
       ]).create();
 
-      check(isFlutterPackage('${d.sandbox}/flutter_pkg')).isTrue();
+      check(isFlutterPackage('${d.sandbox}/flutter_pkg')).isTrue;
     });
 
     test('detects pure Dart package as non-Flutter', () async {
@@ -284,11 +284,11 @@ environment:
 '''),
       ]).create();
 
-      check(isFlutterPackage('${d.sandbox}/dart_pkg')).isFalse();
+      check(isFlutterPackage('${d.sandbox}/dart_pkg')).isFalse;
     });
 
     test('returns false for non-existent directory', () {
-      check(isFlutterPackage('${d.sandbox}/non_existent_pkg')).isFalse();
+      check(isFlutterPackage('${d.sandbox}/non_existent_pkg')).isFalse;
     });
   });
 
@@ -298,8 +298,8 @@ environment:
         d.dir('.dart_tool', [d.file('package_config.json', '{}')]),
       ]).create();
 
-      check(hasPackageConfig('${d.sandbox}/direct_pkg')).isTrue();
-      check(hasEnclosingPackageConfig('${d.sandbox}/direct_pkg')).isFalse();
+      check(hasPackageConfig('${d.sandbox}/direct_pkg')).isTrue;
+      check(hasEnclosingPackageConfig('${d.sandbox}/direct_pkg')).isFalse;
     });
 
     test('detects enclosing ancestor package config', () async {
@@ -308,10 +308,8 @@ environment:
         d.dir('sub_pkg', [d.file('pubspec.yaml', 'name: sub_pkg')]),
       ]).create();
 
-      check(hasPackageConfig('${d.sandbox}/workspace/sub_pkg')).isFalse();
-      check(
-        hasEnclosingPackageConfig('${d.sandbox}/workspace/sub_pkg'),
-      ).isTrue();
+      check(hasPackageConfig('${d.sandbox}/workspace/sub_pkg')).isFalse;
+      check(hasEnclosingPackageConfig('${d.sandbox}/workspace/sub_pkg')).isTrue;
     });
   });
 }

@@ -414,7 +414,7 @@ void _formatY(int a, int b, int c, int d, int e, int f) {
       );
       check(
         report.formatText(onlySafe: true),
-      ).not((it) => it.contains('[SIBLING_STEP]'));
+      ).not(.it()..contains('[SIBLING_STEP]'));
 
       final dir = Directory.systemTemp.createTempSync('sibling_step_');
       addTearDown(() => dir.deleteSync(recursive: true));
@@ -448,7 +448,7 @@ void _registerRevertOracleTests(
         final report = analyzeFixture(fixture);
         final finding = report.findings.singleWhere((f) => f.name == name);
         check(finding.classification).equals(ShallowClassification.siblingStep);
-        check(finding.siblingSteps).isNotEmpty();
+        check(finding.siblingSteps).isNotEmpty;
       });
     }
   }

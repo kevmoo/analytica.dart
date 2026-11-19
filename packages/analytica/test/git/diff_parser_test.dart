@@ -8,21 +8,21 @@ void main() {
       const range = LineRange(10, 20);
 
       check(range.lineCount).equals(11);
-      check(range.contains(10)).isTrue();
-      check(range.contains(15)).isTrue();
-      check(range.contains(20)).isTrue();
-      check(range.contains(9)).isFalse();
-      check(range.contains(21)).isFalse();
+      check(range.contains(10)).isTrue;
+      check(range.contains(15)).isTrue;
+      check(range.contains(20)).isTrue;
+      check(range.contains(9)).isFalse;
+      check(range.contains(21)).isFalse;
 
-      check(range.intersects(5, 9)).isFalse();
-      check(range.intersects(5, 10)).isTrue();
-      check(range.intersects(15, 25)).isTrue();
-      check(range.intersects(20, 25)).isTrue();
-      check(range.intersects(21, 30)).isFalse();
+      check(range.intersects(5, 9)).isFalse;
+      check(range.intersects(5, 10)).isTrue;
+      check(range.intersects(15, 25)).isTrue;
+      check(range.intersects(20, 25)).isTrue;
+      check(range.intersects(21, 30)).isFalse;
 
-      check(range.intersectsRange(const LineRange(1, 10))).isTrue();
-      check(range.intersectsRange(const LineRange(20, 30))).isTrue();
-      check(range.intersectsRange(const LineRange(21, 30))).isFalse();
+      check(range.intersectsRange(const LineRange(1, 10))).isTrue;
+      check(range.intersectsRange(const LineRange(20, 30))).isTrue;
+      check(range.intersectsRange(const LineRange(21, 30))).isFalse;
 
       check(range.toString()).equals('L10-L20');
       check(range.toJson()).deepEquals({'start_line': 10, 'end_line': 20});
@@ -33,9 +33,9 @@ void main() {
       const r2 = LineRange(5, 10);
       const r3 = LineRange(12, 15);
 
-      check(r1 == r2).isTrue();
+      check(r1 == r2).isTrue;
       check(r1.hashCode).equals(r2.hashCode);
-      check(r1 == r3).isFalse();
+      check(r1 == r3).isFalse;
 
       final list = [r3, r1]..sort();
       check(list).deepEquals([r1, r3]);
@@ -69,8 +69,8 @@ index 1234567..89abcdef 100644
 
       final file = result.first;
       check(file.path).equals('lib/example.dart');
-      check(file.isNew).isFalse();
-      check(file.isDeleted).isFalse();
+      check(file.isNew).isFalse;
+      check(file.isDeleted).isFalse;
       check(file.hunks.length).equals(2);
 
       final hunk1 = file.hunks[0];
@@ -171,8 +171,8 @@ index 0000000..1234567
 
       final file = result.first;
       check(file.path).equals('lib/new_file.dart');
-      check(file.isNew).isTrue();
-      check(file.isDeleted).isFalse();
+      check(file.isNew).isTrue;
+      check(file.isDeleted).isFalse;
       check(file.addedOrModifiedLineRanges).deepEquals([const LineRange(1, 3)]);
     });
 
@@ -194,9 +194,9 @@ index 1234567..0000000
 
       final file = result.first;
       check(file.path).equals('lib/old_file.dart');
-      check(file.isDeleted).isTrue();
-      check(file.isNew).isFalse();
-      check(file.addedOrModifiedLineRanges).isEmpty();
+      check(file.isDeleted).isTrue;
+      check(file.isNew).isFalse;
+      check(file.addedOrModifiedLineRanges).isEmpty;
     });
 
     test('parses multiple files in unified diff output', () {
@@ -249,8 +249,8 @@ diff --git a/lib/c.dart b/lib/c.dart
     });
 
     test('returns empty list for empty diff string', () {
-      check(GitDiffParser.parse('')).isEmpty();
-      check(GitDiffParser.parse('   \n  \n')).isEmpty();
+      check(GitDiffParser.parse('')).isEmpty;
+      check(GitDiffParser.parse('   \n  \n')).isEmpty;
     });
 
     test('handles single double-quote path without throwing RangeError', () {

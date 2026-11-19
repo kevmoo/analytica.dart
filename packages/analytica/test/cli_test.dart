@@ -26,16 +26,16 @@ void main() {
         ..addVersionFlag();
 
       final results = parser.parse(['-h', '--version']);
-      check(results['help'] as bool).isTrue();
-      check(results['version'] as bool).isTrue();
+      check(results['help'] as bool).isTrue;
+      check(results['version'] as bool).isTrue;
     });
 
     test('addPathFilterOptions configures exclude and ignore-generated', () {
       final parser = ArgParser()..addPathFilterOptions();
       final defaultResults = parser.parse([]);
       final defaultFilter = parsePathFilter(defaultResults);
-      check(defaultFilter.ignoreGenerated).isTrue();
-      check(defaultFilter.excludePatterns).isEmpty();
+      check(defaultFilter.ignoreGenerated).isTrue;
+      check(defaultFilter.excludePatterns).isEmpty;
 
       final customResults = parser.parse([
         '--exclude=test/fixtures/**',
@@ -43,7 +43,7 @@ void main() {
         '--no-ignore-generated',
       ]);
       final customFilter = parsePathFilter(customResults);
-      check(customFilter.ignoreGenerated).isFalse();
+      check(customFilter.ignoreGenerated).isFalse;
       check(
         customFilter.excludePatterns,
       ).deepEquals(['test/fixtures/**', 'legacy/**', '*.gen.dart']);
@@ -88,7 +88,7 @@ void main() {
     test('resolves file without line specifier', () {
       final result = resolveTargetFileAndLines('lib/src/main.dart');
       check(result.filePath).equals('lib/src/main.dart');
-      check(result.linesString).isNull();
+      check(result.linesString).isNull;
     });
 
     test('resolves file with embedded line bounds', () {
@@ -118,9 +118,9 @@ void main() {
 
   group('parseCommaSeparated', () {
     test('returns empty list on null, empty string, or whitespace', () {
-      check(parseCommaSeparated(null)).isEmpty();
-      check(parseCommaSeparated('')).isEmpty();
-      check(parseCommaSeparated('   ')).isEmpty();
+      check(parseCommaSeparated(null)).isEmpty;
+      check(parseCommaSeparated('')).isEmpty;
+      check(parseCommaSeparated('   ')).isEmpty;
     });
 
     test('parses and trims comma-separated tokens', () {

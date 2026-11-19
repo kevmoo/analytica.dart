@@ -135,9 +135,9 @@ void main() {
 
       // Verify custom roots and entrypoints are preserved
       final undeadNames = report.undead.map((z) => z.name).toSet();
-      check(undeadNames).not((it) => it.contains('customServerEntrypoint'));
-      check(undeadNames).not((it) => it.contains('usedByCustomEntrypoint'));
-      check(undeadNames).not((it) => it.contains('annotatedEntryPoint'));
+      check(undeadNames).not(.it()..contains('customServerEntrypoint'));
+      check(undeadNames).not(.it()..contains('usedByCustomEntrypoint'));
+      check(undeadNames).not(.it()..contains('annotatedEntryPoint'));
 
       // Verify pure undead detected
       check(undeadNames).contains('pureUndead');
@@ -149,12 +149,12 @@ void main() {
       check(tested.classification).equals(UndeadClassification.testedUndead);
       check(tested.orphanTests!.first.file).equals('test/custom_test.dart');
       check(tested.orphanTests!.first.description).equals('isolated test');
-      check(tested.orphanTests!.first.coInvokedHazard).isFalse();
+      check(tested.orphanTests!.first.coInvokedHazard).isFalse;
 
       // Verify co-invoked hazard classified via customTestRunner
       final hazard = report.undead.firstWhere((z) => z.name == 'deadCoInvoked');
       check(hazard.classification).equals(UndeadClassification.coInvokedHazard);
-      check(hazard.orphanTests!.first.coInvokedHazard).isTrue();
+      check(hazard.orphanTests!.first.coInvokedHazard).isTrue;
     });
 
     test(
@@ -226,7 +226,7 @@ void main() {
         check(
           testedFinding.classification,
         ).equals(UndeadClassification.testedUndead);
-        check(testedFinding.orphanTests).isNull();
+        check(testedFinding.orphanTests).isNull;
       },
     );
 
@@ -273,7 +273,7 @@ void deadInternalHelper() {}
         final undeadNames = report.undead.map((z) => z.name).toSet();
 
         // lib/main.dart main and used.dart usedByMain are live
-        check(undeadNames).not((it) => it.contains('usedByMain'));
+        check(undeadNames).not(.it()..contains('usedByMain'));
 
         // internal_tool.dart main and deadInternalHelper are pure undeads
         check(undeadNames).contains('deadInternalHelper');

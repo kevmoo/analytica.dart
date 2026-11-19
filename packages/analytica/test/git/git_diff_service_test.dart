@@ -67,7 +67,7 @@ void main() {
       await runGit(['commit', '-m', 'Main divergence commit']);
 
       final mergeBase = await git.getMergeBase('feat/test');
-      check(mergeBase).isNotEmpty();
+      check(mergeBase).isNotEmpty;
     });
 
     test(
