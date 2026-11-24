@@ -3,6 +3,10 @@
 - Add `CommentDirectiveParser.declarationIgnoreReason` and
   `CommentDirectiveParser.declarationIgnoreReasonFor` to extract optional
   suppression reasons following `// <tool>:ignore` directives (#183).
+- `CommentDirectiveParser` only accepts a directive at the start of a plain `//`
+  comment. Doc comments (`///`) that mention `// <tool>:ignore` or
+  `// <tool>:ignore_for_file` no longer suppress analysis of the file or
+  declaration they document (#196).
 
 ## 0.1.4
 

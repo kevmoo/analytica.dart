@@ -163,6 +163,53 @@ class Foo {}
       check(parser.isDeclarationIgnored(parsed.unit.declarations[1])).isFalse;
     });
 
+    test('ignores directives that doc comments mention', () {
+      // Documenting the syntax used to suppress analysis of the documenting
+      // file itself (#196).
+      const source = '''
+/// Honors `// my_tool:ignore_for_file` and `// my_tool:ignore`.
+class Documented {}
+
+/// my_tool:ignore
+void docComment() {}
+
+///my_tool:ignore_for_file
+void docCommentWithoutSpace() {}
+
+// See `// my_tool:ignore` for details.
+void mentionedLater() {}
+''';
+      final parsed = parseString(
+        content: source,
+        featureSet: FeatureSet.latestLanguageVersion(),
+      );
+
+      check(parser.hasIgnoreForFile(parsed.unit)).isFalse;
+      for (final declaration in parsed.unit.declarations) {
+        check(parser.isDeclarationIgnored(declaration)).isFalse;
+      }
+    });
+
+    test('a directive after a doc comment still applies', () {
+      const source = '''
+/// Documented.
+// my_tool:ignore reason
+void ignored() {}
+
+//my_tool:ignore
+void ignoredWithoutSpace() {}
+''';
+      final parsed = parseString(
+        content: source,
+        featureSet: FeatureSet.latestLanguageVersion(),
+      );
+      final decls = parsed.unit.declarations;
+
+      check(parser.isDeclarationIgnored(decls[0])).isTrue;
+      check(parser.declarationIgnoreReason(decls[0])).equals('reason');
+      check(parser.isDeclarationIgnored(decls[1])).isTrue;
+    });
+
     test(
       'extracts optional suppression reason stripping leading separators',
       () {

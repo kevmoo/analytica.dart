@@ -6,6 +6,10 @@ import 'package:analyzer/dart/ast/token.dart';
 ///
 /// Because this parser inspects token stream comments rather than raw string
 /// matching, it is completely immune to false positives inside string literals.
+///
+/// A directive must open a plain `//` comment. Doc comments (`///`) and text
+/// that merely mentions a directive later in a comment are not directives, so
+/// documenting the syntax does not suppress analysis of the documented file.
 class CommentDirectiveParser {
   final String toolName;
   final RegExp ignoreForFilePattern;
@@ -13,10 +17,10 @@ class CommentDirectiveParser {
 
   CommentDirectiveParser(this.toolName)
     : ignoreForFilePattern = RegExp(
-        '//\\s*${RegExp.escape(toolName)}:ignore_for_file\\b',
+        '^//(?!/)\\s*${RegExp.escape(toolName)}:ignore_for_file\\b',
       ),
       ignoreDeclarationPattern = RegExp(
-        '//\\s*${RegExp.escape(toolName)}:ignore\\b(.*)\$',
+        '^//(?!/)\\s*${RegExp.escape(toolName)}:ignore\\b(.*)\$',
       );
 
   static final _leadingReasonSeparator = RegExp(r'^[\s:\-]+');
