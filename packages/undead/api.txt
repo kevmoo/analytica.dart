@@ -46,7 +46,7 @@ package:undead/undead.dart:
     fromJson (static method: DeclarationKind Function(String))
     jsonValue (getter: String)
   DeclarationNode (class extends Object):
-    new (constructor: DeclarationNode Function({required int column, Element? element, required String id, bool isExported, bool isExternalBinding, bool isIgnored, bool isNativeRoot, bool isSealed, bool isTestSupport, required DeclarationKind kind, required int length, required int line, required String name, required int offset, Set<String>? outgoingTargetIds, required String relativeFilePath, Element? sealedSuperclassElement, String? sealedSuperclassName}))
+    new (constructor: DeclarationNode Function({required int column, Element? element, required String id, bool isExported = false, bool isExternalBinding = false, bool isIgnored = false, bool isNativeRoot = false, bool isSealed = false, bool isTestSupport = false, required DeclarationKind kind, required int length, required int line, required String name, required int offset, Set<String>? outgoingTargetIds, required String relativeFilePath, Element? sealedSuperclassElement, String? sealedSuperclassName}))
     column (getter: int)
     element (getter: Element?)
     id (getter: String)
@@ -67,7 +67,7 @@ package:undead/undead.dart:
     sealedSuperclassName (getter: String?)
     toString (method: String Function())
   DiscoveredCompanionRoots (class extends Object):
-    new (const constructor: DiscoveredCompanionRoots Function({List<String> productionRoots, List<String> testRoots}))
+    new (const constructor: DiscoveredCompanionRoots Function({List<String> productionRoots = [], List<String> testRoots = []}))
     isEmpty (getter: bool)
     isNotEmpty (getter: bool)
     productionRoots (getter: List<String>)
@@ -111,7 +111,7 @@ package:undead/undead.dart:
     new (const constructor: MarkdownFormatter Function())
     format (method: String Function(UndeadReport))
   OrphanTestSite (class extends Object):
-    new (const constructor: OrphanTestSite Function({bool coInvokedHazard, required int column, String? description, required String file, required int line}))
+    new (const constructor: OrphanTestSite Function({bool coInvokedHazard = false, required int column, String? description, required String file, required int line}))
     fromJson (constructor: OrphanTestSite Function(Map<String, dynamic>))
     coInvokedHazard (getter: bool)
     column (getter: int)
@@ -138,7 +138,7 @@ package:undead/undead.dart:
     isTestHarnessSite (method: bool Function(MethodInvocation))
   PackageTopology (class extends Object):
     isFlutterEntrypoint (static method: bool Function(String))
-    new (const constructor: PackageTopology Function({required List<String> auxiliaryFiles, required List<String> demonstrationFiles, required List<String> executableFiles, Set<String> explicitEntrypoints, List<String> extraProductionFiles, List<String> extraTestFiles, Set<String> frameworkRoots, required List<String> internalSrcFiles, required String packageName, required String packagePath, required List<String> publicLibFiles, required List<String> testFiles}))
+    new (const constructor: PackageTopology Function({required List<String> auxiliaryFiles, required List<String> demonstrationFiles, required List<String> executableFiles, Set<String> explicitEntrypoints = {}, List<String> extraProductionFiles = [], List<String> extraTestFiles = [], Set<String> frameworkRoots = {}, required List<String> internalSrcFiles, required String packageName, required String packagePath, required List<String> publicLibFiles, required List<String> testFiles}))
     allFiles (getter: List<String>)
     auxiliaryFiles (getter: List<String>)
     builderFactoryNames (getter: Set<String>, deprecated)
@@ -157,10 +157,10 @@ package:undead/undead.dart:
     isExplicitEntrypoint (method: bool Function(String))
     roleOf (method: FileRole Function(String))
   PathFilter (class extends Object):
-    defaultGeneratedPatterns (static const getter: List<String>)
-    defaultIgnoredDirectories (static const getter: List<String>)
+    defaultGeneratedPatterns (static const getter: List<String> = ['**/*.g.dart', '**/*.freezed.dart', '**/*.mocks.dart', '**/*.config.dart', '**/*.reflectable.dart', '**/*.gen.dart', '**/*.pb.dart', '**/*.pbenum.dart', '**/*.pbjson.dart', '**/*.pbserver.dart'])
+    defaultIgnoredDirectories (static const getter: List<String> = ['.dart_tool/**', '.git/**', 'build/**', '.idea/**', '.vscode/**'])
     defaults (static getter: PathFilter)
-    new (constructor: PathFilter Function({Iterable<String> excludePatterns, bool ignoreGenerated}))
+    new (constructor: PathFilter Function({Iterable<String> excludePatterns = [], bool ignoreGenerated = true}))
     excludePatterns (getter: List<String>)
     ignoreGenerated (getter: bool)
     isExcluded (method: bool Function(String))
@@ -169,10 +169,10 @@ package:undead/undead.dart:
     options (getter: UndeadOptions)
     harvestTopology (method: PackageTopology Function())
   SuggestedAction (class extends Object, abstract, final):
-    delete (static const getter: String)
-    deleteWithOrphanTests (static const getter: String)
-    makePrivate (static const getter: String)
-    manualRefactorHazard (static const getter: String)
+    delete (static const getter: String = 'delete')
+    deleteWithOrphanTests (static const getter: String = 'deleteWithOrphanTests')
+    makePrivate (static const getter: String = 'makePrivate')
+    manualRefactorHazard (static const getter: String = 'manualRefactorHazard')
   TestBlockSite (class extends Object):
     new (constructor: TestBlockSite Function({required int column, String? description, required int line, Set<String>? referencedDeclarationIds, required String relativeFilePath}))
     column (getter: int)
@@ -194,7 +194,7 @@ package:undead/undead.dart:
     options (getter: UndeadOptions)
     analyze (method: Future<UndeadReport> Function())
   UndeadFinding (class extends Object):
-    new (const constructor: UndeadFinding Function({required UndeadClassification classification, required int column, required String file, required String id, bool isExternalBinding, required DeclarationKind kind, required int length, required int line, required String name, List<OrphanTestSite>? orphanTests, required String suggestedAction}))
+    new (const constructor: UndeadFinding Function({required UndeadClassification classification, required int column, required String file, required String id, bool isExternalBinding = false, required DeclarationKind kind, required int length, required int line, required String name, List<OrphanTestSite>? orphanTests, required String suggestedAction}))
     fromJson (constructor: UndeadFinding Function(Map<String, dynamic>))
     classification (getter: UndeadClassification)
     column (getter: int)
@@ -209,7 +209,7 @@ package:undead/undead.dart:
     suggestedAction (getter: String)
     toJson (method: Map<String, dynamic> Function())
   UndeadOptions (class extends Object, final):
-    new (constructor: UndeadOptions Function({bool autoPubGet, List<String> entrypoints, ExampleMode exampleMode, Iterable<String> excludePatterns, List<String> extraRoots, bool failOnUndead, OutputFormat format, FrameworkAdapter frameworkAdapter, bool ignoreExternalBindings, bool ignoreGenerated, List<String> ignoreNamePatterns, bool? includeGenerated, String? jsonOutputPath, AnalysisMode mode, required String packagePath, PathFilter? pathFilter, String? sdkPath, bool suggestPrivate, List<String> testSupportPatterns, bool workspaceDiscovery}))
+    new (constructor: UndeadOptions Function({bool autoPubGet = false, List<String> entrypoints = [], ExampleMode exampleMode = ExampleMode.demonstration, Iterable<String> excludePatterns = [], List<String> extraRoots = [], bool failOnUndead = false, OutputFormat format = OutputFormat.markdown, FrameworkAdapter frameworkAdapter = CompositeFrameworkAdapter.defaults(), bool ignoreExternalBindings = false, bool ignoreGenerated = true, List<String> ignoreNamePatterns = [], bool? includeGenerated, String? jsonOutputPath, AnalysisMode mode = AnalysisMode.library, required String packagePath, PathFilter? pathFilter, String? sdkPath, bool suggestPrivate = false, List<String> testSupportPatterns = ['Fake*', 'Mock*'], bool workspaceDiscovery = true}))
     autoPubGet (getter: bool)
     entrypoints (getter: List<String>)
     exampleMode (getter: ExampleMode)
@@ -231,7 +231,7 @@ package:undead/undead.dart:
     testSupportPatterns (getter: List<String>)
     workspaceDiscovery (getter: bool)
   UndeadReport (class extends Object):
-    new (const constructor: UndeadReport Function({required int coInvokedHazardsFound, required String package, int privateCandidatesFound, required int pureUndeadFound, required int testedUndeadFound, required int totalDeclarations, required List<UndeadFinding> undead, required String version}))
+    new (const constructor: UndeadReport Function({required int coInvokedHazardsFound, required String package, int privateCandidatesFound = 0, required int pureUndeadFound, required int testedUndeadFound, required int totalDeclarations, required List<UndeadFinding> undead, required String version}))
     fromJson (constructor: UndeadReport Function(Map<String, dynamic>))
     coInvokedHazardsFound (getter: int)
     package (getter: String)
@@ -244,8 +244,8 @@ package:undead/undead.dart:
     version (getter: String)
     toJson (method: Map<String, dynamic> Function())
   WorkspaceConsumerDiscovery (class extends Object):
-    defaultExcludedDirectories (static const getter: Set<String>)
-    new (const constructor: WorkspaceConsumerDiscovery Function({Set<String> excludedDirectories, int maxDepth}))
+    defaultExcludedDirectories (static const getter: Set<String> = {'.git', '.dart_tool', 'build', 'out', 'node_modules', 'third_party', 'example', 'examples'})
+    new (const constructor: WorkspaceConsumerDiscovery Function({Set<String> excludedDirectories = {'.git', '.dart_tool', 'build', 'out', 'node_modules', 'third_party', 'example', 'examples'}, int maxDepth = 4}))
     excludedDirectories (getter: Set<String>)
     maxDepth (getter: int)
     discoverConsumers (method: DiscoveredCompanionRoots Function({required String packagePath, String? targetPackageName, String? workspaceRoot}))
@@ -263,11 +263,14 @@ dart:core:
   int (referenced)
 dart:io:
   Directory (referenced)
-package:analytica/src/exceptions.dart:
+package:analytica/src/analyzer/path_filter.dart (^0.1.4):
+  PathFilter (see above)
+package:analytica/src/exceptions.dart (^0.1.4):
   AnalyticaException (referenced)
-package:analyzer/dart/element/element.dart:
+  PackageResolutionException (see above)
+package:analyzer/dart/element/element.dart (>=12.0.0 <15.0.0):
   Element (referenced)
-package:analyzer/src/dart/ast/ast.dart:
+package:analyzer/src/dart/ast/ast.dart (>=12.0.0 <15.0.0):
   AnnotatedNode (referenced)
   Annotation (referenced)
   Declaration (referenced)

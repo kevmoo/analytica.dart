@@ -21,18 +21,18 @@ package:analytica/analytica.dart:
   parseCommaSeparated (function: List<String> Function(String?))
   parseLineBounds (function: (int, int) Function(String))
   parseNonNegativeInt (function: int Function(String, String))
-  parsePathFilter (function: PathFilter Function(ArgResults, {Iterable<String> defaultExcludes}))
+  parsePathFilter (function: PathFilter Function(ArgResults, {Iterable<String> defaultExcludes = []}))
   resolveGitHubSummaryFile (function: File? Function())
   resolveSdkFromDir (function: String? Function(String, String))
   resolveTargetFileAndLines (function: ({String filePath, String? linesString}) Function(String, {String? explicitLines}))
-  runPubGet (function: ProcessResult Function(String, {List<String> additionalArgs, String? flutterRoot, String? sdkPath}))
+  runPubGet (function: ProcessResult Function(String, {List<String> additionalArgs = [], String? flutterRoot, String? sdkPath}))
   AnalyticaException (class extends Object implements Exception, abstract):
     new (const constructor: AnalyticaException Function())
     exitCode (getter: int)
     message (getter: String)
     toString (method: String Function())
   CliException (class extends AnalyticaException):
-    new (const constructor: CliException Function(String, {int exitCode}))
+    new (const constructor: CliException Function(String, {int exitCode = 1}))
     exitCode (getter: int)
     message (getter: String)
   ExitCode (class extends Object):
@@ -66,10 +66,10 @@ package:analytica/analytica.dart:
     packagePath (getter: String?)
     toString (method: String Function())
   PathFilter (class extends Object):
-    defaultGeneratedPatterns (static const getter: List<String>)
-    defaultIgnoredDirectories (static const getter: List<String>)
+    defaultGeneratedPatterns (static const getter: List<String> = ['**/*.g.dart', '**/*.freezed.dart', '**/*.mocks.dart', '**/*.config.dart', '**/*.reflectable.dart', '**/*.gen.dart', '**/*.pb.dart', '**/*.pbenum.dart', '**/*.pbjson.dart', '**/*.pbserver.dart'])
+    defaultIgnoredDirectories (static const getter: List<String> = ['.dart_tool/**', '.git/**', 'build/**', '.idea/**', '.vscode/**'])
     defaults (static getter: PathFilter)
-    new (constructor: PathFilter Function({Iterable<String> excludePatterns, bool ignoreGenerated}))
+    new (constructor: PathFilter Function({Iterable<String> excludePatterns = [], bool ignoreGenerated = true}))
     excludePatterns (getter: List<String>)
     ignoreGenerated (getter: bool)
     isExcluded (method: bool Function(String))
@@ -83,11 +83,11 @@ package:analytica/analytica.dart:
     exitCode (getter: int)
     message (getter: String)
   AnalyticaArgParserExtensions (extension on ArgParser):
-    addFormatOption (method: void Function({List<String> allowed, String defaultsTo, String help}))
-    addHelpFlag (method: void Function({String help}))
+    addFormatOption (method: void Function({List<String> allowed = ['markdown', 'json', 'github'], String defaultsTo = 'markdown', String help = 'Output formatting mode.'}))
+    addHelpFlag (method: void Function({String help = 'Print usage information.'}))
     addPathFilterOptions (method: void Function())
-    addSdkPathOption (method: void Function({String help}))
-    addVersionFlag (method: void Function({String help}))
+    addSdkPathOption (method: void Function({String help = 'Path to the Dart SDK root (overrides auto-discovery).'}))
+    addVersionFlag (method: void Function({String help = 'Print version information.'}))
 package:analytica/analyzer.dart:
   extractNodeName (function: String? Function(AstNode))
   getTopLevelElement (function: Element? Function(Element))
@@ -141,7 +141,7 @@ package:analytica/analyzer.dart:
   PathFilter (see above)
   WildcardPattern (class extends Object):
     anyMatch (static method: bool Function(Iterable<WildcardPattern>, String))
-    new (constructor: WildcardPattern Function(String, {bool caseSensitive}))
+    new (constructor: WildcardPattern Function(String, {bool caseSensitive = true}))
     caseSensitive (getter: bool)
     hashCode (getter: int)
     pattern (getter: String)
@@ -167,8 +167,8 @@ package:analytica/git.dart:
   AstLineMapper (class extends Object):
     findFunctionsAndMethods (static method: List<MappedDeclaration> Function(CompilationUnit, LineInfo, List<LineRange>))
     findTypes (static method: List<MappedDeclaration> Function(CompilationUnit, LineInfo, List<LineRange>))
-    mapDeclarations (static method: List<MappedDeclaration> Function(CompilationUnit, LineInfo, List<LineRange>, {bool includeMembers}))
-    mapDiffToDeclarations (static method: List<MappedDeclaration> Function(CompilationUnit, LineInfo, GitFileDiff, {bool includeMembers}))
+    mapDeclarations (static method: List<MappedDeclaration> Function(CompilationUnit, LineInfo, List<LineRange>, {bool includeMembers = true}))
+    mapDiffToDeclarations (static method: List<MappedDeclaration> Function(CompilationUnit, LineInfo, GitFileDiff, {bool includeMembers = true}))
     new (constructor: AstLineMapper Function())
   DiffHunk (class extends Object):
     new (const constructor: DiffHunk Function({required List<LineRange> addedOrModifiedRanges, required List<String> lines, required int newCount, required int newStart, required int oldCount, required int oldStart, String? sectionHeading}))
@@ -189,12 +189,12 @@ package:analytica/git.dart:
     getCurrentFileContent (method: Future<String> Function(String))
     getHistoricalFileContent (method: Future<String> Function(String, String))
     getMergeBase (method: Future<String> Function(String))
-    getModifiedDartFiles (method: Future<List<String>> Function(String, {List<String> targetPaths}))
-    getParsedDiff (method: Future<List<GitFileDiff>> Function(String, {List<String> targetPaths}))
+    getModifiedDartFiles (method: Future<List<String>> Function(String, {List<String> targetPaths = []}))
+    getParsedDiff (method: Future<List<GitFileDiff>> Function(String, {List<String> targetPaths = []}))
     getRepoRoot (method: Future<String> Function())
-    getUnifiedDiff (method: Future<String> Function(String, {List<String> targetPaths}))
+    getUnifiedDiff (method: Future<String> Function(String, {List<String> targetPaths = []}))
   GitFileDiff (class extends Object):
-    new (const constructor: GitFileDiff Function({required List<DiffHunk> hunks, bool isDeleted, bool isNew, bool isRenamed, String? newPath, String? oldPath}))
+    new (const constructor: GitFileDiff Function({required List<DiffHunk> hunks, bool isDeleted = false, bool isNew = false, bool isRenamed = false, String? newPath, String? oldPath}))
     addedOrModifiedLineRanges (getter: List<LineRange>)
     hunks (getter: List<DiffHunk>)
     isDeleted (getter: bool)
@@ -266,19 +266,19 @@ dart:core:
 dart:io:
   File (referenced)
   ProcessResult (referenced)
-package:analyzer/dart/analysis/analysis_context.dart:
+package:analyzer/dart/analysis/analysis_context.dart (>=12.0.0 <15.0.0):
   AnalysisContext (referenced)
-package:analyzer/dart/analysis/analysis_context_collection.dart:
+package:analyzer/dart/analysis/analysis_context_collection.dart (>=12.0.0 <15.0.0):
   AnalysisContextCollection (referenced)
-package:analyzer/dart/analysis/results.dart:
+package:analyzer/dart/analysis/results.dart (>=12.0.0 <15.0.0):
   ResolvedUnitResult (referenced)
-package:analyzer/dart/ast/visitor.dart:
+package:analyzer/dart/ast/visitor.dart (>=12.0.0 <15.0.0):
   RecursiveAstVisitor (referenced)
-package:analyzer/dart/element/element.dart:
+package:analyzer/dart/element/element.dart (>=12.0.0 <15.0.0):
   Element (referenced)
-package:analyzer/source/line_info.dart:
+package:analyzer/source/line_info.dart (>=12.0.0 <15.0.0):
   LineInfo (referenced)
-package:analyzer/src/dart/ast/ast.dart:
+package:analyzer/src/dart/ast/ast.dart (>=12.0.0 <15.0.0):
   AnnotatedNode (referenced)
   Annotation (referenced)
   AssignmentExpression (referenced)
@@ -298,7 +298,9 @@ package:analyzer/src/dart/ast/ast.dart:
   RelationalPattern (referenced)
   SimpleIdentifier (referenced)
   SuperConstructorInvocation (referenced)
-package:args/src/arg_parser.dart:
+package:args/src/arg_parser.dart (^2.7.0):
   ArgParser (referenced)
-package:args/src/arg_results.dart:
+package:args/src/arg_results.dart (^2.7.0):
   ArgResults (referenced)
+package:io/src/exit_code.dart (^1.0.5):
+  ExitCode (see above)
