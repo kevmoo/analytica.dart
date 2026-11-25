@@ -1,6 +1,9 @@
 import 'dart:io';
 import 'package:analytica/testing.dart';
 import 'package:checks/checks.dart';
+import 'package:cognitive_complexity/cognitive_complexity.dart';
+import 'package:cognitive_complexity/src/complexity/cli.dart';
+import 'package:cognitive_complexity/src/complexity/github_reporter.dart';
 import 'package:path/path.dart' as p;
 import 'package:test/test.dart';
 import 'package:test_descriptor/test_descriptor.dart' as d;
@@ -246,6 +249,179 @@ void main() {
         // The improvements are still reported, just not as an email.
         final summary = await File(summaryPath).readAsString();
         check(summary).contains('**Improved**: 6');
+      },
+    );
+
+    test('--comment-on-clean writes comment file on clean and '
+        'improvement-only diffs', () async {
+      await File(p.join(repoPath, 'lib', 'a.dart')).writeAsString(
+        [
+          for (var i = 0; i < 6; i++) 'int f$i(int x) { return x + $i; }\n',
+        ].join('\n'),
+      );
+      await _runGit(repoPath, ['add', '.']);
+      await _runGit(repoPath, ['commit', '-m', 'simplify']);
+
+      final deltaAnalyzer = DeltaAnalyzer(workingDirectory: repoPath);
+      final deltaSummary = await deltaAnalyzer.computeDeltas(
+        'HEAD~1',
+        targetPaths: const ['lib'],
+        failThreshold: 15,
+        failOnIncrease: true,
+      );
+
+      final out = StringBuffer();
+      GitHubReporter(
+        stdoutSink: out,
+        summaryFile: File(summaryPath),
+        commentFile: File(commentPath),
+        commentOnClean: true,
+      ).printReport(
+        deltaSummary: deltaSummary,
+        failThreshold: 15,
+        failOnIncrease: true,
+      );
+
+      check(File(commentPath).existsSync()).isTrue;
+      final comment = await File(commentPath).readAsString();
+      check(comment)
+        ..contains('<!-- complexity-comment-marker -->')
+        ..contains('**Improved**: 6');
+    });
+  });
+
+  group('--comment-output in regular (full-scan) mode', () {
+    test('skips comment when clean unless --comment-on-clean is set', () async {
+      await d.dir('clean_full', [
+        d.dir('lib', [
+          d.file('ok.dart', 'int simple(int x) => x > 0 ? x : 0;\n'),
+        ]),
+      ]).create();
+
+      final target = p.join(d.sandbox, 'clean_full', 'lib');
+      final commentPath = p.join(d.sandbox, 'full_clean_comment.md');
+
+      final out1 = StringBuffer();
+      final err1 = StringBuffer();
+      final rc1 = await runCli(
+        [
+          '--format=github',
+          '--fail-threshold=15',
+          '--comment-output=$commentPath',
+          target,
+        ],
+        out: out1,
+        err: err1,
+      );
+      check(rc1).equals(0);
+      check(err1.toString()).isEmpty;
+      check(File(commentPath).existsSync()).isFalse;
+
+      final out2 = StringBuffer();
+      final err2 = StringBuffer();
+      final rc2 = await runCli(
+        [
+          '--format=github',
+          '--fail-threshold=15',
+          '--comment-output=$commentPath',
+          '--comment-on-clean',
+          target,
+        ],
+        out: out2,
+        err: err2,
+      );
+      check(rc2).equals(0);
+      check(err2.toString()).isEmpty;
+      check(File(commentPath).existsSync()).isTrue;
+      check(await File(commentPath).readAsString())
+        ..contains('<!-- complexity-comment-marker -->')
+        ..contains('`simple`');
+    });
+
+    test(
+      'caps rows with violations first and emits annotations once',
+      () async {
+        final longBody = List.generate(
+          20,
+          (i) => '  final v$i = $i;',
+        ).join('\n');
+        await d.dir('vio_full', [
+          d.dir('lib', [
+            d.file('app.dart', '''
+int cleanHigh(int x) {
+  if (x > 0) {
+    if (x > 1) return 2;
+  }
+  return 0;
+}
+
+void longZeroScore() {
+$longBody
+}
+
+${_decl('tooComplex', 3)}
+'''),
+          ]),
+        ]).create();
+
+        final target = p.join(d.sandbox, 'vio_full', 'lib');
+        final commentPath = p.join(d.sandbox, 'full_vio_comment.md');
+
+        final out = StringBuffer();
+        final err = StringBuffer();
+        final rc = await runCli(
+          [
+            '--format=github',
+            '--fail-threshold=15',
+            '--max-function-lines=18',
+            '--comment-output=$commentPath',
+            '--max-comment-rows=2',
+            target,
+          ],
+          out: out,
+          err: err,
+        );
+        check(rc).equals(1);
+        check(err.toString()).isEmpty;
+
+        final comment = await File(commentPath).readAsString();
+        // 2 header rows + 2 capped violation rows (`tooComplex` and
+        // `longZeroScore`, ahead of non-violating `cleanHigh`).
+        check(_tableRowCount(comment)).equals(4);
+        check(comment)
+          ..contains('`tooComplex`')
+          ..contains('`longZeroScore`')
+          ..not(.it()..contains('`cleanHigh`'))
+          ..contains('Showing the 2 most significant of 3 declarations.');
+
+        // Annotations must be emitted once per violation, not duplicated for
+        // the comment buffer.
+        check('::error'.allMatches(out.toString()).length).equals(2);
+      },
+    );
+
+    test(
+      'warns when --comment-on-clean is used without --comment-output',
+      () async {
+        await d.dir('warn_clean', [
+          d.dir('lib', [d.file('a.dart', 'int a() => 1;\n')]),
+        ]).create();
+
+        final out = StringBuffer();
+        final err = StringBuffer();
+        final rc = await runCli(
+          [
+            '--format=github',
+            '--comment-on-clean',
+            p.join(d.sandbox, 'warn_clean', 'lib'),
+          ],
+          out: out,
+          err: err,
+        );
+        check(rc).equals(0);
+        check(err.toString()).contains(
+          '--comment-on-clean has no effect unless --comment-output is set.',
+        );
       },
     );
   });

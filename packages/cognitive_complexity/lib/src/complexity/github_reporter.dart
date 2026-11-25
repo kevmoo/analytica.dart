@@ -9,12 +9,14 @@ class GitHubReporter {
   final File? _summaryFile;
   final File? _commentFile;
   final int _maxCommentRows;
+  final bool _commentOnClean;
 
   GitHubReporter({
     StringSink? stdoutSink,
     this._summaryFile,
     this._commentFile,
     this._maxCommentRows = 0,
+    this._commentOnClean = false,
   }) : _stdoutSink = stdoutSink ?? stdout;
 
   /// Generates diagnostic workflow annotations and updates step summary table.
@@ -37,15 +39,16 @@ class GitHubReporter {
     var commentBuf = _commentFile == null ? null : _newBuffer();
 
     if (deltaSummary != null) {
-      // A clean diff gets no comment at all: the action reads the absence of
-      // the comment file as "nothing to report". The step summary below is
-      // written either way.
-      if (deltaSummary.isClean(
-        failThreshold: failThreshold,
-        maxFileLines: maxFileLines,
-        maxFunctionLines: maxFunctionLines,
-        failOnIncrease: failOnIncrease,
-      )) {
+      // A clean diff gets no comment unless commentOnClean is enabled: the
+      // action reads the absence of the comment file as "nothing to report".
+      // The step summary below is written either way.
+      if (!_commentOnClean &&
+          deltaSummary.isClean(
+            failThreshold: failThreshold,
+            maxFileLines: maxFileLines,
+            maxFunctionLines: maxFunctionLines,
+            failOnIncrease: failOnIncrease,
+          )) {
         commentBuf = null;
       }
       _reportDelta(
@@ -58,23 +61,15 @@ class GitHubReporter {
         commentBuf,
       );
     } else if (regularResults != null) {
-      // Regular (non-delta) mode never configures a comment file, so
-      // commentBuf is already null here.
-      final violatedFiles = _filterViolatedFiles(fileMetrics, maxFileLines);
-      if (regularResults.isEmpty && violatedFiles.isEmpty) {
-        summaryBuf.writeln('No Dart declarations analyzed.');
-      }
-      if (regularResults.isNotEmpty) {
-        _renderRegularDeclarationsTable(
-          regularResults,
-          failThreshold,
-          maxFunctionLines,
-          summaryBuf,
-        );
-      }
-      if (violatedFiles.isNotEmpty) {
-        _renderRegularFileViolations(violatedFiles, maxFileLines!, summaryBuf);
-      }
+      commentBuf = _reportRegular(
+        regularResults,
+        fileMetrics,
+        failThreshold,
+        maxFileLines,
+        maxFunctionLines,
+        summaryBuf,
+        commentBuf,
+      );
     }
 
     _write(_summaryFile, summaryBuf, 'step summary', append: true);
@@ -105,24 +100,129 @@ class GitHubReporter {
     }
   }
 
-  List<FileLineMetric> _filterViolatedFiles(
+  StringBuffer? _reportRegular(
+    List<FunctionComplexity> regularResults,
     List<FileLineMetric>? fileMetrics,
+    int? failThreshold,
     int? maxFileLines,
+    int? maxFunctionLines,
+    StringBuffer summaryBuf,
+    StringBuffer? commentBuf,
   ) {
-    if (maxFileLines == null || maxFileLines <= 0 || fileMetrics == null) {
-      return const [];
+    final violatedFiles =
+        (maxFileLines != null && maxFileLines > 0 && fileMetrics != null)
+        ? fileMetrics
+              .where((f) => f.isViolation(maxFileLines: maxFileLines))
+              .toList()
+        : const <FileLineMetric>[];
+    final hasViolations =
+        violatedFiles.isNotEmpty ||
+        regularResults.any(
+          (r) => r.isViolation(
+            failThreshold: failThreshold,
+            maxFunctionLines: maxFunctionLines,
+          ),
+        );
+
+    final activeCommentBuf =
+        (commentBuf != null && (_commentOnClean || hasViolations))
+        ? commentBuf
+        : null;
+
+    if (regularResults.isEmpty && violatedFiles.isEmpty) {
+      for (final buf in [summaryBuf, ?activeCommentBuf]) {
+        buf.writeln('No Dart declarations analyzed.');
+      }
+      return activeCommentBuf;
     }
-    return fileMetrics
-        .where((f) => f.isViolation(maxFileLines: maxFileLines))
-        .toList();
+
+    if (regularResults.isNotEmpty) {
+      _renderRegularDeclarationsTable(
+        regularResults,
+        failThreshold,
+        maxFunctionLines,
+        summaryBuf,
+        emitAnnotations: true,
+      );
+    }
+    if (violatedFiles.isNotEmpty) {
+      _renderRegularFileViolations(
+        violatedFiles,
+        maxFileLines!,
+        summaryBuf,
+        emitAnnotations: true,
+      );
+    }
+
+    if (activeCommentBuf != null) {
+      _renderRegularComment(
+        regularResults,
+        violatedFiles,
+        failThreshold,
+        maxFileLines,
+        maxFunctionLines,
+        activeCommentBuf,
+      );
+    }
+    return activeCommentBuf;
+  }
+
+  void _renderRegularComment(
+    List<FunctionComplexity> regularResults,
+    List<FileLineMetric> violatedFiles,
+    int? failThreshold,
+    int? maxFileLines,
+    int? maxFunctionLines,
+    StringBuffer commentBuf,
+  ) {
+    if (regularResults.isNotEmpty) {
+      bool isVio(FunctionComplexity r) => r.isViolation(
+        failThreshold: failThreshold,
+        maxFunctionLines: maxFunctionLines,
+      );
+      // Rank violations ahead of non-violations while keeping score-descending
+      // order within each bucket so row capping never hides a line violation.
+      final ranked = [
+        ...regularResults.where(isVio),
+        ...regularResults.where((r) => !isVio(r)),
+      ];
+      final capped = _maxCommentRows > 0 && ranked.length > _maxCommentRows
+          ? ranked.sublist(0, _maxCommentRows)
+          : ranked;
+      _renderRegularDeclarationsTable(
+        capped,
+        failThreshold,
+        maxFunctionLines,
+        commentBuf,
+        emitAnnotations: false,
+      );
+      if (capped.length < ranked.length) {
+        commentBuf
+          ..writeln()
+          ..writeln(
+            '_Showing the $_maxCommentRows most significant of '
+            '${ranked.length} declarations. '
+            'See the workflow Step Summary for the full table._',
+          );
+      }
+    }
+    if (violatedFiles.isNotEmpty) {
+      _renderRegularFileViolations(
+        violatedFiles,
+        maxFileLines!,
+        commentBuf,
+        emitAnnotations: false,
+      );
+    }
   }
 
   void _renderRegularDeclarationsTable(
     List<FunctionComplexity> results,
     int? failThreshold,
     int? maxFunctionLines,
-    StringBuffer summaryBuf,
-  ) {
+    StringBuffer summaryBuf, {
+    required bool emitAnnotations,
+  }) {
     final showLines = maxFunctionLines != null && maxFunctionLines > 0;
     if (showLines) {
       summaryBuf.writeln('| Status | Declaration | Location | Lines | Score |');
@@ -139,6 +239,7 @@ class GitHubReporter {
         maxFunctionLines,
         showLines,
         summaryBuf,
+        emitAnnotations: emitAnnotations,
       );
     }
   }
@@ -148,8 +249,9 @@ class GitHubReporter {
     int? failThreshold,
     int? maxFunctionLines,
     bool showLines,
-    StringBuffer summaryBuf,
-  ) {
+    StringBuffer summaryBuf, {
+    required bool emitAnnotations,
+  }) {
     final isScoreVio = failThreshold != null && res.score > failThreshold;
     final isLineVio =
         maxFunctionLines != null &&
@@ -167,7 +269,7 @@ class GitHubReporter {
         '| $statusIcon | `${res.name}` | `$loc` | **${res.score}** |',
       );
     }
-    if (isScoreVio) {
+    if (emitAnnotations && isScoreVio) {
       _stdoutSink.writeln(
         '::error file=${res.filePath},line=${res.startLine},'
         'title=High Cognitive Complexity '
@@ -175,7 +277,7 @@ class GitHubReporter {
         '${res.score} which exceeds failure threshold of $failThreshold.',
       );
     }
-    if (isLineVio) {
+    if (emitAnnotations && isLineVio) {
       _stdoutSink.writeln(
         '::error file=${res.filePath},line=${res.startLine},'
         'title=Declaration Line Limit Exceeded '
@@ -189,8 +291,9 @@ class GitHubReporter {
   void _renderRegularFileViolations(
     List<FileLineMetric> violatedFiles,
     int maxFileLines,
-    StringBuffer summaryBuf,
-  ) {
+    StringBuffer summaryBuf, {
+    required bool emitAnnotations,
+  }) {
     summaryBuf
       ..writeln()
       ..writeln('## 📏 File Line Limit Violations')
@@ -201,12 +304,14 @@ class GitHubReporter {
       summaryBuf.writeln(
         '| 🔴 | `${f.filePath}` | **${f.lineCount}** | $maxFileLines |',
       );
-      _stdoutSink.writeln(
-        '::error file=${f.filePath},line=1,'
-        'title=File Line Limit Exceeded '
-        '(${f.lineCount} > $maxFileLines)::${f.filePath} has ${f.lineCount} '
-        'lines which exceeds max-file-lines of $maxFileLines.',
-      );
+      if (emitAnnotations) {
+        _stdoutSink.writeln(
+          '::error file=${f.filePath},line=1,'
+          'title=File Line Limit Exceeded '
+          '(${f.lineCount} > $maxFileLines)::${f.filePath} has ${f.lineCount} '
+          'lines which exceeds max-file-lines of $maxFileLines.',
+        );
+      }
     }
   }
 

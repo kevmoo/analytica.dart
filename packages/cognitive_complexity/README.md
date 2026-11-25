@@ -66,6 +66,7 @@ Options:
     --comment-output=<path>         With --format=github, also write a standalone report to this path, ordered by significance and capped by --max-comment-rows. Intended for posting as a PR comment while the step summary keeps the full table.
     --max-comment-rows=<count>      Maximum table rows in --comment-output (0 = unlimited). GitHub rejects comment bodies over 65536 characters.
                                     (defaults to "0")
+    --comment-on-clean              With --comment-output, also write the report when there are no violations or complexity regressions.
     --exclude=<glob>                Glob patterns of files/directories to exclude (repeatable or comma-separated).
     --[no-]ignore-generated         Exclude generated files (*.g.dart, *.freezed.dart, *.mocks.dart, etc.).
                                     (defaults to on)
@@ -250,17 +251,19 @@ jobs:
 
 #### Action Inputs Reference
 
-| Input                | Default  | Description                                                                      |
-| :------------------- | :------: | :------------------------------------------------------------------------------- |
-| `targets`            |  _Auto_  | Directories or files to scan. Auto-discovers `lib/` or workspace package libs.   |
-| `threshold`          |   `0`    | Minimum score required to include a declaration in summary tables.               |
-| `fail-threshold`     |   `15`   | Maximum complexity ceiling allowed before failing the build.                     |
-| `max-file-lines`     |   `0`    | Opt-in maximum physical line count per source file (`0` = disabled).             |
-| `max-function-lines` |   `0`    | Opt-in maximum line span per function/method declaration (`0` = disabled).       |
-| `diff-base`          |  _Auto_  | Git ref to compare against (e.g. `origin/main`). Auto-detects PR base.           |
-| `fail-on-increase`   | `false`  | When `true`, blocks PR merge on complexity increases exceeding `fail-threshold`. |
-| `format`             | `github` | Output format: `github` (annotations + step summary), `text`, or `json`.         |
-| `max-comment-rows`   |   `0`    | Maximum table rows in the sticky PR comment (0 = unlimited).                     |
+| Input                | Default  | Description                                                                           |
+| :------------------- | :------: | :------------------------------------------------------------------------------------ |
+| `targets`            |  _Auto_  | Directories or files to scan. Auto-discovers `lib/` or workspace package libs.        |
+| `threshold`          |   `0`    | Minimum score required to include a declaration in summary tables.                    |
+| `fail-threshold`     |   `15`   | Maximum complexity ceiling allowed before failing the build.                          |
+| `max-file-lines`     |   `0`    | Opt-in maximum physical line count per source file (`0` = disabled).                  |
+| `max-function-lines` |   `0`    | Opt-in maximum line span per function/method declaration (`0` = disabled).            |
+| `scan-mode`          |  `diff`  | Scan mode: `diff` (PR/base diff) or `full` (scan all `targets`, skipping diff).       |
+| `diff-base`          |  _Auto_  | Git ref to compare against (e.g. `origin/main`). Auto-detects PR base.                |
+| `fail-on-increase`   | `false`  | When `true`, blocks PR merge on complexity increases exceeding `fail-threshold`.      |
+| `format`             | `github` | Output format: `github` (annotations + step summary), `text`, or `json`.              |
+| `comment-mode`       |  `auto`  | PR comment policy: `auto` (violations/increases), `on-violation`, `always`, or `off`. |
+| `max-comment-rows`   |   `0`    | Maximum table rows in the sticky PR comment (0 = unlimited).                          |
 
 ## 🧠 AI Agent Integration
 

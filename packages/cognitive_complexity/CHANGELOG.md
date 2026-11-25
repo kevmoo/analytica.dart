@@ -1,5 +1,12 @@
 ## 2.0.2-wip
 
+- GitHub Action (`action.yml`): Add `comment-mode` (`auto`, `on-violation`,
+  `always`, `off`; default `auto`) to control PR sticky comment visibility (#5)
+  and `scan-mode` (`diff`, `full`; default `diff`) to opt out of PR diff
+  resolution and scan all targets across the repository (#6).
+- `cognitive_complexity`: Support `--comment-output` in regular (non-diff)
+  `--format=github` scans and add `--comment-on-clean` to emit a standalone
+  comment report even when a scan has no violations or regressions.
 - `data_flow`: Emit a deterministic `[ZERO_NESTING_GAIN]` extraction warning
   when a proposed slice at `callNestingDepth == 0`
   (`sliceScoreInPlace == sliceScoreAtRoot`) inside a borderline function

@@ -108,6 +108,13 @@ Future<int> runCli(
           'Maximum table rows in --comment-output (0 = unlimited). GitHub '
           'rejects comment bodies over 65536 characters.',
     )
+    ..addFlag(
+      'comment-on-clean',
+      negatable: false,
+      help:
+          'With --comment-output, also write the report when there are no '
+          'violations or complexity regressions.',
+    )
     ..addPathFilterOptions();
 
   try {
@@ -151,11 +158,13 @@ Future<int> runCli(
       argResults['max-comment-rows'] as String,
       'max-comment-rows',
     );
+    final commentOnClean = argResults['comment-on-clean'] as bool;
     final pathFilter = parsePathFilter(argResults);
 
     _warnIgnoredFlags(
       failOnIncrease: failOnIncrease,
       commentOutput: commentOutput,
+      commentOnClean: commentOnClean,
       verbose: verbose,
       format: format,
       gitDiffBase: gitDiffBase,
@@ -177,6 +186,7 @@ Future<int> runCli(
         failOnIncrease: failOnIncrease,
         commentOutput: commentOutput,
         maxCommentRows: maxCommentRows,
+        commentOnClean: commentOnClean,
         out: stdoutSink,
         err: stderrSink,
       );
@@ -191,6 +201,9 @@ Future<int> runCli(
       maxFunctionLines: maxFunctionLines,
       format: format,
       verbose: verbose,
+      commentOutput: commentOutput,
+      maxCommentRows: maxCommentRows,
+      commentOnClean: commentOnClean,
       out: stdoutSink,
       err: stderrSink,
     );
@@ -217,6 +230,7 @@ int? _parseOptInPositiveInt(String? raw, String flagName) {
 void _warnIgnoredFlags({
   required bool failOnIncrease,
   required String? commentOutput,
+  required bool commentOnClean,
   required bool verbose,
   required String format,
   required String? gitDiffBase,
@@ -229,10 +243,16 @@ void _warnIgnoredFlags({
     );
   }
 
-  if (commentOutput != null && (format != 'github' || gitDiffBase == null)) {
+  if (commentOutput != null && format != 'github') {
     err.writeln(
-      'Warning: --comment-output has no effect unless --format=github '
-      'and --git-diff are both set.',
+      'Warning: --comment-output has no effect unless --format=github is set.',
+    );
+  }
+
+  if (commentOnClean && commentOutput == null) {
+    err.writeln(
+      'Warning: --comment-on-clean has no effect unless --comment-output is '
+      'set.',
     );
   }
 
@@ -242,6 +262,19 @@ void _warnIgnoredFlags({
     );
   }
 }
+
+GitHubReporter _createGitHubReporter({
+  required StringSink out,
+  String? commentOutput,
+  int maxCommentRows = 0,
+  bool commentOnClean = false,
+}) => GitHubReporter(
+  stdoutSink: out,
+  summaryFile: resolveGitHubSummaryFile(),
+  commentFile: commentOutput == null ? null : File(commentOutput),
+  maxCommentRows: maxCommentRows,
+  commentOnClean: commentOnClean,
+);
 
 Future<int> _handleDiffMode({
   required String gitDiffBase,
@@ -256,6 +289,7 @@ Future<int> _handleDiffMode({
   required StringSink err,
   String? commentOutput,
   int maxCommentRows = 0,
+  bool commentOnClean = false,
 }) async {
   final deltaAnalyzer = DeltaAnalyzer(pathFilter: pathFilter);
   final summary = await deltaAnalyzer.computeDeltas(
@@ -278,11 +312,11 @@ Future<int> _handleDiffMode({
       ),
     );
   } else if (format == 'github') {
-    final reporter = GitHubReporter(
-      stdoutSink: out,
-      summaryFile: resolveGitHubSummaryFile(),
-      commentFile: commentOutput == null ? null : File(commentOutput),
+    final reporter = _createGitHubReporter(
+      out: out,
+      commentOutput: commentOutput,
       maxCommentRows: maxCommentRows,
+      commentOnClean: commentOnClean,
     );
     reporter.printReport(
       deltaSummary: summary,
@@ -332,6 +366,9 @@ int _handleRegularMode({
   required bool verbose,
   required StringSink out,
   required StringSink err,
+  String? commentOutput,
+  int maxCommentRows = 0,
+  bool commentOnClean = false,
 }) {
   final analyzer = ComplexityAnalyzer(pathFilter: pathFilter);
   final allResults = <FunctionComplexity>[];
@@ -363,9 +400,11 @@ int _handleRegularMode({
       ),
     );
   } else if (format == 'github') {
-    final reporter = GitHubReporter(
-      stdoutSink: out,
-      summaryFile: resolveGitHubSummaryFile(),
+    final reporter = _createGitHubReporter(
+      out: out,
+      commentOutput: commentOutput,
+      maxCommentRows: maxCommentRows,
+      commentOnClean: commentOnClean,
     );
     reporter.printReport(
       regularResults: displayed,
