@@ -1,3 +1,4 @@
+import 'package:analytica/analytica.dart';
 import 'package:checks/checks.dart';
 import 'package:test/test.dart';
 import 'package:test_descriptor/test_descriptor.dart' as d;
@@ -293,5 +294,85 @@ dependencies:
         check(topology.extraTestFiles).length.equals(1); // t.dart
       },
     );
+
+    test(
+      'harvests explicit entrypoints and includes custom-directory files',
+      () async {
+        await d.dir('explicit_entry_pkg', [
+          packageConfig('explicit_entry_pkg'),
+          d.file('pubspec.yaml', 'name: explicit_entry_pkg\n'),
+          d.dir('lib', [
+            d.file('benchmark_main.dart', 'void main() {}'),
+            d.dir('src', [d.file('internal_entry.dart', 'void main() {}')]),
+          ]),
+          d.dir('scripts', [d.file('custom_run.dart', 'void main() {}')]),
+        ]).create();
+
+        final pkgPath = d.path('explicit_entry_pkg');
+        final options = UndeadOptions(
+          packagePath: pkgPath,
+          entrypoints: [
+            './lib/benchmark_main.dart',
+            '$pkgPath/lib/src/internal_entry.dart',
+            'scripts/custom_run.dart',
+          ],
+        );
+
+        final topology = RootHarvester(options).harvestTopology();
+
+        check(topology.isExplicitEntrypoint('lib/benchmark_main.dart')).isTrue;
+        check(topology.isExplicitEntrypoint(r'lib\benchmark_main.dart')).isTrue;
+        check(
+          topology.isExplicitEntrypoint('lib/src/internal_entry.dart'),
+        ).isTrue;
+        check(topology.isExplicitEntrypoint('scripts/custom_run.dart')).isTrue;
+        check(topology.isExplicitEntrypoint('lib/main.dart')).isFalse;
+
+        check(topology.executableFiles).contains('scripts/custom_run.dart');
+        check(
+          topology.roleOf('scripts/custom_run.dart'),
+        ).equals(FileRole.executable);
+        check(
+          topology.roleOf('lib/benchmark_main.dart'),
+        ).equals(FileRole.publicLib);
+        check(
+          topology.roleOf('lib/src/internal_entry.dart'),
+        ).equals(FileRole.internalSrc);
+      },
+    );
+
+    test('validates explicit entrypoints exist and are Dart files inside '
+        'target package', () async {
+      await d.dir('invalid_entry_pkg', [
+        packageConfig('invalid_entry_pkg'),
+        d.file('pubspec.yaml', 'name: invalid_entry_pkg\n'),
+        d.dir('lib', [d.file('main.dart', 'void main() {}')]),
+      ]).create();
+
+      await d.file('outside.dart', 'void main() {}').create();
+
+      final pkgPath = d.path('invalid_entry_pkg');
+
+      check(
+        RootHarvester(
+          UndeadOptions(
+            packagePath: pkgPath,
+            entrypoints: ['lib/does_not_exist.dart'],
+          ),
+        ).harvestTopology,
+      ).throws<MissingInputException>();
+
+      check(
+        RootHarvester(
+          UndeadOptions(packagePath: pkgPath, entrypoints: ['../outside.dart']),
+        ).harvestTopology,
+      ).throws<UsageException>();
+
+      check(
+        RootHarvester(
+          UndeadOptions(packagePath: pkgPath, entrypoints: ['pubspec.yaml']),
+        ).harvestTopology,
+      ).throws<UsageException>();
+    });
   });
 }

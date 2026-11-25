@@ -1,5 +1,14 @@
 ## 0.1.3-wip
 
+- Add repeatable `--entrypoint <path>` CLI option and
+  `UndeadOptions.entrypoints` (with `PackageTopology.explicitEntrypoints` and
+  `PackageTopology.isExplicitEntrypoint`) to declare alternate Dart/Flutter
+  entrypoint files whose top-level `main()` is rooted in reachability analysis
+  (#207).
+- Add `UndeadReport.possibleEntrypoints` (serialized in JSON when non-empty and
+  rendered as a Markdown note) to surface unrooted `main()` functions so users
+  and agents can pass `--entrypoint` when appropriate (#207).
+
 ## 0.1.2
 
 - Require `analytica` `^0.1.4`.

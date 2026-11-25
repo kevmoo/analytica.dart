@@ -140,6 +140,61 @@ void main() {
         output,
       ).contains('🎉 **No undead declarations detected across package.**');
       check(output).not(.it()..contains('## Pure Undead'));
+      check(output).not(.it()..contains('--entrypoint'));
     });
+
+    test(
+      'formatters emit possibleEntrypoints FYI when unrooted main() exists',
+      () {
+        const report = UndeadReport(
+          version: '0.1.3-wip',
+          package: 'flutter_app',
+          totalDeclarations: 4,
+          pureUndeadFound: 2,
+          testedUndeadFound: 0,
+          coInvokedHazardsFound: 0,
+          undead: [
+            UndeadFinding(
+              id: 'main',
+              name: 'main',
+              kind: DeclarationKind.function,
+              file: 'lib/benchmark_main.dart',
+              line: 5,
+              column: 1,
+              length: 4,
+              classification: UndeadClassification.pureUndead,
+              suggestedAction: SuggestedAction.delete,
+            ),
+            UndeadFinding(
+              id: 'main',
+              name: 'main',
+              kind: DeclarationKind.function,
+              file: 'lib/staging.dart',
+              line: 3,
+              column: 1,
+              length: 4,
+              classification: UndeadClassification.pureUndead,
+              suggestedAction: SuggestedAction.delete,
+            ),
+          ],
+        );
+
+        final jsonOutput = const JsonFormatter().format(report);
+        final decoded = jsonDecode(jsonOutput) as Map<String, dynamic>;
+        check(decoded['possibleEntrypoints']).isA<List<Object?>>().deepEquals([
+          'lib/benchmark_main.dart',
+          'lib/staging.dart',
+        ]);
+
+        final mdOutput = const MarkdownFormatter().format(report);
+        check(mdOutput).contains('> [!NOTE]');
+        check(
+          mdOutput,
+        ).contains('`lib/benchmark_main.dart`, `lib/staging.dart`');
+        check(mdOutput).contains(
+          '`--entrypoint lib/benchmark_main.dart --entrypoint lib/staging.dart`',
+        );
+      },
+    );
   });
 }

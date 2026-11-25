@@ -473,8 +473,14 @@ class UndeadEngine {
       final isFlutterEntry = PackageTopology.isFlutterEntrypoint(
         node.relativeFilePath,
       );
+      final isExplicitEntry = topology.isExplicitEntrypoint(
+        node.relativeFilePath,
+      );
       final isExecRoot =
           (role == FileRole.executable && node.name == 'main') ||
+          (isExplicitEntry &&
+              node.kind == DeclarationKind.function &&
+              node.name == 'main') ||
           (isFlutterEntry &&
               node.name == 'main' &&
               topology.frameworkRoots.contains('main'));
@@ -682,21 +688,25 @@ class UndeadEngine {
       _ => false,
     };
 
-    if (!isCandidateScope) return false;
-    if (node.name.startsWith('_')) return false;
-    if (node.isIgnored) return false;
-    if (node.isNativeRoot) return false;
-    if (node.isExternalBinding) return false;
-    if (node.isTestSupport) return false;
-    if (WildcardPattern.anyMatch(_ignoreNameWildcards, node.name)) return false;
-    if (WildcardPattern.anyMatch(_testSupportWildcards, node.name)) {
+    if (!isCandidateScope ||
+        node.name.startsWith('_') ||
+        node.isIgnored ||
+        node.isNativeRoot ||
+        node.isExternalBinding ||
+        node.isTestSupport ||
+        exportedNodeIds.contains(node.id) ||
+        !productionLive.contains(node.id) ||
+        crossLibraryReferenced.contains(node.id) ||
+        testReferencedIds.contains(node.id) ||
+        WildcardPattern.anyMatch(_ignoreNameWildcards, node.name) ||
+        WildcardPattern.anyMatch(_testSupportWildcards, node.name)) {
       return false;
     }
-    if (exportedNodeIds.contains(node.id)) return false;
-    if (!productionLive.contains(node.id)) return false;
-    if (crossLibraryReferenced.contains(node.id)) return false;
-    if (testReferencedIds.contains(node.id)) return false;
-    return true;
+
+    return !(node.kind == DeclarationKind.function &&
+        node.name == 'main' &&
+        (topology.isExplicitEntrypoint(node.relativeFilePath) ||
+            PackageTopology.isFlutterEntrypoint(node.relativeFilePath)));
   }
 }
 
@@ -722,6 +732,7 @@ Future<UndeadReport> analyzePackage(
                 testSupportPatterns: options.testSupportPatterns,
                 ignoreNamePatterns: options.ignoreNamePatterns,
                 extraRoots: options.extraRoots,
+                entrypoints: options.entrypoints,
                 ignoreExternalBindings: options.ignoreExternalBindings,
                 workspaceDiscovery: options.workspaceDiscovery,
                 suggestPrivate: options.suggestPrivate,

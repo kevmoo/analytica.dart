@@ -2245,5 +2245,112 @@ void main() {
         ..contains('_privateHelper')
         ..contains('doTestThings');
     });
+
+    test(
+      'roots explicit entrypoints without exempting dead helpers or suggesting '
+      'main as private',
+      () async {
+        await d.dir('explicit_entrypoints_engine_pkg', [
+          packageConfig('explicit_entrypoints_engine_pkg'),
+          d.file('pubspec.yaml', '''
+name: explicit_entrypoints_engine_pkg
+environment:
+  sdk: '^3.5.0'
+'''),
+          d.dir('lib', [
+            d.file('main.dart', '''
+void main() {}
+'''),
+            d.file('benchmark_main.dart', '''
+import 'src/bench_runner.dart';
+
+void main() {
+  BenchRunner.run();
+}
+
+void deadHelperInEntrypoint() {}
+'''),
+            d.dir('src', [
+              d.file('bench_runner.dart', '''
+class BenchRunner {
+  static void run() {}
+}
+'''),
+              d.file('internal_tool.dart', '''
+void main() {
+  _toolWork();
+}
+
+void _toolWork() {}
+void deadToolHelper() {}
+'''),
+            ]),
+          ]),
+          d.dir('scripts', [
+            d.file('custom_entry.dart', '''
+void main() {
+  _customWork();
+}
+
+void _customWork() {}
+void deadCustomHelper() {}
+'''),
+          ]),
+        ]).create();
+
+        final pkgPath = d.path('explicit_entrypoints_engine_pkg');
+
+        // 1. Without explicit entrypoints, benchmark_main.dart and
+        // internal_tool.dart surface in possibleEntrypoints.
+        final withoutEntrypoints = await analyzePackage(
+          pkgPath,
+          options: UndeadOptions(packagePath: '', mode: AnalysisMode.closedApp),
+        );
+        check(
+          withoutEntrypoints.possibleEntrypoints,
+        ).deepEquals(['lib/benchmark_main.dart', 'lib/src/internal_tool.dart']);
+        check(
+          withoutEntrypoints.undead.map((f) => f.name).toSet(),
+        ).contains('BenchRunner');
+
+        // 2. With explicit entrypoints (including lib/src/ and custom
+        // scripts/ directory) and suggestPrivate: true, all three main()
+        // roots and their reachable targets are live, main() is not suggested
+        // as a private candidate, and dead helpers in each entrypoint file
+        // are still flagged.
+        final withEntrypoints = await analyzePackage(
+          pkgPath,
+          options: UndeadOptions(
+            packagePath: '',
+            mode: AnalysisMode.closedApp,
+            suggestPrivate: true,
+            entrypoints: [
+              'lib/benchmark_main.dart',
+              'lib/src/internal_tool.dart',
+              'scripts/custom_entry.dart',
+            ],
+          ),
+        );
+
+        check(withEntrypoints.possibleEntrypoints).isEmpty;
+        final pureNames = withEntrypoints.undead
+            .where((f) => f.classification == UndeadClassification.pureUndead)
+            .map((f) => f.name)
+            .toSet();
+        check(pureNames).deepEquals({
+          'deadHelperInEntrypoint',
+          'deadToolHelper',
+          'deadCustomHelper',
+        });
+
+        final privateNames = withEntrypoints.undead
+            .where(
+              (f) => f.classification == UndeadClassification.privateCandidate,
+            )
+            .map((f) => f.name)
+            .toSet();
+        check(privateNames).not(.it()..contains('main'));
+      },
+    );
   });
 }

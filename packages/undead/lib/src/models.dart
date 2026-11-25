@@ -160,6 +160,7 @@ final class UndeadOptions {
   final List<String> testSupportPatterns;
   final List<String> ignoreNamePatterns;
   final List<String> extraRoots;
+  final List<String> entrypoints;
   final bool ignoreExternalBindings;
   final bool workspaceDiscovery;
   final bool suggestPrivate;
@@ -185,6 +186,7 @@ final class UndeadOptions {
     this.testSupportPatterns = const ['Fake*', 'Mock*'],
     this.ignoreNamePatterns = const [],
     this.extraRoots = const [],
+    this.entrypoints = const [],
     this.ignoreExternalBindings = false,
     this.workspaceDiscovery = true,
     this.suggestPrivate = false,
@@ -348,18 +350,40 @@ class UndeadReport {
     );
   }
 
-  Map<String, dynamic> toJson() => {
-    'version': version,
-    'package': package,
-    'summary': {
-      'totalDeclarations': totalDeclarations,
-      'pureUndead': pureUndeadFound,
-      'testedUndead': testedUndeadFound,
-      'coInvokedHazards': coInvokedHazardsFound,
-      'privateCandidates': privateCandidatesFound,
-    },
-    'undead': undead.map((z) => z.toJson()).toList(),
-  };
+  /// Sorted, deduplicated relative file paths of unrooted top-level `main()`
+  /// functions reported in [undead] (excluding
+  /// [UndeadClassification.privateCandidate]).
+  ///
+  /// Surfaces candidate alternate entrypoints (such as `flutter run -t`
+  /// targets) so humans and agents can decide whether to re-run with
+  /// `--entrypoint`.
+  List<String> get possibleEntrypoints {
+    final files = <String>{
+      for (final finding in undead)
+        if (finding.kind == DeclarationKind.function &&
+            finding.name == 'main' &&
+            finding.classification != UndeadClassification.privateCandidate)
+          finding.file,
+    };
+    return files.toList()..sort();
+  }
+
+  Map<String, dynamic> toJson() {
+    final possible = possibleEntrypoints;
+    return {
+      'version': version,
+      'package': package,
+      'summary': {
+        'totalDeclarations': totalDeclarations,
+        'pureUndead': pureUndeadFound,
+        'testedUndead': testedUndeadFound,
+        'coInvokedHazards': coInvokedHazardsFound,
+        'privateCandidates': privateCandidatesFound,
+      },
+      if (possible.isNotEmpty) 'possibleEntrypoints': possible,
+      'undead': undead.map((z) => z.toJson()).toList(),
+    };
+  }
 }
 
 /// Internal representation of a top-level declaration node in the

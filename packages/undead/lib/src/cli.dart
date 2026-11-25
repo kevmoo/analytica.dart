@@ -72,6 +72,13 @@ ArgParser buildArgParser() => ArgParser()
         'companion packages to include in reachability analysis.',
     defaultsTo: '',
   )
+  ..addMultiOption(
+    'entrypoint',
+    valueHelp: 'path/to/file.dart',
+    help:
+        'Additional Dart entrypoint file(s) whose top-level main() is treated '
+        'as an execution root (repeatable or comma-separated).',
+  )
   ..addFlag(
     'ignore-external-bindings',
     aliases: ['ignore-external-interop'],
@@ -166,8 +173,7 @@ class UndeadCliRunner {
     final exampleMode = ExampleMode.fromString(results.option('example-mode')!);
     final mode = AnalysisMode.fromString(results.option('mode')!);
     var pathFilter = parsePathFilter(results);
-    if (results.wasParsed('include-generated') &&
-        results.flag('include-generated')) {
+    if (results.flag('include-generated')) {
       pathFilter = PathFilter(
         excludePatterns: pathFilter.excludePatterns,
         ignoreGenerated: false,
@@ -187,6 +193,7 @@ class UndeadCliRunner {
       results.option('ignore-name-patterns'),
     );
     final extraRoots = parseCommaSeparated(results.option('extra-roots'));
+    final entrypoints = results.multiOption('entrypoint');
 
     final options = UndeadOptions(
       packagePath: normalizedPath,
@@ -204,6 +211,7 @@ class UndeadCliRunner {
       testSupportPatterns: testSupportPatterns,
       ignoreNamePatterns: ignoreNamePatterns,
       extraRoots: extraRoots,
+      entrypoints: entrypoints,
     );
 
     try {
@@ -235,6 +243,9 @@ class UndeadCliRunner {
     } on SdkDiscoveryException catch (e) {
       errSink.writeln('SDK Error: ${e.message}');
       return ExitCode.unavailable.code;
+    } on AnalyticaException catch (e) {
+      errSink.writeln('Error: ${e.message}');
+      return e.exitCode;
     } catch (e, stack) {
       errSink
         ..writeln('Analysis error: $e')

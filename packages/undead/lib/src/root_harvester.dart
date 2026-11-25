@@ -1,6 +1,6 @@
 import 'dart:io';
 
-import 'package:analytica/sdk_discovery.dart';
+import 'package:analytica/analytica.dart';
 import 'package:path/path.dart' as p;
 
 import 'models.dart';
@@ -47,6 +47,7 @@ class PackageTopology {
   final List<String> auxiliaryFiles;
   final List<String> testFiles;
   final Set<String> frameworkRoots;
+  final Set<String> explicitEntrypoints;
   final List<String> extraProductionFiles;
   final List<String> extraTestFiles;
 
@@ -60,6 +61,7 @@ class PackageTopology {
     required this.auxiliaryFiles,
     required this.testFiles,
     this.frameworkRoots = const {},
+    this.explicitEntrypoints = const {},
     this.extraProductionFiles = const [],
     this.extraTestFiles = const [],
   });
@@ -93,7 +95,18 @@ class PackageTopology {
     if (extraProductionFiles.contains(normalized)) {
       return FileRole.other;
     }
+    if (executableFiles.contains(normalized)) {
+      return FileRole.executable;
+    }
     return _classifyPathPrefix(normalized.replaceAll(r'\', '/'));
+  }
+
+  /// Whether [relativeFilePath] was explicitly declared as an entrypoint via
+  /// `UndeadOptions.entrypoints`.
+  bool isExplicitEntrypoint(String relativeFilePath) {
+    if (explicitEntrypoints.isEmpty) return false;
+    final target = _normalizePosix(relativeFilePath);
+    return explicitEntrypoints.any((entry) => _normalizePosix(entry) == target);
   }
 
   /// Whether [relativeFilePath] is a Flutter main entrypoint (`lib/main.dart` or `lib/main_*.dart`).
@@ -123,6 +136,7 @@ class RootHarvester {
     final packageName = _extractPackageName(pubspecContent);
 
     final files = _classifyPackageFiles(rootDir);
+    final explicitEntrypoints = _harvestExplicitEntrypoints(files);
     final extraProduction = <String>[];
     final extraTest = <String>[];
 
@@ -138,6 +152,7 @@ class RootHarvester {
       demonstrationFiles: files.example,
       auxiliaryFiles: files.auxiliary,
       testFiles: files.test,
+      explicitEntrypoints: explicitEntrypoints,
       extraProductionFiles: extraProduction,
       extraTestFiles: extraTest,
     );
@@ -158,6 +173,7 @@ class RootHarvester {
       auxiliaryFiles: files.auxiliary,
       testFiles: files.test,
       frameworkRoots: frameworkRoots,
+      explicitEntrypoints: explicitEntrypoints,
       extraProductionFiles: extraProduction,
       extraTestFiles: extraTest,
     );
@@ -252,6 +268,62 @@ class RootHarvester {
       auxiliary: auxiliary,
       test: test,
     );
+  }
+
+  Set<String> _harvestExplicitEntrypoints(_PackageFiles files) {
+    if (options.entrypoints.isEmpty) return const {};
+
+    final absPkg = p.normalize(p.absolute(options.packagePath));
+    final knownFiles = <String>{
+      ...files.publicLib,
+      ...files.internalSrc,
+      ...files.bin,
+      ...files.example,
+      ...files.auxiliary,
+      ...files.test,
+    };
+    final result = <String>{};
+
+    for (final raw in options.entrypoints) {
+      final trimmed = raw.trim();
+      if (trimmed.isEmpty) continue;
+
+      final resolved = _resolveEntrypointPath(trimmed, absPkg);
+      final relPath = p.normalize(p.relative(resolved, from: absPkg));
+      result.add(relPath);
+      if (knownFiles.add(relPath)) {
+        files.bin.add(relPath);
+      }
+    }
+
+    return result;
+  }
+
+  String _resolveEntrypointPath(String rawEntrypoint, String absPkg) {
+    final normalizedInput = rawEntrypoint.replaceAll(r'\', '/');
+    final resolved = p.normalize(
+      p.isAbsolute(normalizedInput)
+          ? normalizedInput
+          : p.join(absPkg, normalizedInput),
+    );
+    if (!File(resolved).existsSync()) {
+      throw MissingInputException(
+        'Entrypoint file does not exist: $rawEntrypoint',
+        path: resolved,
+      );
+    }
+    if (!p.isWithin(absPkg, resolved)) {
+      throw UsageException(
+        'Entrypoint must be within the target package: $rawEntrypoint '
+        '(use --extra-roots for external paths).',
+      );
+    }
+    if (!resolved.endsWith('.dart')) {
+      throw UsageException(
+        'Entrypoint must be a Dart (.dart) file: $rawEntrypoint',
+      );
+    }
+    return resolved;
   }
 
   void _discoverWorkspaceConsumers(
@@ -354,6 +426,9 @@ typedef _PackageFiles = ({
   List<String> auxiliary,
   List<String> test,
 });
+
+String _normalizePosix(String path) =>
+    p.normalize(path.replaceAll(r'\', '/')).replaceAll(r'\', '/');
 
 FileRole _classifyPathPrefix(String path) {
   if (path.startsWith('lib/src/')) return FileRole.internalSrc;
