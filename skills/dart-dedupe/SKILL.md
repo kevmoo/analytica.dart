@@ -143,6 +143,16 @@ Evaluate each candidate cluster before modifying code:
 
 ### 🛑 Necessary Duplication (Reject Refactoring & Preserve)
 
+- **Net-zero or net-positive abstraction tax:** Refactors whose total diff
+  (helper signature, parameters, imports, and updated call sites) produces zero
+  or positive net line change (`net lines >= 0`). Skip unless consolidating a
+  verified bug-drift risk across 3+ call sites.
+- **Forced null-assertion casts (`!`):** Merging structurally similar blocks
+  whose fields differ in nullability or type when bridging them requires
+  introducing `!` null-assertion casts or unsafe `as` downcasts.
+- **Trivial `<= 4`-line wrappers and loops:** Extracting trivial `<= 4`-line
+  blocks (such as a 3-line `for` loop, simple guard, or thin wrapper) where the
+  abstraction adds indirection without clarifying intent.
 - **Type-unsafe polymorphic AST targets:** When similar-looking classes (such as
   AST statement variants) do not share a common type interface. Using `dynamic`
   sacrifices compile-time type safety for negligible line reduction.
@@ -175,6 +185,27 @@ duplicate cluster:
   abstractions under `lib/src/` (e.g. `lib/src/shared/` or `lib/src/common/`).
   Never place internal helpers directly in the public `lib/` root.
 
+### Abstraction Design & Import Hygiene
+
+- **Prefer `extension on <Base/Mixin>` over callback-bag helpers:** When clone
+  sites share a base class or mixin (e.g. Flutter `State` subclasses or shared
+  component bases), implement shared logic as an `extension on <Base/Mixin>` (or
+  a method on the shared base/mixin) so it accesses receiver members directly.
+  Avoid top-level helpers that take a bag of lifecycle or state closures (such
+  as `isMounted: () => mounted` or `onRebuild: () => setState(() {})`) to work
+  around missing receiver access.
+- **Forbid self-barrel imports in `lib/src/`:** Never import a package's own
+  public barrel (`package:<pkg>/<pkg>.dart`) from any file under `lib/src/`
+  (including newly extracted shared helpers). Importing the public barrel from
+  `lib/src/` creates import cycles back through callers exported by the barrel;
+  import `lib/src/` siblings directly via relative paths (e.g.
+  `import 'foo.dart';` or `import '../models/bar.dart';`).
+- **Inline or delete residual single-caller pass-throughs:** After extracting a
+  shared abstraction, inspect participating files for residual single-caller
+  wrappers (such as widget or helper classes and private methods that now wrap a
+  single call to the shared helper without adding independent public API or
+  state) and inline or delete them.
+
 ---
 
 ## 4. The 2-Stage Triage & Confirmation Protocol
@@ -196,8 +227,10 @@ artifact named `dedupe_triage_report.md` in
    clone classification category (`logic`, `data`, `boilerplate`), and bucket
    (`identical`, `structural`, `parameterized`, `gapped`). Must include code
    snippets.
-3. **Actionability Annotations**: Highlight recommended extraction strategy or
-   mark as "Necessary Duplication (Preserve)".
+3. **Actionability Annotations**: Estimate net line savings, highlight the
+   recommended extraction strategy (e.g. `extension on <Base/Mixin>` vs. shared
+   helper), or mark as "Necessary Duplication (Preserve)" when abstraction tax,
+   trivial `<= 4`-line size, or `!` casts outweigh the benefit.
 4. **Prioritization**: Rank by highest token volume and widest file footprint
    first.
 
@@ -229,7 +262,7 @@ the desired remediation scope:
 >   instructions (e.g., "Deduplicate clusters in `pkgs/foo` using
 >   `dart-dedupe`").
 > - **Non-Interactive Execution**: In unattended or automated evaluation
->   workflows (e.g. `evalin` or subagents), proceed with Option 1 (Refactor Top
+>   workflows (e.g. evals or subagents), proceed with Option 1 (Refactor Top
 >   Actionable Cluster Across All Files) automatically after verifying baseline
 >   tests pass.
 
@@ -243,9 +276,22 @@ Wrap all deduplication refactoring in a strict verification sandwich:
    - Check `pubspec.yaml`: if `sdk: flutter` is declared, run `flutter test`;
      otherwise run `dart test`.
    - Confirm test suite is 100% green before touching code.
-2. **Surgical Modification**: Extract shared functions or helper classes under
-   `lib/src/` cleanly.
-3. **Verify Post-Refactor Health**:
+2. **Surgical Modification**: Extract shared abstractions under `lib/src/`
+   cleanly. Prefer `extension on <Base/Mixin>` over callback-bag top-level
+   helpers when clone sites share a base class or mixin, and use relative
+   `lib/src/` imports instead of importing the package's own public barrel
+   (`package:<pkg>/<pkg>.dart`).
+3. **Post-Extraction Cleanup & Net-Line Audit**:
+   - **Remove residual single-caller pass-throughs:** Inspect refactored files
+     for leftover single-caller wrappers (e.g. widget or helper classes and
+     private methods that now wrap a single shared helper call with no
+     independent public API or state) and inline or delete them.
+   - **Audit diff quality:** Check `git diff --stat` and `git diff` to verify a
+     net line reduction (`net lines < 0`), zero newly introduced `!`
+     null-assertion casts bridging mismatched fields, and zero
+     `package:<pkg>/<pkg>.dart` imports under `lib/src/`. If a refactor fails
+     this check, revert it and classify the cluster as Necessary Duplication.
+4. **Verify Post-Refactor Health**:
    - Run `dart analyze --fatal-infos` (or `flutter analyze --fatal-infos`).
      Plain `dart analyze` exits 0 on `info` diagnostics, but many ecosystem CI
      pipelines run with `--fatal-infos`; resolve `unused_import`,
@@ -253,9 +299,9 @@ Wrap all deduplication refactoring in a strict verification sandwich:
    - Run `flutter test` or `dart test`.
    - **Monorepo Downstream Gate**: In multi-package workspaces, run tests across
      all dependent packages.
-4. **Zero-Clone Confirmation**: Re-run `dart run dedupe@^0.1.1` to confirm the
+5. **Zero-Clone Confirmation**: Re-run `dart run dedupe@^0.1.1` to confirm the
    target cluster was eliminated.
-5. **Local Staging**: Stage verified diffs locally (`git add .`).
+6. **Local Staging**: Stage verified diffs locally (`git add .`).
 
 ---
 

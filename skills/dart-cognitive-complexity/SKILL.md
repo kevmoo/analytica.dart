@@ -54,9 +54,11 @@ Run the CLI directly (requires Dart SDK **3.12.0+**, verify via
   ```
 - **Scope 3 — Whole-Project & Optional Advisory `shallow` Review**: Zero
   positional paths auto-discovers `lib/` (pass `lib/ bin/` explicitly for CLI
-  packages). `shallow` findings (like `file_split` plans) are advisory prompts
-  for judgment, never a queue to clear or a CI gate (preserve existing repo
-  dogfood `--fail-on-safe-inline` CI steps unless asked):
+  packages). On pre-existing codebase helpers, `shallow` findings (like
+  `file_split` plans) are advisory prompts for judgment, never a batch-inlining
+  queue or a CI gate (preserve existing repo dogfood `--fail-on-safe-inline` CI
+  steps unless asked; see Section 6 for the post-refactor self-check scoped
+  strictly to newly extracted helpers):
   ```bash
   dart run cognitive_complexity@^2.0.1 --threshold 15
   dart run cognitive_complexity@^2.0.1 --threshold 40 test/
@@ -84,10 +86,10 @@ Stop Rule: report that nothing is required, make no edits, and skip Stage 2.
      recommended pattern (A–F or Section 5.4 hot-loop suppression), and unit
      test status.
    - **Optional: Shallow Helper Notes (Advisory, Not Work Items)**: If you ran
-     `cognitive_complexity:shallow`, list findings (`SAFE_INLINE` where
-     `CallerCCAfter < 15`, `ZERO_HEADROOM` where `CallerCCAfter == 15`,
-     `HIGH_ARITY`, `FLATTEN_AND_INLINE`, `LOAD_BEARING`) as review notes—never
-     as work items to batch-inline.
+     `cognitive_complexity:shallow`, list findings on pre-existing code
+     (`SAFE_INLINE` where `CallerCCAfter < 15`, `ZERO_HEADROOM` where
+     `CallerCCAfter == 15`, `HIGH_ARITY`, `FLATTEN_AND_INLINE`, `LOAD_BEARING`)
+     as review notes—never as work items to batch-inline.
 2. **Visible Chat Pre-Render & Outlier-First Mandate**: Render a high-level
    summary and a clickable link to `complexity_triage_report.md` in visible chat
    BEFORE invoking `ask_question`, prioritizing the highest-scoring declaration
@@ -131,6 +133,11 @@ template.
   top-level functions** or `static` methods with explicit inputs (`<= 4` params)
   and immutable return values (Dart 3 named records with `<= 3` fields or value
   types).
+- **Prefer `sealed class` Over Flat Multi-Mode Structs**: When decomposing
+  multi-mode logic, model each mode as a mode-specific `final` subclass of a
+  `sealed class` rather than a single flat helper struct carrying nullable,
+  dummy, or unused fields across modes—making invalid combinations
+  unrepresentable and preserving exhaustive pattern matching.
 - **Forbid Callback Trampolines, Retry `null` Sentinels, `.catchError(...)` &
   Multi-Pass Loop Gaming**: Never pass recursion trampolines
   (`String Function(Object?) pp`) or closure-wrapped mutable locals
@@ -146,6 +153,12 @@ template.
 Apply **Pattern A** (Dart 3 exhaustive `switch` expressions) and **Pattern B**
 (early-return guard clauses, `else` removal after `return`/`break`/`continue`/
 `throw`, merged conditions) first.
+
+- **Keep One Flat Exhaustive `switch` (Never Split Into Sub-Switches)**: A flat
+  `switch` costs `+1` regardless of case count. Never split an exhaustive enum
+  or `sealed` `switch` into multiple sub-switches with `_ =>` wildcards—it adds
+  lines and breaks compile-time exhaustiveness. Keep **one** flat exhaustive
+  `switch` and extract only individual complex case bodies instead.
 
 **5-Step Pre-Extraction Simplification Checklist for Borderline Functions
 (`CC 16–22`)**: When a function is just over the threshold (`CC 16–22`, needing
@@ -191,10 +204,12 @@ dart run cognitive_complexity:shallow@^2.0.1 lib/
 ```
 
 - **Pattern C (`data_flow` 3-Tier Extraction)**: Honor `extraction_warnings`
-  (including `[ZERO_NESTING_GAIN]`). Tier 1: pure function returning a `<= 3`
-  field Dart 3 named record (`slice_score_at_root >= 3`, `<= 4` inputs). Tier 2:
-  single-output pure helper (`<= 3` inputs, `slice_score_at_root >= 3`). Tier 3:
-  Method Object only when 2+ slices share `>= 3` mutated variables (read
+  (including `[ZERO_NESTING_GAIN]`). **Lift extracted statements verbatim
+  first** before applying idiom rewrites so behavior stays anchored across the
+  cut. Tier 1: pure function returning a `<= 3` field Dart 3 named record
+  (`slice_score_at_root >= 3`, `<= 4` inputs). Tier 2: single-output pure helper
+  (`<= 3` inputs, `slice_score_at_root >= 3`). Tier 3: Method Object only when
+  2+ slices share `>= 3` mutated variables (read
   [`references/method-object.md`](references/method-object.md)).
 - **Patterns D, E, F & G**: Fast-fail `if (raw is! Map)` checks (never silent
   `if (raw case ...)` drops); explicit `_Action` enum/`sealed class` returns for
@@ -232,14 +247,34 @@ int _scoreModules(List<int> modules, int size) { ... }
 
 ## 6. Verification & Public API Surface Guardrails
 
-1. **Complexity, API Surface, Format, Analyze & Test**:
+1. **Complexity & API Surface Verification**:
    ```bash
    dart run cognitive_complexity@^2.0.1 --fail-threshold 15 <refactored files>
    dart run api_summary@^1.1.0 > /tmp/api_after.txt && diff -u /tmp/api_before.txt /tmp/api_after.txt
    ```
-   Verify zero public symbol leaks (`git diff api.txt` empty), then run
-   `dart format .`, `dart analyze --fatal-infos`, and `dart test`.
-2. **Blind Self-Review & Provenance**: On diffs `> ~300` lines, have a fresh
-   reviewer judge before/after without tool scores and revert neutral/worse
-   hunks. Ask before appending the provenance block from
+   Verify zero public symbol leaks (`git diff api.txt` empty).
+2. **Post-Refactor Self-Check on Newly Extracted Helpers (`shallow` &
+   `dedupe`)**: Before final formatting and testing, inspect **only** the
+   helpers and extracted case bodies introduced by your current refactor:
+   ```bash
+   dart run cognitive_complexity:shallow@^2.0.1 <refactored files>
+   dart run dedupe@^0.1.1 --git-diff=origin/main --only-changed
+   # Or, without a git diff base:
+   dart run dedupe@^0.1.1 <refactored files>
+   ```
+   - **`shallow` (Scoped Strictly to Your New Helpers)**: Inline newly created
+     single-caller pass-throughs (`SAFE_INLINE`) whose parent stays
+     `<= threshold`, while respecting Section 5.3 Keep/Revert rules for cohesive
+     named step helpers and same-shape siblings. Keep `shallow` advisory on all
+     _pre-existing_ codebase helpers—never pass `--fail-on-safe-inline`, never
+     treat `shallow` as a pass/fail gate, and never batch-inline pre-existing
+     `SAFE_INLINE` helpers.
+   - **`dedupe` (Consolidate Newly Created Clones)**: Consolidate any duplicate
+     blocks introduced across your extracted case bodies or helpers into a
+     shared pure helper (`FanIn >= 2`).
+3. **Format, Analyze, Test, Blind Self-Review & Provenance**: Run
+   `dart format .`, `dart analyze --fatal-infos`, and `dart test` (or
+   `flutter test`). On diffs `> ~300` lines, have a fresh reviewer judge
+   before/after without tool scores and revert neutral/worse hunks. Ask before
+   appending the provenance block from
    [`references/refactoring_recipes.md`](references/refactoring_recipes.md#3-pull-request--commit-provenance-template).
