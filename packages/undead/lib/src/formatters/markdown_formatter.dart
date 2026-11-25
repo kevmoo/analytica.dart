@@ -44,6 +44,7 @@ class MarkdownFormatter {
           )
           .toList(),
     );
+    _writePossibleEntrypoints(buffer, report.possibleEntrypoints);
 
     return buffer.toString();
   }
@@ -157,5 +158,23 @@ class MarkdownFormatter {
       );
     }
     buffer.writeln();
+  }
+
+  static void _writePossibleEntrypoints(
+    StringBuffer buffer,
+    List<String> possibleEntrypoints,
+  ) {
+    if (possibleEntrypoints.isEmpty) return;
+    final files = possibleEntrypoints.map((f) => '`$f`').join(', ');
+    final flags = possibleEntrypoints.map((f) => '--entrypoint $f').join(' ');
+    buffer
+      ..writeln('> [!NOTE]')
+      ..writeln('>')
+      ..writeln(
+        '> Unrooted `main()` function(s) found in: $files. '
+        'If these are alternate entrypoints (for example, `flutter run -t`), '
+        're-run with `$flags`.',
+      )
+      ..writeln();
   }
 }

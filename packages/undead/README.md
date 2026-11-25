@@ -79,6 +79,7 @@ Usage: undead [options] [target_path]
                                            (defaults to "")
     --extra-roots=<dir1,dir2>              Comma-separated list of additional root/test directories or companion packages to include in reachability analysis.
                                            (defaults to "")
+    --entrypoint=<path/to/file.dart>       Additional Dart entrypoint file(s) whose top-level main() is treated as an execution root (repeatable or comma-separated).
     --[no-]ignore-external-bindings        Ignore unreferenced external platform and FFI/interop facade declarations.
     --[no-]workspace-discovery             Automatically discover and ingest consumer roots from sibling packages in the enclosing workspace.
                                            (defaults to on)

@@ -50,6 +50,7 @@ void main() {
       check(stdout).contains('--format');
       check(stdout).contains('--example-mode');
       check(stdout).contains('--mode');
+      check(stdout).contains('--entrypoint');
       check(stdout).contains('--pub-get');
       check(stdout).contains('suggest-private');
       check(stdout).contains('fail-on-undead');
@@ -506,5 +507,118 @@ void onlyUsedHere() {}
       check(firstFinding['classification']).equals('privateCandidate');
       check(firstFinding['suggestedAction']).equals('makePrivate');
     });
+
+    test(
+      'supports repeatable --entrypoint and emits possibleEntrypoints FYI',
+      () async {
+        await d.dir('cli_entrypoint_pkg', [
+          packageConfig('cli_entrypoint_pkg'),
+          d.file('pubspec.yaml', '''
+name: cli_entrypoint_pkg
+environment:
+  sdk: '^3.5.0'
+'''),
+          d.dir('lib', [
+            d.file('main.dart', 'void main() {}'),
+            d.file('benchmark_main.dart', '''
+void main() {
+  _runBench();
+}
+
+void _runBench() {}
+void unusedBenchHelper() {}
+'''),
+            d.file('staging_main.dart', '''
+void main() {
+  _runStaging();
+}
+
+void _runStaging() {}
+'''),
+          ]),
+        ]).create();
+
+        // 1. Without --entrypoint, both unrooted main() files surface in FYI.
+        final proc1 = await runUndead([
+          '--mode=closed-app',
+          '--format=json',
+          d.path('cli_entrypoint_pkg'),
+        ]);
+        final out1 = await proc1.stdoutStream().join('\n');
+        await proc1.shouldExit(0);
+        final json1 = jsonDecode(out1) as Map<String, dynamic>;
+        check(json1['possibleEntrypoints']).isA<List<Object?>>().deepEquals([
+          'lib/benchmark_main.dart',
+          'lib/staging_main.dart',
+        ]);
+
+        // Markdown also shows the --entrypoint FYI callout.
+        final procMd = await runUndead([
+          '--mode=closed-app',
+          '--format=markdown',
+          d.path('cli_entrypoint_pkg'),
+        ]);
+        final outMd = await procMd.stdoutStream().join('\n');
+        await procMd.shouldExit(0);
+        check(outMd).contains(
+          '--entrypoint lib/benchmark_main.dart '
+          '--entrypoint lib/staging_main.dart',
+        );
+
+        // 2. With repeated --entrypoint, both mains and reachable helpers are
+        // live, while unusedBenchHelper is still flagged.
+        final proc2 = await runUndead([
+          '--mode=closed-app',
+          '--format=json',
+          '--entrypoint',
+          'lib/benchmark_main.dart',
+          '--entrypoint',
+          'lib/staging_main.dart',
+          d.path('cli_entrypoint_pkg'),
+        ]);
+        final out2 = await proc2.stdoutStream().join('\n');
+        await proc2.shouldExit(0);
+        final json2 = jsonDecode(out2) as Map<String, dynamic>;
+        check(json2.containsKey('possibleEntrypoints')).isFalse;
+        final undead2 = (json2['undead'] as List<dynamic>)
+            .cast<Map<String, dynamic>>()
+            .map((e) => e['name'])
+            .toList();
+        check(undead2).deepEquals(['unusedBenchHelper']);
+      },
+    );
+
+    test(
+      'missing or invalid --entrypoint exits with clean diagnostic code',
+      () async {
+        await d.dir('cli_bad_entry_pkg', [
+          packageConfig('cli_bad_entry_pkg'),
+          d.file('pubspec.yaml', '''
+name: cli_bad_entry_pkg
+environment:
+  sdk: '^3.5.0'
+'''),
+          d.dir('lib', [d.file('main.dart', 'void main() {}')]),
+        ]).create();
+
+        final missingProc = await runUndead([
+          '--entrypoint',
+          'lib/missing.dart',
+          d.path('cli_bad_entry_pkg'),
+        ]);
+        final missingErr = await missingProc.stderrStream().join('\n');
+        await missingProc.shouldExit(66);
+        check(missingErr).contains('Entrypoint file does not exist');
+
+        final nonDartProc = await runUndead([
+          '--entrypoint',
+          'pubspec.yaml',
+          d.path('cli_bad_entry_pkg'),
+        ]);
+        final nonDartErr = await nonDartProc.stderrStream().join('\n');
+        await nonDartProc.shouldExit(64);
+        check(nonDartErr).contains('Entrypoint must be a Dart (.dart) file');
+      },
+    );
   });
 }

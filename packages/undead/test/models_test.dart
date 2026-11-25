@@ -178,12 +178,14 @@ void main() {
       check(defaultOptions.autoPubGet).isFalse;
       check(defaultOptions.workspaceDiscovery).isTrue;
       check(defaultOptions.suggestPrivate).isFalse;
+      check(defaultOptions.entrypoints).isEmpty;
 
       final customOptions = UndeadOptions(
         packagePath: '/path/to/pkg',
         testSupportPatterns: ['*Stub', 'CustomFixture*'],
         ignoreNamePatterns: ['*_generated', 'Ignored*'],
         extraRoots: ['../companion_test', '/external/tests'],
+        entrypoints: ['lib/benchmark_main.dart', 'lib/staging.dart'],
         workspaceDiscovery: false,
         suggestPrivate: true,
       );
@@ -197,8 +199,106 @@ void main() {
       check(
         customOptions.extraRoots,
       ).deepEquals(['../companion_test', '/external/tests']);
+      check(
+        customOptions.entrypoints,
+      ).deepEquals(['lib/benchmark_main.dart', 'lib/staging.dart']);
       check(customOptions.workspaceDiscovery).isFalse;
       check(customOptions.suggestPrivate).isTrue;
+    });
+
+    test('UndeadReport.possibleEntrypoints extracts unrooted main() '
+        'functions only', () {
+      const cleanReport = UndeadReport(
+        version: '0.1.3-wip',
+        package: 'pkg',
+        totalDeclarations: 2,
+        pureUndeadFound: 1,
+        testedUndeadFound: 0,
+        coInvokedHazardsFound: 0,
+        undead: [
+          UndeadFinding(
+            id: 'helper',
+            name: 'helper',
+            kind: DeclarationKind.function,
+            file: 'lib/src/helper.dart',
+            line: 1,
+            column: 1,
+            length: 6,
+            classification: UndeadClassification.pureUndead,
+            suggestedAction: SuggestedAction.delete,
+          ),
+        ],
+      );
+      check(cleanReport.possibleEntrypoints).isEmpty;
+      check(cleanReport.toJson().containsKey('possibleEntrypoints')).isFalse;
+
+      const reportWithMains = UndeadReport(
+        version: '0.1.3-wip',
+        package: 'pkg',
+        totalDeclarations: 5,
+        pureUndeadFound: 2,
+        testedUndeadFound: 1,
+        coInvokedHazardsFound: 0,
+        privateCandidatesFound: 1,
+        undead: [
+          UndeadFinding(
+            id: 'main',
+            name: 'main',
+            kind: DeclarationKind.function,
+            file: 'lib/z_main.dart',
+            line: 1,
+            column: 1,
+            length: 4,
+            classification: UndeadClassification.pureUndead,
+            suggestedAction: SuggestedAction.delete,
+          ),
+          UndeadFinding(
+            id: 'main',
+            name: 'main',
+            kind: DeclarationKind.function,
+            file: 'lib/benchmark_main.dart',
+            line: 1,
+            column: 1,
+            length: 4,
+            classification: UndeadClassification.testedUndead,
+            suggestedAction: SuggestedAction.deleteWithOrphanTests,
+          ),
+          UndeadFinding(
+            id: 'main',
+            name: 'main',
+            kind: DeclarationKind.variable,
+            file: 'lib/src/var_main.dart',
+            line: 1,
+            column: 1,
+            length: 4,
+            classification: UndeadClassification.pureUndead,
+            suggestedAction: SuggestedAction.delete,
+          ),
+          UndeadFinding(
+            id: 'main',
+            name: 'main',
+            kind: DeclarationKind.function,
+            file: 'lib/src/private_main.dart',
+            line: 1,
+            column: 1,
+            length: 4,
+            classification: UndeadClassification.privateCandidate,
+            suggestedAction: SuggestedAction.makePrivate,
+          ),
+        ],
+      );
+
+      check(
+        reportWithMains.possibleEntrypoints,
+      ).deepEquals(['lib/benchmark_main.dart', 'lib/z_main.dart']);
+      final json = reportWithMains.toJson();
+      check(json['possibleEntrypoints']).isA<List<Object?>>().deepEquals([
+        'lib/benchmark_main.dart',
+        'lib/z_main.dart',
+      ]);
+      check(
+        UndeadReport.fromJson(json).possibleEntrypoints,
+      ).deepEquals(['lib/benchmark_main.dart', 'lib/z_main.dart']);
     });
 
     test('UndeadReport deserializes camelCase JSON summary correctly', () {
