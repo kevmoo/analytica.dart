@@ -112,6 +112,13 @@ Future<int> runCli(
           'Maximum table rows in --comment-output (0 = unlimited). GitHub '
           'rejects comment bodies over 65536 characters.',
     )
+    ..addFlag(
+      'comment-on-clean',
+      negatable: false,
+      help:
+          'With --comment-output, also write the report when there are no '
+          'violations or complexity regressions.',
+    )
     ..addPathFilterOptions();
 
   try {
@@ -155,11 +162,13 @@ Future<int> runCli(
       argResults['max-comment-rows'] as String,
       'max-comment-rows',
     );
+    final commentOnClean = argResults['comment-on-clean'] as bool;
     final pathFilter = parsePathFilter(argResults);
 
     _warnIgnoredFlags(
       failOnIncrease: failOnIncrease,
       commentOutput: commentOutput,
+      commentOnClean: commentOnClean,
       verbose: verbose,
       format: format,
       gitDiffBase: gitDiffBase,
@@ -193,6 +202,7 @@ Future<int> runCli(
         failOnIncrease: failOnIncrease,
         commentOutput: commentOutput,
         maxCommentRows: maxCommentRows,
+        commentOnClean: commentOnClean,
         out: stdoutSink,
         err: stderrSink,
         environment: environment,
@@ -208,6 +218,9 @@ Future<int> runCli(
       maxFunctionLines: maxFunctionLines,
       format: format,
       verbose: verbose,
+      commentOutput: commentOutput,
+      maxCommentRows: maxCommentRows,
+      commentOnClean: commentOnClean,
       out: stdoutSink,
       err: stderrSink,
       input: stdinStream,
@@ -236,6 +249,7 @@ int? _parseOptInPositiveInt(String? raw, String flagName) {
 void _warnIgnoredFlags({
   required bool failOnIncrease,
   required String? commentOutput,
+  required bool commentOnClean,
   required bool verbose,
   required String format,
   required String? gitDiffBase,
@@ -248,10 +262,16 @@ void _warnIgnoredFlags({
     );
   }
 
-  if (commentOutput != null && (format != 'github' || gitDiffBase == null)) {
+  if (commentOutput != null && format != 'github') {
     err.writeln(
-      'Warning: --comment-output has no effect unless --format=github '
-      'and --git-diff are both set.',
+      'Warning: --comment-output has no effect unless --format=github is set.',
+    );
+  }
+
+  if (commentOnClean && commentOutput == null) {
+    err.writeln(
+      'Warning: --comment-on-clean has no effect unless --comment-output is '
+      'set.',
     );
   }
 
@@ -262,10 +282,26 @@ void _warnIgnoredFlags({
   }
 }
 
-File? _resolveSummaryFile(Map<String, String>? environment) {
-  if (environment == null) return resolveGitHubSummaryFile();
-  final path = environment['GITHUB_STEP_SUMMARY'];
-  return (path != null && path.isNotEmpty) ? File(path) : null;
+GitHubReporter _createGitHubReporter({
+  required StringSink out,
+  String? commentOutput,
+  int maxCommentRows = 0,
+  bool commentOnClean = false,
+  Map<String, String>? environment,
+}) {
+  final summaryPath = environment?['GITHUB_STEP_SUMMARY'];
+  final summaryFile = environment == null
+      ? resolveGitHubSummaryFile()
+      : (summaryPath != null && summaryPath.isNotEmpty
+            ? File(summaryPath)
+            : null);
+  return GitHubReporter(
+    stdoutSink: out,
+    summaryFile: summaryFile,
+    commentFile: commentOutput == null ? null : File(commentOutput),
+    maxCommentRows: maxCommentRows,
+    commentOnClean: commentOnClean,
+  );
 }
 
 Future<int> _handleDiffMode({
@@ -281,6 +317,7 @@ Future<int> _handleDiffMode({
   required StringSink err,
   String? commentOutput,
   int maxCommentRows = 0,
+  bool commentOnClean = false,
   Map<String, String>? environment,
 }) async {
   final deltaAnalyzer = DeltaAnalyzer(pathFilter: pathFilter);
@@ -304,11 +341,12 @@ Future<int> _handleDiffMode({
       ),
     );
   } else if (format == 'github') {
-    final reporter = GitHubReporter(
-      stdoutSink: out,
-      summaryFile: _resolveSummaryFile(environment),
-      commentFile: commentOutput == null ? null : File(commentOutput),
+    final reporter = _createGitHubReporter(
+      out: out,
+      commentOutput: commentOutput,
       maxCommentRows: maxCommentRows,
+      commentOnClean: commentOnClean,
+      environment: environment,
     );
     reporter.printReport(
       deltaSummary: summary,
@@ -359,6 +397,9 @@ Future<int> _handleRegularMode({
   required StringSink out,
   required StringSink err,
   required Stream<List<int>> input,
+  String? commentOutput,
+  int maxCommentRows = 0,
+  bool commentOnClean = false,
   Map<String, String>? environment,
 }) async {
   final analyzer = ComplexityAnalyzer(pathFilter: pathFilter);
@@ -379,7 +420,10 @@ Future<int> _handleRegularMode({
       .where(
         (r) =>
             r.score >= threshold ||
-            (maxFunctionLines != null && r.lineCount > maxFunctionLines),
+            r.isViolation(
+              failThreshold: failThreshold,
+              maxFunctionLines: maxFunctionLines,
+            ),
       )
       .toList();
 
@@ -390,9 +434,12 @@ Future<int> _handleRegularMode({
       ),
     );
   } else if (format == 'github') {
-    final reporter = GitHubReporter(
-      stdoutSink: out,
-      summaryFile: _resolveSummaryFile(environment),
+    final reporter = _createGitHubReporter(
+      out: out,
+      commentOutput: commentOutput,
+      maxCommentRows: maxCommentRows,
+      commentOnClean: commentOnClean,
+      environment: environment,
     );
     reporter.printReport(
       regularResults: displayed,

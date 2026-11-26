@@ -30,6 +30,13 @@ inputs:
     description: 'Opt-in maximum lines per function/method declaration (empty or 0 = disabled by default).'
     required: false
     default: ''
+  scan-mode:
+    description: >-
+      Scan mode: 'diff' (default; compares against diff-base or the PR base
+      branch) or 'full' (skips diff resolution and scans all targets across
+      the repository).
+    required: false
+    default: 'diff'
   diff-base:
     description: 'Git ref (e.g. origin/main) to compare against. Auto-detects PR base by default.'
     required: false
@@ -42,6 +49,14 @@ inputs:
     description: 'Output format: github (summary table + annotations), text, or json.'
     required: false
     default: 'github'
+  comment-mode:
+    description: >-
+      PR sticky comment visibility: 'auto' (default; comments on violations or
+      complexity increases, quiet on clean diffs), 'on-violation' (comments
+      only on threshold or line-limit violations), 'always' (always comments on
+      PR runs, even when clean), or 'off' (disables PR comments completely).
+    required: false
+    default: 'auto'
   max-comment-rows:
     description: >-
       Maximum table rows in the sticky PR comment, most significant first
@@ -58,27 +73,44 @@ runs:
       id: prepare
       shell: bash
       env:
+        INPUT_SCAN_MODE: ${{ inputs.scan-mode }}
         INPUT_DIFF_BASE: ${{ inputs.diff-base }}
         EVENT_NAME: ${{ github.event_name }}
         BASE_REF: ${{ github.base_ref }}
       run: |
+        scan_mode="${INPUT_SCAN_MODE:-diff}"
+        case "$scan_mode" in
+          diff|full) ;;
+          *)
+            echo "::error::scan-mode must be 'diff' or 'full', got '${INPUT_SCAN_MODE}'."
+            exit 1
+            ;;
+        esac
+
         diff_arg=""
-        base="$INPUT_DIFF_BASE"
-        if [ -z "$base" ]; then
-          if [ "$EVENT_NAME" = "pull_request" ] || [ "$EVENT_NAME" = "pull_request_target" ]; then
-            base="origin/$BASE_REF"
+        if [ "$scan_mode" = "full" ]; then
+          if [ -n "$INPUT_DIFF_BASE" ]; then
+            echo "::warning::diff-base ('${INPUT_DIFF_BASE}') is ignored when scan-mode is 'full'."
           fi
-        fi
-        if [ -n "$base" ]; then
-          echo "Fetching Git object history for diff base $base..."
-          git fetch origin "${base#origin/}" 2>/dev/null || true
-          diff_arg="--git-diff=$base"
+        else
+          base="$INPUT_DIFF_BASE"
+          if [ -z "$base" ]; then
+            if [ "$EVENT_NAME" = "pull_request" ] || [ "$EVENT_NAME" = "pull_request_target" ]; then
+              base="origin/$BASE_REF"
+            fi
+          fi
+          if [ -n "$base" ]; then
+            echo "Fetching Git object history for diff base $base..."
+            git fetch origin "${base#origin/}" 2>/dev/null || true
+            diff_arg="--git-diff=$base"
+          fi
         fi
         echo "diff_arg=$diff_arg" >> "$GITHUB_OUTPUT"
 
     - name: Execute Cognitive Complexity Scanner
       shell: bash
       env:
+        INPUT_SCAN_MODE: ${{ inputs.scan-mode }}
         INPUT_THRESHOLD: ${{ inputs.threshold }}
         INPUT_FAIL_THRESHOLD: ${{ inputs.fail-threshold }}
         INPUT_MAX_FILE_LINES: ${{ inputs.max-file-lines }}
@@ -86,6 +118,7 @@ runs:
         INPUT_FAIL_ON_INCREASE: ${{ inputs.fail-on-increase }}
         INPUT_FORMAT: ${{ inputs.format }}
         INPUT_TARGETS: ${{ inputs.targets }}
+        INPUT_COMMENT_MODE: ${{ inputs.comment-mode }}
         INPUT_MAX_COMMENT_ROWS: ${{ inputs.max-comment-rows }}
         DIFF_ARG: ${{ steps.prepare.outputs.diff_arg }}
         ACTION_PATH: ${{ github.action_path }}
@@ -93,9 +126,19 @@ runs:
         PR_NUMBER: ${{ github.event.pull_request.number }}
         HEAD_SHA: ${{ github.event.pull_request.head.sha }}
       run: |
+        scan_mode="${INPUT_SCAN_MODE:-diff}"
         fail_inc_arg=""
         if [ "$INPUT_FAIL_ON_INCREASE" = "true" ]; then
-          fail_inc_arg="--fail-on-increase"
+          if [ "$scan_mode" = "full" ]; then
+            echo "::warning::fail-on-increase is ignored when scan-mode is 'full'."
+          else
+            fail_inc_arg="--fail-on-increase"
+          fi
+        fi
+
+        fail_threshold_args=()
+        if [ -n "$INPUT_FAIL_THRESHOLD" ]; then
+          fail_threshold_args+=(--fail-threshold="$INPUT_FAIL_THRESHOLD")
         fi
 
         line_args=()
@@ -106,6 +149,15 @@ runs:
           line_args+=(--max-function-lines="$INPUT_MAX_FUNCTION_LINES")
         fi
 
+        comment_mode="${INPUT_COMMENT_MODE:-auto}"
+        case "$comment_mode" in
+          auto|on-violation|always|off) ;;
+          *)
+            echo "::error::comment-mode must be one of 'auto', 'on-violation', 'always', or 'off', got '${INPUT_COMMENT_MODE}'."
+            exit 1
+            ;;
+        esac
+
         case "${INPUT_MAX_COMMENT_ROWS:-0}" in
           ''|*[!0-9]*)
             echo "::error::max-comment-rows must be a non-negative integer, got '${INPUT_MAX_COMMENT_ROWS}'."
@@ -115,13 +167,14 @@ runs:
 
         # Absolute path so it is independent of the scanner's cwd.
         # An array keeps the path intact even if RUNNER_TEMP contains spaces.
-        # Only request a comment when one could actually be posted: the CLI
-        # warns about --comment-output outside github+diff mode, which made
-        # push-triggered runs noisier than before.
+        # Only request a comment when one could actually be posted.
         comment_file="${RUNNER_TEMP}/complexity-comment.md"
         comment_args=()
-        if [ "$INPUT_FORMAT" = "github" ] && [ -n "$DIFF_ARG" ]; then
+        if [ "$INPUT_FORMAT" = "github" ] && [ "$comment_mode" != "off" ] && [ -n "$PR_NUMBER" ] && [ -n "$GH_TOKEN" ]; then
           comment_args+=(--comment-output="$comment_file")
+          if [ "$comment_mode" = "always" ]; then
+            comment_args+=(--comment-on-clean)
+          fi
           if [ "${INPUT_MAX_COMMENT_ROWS:-0}" -gt 0 ]; then
             comment_args+=(--max-comment-rows="$INPUT_MAX_COMMENT_ROWS")
           fi
@@ -144,7 +197,7 @@ runs:
         set +e
         dart run "$ACTION_PATH/bin/cognitive_complexity.dart" \
           --threshold="$INPUT_THRESHOLD" \
-          --fail-threshold="$INPUT_FAIL_THRESHOLD" \
+          "${fail_threshold_args[@]}" \
           --format="$INPUT_FORMAT" \
           $DIFF_ARG \
           $fail_inc_arg \
@@ -155,7 +208,7 @@ runs:
         set -e
 
         # If running inside a PR context and GH_TOKEN is present, post or update sticky comment
-        if [ -n "$PR_NUMBER" ] && [ -n "$GH_TOKEN" ] && [ "$INPUT_FORMAT" = "github" ]; then
+        if [ "$comment_mode" != "off" ] && [ -n "$PR_NUMBER" ] && [ -n "$GH_TOKEN" ] && [ "$INPUT_FORMAT" = "github" ]; then
           echo "Searching for existing complexity audit comment on PR #$PR_NUMBER..."
           # Never let a transient API failure fail the step: the lookup now runs
           # on clean runs too, so an unguarded non-zero exit under `set -e`
@@ -164,7 +217,14 @@ runs:
             --jq '.[] | select(.body | contains("<!-- complexity-comment-marker -->")) | .id' 2>/dev/null || true)
           comment_id=$(printf '%s\n' "$comment_ids" | head -n 1)
 
+          should_post=false
           if [ -f "$comment_file" ] && [ -s "$comment_file" ]; then
+            if [ "$comment_mode" != "on-violation" ] || [ "$exit_code" -ne 0 ]; then
+              should_post=true
+            fi
+          fi
+
+          if [ "$should_post" = "true" ]; then
             if [ -n "$comment_id" ]; then
               echo "Updating existing comment (ID: $comment_id)..."
               gh api -X PATCH "repos/$GITHUB_REPOSITORY/issues/comments/$comment_id" -F body=@"$comment_file" > /dev/null || true
@@ -173,19 +233,26 @@ runs:
               gh pr comment "$PR_NUMBER" --body-file "$comment_file" --repo "$GITHUB_REPOSITORY" > /dev/null || true
             fi
           elif [ "$exit_code" -eq 0 ] && [ -n "$comment_id" ]; then
-            # Only a successful run proves the diff is clean. A crash also
+            # Only a successful run proves the scan is clean. A crash also
             # leaves no comment file, and must not be reported as resolved.
             echo "Run is clean. Patching existing comment to resolved status..."
             resolved_file="${RUNNER_TEMP}/resolved-complexity-comment.md"
             # GITHUB_SHA is the ephemeral refs/pull/N/merge commit on
             # pull_request events, which is not reachable in the branch.
             sha="${HEAD_SHA:-${GITHUB_SHA:-unknown}}"
+            if [ "${INPUT_SCAN_MODE:-diff}" = "full" ]; then
+              clean_msg="Clean - no complexity violations in the current scan."
+            elif [ "$comment_mode" = "on-violation" ]; then
+              clean_msg="Clean - no complexity violations in the current diff."
+            else
+              clean_msg="Clean - no complexity regressions in the current diff."
+            fi
             {
               echo "<!-- complexity-comment-marker -->"
               echo "# 📊 Cognitive Complexity Analysis"
               echo
               echo "> [!TIP]"
-              echo "> **Status:** Clean - no complexity regressions in the current diff."
+              echo "> **Status:** $clean_msg"
               echo
               echo "_Last checked: ${sha:0:7} ([run](${GITHUB_SERVER_URL:-https://github.com}/$GITHUB_REPOSITORY/actions/runs/${GITHUB_RUN_ID:-0}))._"
             } > "$resolved_file"

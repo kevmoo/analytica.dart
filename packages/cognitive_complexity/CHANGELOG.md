@@ -1,5 +1,12 @@
-## 2.0.2-wip
+## 2.1.0-wip
 
+- GitHub Action (`action.yml`): Add `comment-mode` (`auto`, `on-violation`,
+  `always`, `off`; default `auto`) to control PR sticky comment visibility (#5)
+  and `scan-mode` (`diff`, `full`; default `diff`) to opt out of PR diff
+  resolution and scan all targets across the repository (#6).
+- `cognitive_complexity`: Support `--comment-output` in regular (non-diff)
+  `--format=github` scans and add `--comment-on-clean` to emit a standalone
+  comment report even when a scan has no violations or regressions.
 - `cognitive_complexity`: Accept `-` as a positional target to score Dart source
   read from `stdin` (reported under `<stdin>` across text, JSON, and GitHub
   formats, including `--max-file-lines`, `--max-function-lines`, and suppression

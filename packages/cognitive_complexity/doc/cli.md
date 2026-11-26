@@ -66,8 +66,9 @@ static-analysis CLIs:
 | `--fail-on-increase`           | `flag`   | `false` | With `--git-diff`, fails if any modified function increases in complexity (or exceeds `--fail-threshold` when both are set).           |
 | `--format <type>`              | `enum`   | `text`  | Output format: `text` (terminal), `json` (machine-readable), or `github` (GHA annotations).                                            |
 | `-v, --verbose`                | `flag`   | `false` | With `--format=text`, adds a `Breakdown` column (`branches`, `nesting`, `boolean_ops`, `max_depth`) and tags `_test.dart` entrypoints. |
-| `--comment-output <path>`      | `String` | _None_  | With `--format=github` and `--git-diff`, writes a significance-ordered standalone PR comment report.                                   |
+| `--comment-output <path>`      | `String` | _None_  | With `--format=github`, writes a significance-ordered standalone PR comment report.                                                    |
 | `--max-comment-rows <count>`   | `int`    |   `0`   | Maximum table rows in `--comment-output` (`0` = unlimited).                                                                            |
+| `--comment-on-clean`           | `flag`   | `false` | With `--comment-output`, also write the report when there are no violations or complexity regressions.                                 |
 | `--exclude <glob>`             | `multi`  | _None_  | Glob patterns of files/directories to exclude (repeatable or comma-separated).                                                         |
 | `--[no-]ignore-generated`      | `flag`   | `true`  | Exclude generated files (`*.g.dart`, `*.freezed.dart`, `*.mocks.dart`, etc.).                                                          |
 
