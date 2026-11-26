@@ -378,6 +378,67 @@ exit 0
         "'always', or 'off', got 'invalid'.",
       );
     });
+
+    test('updates existing sticky comment via PATCH when posting', () async {
+      final res = await runExecute(
+        env: {'INPUT_COMMENT_MODE': 'always'},
+        scannerExitCode: 0,
+        commentContent: '<!-- complexity-comment-marker -->\nupdated report\n',
+        existingCommentId: '777',
+      );
+      check(res.exitCode).equals(0);
+      check(res.ghLog)
+        ..contains('PATCH repos/owner/repo/issues/comments/777')
+        ..not(.it()..contains('pr comment'));
+      check(res.patchedBody).contains('updated report');
+    });
+
+    test(
+      'comment-mode=auto resolves stale sticky comment with diff copy',
+      () async {
+        final res = await runExecute(
+          env: {'INPUT_COMMENT_MODE': 'auto'},
+          scannerExitCode: 0,
+          existingCommentId: '888',
+        );
+        check(res.exitCode).equals(0);
+        check(res.ghLog).contains('PATCH repos/owner/repo/issues/comments/888');
+        check(
+          res.patchedBody,
+        ).contains('Clean - no complexity regressions in the current diff.');
+      },
+    );
+
+    test('skips --comment-output and gh calls outside PR context', () async {
+      final res = await runExecute(
+        env: {'PR_NUMBER': '', 'INPUT_COMMENT_MODE': 'always'},
+        scannerExitCode: 0,
+      );
+      check(res.exitCode).equals(0);
+      check(res.dartLog).not(.it()..contains('--comment-output'));
+      check(res.ghLog.trim()).isEmpty;
+    });
+
+    test('scan-mode=full warns and omits --fail-on-increase, and empty '
+        'fail-threshold omits --fail-threshold', () async {
+      final res = await runExecute(
+        env: {
+          'INPUT_SCAN_MODE': 'full',
+          'DIFF_ARG': '',
+          'INPUT_FAIL_ON_INCREASE': 'true',
+          'INPUT_FAIL_THRESHOLD': '',
+          'INPUT_COMMENT_MODE': 'off',
+        },
+        scannerExitCode: 0,
+      );
+      check(res.exitCode).equals(0);
+      check(res.stdout).contains(
+        "::warning::fail-on-increase is ignored when scan-mode is 'full'.",
+      );
+      check(res.dartLog)
+        ..not(.it()..contains('--fail-on-increase'))
+        ..not(.it()..contains('--fail-threshold'));
+    });
   });
 }
 

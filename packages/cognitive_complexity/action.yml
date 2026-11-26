@@ -126,9 +126,19 @@ runs:
         PR_NUMBER: ${{ github.event.pull_request.number }}
         HEAD_SHA: ${{ github.event.pull_request.head.sha }}
       run: |
+        scan_mode="${INPUT_SCAN_MODE:-diff}"
         fail_inc_arg=""
         if [ "$INPUT_FAIL_ON_INCREASE" = "true" ]; then
-          fail_inc_arg="--fail-on-increase"
+          if [ "$scan_mode" = "full" ]; then
+            echo "::warning::fail-on-increase is ignored when scan-mode is 'full'."
+          else
+            fail_inc_arg="--fail-on-increase"
+          fi
+        fi
+
+        fail_threshold_args=()
+        if [ -n "$INPUT_FAIL_THRESHOLD" ]; then
+          fail_threshold_args+=(--fail-threshold="$INPUT_FAIL_THRESHOLD")
         fi
 
         line_args=()
@@ -187,7 +197,7 @@ runs:
         set +e
         dart run "$ACTION_PATH/bin/cognitive_complexity.dart" \
           --threshold="$INPUT_THRESHOLD" \
-          --fail-threshold="$INPUT_FAIL_THRESHOLD" \
+          "${fail_threshold_args[@]}" \
           --format="$INPUT_FORMAT" \
           $DIFF_ARG \
           $fail_inc_arg \

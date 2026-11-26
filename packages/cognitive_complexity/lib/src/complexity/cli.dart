@@ -16,14 +16,16 @@ Future<int> runCli(
   List<String> args, {
   StringSink? out,
   StringSink? err,
+  Map<String, String>? environment,
 }) async {
   final stdoutSink = out ?? stdout;
   final stderrSink = err ?? stderr;
+  final env = environment ?? Platform.environment;
 
   // Under GitHub Actions, the process is compiled/run from the action's folder.
   // We re-align Directory.current to GITHUB_WORKSPACE so target scanning paths
   // and git commands resolve against the user's project workspace repository.
-  final workspace = Platform.environment['GITHUB_WORKSPACE'];
+  final workspace = env['GITHUB_WORKSPACE'];
   if (workspace != null && workspace.isNotEmpty) {
     Directory.current = workspace;
   }
@@ -189,6 +191,7 @@ Future<int> runCli(
         commentOnClean: commentOnClean,
         out: stdoutSink,
         err: stderrSink,
+        environment: environment,
       );
     }
 
@@ -206,6 +209,7 @@ Future<int> runCli(
       commentOnClean: commentOnClean,
       out: stdoutSink,
       err: stderrSink,
+      environment: environment,
     );
   } on FormatException catch (e) {
     stderrSink.writeln('Error: ${e.message}');
@@ -268,13 +272,22 @@ GitHubReporter _createGitHubReporter({
   String? commentOutput,
   int maxCommentRows = 0,
   bool commentOnClean = false,
-}) => GitHubReporter(
-  stdoutSink: out,
-  summaryFile: resolveGitHubSummaryFile(),
-  commentFile: commentOutput == null ? null : File(commentOutput),
-  maxCommentRows: maxCommentRows,
-  commentOnClean: commentOnClean,
-);
+  Map<String, String>? environment,
+}) {
+  final summaryPath = environment?['GITHUB_STEP_SUMMARY'];
+  final summaryFile = environment == null
+      ? resolveGitHubSummaryFile()
+      : (summaryPath != null && summaryPath.isNotEmpty
+            ? File(summaryPath)
+            : null);
+  return GitHubReporter(
+    stdoutSink: out,
+    summaryFile: summaryFile,
+    commentFile: commentOutput == null ? null : File(commentOutput),
+    maxCommentRows: maxCommentRows,
+    commentOnClean: commentOnClean,
+  );
+}
 
 Future<int> _handleDiffMode({
   required String gitDiffBase,
@@ -290,6 +303,7 @@ Future<int> _handleDiffMode({
   String? commentOutput,
   int maxCommentRows = 0,
   bool commentOnClean = false,
+  Map<String, String>? environment,
 }) async {
   final deltaAnalyzer = DeltaAnalyzer(pathFilter: pathFilter);
   final summary = await deltaAnalyzer.computeDeltas(
@@ -317,6 +331,7 @@ Future<int> _handleDiffMode({
       commentOutput: commentOutput,
       maxCommentRows: maxCommentRows,
       commentOnClean: commentOnClean,
+      environment: environment,
     );
     reporter.printReport(
       deltaSummary: summary,
@@ -369,6 +384,7 @@ int _handleRegularMode({
   String? commentOutput,
   int maxCommentRows = 0,
   bool commentOnClean = false,
+  Map<String, String>? environment,
 }) {
   final analyzer = ComplexityAnalyzer(pathFilter: pathFilter);
   final allResults = <FunctionComplexity>[];
@@ -389,7 +405,10 @@ int _handleRegularMode({
       .where(
         (r) =>
             r.score >= threshold ||
-            (maxFunctionLines != null && r.lineCount > maxFunctionLines),
+            r.isViolation(
+              failThreshold: failThreshold,
+              maxFunctionLines: maxFunctionLines,
+            ),
       )
       .toList();
 
@@ -405,6 +424,7 @@ int _handleRegularMode({
       commentOutput: commentOutput,
       maxCommentRows: maxCommentRows,
       commentOnClean: commentOnClean,
+      environment: environment,
     );
     reporter.printReport(
       regularResults: displayed,

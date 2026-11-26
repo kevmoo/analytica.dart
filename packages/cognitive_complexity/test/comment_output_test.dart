@@ -287,6 +287,25 @@ void main() {
       check(comment)
         ..contains('<!-- complexity-comment-marker -->')
         ..contains('**Improved**: 6');
+
+      // Also verify zero-delta empty diff under --comment-on-clean.
+      await _runGit(repoPath, ['commit', '--allow-empty', '-m', 'empty']);
+      final emptySummary = await deltaAnalyzer.computeDeltas(
+        'HEAD~1',
+        targetPaths: const ['lib'],
+        failThreshold: 15,
+      );
+      final emptyCommentPath = p.join(d.sandbox, 'empty_clean_comment.md');
+      GitHubReporter(
+        stdoutSink: StringBuffer(),
+        summaryFile: File(summaryPath),
+        commentFile: File(emptyCommentPath),
+        commentOnClean: true,
+      ).printReport(deltaSummary: emptySummary, failThreshold: 15);
+      check(File(emptyCommentPath).existsSync()).isTrue;
+      check(await File(emptyCommentPath).readAsString())
+        ..contains('<!-- complexity-comment-marker -->')
+        ..contains('No modified Dart declarations detected.');
     });
   });
 
@@ -299,7 +318,9 @@ void main() {
       ]).create();
 
       final target = p.join(d.sandbox, 'clean_full', 'lib');
+      final summaryPath = p.join(d.sandbox, 'full_clean_summary.md');
       final commentPath = p.join(d.sandbox, 'full_clean_comment.md');
+      final env = {'GITHUB_STEP_SUMMARY': summaryPath};
 
       final out1 = StringBuffer();
       final err1 = StringBuffer();
@@ -312,10 +333,12 @@ void main() {
         ],
         out: out1,
         err: err1,
+        environment: env,
       );
       check(rc1).equals(0);
       check(err1.toString()).isEmpty;
       check(File(commentPath).existsSync()).isFalse;
+      check(await File(summaryPath).readAsString()).contains('`simple`');
 
       final out2 = StringBuffer();
       final err2 = StringBuffer();
@@ -329,6 +352,7 @@ void main() {
         ],
         out: out2,
         err: err2,
+        environment: env,
       );
       check(rc2).equals(0);
       check(err2.toString()).isEmpty;
@@ -365,6 +389,7 @@ ${_decl('tooComplex', 3)}
         ]).create();
 
         final target = p.join(d.sandbox, 'vio_full', 'lib');
+        final summaryPath = p.join(d.sandbox, 'full_vio_summary.md');
         final commentPath = p.join(d.sandbox, 'full_vio_comment.md');
 
         final out = StringBuffer();
@@ -380,6 +405,7 @@ ${_decl('tooComplex', 3)}
           ],
           out: out,
           err: err,
+          environment: {'GITHUB_STEP_SUMMARY': summaryPath},
         );
         check(rc).equals(1);
         check(err.toString()).isEmpty;
@@ -400,6 +426,81 @@ ${_decl('tooComplex', 3)}
       },
     );
 
+    test('surfaces violations in regular --comment-output even when '
+        '--threshold exceeds --fail-threshold', () async {
+      await d.dir('thresh_vio', [
+        d.dir('lib', [
+          d.file('app.dart', '''
+int overFail(int x) {
+  if (x > 0) {
+    if (x > 1) return 2;
+  }
+  return 0;
+}
+'''),
+        ]),
+      ]).create();
+
+      final target = p.join(d.sandbox, 'thresh_vio', 'lib');
+      final summaryPath = p.join(d.sandbox, 'thresh_summary.md');
+      final commentPath = p.join(d.sandbox, 'thresh_comment.md');
+
+      final out = StringBuffer();
+      final err = StringBuffer();
+      final rc = await runCli(
+        [
+          '--format=github',
+          '--threshold=10',
+          '--fail-threshold=2',
+          '--comment-output=$commentPath',
+          target,
+        ],
+        out: out,
+        err: err,
+        environment: {'GITHUB_STEP_SUMMARY': summaryPath},
+      );
+      check(rc).equals(1);
+      check(err.toString()).isEmpty;
+      check(out.toString()).contains('::error');
+      check(File(commentPath).existsSync()).isTrue;
+      check(await File(commentPath).readAsString()).contains('`overFail`');
+    });
+
+    test(
+      'writes regular --comment-output for file-only line violations',
+      () async {
+        final body = List.generate(12, (i) => 'const c$i = $i;').join('\n');
+        await d.dir('file_only_vio', [
+          d.dir('lib', [d.file('constants.dart', '$body\n')]),
+        ]).create();
+
+        final target = p.join(d.sandbox, 'file_only_vio', 'lib');
+        final summaryPath = p.join(d.sandbox, 'file_only_summary.md');
+        final commentPath = p.join(d.sandbox, 'file_only_comment.md');
+
+        final out = StringBuffer();
+        final err = StringBuffer();
+        final rc = await runCli(
+          [
+            '--format=github',
+            '--max-file-lines=5',
+            '--comment-output=$commentPath',
+            target,
+          ],
+          out: out,
+          err: err,
+          environment: {'GITHUB_STEP_SUMMARY': summaryPath},
+        );
+        check(rc).equals(1);
+        check(err.toString()).isEmpty;
+        check('::error'.allMatches(out.toString()).length).equals(1);
+        check(File(commentPath).existsSync()).isTrue;
+        check(await File(commentPath).readAsString())
+          ..contains('File Line Limit Violations')
+          ..contains('constants.dart');
+      },
+    );
+
     test(
       'warns when --comment-on-clean is used without --comment-output',
       () async {
@@ -417,6 +518,7 @@ ${_decl('tooComplex', 3)}
           ],
           out: out,
           err: err,
+          environment: const {},
         );
         check(rc).equals(0);
         check(err.toString()).contains(
