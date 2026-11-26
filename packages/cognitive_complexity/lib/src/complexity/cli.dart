@@ -17,15 +17,17 @@ Future<int> runCli(
   StringSink? out,
   StringSink? err,
   Stream<List<int>>? input,
+  Map<String, String>? environment,
 }) async {
   final stdoutSink = out ?? stdout;
   final stderrSink = err ?? stderr;
   final stdinStream = input ?? stdin;
+  final env = environment ?? Platform.environment;
 
   // Under GitHub Actions, the process is compiled/run from the action's folder.
   // We re-align Directory.current to GITHUB_WORKSPACE so target scanning paths
   // and git commands resolve against the user's project workspace repository.
-  final workspace = Platform.environment['GITHUB_WORKSPACE'];
+  final workspace = env['GITHUB_WORKSPACE'];
   if (workspace != null && workspace.isNotEmpty) {
     Directory.current = workspace;
   }
@@ -193,6 +195,7 @@ Future<int> runCli(
         maxCommentRows: maxCommentRows,
         out: stdoutSink,
         err: stderrSink,
+        environment: environment,
       );
     }
 
@@ -208,6 +211,7 @@ Future<int> runCli(
       out: stdoutSink,
       err: stderrSink,
       input: stdinStream,
+      environment: environment,
     );
   } on FormatException catch (e) {
     stderrSink.writeln('Error: ${e.message}');
@@ -258,6 +262,12 @@ void _warnIgnoredFlags({
   }
 }
 
+File? _resolveSummaryFile(Map<String, String>? environment) {
+  if (environment == null) return resolveGitHubSummaryFile();
+  final path = environment['GITHUB_STEP_SUMMARY'];
+  return (path != null && path.isNotEmpty) ? File(path) : null;
+}
+
 Future<int> _handleDiffMode({
   required String gitDiffBase,
   required List<String> targets,
@@ -271,6 +281,7 @@ Future<int> _handleDiffMode({
   required StringSink err,
   String? commentOutput,
   int maxCommentRows = 0,
+  Map<String, String>? environment,
 }) async {
   final deltaAnalyzer = DeltaAnalyzer(pathFilter: pathFilter);
   final summary = await deltaAnalyzer.computeDeltas(
@@ -295,7 +306,7 @@ Future<int> _handleDiffMode({
   } else if (format == 'github') {
     final reporter = GitHubReporter(
       stdoutSink: out,
-      summaryFile: resolveGitHubSummaryFile(),
+      summaryFile: _resolveSummaryFile(environment),
       commentFile: commentOutput == null ? null : File(commentOutput),
       maxCommentRows: maxCommentRows,
     );
@@ -348,6 +359,7 @@ Future<int> _handleRegularMode({
   required StringSink out,
   required StringSink err,
   required Stream<List<int>> input,
+  Map<String, String>? environment,
 }) async {
   final analyzer = ComplexityAnalyzer(pathFilter: pathFilter);
   final (
@@ -380,7 +392,7 @@ Future<int> _handleRegularMode({
   } else if (format == 'github') {
     final reporter = GitHubReporter(
       stdoutSink: out,
-      summaryFile: resolveGitHubSummaryFile(),
+      summaryFile: _resolveSummaryFile(environment),
     );
     reporter.printReport(
       regularResults: displayed,
@@ -448,7 +460,15 @@ _collectRegularTargets(
 
   for (final target in targets) {
     if (target == '-') {
-      final code = await utf8.decodeStream(input);
+      final String code;
+      try {
+        code = await utf8.decodeStream(input);
+      } on FormatException catch (e) {
+        throw FileSystemException(
+          'Invalid UTF-8 input: ${e.message}',
+          '<stdin>',
+        );
+      }
       results.addAll(analyzer.analyzeCode(code, filePath: '<stdin>'));
       suppressed.addAll(
         analyzer.analyzeCodeSuppressed(code, filePath: '<stdin>'),

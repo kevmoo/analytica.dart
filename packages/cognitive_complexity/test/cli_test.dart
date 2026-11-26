@@ -711,8 +711,9 @@ int newlySuppressed(int a) {
     group('stdin target (-)', () {
       Future<({String stdout, String stderr, int exitCode})> runWithStdin(
         List<String> args,
-        String input,
-      ) async {
+        String input, {
+        Map<String, String> environment = const {},
+      }) async {
         final out = StringBuffer();
         final err = StringBuffer();
         final code = await runCli(
@@ -720,6 +721,7 @@ int newlySuppressed(int a) {
           out: out,
           err: err,
           input: Stream<List<int>>.value(utf8.encode(input)),
+          environment: environment,
         );
         return (stdout: out.toString(), stderr: err.toString(), exitCode: code);
       }
@@ -734,11 +736,12 @@ int newlySuppressed(int a) {
 
         await check(
           proc.stdout,
-        ).emitsThrough(.it()..contains('1  f            <stdin>:L1-1'));
+        ).emitsThrough(.it()..contains(RegExp(r'\b1\s+f\s+<stdin>:L1-1\b')));
         await proc.shouldExit(0);
       });
 
-      test('scores Dart snippet from stdin in text and JSON formats', () async {
+      test('scores Dart snippet from stdin across text, JSON, verbose, and '
+          'github formats', () async {
         const snippet = '''
 int f(int x) {
   if (x > 0) {
@@ -753,18 +756,39 @@ int f(int x) {
         check(text.exitCode).equals(0);
         check(text.stdout)
           ..contains('Score  Declaration')
-          ..contains('    3  f            <stdin>:L1-7');
+          ..contains(RegExp(r'\b3\s+f\s+<stdin>:L1-7\b'));
 
-        final json = await runWithStdin(['--format', 'json', '-'], snippet);
-        check(json.exitCode).equals(0);
-        check(json.stdout)
-          ..contains('"file":"<stdin>"')
-          ..contains('"name":"f"')
-          ..contains('"score":3');
+        final verbose = await runWithStdin(['--verbose', '-'], snippet);
+        check(verbose.exitCode).equals(0);
+        check(verbose.stdout)
+          ..contains('Breakdown')
+          ..contains('br 2 nest 1 bool 0 depth 2');
+
+        final jsonRes = await runWithStdin(['--format', 'json', '-'], snippet);
+        check(jsonRes.exitCode).equals(0);
+        final decoded = jsonDecode(jsonRes.stdout) as List<dynamic>;
+        check(decoded).length.equals(1);
+        final entry = decoded.single as Map<String, dynamic>;
+        check(entry['file']).equals('<stdin>');
+        check(entry['name']).equals('f');
+        check(entry['score']).equals(3);
+        check(entry['lines']).equals(7);
+
+        final summaryPath = '${d.sandbox}/stdin_summary.md';
+        final github = await runWithStdin(
+          ['--format', 'github', '--fail-threshold', '2', '-'],
+          snippet,
+          environment: {'GITHUB_STEP_SUMMARY': summaryPath},
+        );
+        check(github.exitCode).equals(1);
+        check(github.stdout).contains('::error file=<stdin>,line=1,');
+        check(
+          await File(summaryPath).readAsString(),
+        ).contains('`<stdin>:L1-7`');
       });
 
-      test('enforces --fail-threshold, --max-file-lines, and '
-          '--max-function-lines on stdin', () async {
+      test('enforces --threshold, --fail-threshold, --max-function-lines, and '
+          '--max-file-lines independently on stdin', () async {
         const snippet = '''
 int f(int x) {
   if (x > 0) {
@@ -775,6 +799,12 @@ int f(int x) {
 }
 ''';
 
+        final filtered = await runWithStdin(['--threshold', '5', '-'], snippet);
+        check(filtered.exitCode).equals(0);
+        check(
+          filtered.stdout,
+        ).contains('No declarations found with cognitive complexity >= 5.');
+
         final threshold = await runWithStdin([
           '--fail-threshold',
           '2',
@@ -783,20 +813,83 @@ int f(int x) {
         check(threshold.exitCode).equals(1);
         check(threshold.stdout).contains('[VIOLATION: score > 2]');
 
-        final fileLines = await runWithStdin([
-          '--max-file-lines',
+        // Verify --max-function-lines alone (without --max-file-lines).
+        final fnLines = await runWithStdin([
+          '--max-function-lines',
           '4',
+          '-',
+        ], snippet);
+        check(fnLines.exitCode).equals(1);
+        check(fnLines.stdout).contains('[VIOLATION: lines > 4]');
+
+        final fnLinesJson = await runWithStdin([
           '--max-function-lines',
           '4',
           '--format',
           'json',
           '-',
         ], snippet);
+        check(fnLinesJson.exitCode).equals(1);
+        final fnDecoded = jsonDecode(fnLinesJson.stdout) as List<dynamic>;
+        check((fnDecoded.single as Map<String, dynamic>)['lines']).equals(7);
+
+        // Verify --max-file-lines alone (without --max-function-lines).
+        final fileLines = await runWithStdin([
+          '--max-file-lines',
+          '4',
+          '--format',
+          'json',
+          '-',
+        ], snippet);
         check(fileLines.exitCode).equals(1);
-        check(fileLines.stdout)
-          ..contains('"file":"<stdin>"')
-          ..contains('"lines":8')
-          ..contains('"violation":true');
+        final fileDecoded =
+            jsonDecode(fileLines.stdout) as Map<String, dynamic>;
+        final files = fileDecoded['files'] as List<dynamic>;
+        check(files).length.equals(1);
+        final fileEntry = files.single as Map<String, dynamic>;
+        check(fileEntry['file']).equals('<stdin>');
+        check(fileEntry['lines']).equals(8);
+        check(fileEntry['violation']).equals(true);
+      });
+
+      test('reassembles chunked multi-byte UTF-8 stdin and rejects malformed '
+          'UTF-8 cleanly', () async {
+        // Split a multi-byte UTF-8 comment ('—' = 0xE2 0x80 0x94) across
+        // chunks.
+        final bytes = utf8.encode(
+          '// note — split\nint f(int x) => x > 0 ? 1 : 0;\n',
+        );
+        final splitAt = bytes.indexOf(0x80);
+        final out = StringBuffer();
+        final err = StringBuffer();
+        final rc = await runCli(
+          ['--format', 'json', '-'],
+          out: out,
+          err: err,
+          input: Stream<List<int>>.fromIterable([
+            bytes.sublist(0, splitAt),
+            bytes.sublist(splitAt),
+          ]),
+          environment: const {},
+        );
+        check(rc).equals(0);
+        final decoded = jsonDecode(out.toString()) as List<dynamic>;
+        check((decoded.single as Map<String, dynamic>)['score']).equals(1);
+
+        final badOut = StringBuffer();
+        final badErr = StringBuffer();
+        final badRc = await runCli(
+          ['-'],
+          out: badOut,
+          err: badErr,
+          input: Stream<List<int>>.value(const [0xFF, 0xFE]),
+          environment: const {},
+        );
+        check(badRc).equals(64);
+        check(badErr.toString())
+          ..contains('Invalid UTF-8 input')
+          ..contains('(<stdin>)')
+          ..not(.it()..contains('Usage:'));
       });
 
       test('respects ignore directives and handles empty stdin', () async {
