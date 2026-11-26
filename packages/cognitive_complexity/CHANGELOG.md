@@ -1,4 +1,4 @@
-## 2.0.2-wip
+## 2.1.0-wip
 
 - GitHub Action (`action.yml`): Add `comment-mode` (`auto`, `on-violation`,
   `always`, `off`; default `auto`) to control PR sticky comment visibility (#5)
