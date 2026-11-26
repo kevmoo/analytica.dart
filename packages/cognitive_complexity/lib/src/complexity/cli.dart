@@ -16,14 +16,18 @@ Future<int> runCli(
   List<String> args, {
   StringSink? out,
   StringSink? err,
+  Stream<List<int>>? input,
+  Map<String, String>? environment,
 }) async {
   final stdoutSink = out ?? stdout;
   final stderrSink = err ?? stderr;
+  final stdinStream = input ?? stdin;
+  final env = environment ?? Platform.environment;
 
   // Under GitHub Actions, the process is compiled/run from the action's folder.
   // We re-align Directory.current to GITHUB_WORKSPACE so target scanning paths
   // and git commands resolve against the user's project workspace repository.
-  final workspace = Platform.environment['GITHUB_WORKSPACE'];
+  final workspace = env['GITHUB_WORKSPACE'];
   if (workspace != null && workspace.isNotEmpty) {
     Directory.current = workspace;
   }
@@ -162,9 +166,21 @@ Future<int> runCli(
       err: stderrSink,
     );
 
+    final stdinTargetCount = targets.where((t) => t == '-').length;
+    if (stdinTargetCount > 1) {
+      throw const FormatException(
+        'Stdin target "-" cannot be specified more than once.',
+      );
+    }
+
     if (gitDiffBase != null) {
       if (gitDiffBase.trim().isEmpty) {
         throw const FormatException('Git diff base reference cannot be empty.');
+      }
+      if (stdinTargetCount > 0) {
+        throw const FormatException(
+          'Cannot combine stdin target "-" with --git-diff.',
+        );
       }
       return await _handleDiffMode(
         gitDiffBase: gitDiffBase,
@@ -179,10 +195,11 @@ Future<int> runCli(
         maxCommentRows: maxCommentRows,
         out: stdoutSink,
         err: stderrSink,
+        environment: environment,
       );
     }
 
-    return _handleRegularMode(
+    return await _handleRegularMode(
       targets: targets,
       pathFilter: pathFilter,
       threshold: threshold,
@@ -193,6 +210,8 @@ Future<int> runCli(
       verbose: verbose,
       out: stdoutSink,
       err: stderrSink,
+      input: stdinStream,
+      environment: environment,
     );
   } on FormatException catch (e) {
     stderrSink.writeln('Error: ${e.message}');
@@ -243,6 +262,12 @@ void _warnIgnoredFlags({
   }
 }
 
+File? _resolveSummaryFile(Map<String, String>? environment) {
+  if (environment == null) return resolveGitHubSummaryFile();
+  final path = environment['GITHUB_STEP_SUMMARY'];
+  return (path != null && path.isNotEmpty) ? File(path) : null;
+}
+
 Future<int> _handleDiffMode({
   required String gitDiffBase,
   required List<String> targets,
@@ -256,6 +281,7 @@ Future<int> _handleDiffMode({
   required StringSink err,
   String? commentOutput,
   int maxCommentRows = 0,
+  Map<String, String>? environment,
 }) async {
   final deltaAnalyzer = DeltaAnalyzer(pathFilter: pathFilter);
   final summary = await deltaAnalyzer.computeDeltas(
@@ -280,7 +306,7 @@ Future<int> _handleDiffMode({
   } else if (format == 'github') {
     final reporter = GitHubReporter(
       stdoutSink: out,
-      summaryFile: resolveGitHubSummaryFile(),
+      summaryFile: _resolveSummaryFile(environment),
       commentFile: commentOutput == null ? null : File(commentOutput),
       maxCommentRows: maxCommentRows,
     );
@@ -321,7 +347,7 @@ Future<int> _handleDiffMode({
   return ExitCode.success.code;
 }
 
-int _handleRegularMode({
+Future<int> _handleRegularMode({
   required List<String> targets,
   required PathFilter pathFilter,
   required int threshold,
@@ -332,19 +358,20 @@ int _handleRegularMode({
   required bool verbose,
   required StringSink out,
   required StringSink err,
-}) {
+  required Stream<List<int>> input,
+  Map<String, String>? environment,
+}) async {
   final analyzer = ComplexityAnalyzer(pathFilter: pathFilter);
-  final allResults = <FunctionComplexity>[];
-  final allSuppressed = <SuppressedDeclaration>[];
-  final fileMetrics = <FileLineMetric>[];
-
-  for (final target in targets) {
-    allResults.addAll(analyzer.analyzePath(target));
-    allSuppressed.addAll(analyzer.analyzePathSuppressed(target));
-    if (maxFileLines != null) {
-      fileMetrics.addAll(analyzer.analyzePathFileLines(target));
-    }
-  }
+  final (
+    results: allResults,
+    suppressed: allSuppressed,
+    :fileMetrics,
+  ) = await _collectRegularTargets(
+    targets,
+    analyzer,
+    includeFileLines: maxFileLines != null,
+    input: input,
+  );
 
   allResults.sort((a, b) => b.score.compareTo(a.score));
   allSuppressed.sort((a, b) => b.score.compareTo(a.score));
@@ -365,7 +392,7 @@ int _handleRegularMode({
   } else if (format == 'github') {
     final reporter = GitHubReporter(
       stdoutSink: out,
-      summaryFile: resolveGitHubSummaryFile(),
+      summaryFile: _resolveSummaryFile(environment),
     );
     reporter.printReport(
       regularResults: displayed,
@@ -400,7 +427,13 @@ int _handleRegularMode({
 
   if (hasDeclVio || hasFileVio) {
     if (format == 'text') {
-      err.writeln(_formatRegularError(failThreshold));
+      err.writeln(
+        failThreshold != null
+            ? '\nError: One or more functions exceeded the failure threshold '
+                  '($failThreshold).'
+            : '\nError: One or more declarations or files exceeded the '
+                  'configured line limit.',
+      );
     }
     return 1;
   }
@@ -408,11 +441,57 @@ int _handleRegularMode({
   return ExitCode.success.code;
 }
 
-String _formatRegularError(int? failThreshold) => failThreshold != null
-    ? '\nError: One or more functions exceeded the failure threshold '
-          '($failThreshold).'
-    : '\nError: One or more declarations or files exceeded the configured '
-          'line limit.';
+Future<
+  ({
+    List<FunctionComplexity> results,
+    List<SuppressedDeclaration> suppressed,
+    List<FileLineMetric> fileMetrics,
+  })
+>
+_collectRegularTargets(
+  List<String> targets,
+  ComplexityAnalyzer analyzer, {
+  required bool includeFileLines,
+  required Stream<List<int>> input,
+}) async {
+  final results = <FunctionComplexity>[];
+  final suppressed = <SuppressedDeclaration>[];
+  final fileMetrics = <FileLineMetric>[];
+
+  for (final target in targets) {
+    if (target == '-') {
+      final String code;
+      try {
+        code = await utf8.decodeStream(input);
+      } on FormatException catch (e) {
+        throw FileSystemException(
+          'Invalid UTF-8 input: ${e.message}',
+          '<stdin>',
+        );
+      }
+      results.addAll(analyzer.analyzeCode(code, filePath: '<stdin>'));
+      suppressed.addAll(
+        analyzer.analyzeCodeSuppressed(code, filePath: '<stdin>'),
+      );
+      final lineCount = includeFileLines
+          ? analyzer.analyzeCodeLineCount(code)
+          : null;
+      if (lineCount != null) {
+        fileMetrics.add(
+          FileLineMetric(filePath: '<stdin>', lineCount: lineCount),
+        );
+      }
+      continue;
+    }
+    results.addAll(analyzer.analyzePath(target));
+    suppressed.addAll(analyzer.analyzePathSuppressed(target));
+    if (includeFileLines) {
+      fileMetrics.addAll(analyzer.analyzePathFileLines(target));
+    }
+  }
+
+  return (results: results, suppressed: suppressed, fileMetrics: fileMetrics);
+}
 
 Object _encodeRegularJson(
   List<FunctionComplexity> displayed,
@@ -469,6 +548,7 @@ void _printUsage(ArgParser parser, StringSink sink) {
     'Without targets, scans lib/ (or every workspace member and '
     'packages/*/lib, pkgs/*/lib in monorepos).',
   );
+  sink.writeln('Pass "-" as a target to read Dart source from stdin.');
   sink.writeln();
   sink.writeln('Options:');
   sink.writeln(parser.usage);
