@@ -1,7 +1,9 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:analytica/testing.dart';
 import 'package:checks/checks.dart';
+import 'package:cognitive_complexity/src/complexity/cli.dart';
 import 'package:test/scaffolding.dart';
 import 'package:test_descriptor/test_descriptor.dart' as d;
 import 'package:test_process/test_process.dart';
@@ -704,6 +706,270 @@ int newlySuppressed(int a) {
         ..contains('"suppressedDeclarations":1')
         ..contains('"name":"newlySuppressed"')
         ..contains('"reason":"protocol compatibility"');
+    });
+
+    group('stdin target (-)', () {
+      Future<({String stdout, String stderr, int exitCode})> runWithStdin(
+        List<String> args,
+        String input, {
+        Map<String, String> environment = const {},
+      }) async {
+        final out = StringBuffer();
+        final err = StringBuffer();
+        final code = await runCli(
+          args,
+          out: out,
+          err: err,
+          input: Stream<List<int>>.value(utf8.encode(input)),
+          environment: environment,
+        );
+        return (stdout: out.toString(), stderr: err.toString(), exitCode: code);
+      }
+
+      test('pipes real process stdin end-to-end', () async {
+        final proc = await TestProcess.start(Platform.resolvedExecutable, [
+          binPath,
+          '-',
+        ]);
+        proc.stdin.writeln('int f(int x) => x > 0 ? x : -x;');
+        await proc.stdin.close();
+
+        await check(
+          proc.stdout,
+        ).emitsThrough(.it()..contains(RegExp(r'\b1\s+f\s+<stdin>:L1-1\b')));
+        await proc.shouldExit(0);
+      });
+
+      test('scores Dart snippet from stdin across text, JSON, verbose, and '
+          'github formats', () async {
+        const snippet = '''
+int f(int x) {
+  if (x > 0) {
+    if (x > 10) return 2;
+    return 1;
+  }
+  return 0;
+}
+''';
+
+        final text = await runWithStdin(['-'], snippet);
+        check(text.exitCode).equals(0);
+        check(text.stdout)
+          ..contains('Score  Declaration')
+          ..contains(RegExp(r'\b3\s+f\s+<stdin>:L1-7\b'));
+
+        final verbose = await runWithStdin(['--verbose', '-'], snippet);
+        check(verbose.exitCode).equals(0);
+        check(verbose.stdout)
+          ..contains('Breakdown')
+          ..contains('br 2 nest 1 bool 0 depth 2');
+
+        final jsonRes = await runWithStdin(['--format', 'json', '-'], snippet);
+        check(jsonRes.exitCode).equals(0);
+        final decoded = jsonDecode(jsonRes.stdout) as List<dynamic>;
+        check(decoded).length.equals(1);
+        final entry = decoded.single as Map<String, dynamic>;
+        check(entry['file']).equals('<stdin>');
+        check(entry['name']).equals('f');
+        check(entry['score']).equals(3);
+        check(entry['lines']).equals(7);
+
+        final summaryPath = '${d.sandbox}/stdin_summary.md';
+        final github = await runWithStdin(
+          ['--format', 'github', '--fail-threshold', '2', '-'],
+          snippet,
+          environment: {'GITHUB_STEP_SUMMARY': summaryPath},
+        );
+        check(github.exitCode).equals(1);
+        check(github.stdout).contains('::error file=<stdin>,line=1,');
+        check(
+          await File(summaryPath).readAsString(),
+        ).contains('`<stdin>:L1-7`');
+      });
+
+      test('enforces --threshold, --fail-threshold, --max-function-lines, and '
+          '--max-file-lines independently on stdin', () async {
+        const snippet = '''
+int f(int x) {
+  if (x > 0) {
+    if (x > 10) return 2;
+    return 1;
+  }
+  return 0;
+}
+''';
+
+        final filtered = await runWithStdin(['--threshold', '5', '-'], snippet);
+        check(filtered.exitCode).equals(0);
+        check(
+          filtered.stdout,
+        ).contains('No declarations found with cognitive complexity >= 5.');
+
+        final threshold = await runWithStdin([
+          '--fail-threshold',
+          '2',
+          '-',
+        ], snippet);
+        check(threshold.exitCode).equals(1);
+        check(threshold.stdout).contains('[VIOLATION: score > 2]');
+
+        // Verify --max-function-lines alone (without --max-file-lines).
+        final fnLines = await runWithStdin([
+          '--max-function-lines',
+          '4',
+          '-',
+        ], snippet);
+        check(fnLines.exitCode).equals(1);
+        check(fnLines.stdout).contains('[VIOLATION: lines > 4]');
+
+        final fnLinesJson = await runWithStdin([
+          '--max-function-lines',
+          '4',
+          '--format',
+          'json',
+          '-',
+        ], snippet);
+        check(fnLinesJson.exitCode).equals(1);
+        final fnDecoded = jsonDecode(fnLinesJson.stdout) as List<dynamic>;
+        check((fnDecoded.single as Map<String, dynamic>)['lines']).equals(7);
+
+        // Verify --max-file-lines alone (without --max-function-lines).
+        final fileLines = await runWithStdin([
+          '--max-file-lines',
+          '4',
+          '--format',
+          'json',
+          '-',
+        ], snippet);
+        check(fileLines.exitCode).equals(1);
+        final fileDecoded =
+            jsonDecode(fileLines.stdout) as Map<String, dynamic>;
+        final files = fileDecoded['files'] as List<dynamic>;
+        check(files).length.equals(1);
+        final fileEntry = files.single as Map<String, dynamic>;
+        check(fileEntry['file']).equals('<stdin>');
+        check(fileEntry['lines']).equals(8);
+        check(fileEntry['violation']).equals(true);
+      });
+
+      test('reassembles chunked multi-byte UTF-8 stdin and rejects malformed '
+          'UTF-8 cleanly', () async {
+        // Split a multi-byte UTF-8 comment ('—' = 0xE2 0x80 0x94) across
+        // chunks.
+        final bytes = utf8.encode(
+          '// note — split\nint f(int x) => x > 0 ? 1 : 0;\n',
+        );
+        final splitAt = bytes.indexOf(0x80);
+        final out = StringBuffer();
+        final err = StringBuffer();
+        final rc = await runCli(
+          ['--format', 'json', '-'],
+          out: out,
+          err: err,
+          input: Stream<List<int>>.fromIterable([
+            bytes.sublist(0, splitAt),
+            bytes.sublist(splitAt),
+          ]),
+          environment: const {},
+        );
+        check(rc).equals(0);
+        final decoded = jsonDecode(out.toString()) as List<dynamic>;
+        check((decoded.single as Map<String, dynamic>)['score']).equals(1);
+
+        final badOut = StringBuffer();
+        final badErr = StringBuffer();
+        final badRc = await runCli(
+          ['-'],
+          out: badOut,
+          err: badErr,
+          input: Stream<List<int>>.value(const [0xFF, 0xFE]),
+          environment: const {},
+        );
+        check(badRc).equals(64);
+        check(badErr.toString())
+          ..contains('Invalid UTF-8 input')
+          ..contains('(<stdin>)')
+          ..not(.it()..contains('Usage:'));
+      });
+
+      test('respects ignore directives and handles empty stdin', () async {
+        const suppressedSnippet = '''
+// cognitive_complexity:ignore -- lookup table
+int ignored(int x) {
+  if (x > 0) {
+    if (x > 1) return 2;
+  }
+  return 0;
+}
+''';
+        final suppressed = await runWithStdin([
+          '--fail-threshold',
+          '1',
+          '-',
+        ], suppressedSnippet);
+        check(suppressed.exitCode).equals(0);
+        check(suppressed.stdout)
+          ..contains('Suppressed declarations (1):')
+          ..contains('ignored (score: 3, reason: lookup table)  <stdin>:L2-7');
+
+        const ignoreForFile = '''
+// cognitive_complexity:ignore_for_file
+int skipped(int x) {
+  if (x > 0) {
+    if (x > 1) return 2;
+  }
+  return 0;
+}
+''';
+        final skipped = await runWithStdin([
+          '--fail-threshold',
+          '1',
+          '--max-file-lines',
+          '2',
+          '-',
+        ], ignoreForFile);
+        check(skipped.exitCode).equals(0);
+        check(skipped.stdout).contains('No Dart declarations analyzed.');
+
+        final empty = await runWithStdin(['--max-file-lines', '10', '-'], '');
+        check(empty.exitCode).equals(0);
+        check(empty.stdout).contains('No Dart declarations analyzed.');
+      });
+
+      test('mixes stdin target with file targets', () async {
+        await d.dir('stdin_mix', [
+          d.file('other.dart', 'int g(int x) => x > 0 ? 1 : 0;\n'),
+        ]).create();
+
+        final result = await runWithStdin([
+          '-',
+          '${d.sandbox}/stdin_mix/other.dart',
+        ], 'int f(int x) { if (x > 0) { if (x > 1) return 2; } return 0; }\n');
+        check(result.exitCode).equals(0);
+        check(result.stdout)
+          ..contains('<stdin>:L1-1')
+          ..contains('other.dart:L1-1');
+      });
+
+      test('rejects - combined with --git-diff with exit code 64', () async {
+        final result = await runWithStdin([
+          '--git-diff',
+          'HEAD',
+          '-',
+        ], 'int f(int x) => x;\n');
+        check(result.exitCode).equals(64);
+        check(
+          result.stderr,
+        ).contains('Cannot combine stdin target "-" with --git-diff.');
+      });
+
+      test('rejects duplicate - targets with exit code 64', () async {
+        final result = await runWithStdin(['-', '-'], 'int f(int x) => x;\n');
+        check(result.exitCode).equals(64);
+        check(
+          result.stderr,
+        ).contains('Stdin target "-" cannot be specified more than once.');
+      });
     });
   });
 }

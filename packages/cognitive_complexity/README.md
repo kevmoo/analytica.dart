@@ -50,6 +50,7 @@ Dart & Flutter Cognitive Complexity Calculator
 Usage: dart run cognitive_complexity [options] [<file_or_directory>...]
 
 Without targets, scans lib/ (or every workspace member and packages/*/lib, pkgs/*/lib in monorepos).
+Pass "-" as a target to read Dart source from stdin.
 
 Options:
 -h, --help                          Print this usage information.

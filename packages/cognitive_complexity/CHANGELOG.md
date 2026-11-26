@@ -7,6 +7,11 @@
 - `cognitive_complexity`: Support `--comment-output` in regular (non-diff)
   `--format=github` scans and add `--comment-on-clean` to emit a standalone
   comment report even when a scan has no violations or regressions.
+- `cognitive_complexity`: Accept `-` as a positional target to score Dart source
+  read from `stdin` (reported under `<stdin>` across text, JSON, and GitHub
+  formats, including `--max-file-lines`, `--max-function-lines`, and suppression
+  directives). Rejects `-` when combined with `--git-diff` or repeated more than
+  once with exit code `64` (#198).
 - `data_flow`: Emit a deterministic `[ZERO_NESTING_GAIN]` extraction warning
   when a proposed slice at `callNestingDepth == 0`
   (`sliceScoreInPlace == sliceScoreAtRoot`) inside a borderline function

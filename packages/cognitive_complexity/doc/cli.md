@@ -92,6 +92,9 @@ dart run cognitive_complexity lib/src/analyzer.dart lib/src/visitor.dart
 
 # Auto-discover lib/ (or workspace members packages/*/lib, pkgs/*/lib)
 dart run cognitive_complexity
+
+# Score Dart source piped via stdin
+echo 'int f(int x) => x > 0 ? x : -x;' | dart run cognitive_complexity -
 ```
 
 ## Git Diff & CI Ratcheting
