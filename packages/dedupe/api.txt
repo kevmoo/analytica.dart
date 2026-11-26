@@ -3,8 +3,8 @@ environment:
 executables:
   dedupe
 package:dedupe/dedupe.dart:
-  dedupeVersion (static const getter: String)
-  defaultDartExclusions (static const getter: List<String>)
+  dedupeVersion (static const getter: String = '0.1.2-wip')
+  defaultDartExclusions (static const getter: List<String> = ['**/*.g.dart', '**/*.freezed.dart', '**/*.mocks.dart', '**/*.config.dart', '**/*.reflectable.dart', '**/*.gen.dart', '**/*.pb.dart', '**/*.pbenum.dart', '**/*.pbjson.dart', '**/*.pbserver.dart', '**/*_bindings.dart', '**/native_*.dart', '**/jni_*.dart'])
   CloneBucket (enum):
     gapped (enum constant: CloneBucket)
     identical (enum constant: CloneBucket)
@@ -25,7 +25,7 @@ package:dedupe/dedupe.dart:
     displayName (getter: String)
     jsonValue (getter: String)
   CloneInstance (class extends Object, final):
-    new (const constructor: CloneInstance Function({required int endColumn, required int endLine, required String filePath, bool inDiff, required int lineCount, required String snippet, required int startColumn, required int startLine, required int tokenCount}))
+    new (const constructor: CloneInstance Function({required int endColumn, required int endLine, required String filePath, bool inDiff = false, required int lineCount, required String snippet, required int startColumn, required int startLine, required int tokenCount}))
     fromJson (constructor: CloneInstance Function(Map<String, dynamic>))
     endColumn (getter: int)
     endLine (getter: int)
@@ -49,7 +49,7 @@ package:dedupe/dedupe.dart:
     new (constructor: DedupeDeltaService Function({String? workingDirectory}))
     applyDiffToClusters (method: ({List<DuplicateCluster> clusters, int clustersOutsideDiff, double? diffDuplicationPercent}) Function({required List<DuplicateCluster> clusters, required Map<String, List<LineRange>> diffRanges, required bool onlyChanged, required List<TokenSequence> sequences}))
     extractDiffRanges (method: Map<String, List<LineRange>> Function(List<GitFileDiff>, {String? baseDir, String? repoRoot}))
-    getParsedDiff (method: Future<List<GitFileDiff>> Function(String, {List<String> targetPaths}))
+    getParsedDiff (method: Future<List<GitFileDiff>> Function(String, {List<String> targetPaths = []}))
     getRepoRoot (method: Future<String> Function())
   DedupeEngine (class extends Object):
     new (const constructor: DedupeEngine Function(DedupeOptions))
@@ -67,7 +67,7 @@ package:dedupe/dedupe.dart:
     topCount (getter: int)
     report (method: void Function(DedupeReport))
   DedupeOptions (class extends Object, final):
-    new (constructor: DedupeOptions Function({String bucketFilter, String? cacheDir, String categoryFilter, bool clearCache, Iterable<String> excludePatterns, double? failThreshold, OutputFormat format, String? gitDiffBase, bool ignoreComments, bool ignoreGenerated, bool ignoreIdentifiers, bool ignoreLiterals, bool includeClusters, bool includeFileTable, List<String> includePatterns, String? jsonOutputPath, int minLines, int minTokens, bool onlyChanged, PathFilter? pathFilter, String? sdkPath, required String targetPath, List<String> targets, int top, bool useCache}))
+    new (constructor: DedupeOptions Function({String bucketFilter = 'all', String? cacheDir, String categoryFilter = 'all', bool clearCache = false, Iterable<String> excludePatterns = ['**/*.g.dart', '**/*.freezed.dart', '**/*.mocks.dart', '**/*.config.dart', '**/*.reflectable.dart', '**/*.gen.dart', '**/*.pb.dart', '**/*.pbenum.dart', '**/*.pbjson.dart', '**/*.pbserver.dart', '**/*_bindings.dart', '**/native_*.dart', '**/jni_*.dart'], double? failThreshold, OutputFormat format = OutputFormat.markdown, String? gitDiffBase, bool ignoreComments = true, bool ignoreGenerated = true, bool ignoreIdentifiers = false, bool ignoreLiterals = true, bool includeClusters = true, bool includeFileTable = true, List<String> includePatterns = ['**/*.dart'], String? jsonOutputPath, int minLines = 4, int minTokens = 40, bool onlyChanged = false, PathFilter? pathFilter, String? sdkPath, required String targetPath, List<String> targets = ['lib'], int top = 0, bool useCache = true}))
     bucketFilter (getter: String)
     cacheDir (getter: String?)
     categoryFilter (getter: String)
@@ -109,7 +109,7 @@ package:dedupe/dedupe.dart:
     toJson (method: Map<String, dynamic> Function())
     toString (method: String Function())
   DedupeSummary (class extends Object, final):
-    new (const constructor: DedupeSummary Function({required int cloneInstanceCount, required int clusterCount, int clustersOutsideDiff, double? diffDuplicationPercentage, required int duplicateLines, required int duplicateTokens, required double duplicationPercentage, required int estimatedLinesSaved, required int filesAnalyzed, required int totalLines, required int totalTokens}))
+    new (const constructor: DedupeSummary Function({required int cloneInstanceCount, required int clusterCount, int clustersOutsideDiff = 0, double? diffDuplicationPercentage, required int duplicateLines, required int duplicateTokens, required double duplicationPercentage, required int estimatedLinesSaved, required int filesAnalyzed, required int totalLines, required int totalTokens}))
     fromJson (constructor: DedupeSummary Function(Map<String, dynamic>))
     cloneInstanceCount (getter: int)
     clusterCount (getter: int)
@@ -127,7 +127,7 @@ package:dedupe/dedupe.dart:
     toJson (method: Map<String, dynamic> Function())
     toString (method: String Function())
   DuplicateCluster (class extends Object, final):
-    new (constructor: DuplicateCluster Function({required CloneBucket bucket, required CloneCategory category, required int estimatedLinesSaved, required String id, required List<CloneInstance> instances, bool intersectsDiff, bool isNewlyIntroduced, required int lineCount, required int tokenCount}))
+    new (constructor: DuplicateCluster Function({required CloneBucket bucket, required CloneCategory category, required int estimatedLinesSaved, required String id, required List<CloneInstance> instances, bool intersectsDiff = false, bool isNewlyIntroduced = false, required int lineCount, required int tokenCount}))
     fromJson (constructor: DuplicateCluster Function(Map<String, dynamic>))
     bucket (getter: CloneBucket)
     category (getter: CloneCategory)
@@ -161,7 +161,7 @@ package:dedupe/dedupe.dart:
     new (const constructor: JsonFormatter Function())
     format (method: String Function(DedupeReport))
   MarkdownFormatter (class extends Object with ClusterFilterMixin):
-    new (const constructor: MarkdownFormatter Function({String bucketFilter, String categoryFilter, bool includeClusters, bool includeFileTable, int topCount}))
+    new (const constructor: MarkdownFormatter Function({String bucketFilter = 'all', String categoryFilter = 'all', bool includeClusters = true, bool includeFileTable = true, int topCount = 0}))
     bucketFilter (getter: String)
     categoryFilter (getter: String)
     includeClusters (getter: bool)
@@ -178,7 +178,7 @@ package:dedupe/dedupe.dart:
     fromString (static method: OutputFormat Function(String))
     jsonValue (getter: String)
   TextFormatter (class extends Object with ClusterFilterMixin):
-    new (const constructor: TextFormatter Function({String bucketFilter, String categoryFilter, int topCount}))
+    new (const constructor: TextFormatter Function({String bucketFilter = 'all', String categoryFilter = 'all', int topCount = 0}))
     bucketFilter (getter: String)
     categoryFilter (getter: String)
     topCount (getter: int)
@@ -199,8 +199,8 @@ dart:core:
   int (referenced)
 dart:io:
   File (referenced)
-package:analytica/src/analyzer/path_filter.dart:
+package:analytica/src/analyzer/path_filter.dart (^0.1.4):
   PathFilter (referenced)
-package:analytica/src/git/models.dart:
+package:analytica/src/git/models.dart (^0.1.4):
   GitFileDiff (referenced)
   LineRange (referenced)
