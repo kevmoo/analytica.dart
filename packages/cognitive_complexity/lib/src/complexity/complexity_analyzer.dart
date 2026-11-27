@@ -7,9 +7,11 @@ import 'package:analyzer/dart/ast/visitor.dart';
 import 'package:analyzer/source/line_info.dart';
 import 'package:path/path.dart' as p;
 import 'cognitive_complexity_visitor.dart';
+import 'lcov_coverage.dart';
 
 export 'package:analytica/analyzer.dart' show PathFilter;
 export 'cognitive_complexity_visitor.dart' show ComplexityComposition;
+export 'lcov_coverage.dart' show DeclarationCoverage, LcovCoverage;
 
 final _directiveParser = CommentDirectiveParser('cognitive_complexity');
 
@@ -46,6 +48,10 @@ class FunctionComplexity {
   /// operator sequences, plus the deepest scoring nesting level.
   final ComplexityComposition composition;
 
+  /// Optional line-coverage metrics for this declaration when `--coverage` is
+  /// supplied.
+  final DeclarationCoverage? coverage;
+
   const FunctionComplexity({
     required this.filePath,
     required this.name,
@@ -53,7 +59,20 @@ class FunctionComplexity {
     required this.endLine,
     required this.score,
     required this.composition,
+    this.coverage,
   });
+
+  /// Returns a copy of this declaration annotated with [coverage].
+  FunctionComplexity withCoverage(DeclarationCoverage? coverage) =>
+      FunctionComplexity(
+        filePath: filePath,
+        name: name,
+        startLine: startLine,
+        endLine: endLine,
+        score: score,
+        composition: composition,
+        coverage: coverage,
+      );
 
   /// Total physical line span of this declaration (`endLine - startLine + 1`).
   int get lineCount => endLine >= startLine ? endLine - startLine + 1 : 0;
@@ -85,6 +104,7 @@ class FunctionComplexity {
       'max_depth': composition.maxDepth,
     },
     'is_test_entrypoint': isTestEntrypoint,
+    if (coverage != null) 'coverage': coverage!.toJson(),
   };
 
   @override

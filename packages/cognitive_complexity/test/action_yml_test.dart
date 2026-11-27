@@ -233,6 +233,7 @@ exit 0
           'INPUT_FAIL_THRESHOLD': '15',
           'INPUT_MAX_FILE_LINES': '',
           'INPUT_MAX_FUNCTION_LINES': '',
+          'INPUT_COVERAGE': '',
           'INPUT_FAIL_ON_INCREASE': 'false',
           'INPUT_FORMAT': 'github',
           'INPUT_TARGETS': '',
@@ -437,8 +438,24 @@ exit 0
       );
       check(res.dartLog)
         ..not(.it()..contains('--fail-on-increase'))
-        ..not(.it()..contains('--fail-threshold'));
+        ..not(.it()..contains('--fail-threshold'))
+        ..not(.it()..contains('--coverage='));
     });
+
+    test(
+      'forwards --coverage when coverage input is set (including spaces)',
+      () async {
+        final res = await runExecute(
+          env: {
+            'INPUT_COVERAGE': 'my coverage/lcov.info',
+            'INPUT_COMMENT_MODE': 'off',
+          },
+          scannerExitCode: 0,
+        );
+        check(res.exitCode).equals(0);
+        check(res.dartLog).contains('--coverage=my coverage/lcov.info');
+      },
+    );
   });
 }
 

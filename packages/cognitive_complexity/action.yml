@@ -65,6 +65,13 @@ inputs:
       large diff fails to post.
     required: false
     default: '0'
+  coverage:
+    description: >-
+      Optional path to an LCOV coverage file (e.g. coverage/lcov.info from
+      'dart test --coverage-path=coverage/lcov.info' or 'flutter test
+      --coverage') to annotate reported declarations with line coverage.
+    required: false
+    default: ''
 
 runs:
   using: 'composite'
@@ -120,6 +127,7 @@ runs:
         INPUT_TARGETS: ${{ inputs.targets }}
         INPUT_COMMENT_MODE: ${{ inputs.comment-mode }}
         INPUT_MAX_COMMENT_ROWS: ${{ inputs.max-comment-rows }}
+        INPUT_COVERAGE: ${{ inputs.coverage }}
         DIFF_ARG: ${{ steps.prepare.outputs.diff_arg }}
         ACTION_PATH: ${{ github.action_path }}
         GH_TOKEN: ${{ github.token }}
@@ -147,6 +155,11 @@ runs:
         fi
         if [ -n "$INPUT_MAX_FUNCTION_LINES" ] && [ "${INPUT_MAX_FUNCTION_LINES:-0}" -gt 0 ] 2>/dev/null; then
           line_args+=(--max-function-lines="$INPUT_MAX_FUNCTION_LINES")
+        fi
+
+        coverage_args=()
+        if [ -n "$INPUT_COVERAGE" ]; then
+          coverage_args+=(--coverage="$INPUT_COVERAGE")
         fi
 
         comment_mode="${INPUT_COMMENT_MODE:-auto}"
@@ -202,6 +215,7 @@ runs:
           $DIFF_ARG \
           $fail_inc_arg \
           "${line_args[@]}" \
+          "${coverage_args[@]}" \
           "${comment_args[@]}" \
           $targets
         exit_code=$?

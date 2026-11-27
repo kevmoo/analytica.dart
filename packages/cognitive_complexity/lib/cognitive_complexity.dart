@@ -11,8 +11,10 @@ export 'src/complexity/complexity_analyzer.dart'
     show
         ComplexityAnalyzer,
         ComplexityComposition,
+        DeclarationCoverage,
         FileLineMetric,
         FunctionComplexity,
+        LcovCoverage,
         PathFilter,
         SuppressedDeclaration;
 export 'src/complexity/delta_analyzer.dart'

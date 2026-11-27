@@ -68,6 +68,7 @@ Options:
     --max-comment-rows=<count>      Maximum table rows in --comment-output (0 = unlimited). GitHub rejects comment bodies over 65536 characters.
                                     (defaults to "0")
     --comment-on-clean              With --comment-output, also write the report when there are no violations or complexity regressions.
+    --coverage=<lcov.info>          Optional path to an LCOV coverage file (e.g. coverage/lcov.info from "dart test --coverage-path=coverage/lcov.info" or "flutter test --coverage") to annotate declarations with line coverage.
     --exclude=<glob>                Glob patterns of files/directories to exclude (repeatable or comma-separated).
     --[no-]ignore-generated         Exclude generated files (*.g.dart, *.freezed.dart, *.mocks.dart, etc.).
                                     (defaults to on)
@@ -265,6 +266,7 @@ jobs:
 | `format`             | `github` | Output format: `github` (annotations + step summary), `text`, or `json`.              |
 | `comment-mode`       |  `auto`  | PR comment policy: `auto` (violations/increases), `on-violation`, `always`, or `off`. |
 | `max-comment-rows`   |   `0`    | Maximum table rows in the sticky PR comment (0 = unlimited).                          |
+| `coverage`           |  _None_  | Optional LCOV file path (e.g. `coverage/lcov.info`) to annotate declaration coverage. |
 
 ## 🧠 AI Agent Integration
 
