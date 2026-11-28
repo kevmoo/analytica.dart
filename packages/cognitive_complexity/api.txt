@@ -100,7 +100,7 @@ package:cognitive_complexity/cognitive_complexity.dart:
     countViolations (method: int Function({bool failOnIncrease = false, int? failThreshold, int? maxFileLines, int? maxFunctionLines}))
     isClean (method: bool Function({bool failOnIncrease = false, int? failThreshold, int? maxFileLines, int? maxFunctionLines}))
     toJson (method: Map<String, dynamic> Function({bool failOnIncrease = false, int? failThreshold, int? maxFileLines, int? maxFunctionLines}))
-    withCoverage (method: DeltaSummary Function(LcovCoverage))
+    withCoverage (method: DeltaSummary Function(LcovCoverage, {String? baseDirectory}))
   FileLineDelta (class extends Object):
     new (const constructor: FileLineDelta Function({required String filePath, required int? newLines, required int? oldLines, required DeltaStatus status}))
     delta (getter: int)
@@ -160,8 +160,8 @@ package:cognitive_complexity/cognitive_complexity.dart:
     fromFile (constructor: LcovCoverage Function(String, {String? baseDirectory}))
     parse (constructor: LcovCoverage Function(String, {String? baseDirectory, String? fallbackDirectory}))
     fileCount (getter: int)
-    annotateDeclarations (method: List<FunctionComplexity> Function(List<FunctionComplexity>))
-    coverageFor (method: DeclarationCoverage Function({required int endLine, required String filePath, required int startLine}))
+    annotateDeclarations (method: List<FunctionComplexity> Function(List<FunctionComplexity>, {String? baseDirectory}))
+    coverageFor (method: DeclarationCoverage Function({String? baseDirectory, required int endLine, required String filePath, required int startLine}))
   PathFilter (class extends Object):
     defaultGeneratedPatterns (static const getter: List<String> = ['**/*.g.dart', '**/*.freezed.dart', '**/*.mocks.dart', '**/*.config.dart', '**/*.reflectable.dart', '**/*.gen.dart', '**/*.pb.dart', '**/*.pbenum.dart', '**/*.pbjson.dart', '**/*.pbserver.dart'])
     defaultIgnoredDirectories (static const getter: List<String> = ['.dart_tool/**', '.git/**', 'build/**', '.idea/**', '.vscode/**'])

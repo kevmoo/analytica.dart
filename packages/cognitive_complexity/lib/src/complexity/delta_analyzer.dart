@@ -215,25 +215,30 @@ class DeltaSummary {
 
   /// Returns a copy of this summary with [coverage] attached to every
   /// non-removed declaration delta.
-  DeltaSummary withCoverage(LcovCoverage coverage) => DeltaSummary(
-    baseRef: baseRef,
-    targetRef: targetRef,
-    filesAnalyzed: filesAnalyzed,
-    deltas: List.unmodifiable([
-      for (final d in deltas)
-        d.status == DeltaStatus.removed
-            ? d
-            : d.withCoverage(
-                coverage.coverageFor(
-                  filePath: d.filePath,
-                  startLine: d.startLine,
-                  endLine: d.endLine,
-                ),
-              ),
-    ]),
-    fileDeltas: fileDeltas,
-    suppressedDeclarations: suppressedDeclarations,
-  );
+  ///
+  /// Pass [baseDirectory] (typically the Git repository root) when delta file
+  /// paths are relative to a directory other than [coverage]'s base directory.
+  DeltaSummary withCoverage(LcovCoverage coverage, {String? baseDirectory}) =>
+      DeltaSummary(
+        baseRef: baseRef,
+        targetRef: targetRef,
+        filesAnalyzed: filesAnalyzed,
+        deltas: List.unmodifiable([
+          for (final d in deltas)
+            d.status == DeltaStatus.removed
+                ? d
+                : d.withCoverage(
+                    coverage.coverageFor(
+                      filePath: d.filePath,
+                      startLine: d.startLine,
+                      endLine: d.endLine,
+                      baseDirectory: baseDirectory,
+                    ),
+                  ),
+        ]),
+        fileDeltas: fileDeltas,
+        suppressedDeclarations: suppressedDeclarations,
+      );
 
   int get netDelta => deltas.fold(0, (sum, d) => sum + d.delta);
 

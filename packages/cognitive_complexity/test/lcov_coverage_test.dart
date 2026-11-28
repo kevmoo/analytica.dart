@@ -80,6 +80,13 @@ void _declarationCoverageTests() {
     check(
       cov.formatUncoveredRanges(maxRanges: 0),
     ).equals('L2, L4, L6, L8, L10, L12-13');
+    const single = DeclarationCoverage(
+      loaded: true,
+      coveredLines: 0,
+      executableLines: 1,
+      uncoveredLines: [42],
+    );
+    check(single.formatUncoveredRanges()).equals('L42');
   });
 }
 
@@ -174,6 +181,88 @@ end_of_record
       () => LcovCoverage.fromFile(p.join(d.sandbox, 'nope.info')),
     ).throws<FileSystemException>();
   });
+
+  test('rejects non-empty non-LCOV content with FormatException', () {
+    check(
+        () => LcovCoverage.parse('{"type":"CodeCoverage","coverage":[]}'),
+      ).throws<FormatException>().has('message', (e) => e.message)
+      ..contains('No LCOV coverage records')
+      ..contains('--coverage-path=coverage/lcov.info');
+  });
+
+  test(
+    'prioritizes lcov package dir over baseDir on monorepo filename collision',
+    () async {
+      await d.dir('mono', [
+        d.dir('lib', [d.file('main.dart', 'void rootMain() {}\n')]),
+        d.dir('packages', [
+          d.dir('foo', [
+            d.dir('lib', [d.file('main.dart', 'void pkgMain() {}\n')]),
+            d.dir('coverage', [
+              d.file('lcov.info', '''
+SF:lib/main.dart
+DA:1,5
+end_of_record
+'''),
+            ]),
+          ]),
+        ]),
+      ]).create();
+
+      final monoDir = p.join(d.sandbox, 'mono');
+      final lcovPath = p.join(
+        monoDir,
+        'packages',
+        'foo',
+        'coverage',
+        'lcov.info',
+      );
+      final coverage = LcovCoverage.fromFile(lcovPath, baseDirectory: monoDir);
+
+      final pkgCov = coverage.coverageFor(
+        filePath: p.join(monoDir, 'packages', 'foo', 'lib', 'main.dart'),
+        startLine: 1,
+        endLine: 1,
+      );
+      check(pkgCov.loaded).isTrue;
+      check(pkgCov.coveredLines).equals(1);
+
+      final rootCov = coverage.coverageFor(
+        filePath: p.join(monoDir, 'lib', 'main.dart'),
+        startLine: 1,
+        endLine: 1,
+      );
+      check(rootCov.loaded).isFalse;
+    },
+  );
+
+  test(
+    'filters DA lines to [startLine, endLine] and supports absolute SF',
+    () async {
+      await d.dir('abs_pkg', [
+        d.dir('lib', [d.file('two.dart', '// line 1\n')]),
+      ]).create();
+      final absFile = p.join(d.sandbox, 'abs_pkg', 'lib', 'two.dart');
+      final coverage = LcovCoverage.parse('''
+SF:$absFile
+DA:1,1
+DA:5,1
+DA:7,0
+DA:10,1
+DA:12,0
+end_of_record
+''');
+      final first = coverage.coverageFor(
+        filePath: absFile,
+        startLine: 5,
+        endLine: 10,
+      );
+      check(first.loaded).isTrue;
+      check(first.executableLines).equals(3);
+      check(first.coveredLines).equals(2);
+      check(first.uncoveredLines).deepEquals([7]);
+    },
+  );
 }
 
 void _regularCliTests() {
@@ -219,11 +308,16 @@ end_of_record
       final lcovPath = p.join(projDir, 'coverage', 'lcov.info');
       final libDir = p.join(projDir, 'lib');
 
-      // 1. Text format
+      // 1. Text format (including --verbose and --max-function-lines combined)
       final textOut = StringBuffer();
       final textErr = StringBuffer();
       final textCode = await runCli(
-        ['--coverage=$lcovPath', libDir],
+        [
+          '--coverage=$lcovPath',
+          '--verbose',
+          '--max-function-lines=100',
+          libDir,
+        ],
         out: textOut,
         err: textErr,
         environment: const {},
@@ -231,7 +325,9 @@ end_of_record
       check(textCode).equals(0);
       check(textErr.toString()).isEmpty;
       check(textOut.toString())
+        ..contains('Lines')
         ..contains('Coverage')
+        ..contains('Breakdown')
         ..contains('50% (3/6)')
         ..contains('[uncovered: L4-5, L7]')
         ..contains('0% (unloaded)');
@@ -452,6 +548,71 @@ end_of_record
         ..contains('| — |');
     },
   );
+
+  test(
+    'resolves --git-diff --coverage when invoked from a monorepo subpackage',
+    () async {
+      final binPath = await resolvePackageExecutable(
+        'package:cognitive_complexity/cognitive_complexity.dart',
+        'cognitive_complexity',
+      );
+      await d.dir('mono_git', [
+        d.dir('packages', [
+          d.dir('sub', [
+            d.dir('lib', [
+              d.file('work.dart', '''
+int scoreMe(int x) {
+  if (x > 0) return 1;
+  return 0;
+}
+'''),
+            ]),
+          ]),
+        ]),
+      ]).create();
+
+      final repoDir = p.join(d.sandbox, 'mono_git');
+      final subDir = p.join(repoDir, 'packages', 'sub');
+      await _runGit(repoDir, ['init', '-b', 'main']);
+      await _runGit(repoDir, ['config', 'user.email', 'test@example.com']);
+      await _runGit(repoDir, ['config', 'user.name', 'Test']);
+      await _runGit(repoDir, ['config', 'commit.gpgsign', 'false']);
+      await _runGit(repoDir, ['add', '.']);
+      await _runGit(repoDir, ['commit', '-m', 'init']);
+
+      await File(p.join(subDir, 'lib', 'work.dart')).writeAsString('''
+int scoreMe(int x) {
+  if (x > 0) {
+    if (x > 10) return 2;
+    return 1;
+  }
+  return 0;
+}
+''');
+      final lcovPath = p.join(subDir, 'coverage', 'lcov.info');
+      await File(lcovPath).parent.create(recursive: true);
+      await File(lcovPath).writeAsString('''
+SF:lib/work.dart
+DA:2,1
+DA:3,0
+DA:4,1
+DA:6,0
+end_of_record
+''');
+
+      final res = await Process.run(
+        Platform.resolvedExecutable,
+        [binPath, '--git-diff=HEAD', '--coverage=coverage/lcov.info', 'lib'],
+        workingDirectory: subDir,
+        environment: {'GITHUB_WORKSPACE': subDir},
+      );
+      check(res.exitCode).equals(0);
+      check(res.stdout as String)
+        ..contains('50% (2/4)')
+        ..contains('[uncovered: L3, L6]')
+        ..not(.it()..contains('0% (unloaded)'));
+    },
+  );
 }
 
 void _validationCliTests() {
@@ -499,6 +660,22 @@ void _validationCliTests() {
         ),
       ).equals(64);
       check(errMissing.toString()).contains('Coverage file does not exist');
+
+      // Non-LCOV (.vm.json) file rejected with exit code 64
+      await d
+          .file('bad.vm.json', '{"type":"CodeCoverage","coverage":[]}')
+          .create();
+      final errVmJson = StringBuffer();
+      check(
+        await runCli(
+          ['--coverage=${p.join(d.sandbox, 'bad.vm.json')}', '-'],
+          out: StringBuffer(),
+          err: errVmJson,
+          input: Stream.value(utf8.encode('void f() {}')),
+          environment: const {},
+        ),
+      ).equals(64);
+      check(errVmJson.toString()).contains('No LCOV coverage records');
 
       // Valid lcov + stdin target emits warning and omits coverage on <stdin>
       final stdinOut = StringBuffer();

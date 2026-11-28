@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:math';
 
 import 'package:analytica/analytica.dart';
+import 'package:analytica/git.dart';
 import 'package:args/args.dart';
 
 import '../schema_version.dart';
@@ -355,7 +356,10 @@ Future<int> _handleDiffMode({
   );
   final summary = coverage == null
       ? rawSummary
-      : rawSummary.withCoverage(coverage);
+      : rawSummary.withCoverage(
+          coverage,
+          baseDirectory: await const GitDiffService().getRepoRoot(),
+        );
 
   if (format == 'json') {
     out.writeln(

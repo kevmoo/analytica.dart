@@ -188,7 +188,7 @@ done
 if [ "\$1" = "pub" ]; then
   exit 0
 fi
-printf '%s\\n' "\$*" >> "$dartLogPath"
+printf '[%s]\\n' "\$@" >> "$dartLogPath"
 $writeCommentSnippet
 exit $scannerExitCode
 ''');
@@ -453,7 +453,7 @@ exit 0
           scannerExitCode: 0,
         );
         check(res.exitCode).equals(0);
-        check(res.dartLog).contains('--coverage=my coverage/lcov.info');
+        check(res.dartLog).contains('[--coverage=my coverage/lcov.info]');
       },
     );
   });

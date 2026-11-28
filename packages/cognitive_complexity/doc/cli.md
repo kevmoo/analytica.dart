@@ -123,6 +123,33 @@ complexity increase on a modified function immediately exits with code `1`:
 dart run cognitive_complexity --git-diff=origin/main --fail-on-increase
 ```
 
+## Line Coverage Annotation (`--coverage`)
+
+Pass an LCOV report via `--coverage <lcov.info>` to annotate reported
+declarations with per-function line coverage before refactoring high-complexity
+hotspots or reviewing PR diffs:
+
+```bash
+# Pure Dart (1-step LCOV via package:test)
+dart test --coverage-path=coverage/lcov.info
+dart run cognitive_complexity --threshold=15 --coverage=coverage/lcov.info
+
+# Flutter
+flutter test --coverage
+dart run cognitive_complexity --threshold=15 --coverage=coverage/lcov.info
+```
+
+- **Loaded declarations**: show `N% (covered/executable)` and, in text output,
+  compact uncovered line ranges (`[uncovered: L48-50, L61]`).
+- **Unloaded files**: files absent from `lcov.info` (never imported by any test)
+  report `0% (unloaded)` rather than silently skipping coverage.
+- **No executable lines / deleted**: declarations in loaded files with no
+  recorded executable lines show `n/a`; removed declarations in `--git-diff`
+  show `—` (and omit `coverage` in JSON).
+- **JSON output**: adds a `coverage` object (`loaded`, `covered_lines`,
+  `executable_lines`, `percent`, `uncovered_lines`) per declaration when
+  `--coverage` is supplied, and omits the key completely otherwise.
+
 ## Exit Codes
 
 - `0`: Scan completed successfully; all thresholds and gates satisfied.

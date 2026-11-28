@@ -93,15 +93,20 @@ final class LcovCoverage {
 
   final Map<String, Map<int, int>> _fileHits;
   final String _baseDirectory;
+  final Map<String, String> _canonicalCache;
 
-  LcovCoverage._(this._fileHits, this._baseDirectory);
+  LcovCoverage._(this._fileHits, this._baseDirectory, this._canonicalCache);
 
   /// Parses an LCOV report from [content].
   ///
-  /// Relative `SF:` paths are resolved against [baseDirectory] (defaulting to
-  /// [Directory.current]) and, if not found there on disk, against
-  /// [fallbackDirectory] when provided. Duplicate `SF:` records for the same
+  /// Relative `SF:` paths are resolved against [fallbackDirectory] first (when
+  /// provided and present on disk — e.g. the package root inferred from
+  /// `packages/foo/coverage/lcov.info`), and otherwise against [baseDirectory]
+  /// (defaulting to [Directory.current]). Duplicate `SF:` records for the same
   /// file are merged by summing line hit counts.
+  ///
+  /// Throws [FormatException] when [content] is non-empty but contains zero
+  /// `SF:` records (for example, if a `.vm.json` coverage file was passed).
   factory LcovCoverage.parse(
     String content, {
     String? baseDirectory,
@@ -113,6 +118,7 @@ final class LcovCoverage {
     final fallbackDir = fallbackDirectory == null
         ? null
         : p.normalize(p.absolute(fallbackDirectory));
+    final canonicalCache = <String, String>{};
     final fileHits = <String, Map<int, int>>{};
     Map<int, int>? currentFile;
 
@@ -120,9 +126,7 @@ final class LcovCoverage {
       final line = rawLine.trim();
       if (line == 'end_of_record') {
         currentFile = null;
-        continue;
-      }
-      if (line.startsWith('SF:')) {
+      } else if (line.startsWith('SF:')) {
         final sourcePath = line.substring(3).trim();
         currentFile = sourcePath.isEmpty
             ? null
@@ -131,27 +135,36 @@ final class LcovCoverage {
                   sourcePath,
                   baseDir: baseDir,
                   fallbackDir: fallbackDir,
+                  canonicalCache: canonicalCache,
                 ),
                 () => <int, int>{},
               );
-        continue;
+      } else if (currentFile != null && line.startsWith('DA:')) {
+        _recordDaLine(currentFile, line);
       }
-      if (currentFile == null) continue;
-      final match = _daPattern.firstMatch(line);
-      if (match == null) continue;
-      final lineNum = int.parse(match[1]!);
-      if (lineNum == 0) continue;
-      final hits = int.parse(match[2]!);
-      currentFile[lineNum] = (currentFile[lineNum] ?? 0) + hits;
     }
 
-    return LcovCoverage._(fileHits, baseDir);
+    if (fileHits.isEmpty && content.trim().isNotEmpty) {
+      throw const FormatException(
+        'No LCOV coverage records ("SF:" lines) found. Ensure the file is in '
+        'LCOV format (generate with '
+        '"dart test --coverage-path=coverage/lcov.info" or '
+        '"flutter test --coverage").',
+      );
+    }
+
+    return LcovCoverage._(fileHits, baseDir, canonicalCache);
   }
 
   /// Loads and parses an LCOV file at [filePath].
   ///
-  /// Throws [FormatException] if [filePath] is empty or is a directory, and
-  /// [FileSystemException] if the file does not exist.
+  /// Relative `SF:` paths are checked against the package directory inferred
+  /// from [filePath] (the parent of a `coverage/` directory, or [filePath]'s
+  /// directory) before falling back to [baseDirectory] / [Directory.current].
+  ///
+  /// Throws [FormatException] if [filePath] is empty, is a directory, or is
+  /// non-empty without LCOV `SF:` records; throws [FileSystemException] if the
+  /// file does not exist.
   factory LcovCoverage.fromFile(String filePath, {String? baseDirectory}) {
     if (filePath.trim().isEmpty) {
       throw const FormatException('Coverage file path cannot be empty.');
@@ -187,8 +200,9 @@ final class LcovCoverage {
   /// Returns a list of [declarations] annotated with line coverage from this
   /// report, leaving `<stdin>` declarations unannotated.
   List<FunctionComplexity> annotateDeclarations(
-    List<FunctionComplexity> declarations,
-  ) => [
+    List<FunctionComplexity> declarations, {
+    String? baseDirectory,
+  }) => [
     for (final decl in declarations)
       decl.filePath == '<stdin>'
           ? decl
@@ -197,6 +211,7 @@ final class LcovCoverage {
                 filePath: decl.filePath,
                 startLine: decl.startLine,
                 endLine: decl.endLine,
+                baseDirectory: baseDirectory,
               ),
             ),
   ];
@@ -204,15 +219,23 @@ final class LcovCoverage {
   /// Computes [DeclarationCoverage] for the 1-based inclusive line span
   /// `[startLine, endLine]` in [filePath].
   ///
+  /// When [filePath] is relative, resolves it against [baseDirectory] (or the
+  /// base directory captured when this [LcovCoverage] was constructed).
   /// Returns a [DeclarationCoverage] with `loaded: false` (`percent == 0.0`)
   /// when [filePath] is absent from the LCOV report.
   DeclarationCoverage coverageFor({
     required String filePath,
     required int startLine,
     required int endLine,
+    String? baseDirectory,
   }) {
+    final normalized = Platform.isWindows
+        ? filePath
+        : filePath.replaceAll(r'\', '/');
+    final baseDir = baseDirectory ?? _baseDirectory;
     final canonical = _canonicalizePath(
-      p.isAbsolute(filePath) ? filePath : p.join(_baseDirectory, filePath),
+      p.isAbsolute(normalized) ? normalized : p.join(baseDir, normalized),
+      _canonicalCache,
     );
     final hits = _fileHits[canonical];
     if (hits == null) {
@@ -245,36 +268,46 @@ final class LcovCoverage {
     );
   }
 
+  static void _recordDaLine(Map<int, int> currentFile, String line) {
+    final match = _daPattern.firstMatch(line);
+    if (match == null) return;
+    final lineNum = int.parse(match[1]!);
+    if (lineNum == 0) return;
+    final hits = int.parse(match[2]!);
+    currentFile[lineNum] = (currentFile[lineNum] ?? 0) + hits;
+  }
+
   static String _resolveSourcePath(
     String rawPath, {
     required String baseDir,
     required String? fallbackDir,
+    required Map<String, String> canonicalCache,
   }) {
     final normalized = Platform.isWindows
         ? rawPath
         : rawPath.replaceAll(r'\', '/');
     if (p.isAbsolute(normalized)) {
-      return _canonicalizePath(normalized);
-    }
-    final primary = p.normalize(p.join(baseDir, normalized));
-    if (File(primary).existsSync()) {
-      return _canonicalizePath(primary);
+      return _canonicalizePath(normalized, canonicalCache);
     }
     if (fallbackDir != null) {
-      final fallback = p.normalize(p.join(fallbackDir, normalized));
-      if (File(fallback).existsSync()) {
-        return _canonicalizePath(fallback);
+      final fromLcov = p.normalize(p.join(fallbackDir, normalized));
+      if (File(fromLcov).existsSync()) {
+        return _canonicalizePath(fromLcov, canonicalCache);
       }
     }
-    return _canonicalizePath(primary);
+    return _canonicalizePath(p.join(baseDir, normalized), canonicalCache);
   }
 
-  static String _canonicalizePath(String path) {
+  static String _canonicalizePath(
+    String path,
+    Map<String, String> canonicalCache,
+  ) {
     final normalized = p.normalize(p.absolute(path));
-    final file = File(normalized);
-    if (file.existsSync()) {
-      return p.normalize(file.resolveSymbolicLinksSync());
-    }
-    return normalized;
+    return canonicalCache.putIfAbsent(normalized, () {
+      final file = File(normalized);
+      return file.existsSync()
+          ? p.normalize(file.resolveSymbolicLinksSync())
+          : normalized;
+    });
   }
 }
