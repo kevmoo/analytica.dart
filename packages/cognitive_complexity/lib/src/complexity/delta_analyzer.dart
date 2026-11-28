@@ -67,6 +67,10 @@ class ComplexityDelta {
   final int? newLines;
   final DeltaStatus status;
 
+  /// Optional line-coverage metrics for the current version of this declaration
+  /// when `--coverage` is supplied (`null` for removed declarations).
+  final DeclarationCoverage? coverage;
+
   const ComplexityDelta({
     required this.filePath,
     required this.name,
@@ -77,7 +81,23 @@ class ComplexityDelta {
     required this.status,
     this.oldLines,
     this.newLines,
+    this.coverage,
   });
+
+  /// Returns a copy of this delta annotated with [coverage].
+  ComplexityDelta withCoverage(DeclarationCoverage? coverage) =>
+      ComplexityDelta(
+        filePath: filePath,
+        name: name,
+        startLine: startLine,
+        endLine: endLine,
+        oldScore: oldScore,
+        newScore: newScore,
+        status: status,
+        oldLines: oldLines,
+        newLines: newLines,
+        coverage: coverage,
+      );
 
   int get delta => (newScore ?? 0) - (oldScore ?? 0);
 
@@ -139,6 +159,7 @@ class ComplexityDelta {
       maxFunctionLines: maxFunctionLines,
       failOnIncrease: failOnIncrease,
     ),
+    if (coverage != null) 'coverage': coverage!.toJson(),
   };
 }
 
@@ -191,6 +212,33 @@ class DeltaSummary {
     this.fileDeltas = const [],
     this.suppressedDeclarations = const [],
   });
+
+  /// Returns a copy of this summary with [coverage] attached to every
+  /// non-removed declaration delta.
+  ///
+  /// Pass [baseDirectory] (typically the Git repository root) when delta file
+  /// paths are relative to a directory other than [coverage]'s base directory.
+  DeltaSummary withCoverage(LcovCoverage coverage, {String? baseDirectory}) =>
+      DeltaSummary(
+        baseRef: baseRef,
+        targetRef: targetRef,
+        filesAnalyzed: filesAnalyzed,
+        deltas: List.unmodifiable([
+          for (final d in deltas)
+            d.status == DeltaStatus.removed
+                ? d
+                : d.withCoverage(
+                    coverage.coverageFor(
+                      filePath: d.filePath,
+                      startLine: d.startLine,
+                      endLine: d.endLine,
+                      baseDirectory: baseDirectory,
+                    ),
+                  ),
+        ]),
+        fileDeltas: fileDeltas,
+        suppressedDeclarations: suppressedDeclarations,
+      );
 
   int get netDelta => deltas.fold(0, (sum, d) => sum + d.delta);
 

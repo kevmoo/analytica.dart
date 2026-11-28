@@ -55,22 +55,23 @@ static-analysis CLIs:
 
 ## Command Options & Flags (`cognitive_complexity`)
 
-| Option / Flag                  | Type     | Default | Description                                                                                                                            |
-| :----------------------------- | :------- | :-----: | :------------------------------------------------------------------------------------------------------------------------------------- |
-| `-h, --help`                   | `flag`   | `false` | Print usage information and exit.                                                                                                      |
-| `-t, --threshold <value>`      | `int`    |   `0`   | Minimum complexity score to include in the report.                                                                                     |
-| `-f, --fail-threshold <value>` | `int`    | _None_  | Ceiling score; exits with code `1` if any declaration exceeds this value.                                                              |
-| `--max-file-lines <lines>`     | `int`    |   `0`   | Opt-in maximum physical line count per source file (`0` = disabled).                                                                   |
-| `--max-function-lines <lines>` | `int`    |   `0`   | Opt-in maximum line span per function/method declaration (`0` = disabled).                                                             |
-| `-d, --git-diff <git-ref>`     | `String` | _None_  | Compares current workspace declarations against `<git-ref>`, evaluating complexity deltas (Δ).                                         |
-| `--fail-on-increase`           | `flag`   | `false` | With `--git-diff`, fails if any modified function increases in complexity (or exceeds `--fail-threshold` when both are set).           |
-| `--format <type>`              | `enum`   | `text`  | Output format: `text` (terminal), `json` (machine-readable), or `github` (GHA annotations).                                            |
-| `-v, --verbose`                | `flag`   | `false` | With `--format=text`, adds a `Breakdown` column (`branches`, `nesting`, `boolean_ops`, `max_depth`) and tags `_test.dart` entrypoints. |
-| `--comment-output <path>`      | `String` | _None_  | With `--format=github`, writes a significance-ordered standalone PR comment report.                                                    |
-| `--max-comment-rows <count>`   | `int`    |   `0`   | Maximum table rows in `--comment-output` (`0` = unlimited).                                                                            |
-| `--comment-on-clean`           | `flag`   | `false` | With `--comment-output`, also write the report when there are no violations or complexity regressions.                                 |
-| `--exclude <glob>`             | `multi`  | _None_  | Glob patterns of files/directories to exclude (repeatable or comma-separated).                                                         |
-| `--[no-]ignore-generated`      | `flag`   | `true`  | Exclude generated files (`*.g.dart`, `*.freezed.dart`, `*.mocks.dart`, etc.).                                                          |
+| Option / Flag                  | Type     | Default | Description                                                                                                                                            |
+| :----------------------------- | :------- | :-----: | :----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `-h, --help`                   | `flag`   | `false` | Print usage information and exit.                                                                                                                      |
+| `-t, --threshold <value>`      | `int`    |   `0`   | Minimum complexity score to include in the report.                                                                                                     |
+| `-f, --fail-threshold <value>` | `int`    | _None_  | Ceiling score; exits with code `1` if any declaration exceeds this value.                                                                              |
+| `--max-file-lines <lines>`     | `int`    |   `0`   | Opt-in maximum physical line count per source file (`0` = disabled).                                                                                   |
+| `--max-function-lines <lines>` | `int`    |   `0`   | Opt-in maximum line span per function/method declaration (`0` = disabled).                                                                             |
+| `-d, --git-diff <git-ref>`     | `String` | _None_  | Compares current workspace declarations against `<git-ref>`, evaluating complexity deltas (Δ).                                                         |
+| `--fail-on-increase`           | `flag`   | `false` | With `--git-diff`, fails if any modified function increases in complexity (or exceeds `--fail-threshold` when both are set).                           |
+| `--format <type>`              | `enum`   | `text`  | Output format: `text` (terminal), `json` (machine-readable), or `github` (GHA annotations).                                                            |
+| `-v, --verbose`                | `flag`   | `false` | With `--format=text`, adds a `Breakdown` column (`branches`, `nesting`, `boolean_ops`, `max_depth`) and tags `_test.dart` entrypoints.                 |
+| `--comment-output <path>`      | `String` | _None_  | With `--format=github`, writes a significance-ordered standalone PR comment report.                                                                    |
+| `--max-comment-rows <count>`   | `int`    |   `0`   | Maximum table rows in `--comment-output` (`0` = unlimited).                                                                                            |
+| `--comment-on-clean`           | `flag`   | `false` | With `--comment-output`, also write the report when there are no violations or complexity regressions.                                                 |
+| `--coverage <lcov.info>`       | `String` | _None_  | Annotate declarations with per-function line coverage from an LCOV file (`dart test --coverage-path=coverage/lcov.info` or `flutter test --coverage`). |
+| `--exclude <glob>`             | `multi`  | _None_  | Glob patterns of files/directories to exclude (repeatable or comma-separated).                                                                         |
+| `--[no-]ignore-generated`      | `flag`   | `true`  | Exclude generated files (`*.g.dart`, `*.freezed.dart`, `*.mocks.dart`, etc.).                                                                          |
 
 > [!NOTE]
 >
@@ -121,6 +122,33 @@ complexity increase on a modified function immediately exits with code `1`:
 ```bash
 dart run cognitive_complexity --git-diff=origin/main --fail-on-increase
 ```
+
+## Line Coverage Annotation (`--coverage`)
+
+Pass an LCOV report via `--coverage <lcov.info>` to annotate reported
+declarations with per-function line coverage before refactoring high-complexity
+hotspots or reviewing PR diffs:
+
+```bash
+# Pure Dart (1-step LCOV via package:test)
+dart test --coverage-path=coverage/lcov.info
+dart run cognitive_complexity --threshold=15 --coverage=coverage/lcov.info
+
+# Flutter
+flutter test --coverage
+dart run cognitive_complexity --threshold=15 --coverage=coverage/lcov.info
+```
+
+- **Loaded declarations**: show `N% (covered/executable)` and, in text output,
+  compact uncovered line ranges (`[uncovered: L48-50, L61]`).
+- **Unloaded files**: files absent from `lcov.info` (never imported by any test)
+  report `0% (unloaded)` rather than silently skipping coverage.
+- **No executable lines / deleted**: declarations in loaded files with no
+  recorded executable lines show `n/a`; removed declarations in `--git-diff`
+  show `—` (and omit `coverage` in JSON).
+- **JSON output**: adds a `coverage` object (`loaded`, `covered_lines`,
+  `executable_lines`, `percent`, `uncovered_lines`) per declaration when
+  `--coverage` is supplied, and omits the key completely otherwise.
 
 ## Exit Codes
 

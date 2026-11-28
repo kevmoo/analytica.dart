@@ -224,13 +224,26 @@ class GitHubReporter {
     required bool emitAnnotations,
   }) {
     final showLines = maxFunctionLines != null && maxFunctionLines > 0;
-    if (showLines) {
-      summaryBuf.writeln('| Status | Declaration | Location | Lines | Score |');
-      summaryBuf.writeln('| :---: | :--- | :--- | :---: | :---: |');
-    } else {
-      summaryBuf.writeln('| Status | Declaration | Location | Score |');
-      summaryBuf.writeln('| :---: | :--- | :--- | :---: |');
-    }
+    final showCoverage = results.any((r) => r.coverage != null);
+    final headers = [
+      'Status',
+      'Declaration',
+      'Location',
+      if (showLines) 'Lines',
+      'Score',
+      if (showCoverage) 'Coverage',
+    ];
+    final aligns = [
+      ':---:',
+      ':---',
+      ':---',
+      if (showLines) ':---:',
+      ':---:',
+      if (showCoverage) ':---:',
+    ];
+    summaryBuf
+      ..writeln('| ${headers.join(' | ')} |')
+      ..writeln('| ${aligns.join(' | ')} |');
 
     for (final res in results) {
       _writeRegularDeclarationRow(
@@ -238,6 +251,7 @@ class GitHubReporter {
         failThreshold,
         maxFunctionLines,
         showLines,
+        showCoverage,
         summaryBuf,
         emitAnnotations: emitAnnotations,
       );
@@ -249,6 +263,7 @@ class GitHubReporter {
     int? failThreshold,
     int? maxFunctionLines,
     bool showLines,
+    bool showCoverage,
     StringBuffer summaryBuf, {
     required bool emitAnnotations,
   }) {
@@ -259,16 +274,15 @@ class GitHubReporter {
         res.lineCount > maxFunctionLines;
     final statusIcon = (isScoreVio || isLineVio) ? '🔴' : '🟢';
     final loc = '${res.filePath}:L${res.startLine}-${res.endLine}';
-    if (showLines) {
-      summaryBuf.writeln(
-        '| $statusIcon | `${res.name}` | `$loc` '
-        '| ${res.lineCount} | **${res.score}** |',
-      );
-    } else {
-      summaryBuf.writeln(
-        '| $statusIcon | `${res.name}` | `$loc` | **${res.score}** |',
-      );
-    }
+    final cells = [
+      statusIcon,
+      '`${res.name}`',
+      '`$loc`',
+      if (showLines) '${res.lineCount}',
+      '**${res.score}**',
+      if (showCoverage) res.coverage?.formatShort() ?? '—',
+    ];
+    summaryBuf.writeln('| ${cells.join(' | ')} |');
     if (emitAnnotations && isScoreVio) {
       _stdoutSink.writeln(
         '::error file=${res.filePath},line=${res.startLine},'
@@ -481,8 +495,16 @@ class GitHubReporter {
     bool failOnIncrease,
     StringBuffer buf,
   ) {
-    buf.writeln('| Status | Declaration | Location | Delta | Score |');
-    buf.writeln('| :---: | :--- | :--- | :---: | :---: |');
+    final showCoverage = deltas.any((d) => d.coverage != null);
+    if (showCoverage) {
+      buf.writeln(
+        '| Status | Declaration | Location | Delta | Score | Coverage |',
+      );
+      buf.writeln('| :---: | :--- | :--- | :---: | :---: | :---: |');
+    } else {
+      buf.writeln('| Status | Declaration | Location | Delta | Score |');
+      buf.writeln('| :---: | :--- | :--- | :---: | :---: |');
+    }
 
     for (final d in deltas) {
       final isVio = d.isViolation(
@@ -504,8 +526,12 @@ class GitHubReporter {
         (final oldS?, null) => (d.filePath, '$oldS -> _deleted_'),
         (null, null) => (d.filePath, '_deleted_'),
       };
-
-      buf.writeln('| $icon | `${d.name}` | `$loc` | `$deltaStr` | $scoreStr |');
+      final covSuffix = showCoverage
+          ? ' ${d.coverage?.formatShort() ?? '—'} |'
+          : '';
+      buf.writeln(
+        '| $icon | `${d.name}` | `$loc` | `$deltaStr` | $scoreStr |$covSuffix',
+      );
     }
   }
 

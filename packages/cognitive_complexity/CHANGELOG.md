@@ -1,5 +1,11 @@
 ## 2.1.0-wip
 
+- `cognitive_complexity`: Add `--coverage <lcov.info>` option (plus
+  `LcovCoverage` and `DeclarationCoverage` library APIs and optional `coverage`
+  input in `action.yml`) to annotate declarations with per-function line
+  coverage (`%`, `covered/executable`, uncovered line ranges, and
+  `0% (unloaded)` for files absent from LCOV) across text, JSON, and GitHub
+  formats in both regular and `--git-diff` scans (#211).
 - GitHub Action (`action.yml`): Add `comment-mode` (`auto`, `on-violation`,
   `always`, `off`; default `auto`) to control PR sticky comment visibility (#5)
   and `scan-mode` (`diff`, `full`; default `diff`) to opt out of PR diff

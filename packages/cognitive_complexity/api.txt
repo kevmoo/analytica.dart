@@ -19,7 +19,8 @@ package:cognitive_complexity/cognitive_complexity.dart:
     analyzePathFileLines (method: List<FileLineMetric> Function(String))
     analyzePathSuppressed (method: List<SuppressedDeclaration> Function(String))
   ComplexityDelta (class extends Object):
-    new (const constructor: ComplexityDelta Function({required int endLine, required String filePath, required String name, int? newLines, required int? newScore, int? oldLines, required int? oldScore, required int startLine, required DeltaStatus status}))
+    new (const constructor: ComplexityDelta Function({DeclarationCoverage? coverage, required int endLine, required String filePath, required String name, int? newLines, required int? newScore, int? oldLines, required int? oldScore, required int startLine, required DeltaStatus status}))
+    coverage (getter: DeclarationCoverage?)
     delta (getter: int)
     endLine (getter: int)
     filePath (getter: String)
@@ -35,6 +36,17 @@ package:cognitive_complexity/cognitive_complexity.dart:
     isScoreViolation (method: bool Function({bool failOnIncrease = false, int? failThreshold}))
     isViolation (method: bool Function({bool failOnIncrease = false, int? failThreshold, int? maxFunctionLines}))
     toJson (method: Map<String, dynamic> Function({bool failOnIncrease = false, int? failThreshold, int? maxFunctionLines}))
+    withCoverage (method: ComplexityDelta Function(DeclarationCoverage?))
+  DeclarationCoverage (class extends Object, final):
+    new (const constructor: DeclarationCoverage Function({required int coveredLines, required int executableLines, required bool loaded, required List<int> uncoveredLines}))
+    coveredLines (getter: int)
+    executableLines (getter: int)
+    loaded (getter: bool)
+    percent (getter: double?)
+    uncoveredLines (getter: List<int>)
+    formatShort (method: String Function())
+    formatUncoveredRanges (method: String Function({int maxRanges = 5}))
+    toJson (method: Map<String, dynamic> Function())
   DeclarationUnit (class extends Object):
     new (const constructor: DeclarationUnit Function({required int endLine, required Set<String> hardPinnedPeers, required bool isPublic, required bool isSealed, required String kind, int memberCount = 0, required String name, required Set<String> outgoingIntraFileRefs, int overrideMemberCount = 0, required Map<String, Set<String>> privateMemberAccessesByTarget, String? representationType, required Set<String> requiredImportDirectives, required int startLine, int staticMethodCount = 0, int staticMethodLines = 0, int stringLiteralLines = 0, String? supertypeLabel}))
     endLine (getter: int)
@@ -88,6 +100,7 @@ package:cognitive_complexity/cognitive_complexity.dart:
     countViolations (method: int Function({bool failOnIncrease = false, int? failThreshold, int? maxFileLines, int? maxFunctionLines}))
     isClean (method: bool Function({bool failOnIncrease = false, int? failThreshold, int? maxFileLines, int? maxFunctionLines}))
     toJson (method: Map<String, dynamic> Function({bool failOnIncrease = false, int? failThreshold, int? maxFileLines, int? maxFunctionLines}))
+    withCoverage (method: DeltaSummary Function(LcovCoverage, {String? baseDirectory}))
   FileLineDelta (class extends Object):
     new (const constructor: FileLineDelta Function({required String filePath, required int? newLines, required int? oldLines, required DeltaStatus status}))
     delta (getter: int)
@@ -129,8 +142,9 @@ package:cognitive_complexity/cognitive_complexity.dart:
     formatText (method: String Function())
     toJson (method: Map<String, dynamic> Function())
   FunctionComplexity (class extends Object):
-    new (const constructor: FunctionComplexity Function({required ({int booleanOps, int branches, int maxDepth, int nesting}) composition, required int endLine, required String filePath, required String name, required int score, required int startLine}))
+    new (const constructor: FunctionComplexity Function({required ({int booleanOps, int branches, int maxDepth, int nesting}) composition, DeclarationCoverage? coverage, required int endLine, required String filePath, required String name, required int score, required int startLine}))
     composition (getter: ({int booleanOps, int branches, int maxDepth, int nesting}))
+    coverage (getter: DeclarationCoverage?)
     endLine (getter: int)
     filePath (getter: String)
     isTestEntrypoint (getter: bool)
@@ -141,6 +155,13 @@ package:cognitive_complexity/cognitive_complexity.dart:
     isViolation (method: bool Function({int? failThreshold, int? maxFunctionLines}))
     toJson (method: Map<String, dynamic> Function())
     toString (method: String Function())
+    withCoverage (method: FunctionComplexity Function(DeclarationCoverage?))
+  LcovCoverage (class extends Object, final):
+    fromFile (constructor: LcovCoverage Function(String, {String? baseDirectory}))
+    parse (constructor: LcovCoverage Function(String, {String? baseDirectory, String? fallbackDirectory}))
+    fileCount (getter: int)
+    annotateDeclarations (method: List<FunctionComplexity> Function(List<FunctionComplexity>, {String? baseDirectory}))
+    coverageFor (method: DeclarationCoverage Function({String? baseDirectory, required int endLine, required String filePath, required int startLine}))
   PathFilter (class extends Object):
     defaultGeneratedPatterns (static const getter: List<String> = ['**/*.g.dart', '**/*.freezed.dart', '**/*.mocks.dart', '**/*.config.dart', '**/*.reflectable.dart', '**/*.gen.dart', '**/*.pb.dart', '**/*.pbenum.dart', '**/*.pbjson.dart', '**/*.pbserver.dart'])
     defaultIgnoredDirectories (static const getter: List<String> = ['.dart_tool/**', '.git/**', 'build/**', '.idea/**', '.vscode/**'])
@@ -314,6 +335,7 @@ dart:core:
   Set (referenced)
   String (referenced)
   bool (referenced)
+  double (referenced)
   int (referenced)
 package:analytica/src/analyzer/path_filter.dart (^0.1.4):
   PathFilter (see above)

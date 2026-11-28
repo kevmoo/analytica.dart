@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:math';
 
 import 'package:analytica/analytica.dart';
+import 'package:analytica/git.dart';
 import 'package:args/args.dart';
 
 import '../schema_version.dart';
@@ -119,6 +120,15 @@ Future<int> runCli(
           'With --comment-output, also write the report when there are no '
           'violations or complexity regressions.',
     )
+    ..addOption(
+      'coverage',
+      valueHelp: 'lcov.info',
+      help:
+          'Optional path to an LCOV coverage file (e.g. coverage/lcov.info '
+          'from "dart test --coverage-path=coverage/lcov.info" or '
+          '"flutter test --coverage") to annotate declarations with line '
+          'coverage.',
+    )
     ..addPathFilterOptions();
 
   try {
@@ -163,6 +173,7 @@ Future<int> runCli(
       'max-comment-rows',
     );
     final commentOnClean = argResults['comment-on-clean'] as bool;
+    final coveragePath = argResults['coverage'] as String?;
     final pathFilter = parsePathFilter(argResults);
 
     _warnIgnoredFlags(
@@ -172,6 +183,8 @@ Future<int> runCli(
       verbose: verbose,
       format: format,
       gitDiffBase: gitDiffBase,
+      coveragePath: coveragePath,
+      hasStdinTarget: targets.contains('-'),
       err: stderrSink,
     );
 
@@ -181,6 +194,10 @@ Future<int> runCli(
         'Stdin target "-" cannot be specified more than once.',
       );
     }
+
+    final coverage = coveragePath == null
+        ? null
+        : LcovCoverage.fromFile(coveragePath);
 
     if (gitDiffBase != null) {
       if (gitDiffBase.trim().isEmpty) {
@@ -200,6 +217,7 @@ Future<int> runCli(
         maxFileLines: maxFileLines,
         maxFunctionLines: maxFunctionLines,
         failOnIncrease: failOnIncrease,
+        coverage: coverage,
         commentOutput: commentOutput,
         maxCommentRows: maxCommentRows,
         commentOnClean: commentOnClean,
@@ -218,6 +236,7 @@ Future<int> runCli(
       maxFunctionLines: maxFunctionLines,
       format: format,
       verbose: verbose,
+      coverage: coverage,
       commentOutput: commentOutput,
       maxCommentRows: maxCommentRows,
       commentOnClean: commentOnClean,
@@ -253,6 +272,8 @@ void _warnIgnoredFlags({
   required bool verbose,
   required String format,
   required String? gitDiffBase,
+  required String? coveragePath,
+  required bool hasStdinTarget,
   required StringSink err,
 }) {
   if (failOnIncrease && gitDiffBase == null) {
@@ -279,6 +300,10 @@ void _warnIgnoredFlags({
     err.writeln(
       'Warning: --verbose only affects --format=text without --git-diff.',
     );
+  }
+
+  if (coveragePath != null && hasStdinTarget) {
+    err.writeln('Warning: --coverage is ignored for stdin ("-") targets.');
   }
 }
 
@@ -315,19 +340,26 @@ Future<int> _handleDiffMode({
   required bool failOnIncrease,
   required StringSink out,
   required StringSink err,
+  LcovCoverage? coverage,
   String? commentOutput,
   int maxCommentRows = 0,
   bool commentOnClean = false,
   Map<String, String>? environment,
 }) async {
   final deltaAnalyzer = DeltaAnalyzer(pathFilter: pathFilter);
-  final summary = await deltaAnalyzer.computeDeltas(
+  final rawSummary = await deltaAnalyzer.computeDeltas(
     gitDiffBase,
     targetPaths: targets,
     failThreshold: failThreshold,
     maxFunctionLines: maxFunctionLines,
     failOnIncrease: failOnIncrease,
   );
+  final summary = coverage == null
+      ? rawSummary
+      : rawSummary.withCoverage(
+          coverage,
+          baseDirectory: await const GitDiffService().getRepoRoot(),
+        );
 
   if (format == 'json') {
     out.writeln(
@@ -397,6 +429,7 @@ Future<int> _handleRegularMode({
   required StringSink out,
   required StringSink err,
   required Stream<List<int>> input,
+  LcovCoverage? coverage,
   String? commentOutput,
   int maxCommentRows = 0,
   bool commentOnClean = false,
@@ -416,7 +449,7 @@ Future<int> _handleRegularMode({
 
   allResults.sort((a, b) => b.score.compareTo(a.score));
   allSuppressed.sort((a, b) => b.score.compareTo(a.score));
-  final displayed = allResults
+  final rawDisplayed = allResults
       .where(
         (r) =>
             r.score >= threshold ||
@@ -426,6 +459,9 @@ Future<int> _handleRegularMode({
             ),
       )
       .toList();
+  final displayed = coverage == null
+      ? rawDisplayed
+      : coverage.annotateDeclarations(rawDisplayed);
 
   if (format == 'json') {
     out.writeln(
@@ -627,11 +663,18 @@ void _printTextReport(
   }
 
   if (results.isNotEmpty) {
+    final showCoverage = results.any((r) => r.coverage != null);
     final layout = (
       maxNameLen: results.fold(
         'Declaration'.length,
         (w, r) => max(w, r.name.length),
       ),
+      coverageWidth: showCoverage
+          ? results.fold(
+              'Coverage'.length,
+              (w, r) => max(w, (r.coverage?.formatShort() ?? '—').length),
+            )
+          : 0,
       breakdownWidth: verbose
           ? results.fold(
               'Breakdown'.length,
@@ -639,6 +682,7 @@ void _printTextReport(
             )
           : 0,
       showLines: maxFunctionLines != null,
+      showCoverage: showCoverage,
       verbose: verbose,
     );
     _printRegularHeader(layout, sink);
@@ -668,24 +712,31 @@ void _printSuppressedDeclarations(
 
 typedef _RegularTableLayout = ({
   int maxNameLen,
+  int coverageWidth,
   int breakdownWidth,
   bool showLines,
+  bool showCoverage,
   bool verbose,
 });
 
 void _printRegularHeader(_RegularTableLayout layout, StringSink sink) {
   final headerLines = layout.showLines ? '  ${'Lines'.padLeft(5)}' : '';
+  final headerCoverage = layout.showCoverage
+      ? '  ${'Coverage'.padRight(layout.coverageWidth)}'
+      : '';
   final headerBreakdown = layout.verbose
       ? '  ${'Breakdown'.padRight(layout.breakdownWidth)}'
       : '';
   final headerName = 'Declaration'.padRight(layout.maxNameLen);
   sink.writeln(
-    '${'Score'.padLeft(5)}$headerLines$headerBreakdown  $headerName  Location',
+    '${'Score'.padLeft(5)}$headerLines$headerCoverage$headerBreakdown  '
+    '$headerName  Location',
   );
   sink.writeln(
     '-' *
         (5 +
             headerLines.length +
+            headerCoverage.length +
             headerBreakdown.length +
             2 +
             layout.maxNameLen +
@@ -702,11 +753,17 @@ String _formatRegularRow(
 ) {
   final scoreStr = res.score.toString().padLeft(5);
   final linesStr = layout.showLines ? '  ${'${res.lineCount}'.padLeft(5)}' : '';
+  final covLabel = res.coverage?.formatShort() ?? '—';
+  final coverageStr = layout.showCoverage
+      ? '  ${covLabel.padRight(layout.coverageWidth)}'
+      : '';
   final breakdownStr = layout.verbose
       ? '  ${_formatBreakdown(res.composition).padRight(layout.breakdownWidth)}'
       : '';
   final nameStr = res.name.padRight(layout.maxNameLen);
   final locStr = '${res.filePath}:L${res.startLine}-${res.endLine}';
+  final uncovered = res.coverage?.formatUncoveredRanges() ?? '';
+  final uncoveredStr = uncovered.isEmpty ? '' : ' [uncovered: $uncovered]';
   final marker = _violationMarker([
     if (failThreshold != null && res.score > failThreshold)
       'score > $failThreshold',
@@ -716,7 +773,8 @@ String _formatRegularRow(
   final entrypoint = layout.verbose && res.isTestEntrypoint
       ? ' [test entrypoint]'
       : '';
-  return '$scoreStr$linesStr$breakdownStr  $nameStr  $locStr$marker$entrypoint';
+  return '$scoreStr$linesStr$coverageStr$breakdownStr  $nameStr  '
+      '$locStr$uncoveredStr$marker$entrypoint';
 }
 
 /// Renders a [ComplexityComposition] as `br N nest N bool N depth N`.
@@ -803,21 +861,42 @@ void _printDeltaTableSection(
   bool failOnIncrease,
   StringSink sink,
 ) {
-  var maxName = 'Declaration'.length;
-  for (final d in deltas) {
-    if (d.name.length > maxName) maxName = d.name.length;
-  }
+  final deltaList = deltas.toList();
+  final maxName = deltaList.fold(
+    'Declaration'.length,
+    (w, d) => max(w, d.name.length),
+  );
+  final showCoverage = deltaList.any((d) => d.coverage != null);
+  final coverageWidth = showCoverage
+      ? deltaList.fold(
+          'Coverage'.length,
+          (w, d) => max(w, (d.coverage?.formatShort() ?? '—').length),
+        )
+      : 0;
 
   final showLines = maxFunctionLines != null;
   final hdrDelta = 'Delta'.padLeft(6);
   final hdrScore = 'Score'.padRight(12);
   final hdrLines = showLines ? '  ${'Lines'.padRight(12)}' : '';
+  final hdrCoverage = showCoverage
+      ? '  ${'Coverage'.padRight(coverageWidth)}'
+      : '';
   final hdrName = 'Declaration'.padRight(maxName);
-  sink.writeln('$hdrDelta  $hdrScore$hdrLines  $hdrName  Location');
-  final rule = '-' * (6 + 2 + 12 + hdrLines.length + 2 + maxName + 2 + 30);
+  sink.writeln('$hdrDelta  $hdrScore$hdrLines$hdrCoverage  $hdrName  Location');
+  final rule =
+      '-' *
+      (6 +
+          2 +
+          12 +
+          hdrLines.length +
+          hdrCoverage.length +
+          2 +
+          maxName +
+          2 +
+          30);
   sink.writeln(rule);
 
-  for (final d in deltas) {
+  for (final d in deltaList) {
     final deltaStr = d.delta > 0 ? '+${d.delta}' : '${d.delta}';
     final (locStr, rawScore) = switch ((d.oldScore, d.newScore)) {
       (final oldS?, final newS?) => (
@@ -835,7 +914,12 @@ void _printDeltaTableSection(
     final linesStr = showLines
         ? '  ${'${d.oldLines ?? 'new'} -> ${d.newLines ?? 'del'}'.padRight(12)}'
         : '';
+    final coverageStr = showCoverage
+        ? '  ${(d.coverage?.formatShort() ?? '—').padRight(coverageWidth)}'
+        : '';
     final nameStr = d.name.padRight(maxName);
+    final uncovered = d.coverage?.formatUncoveredRanges() ?? '';
+    final uncoveredStr = uncovered.isEmpty ? '' : ' [uncovered: $uncovered]';
     final marker = _deltaMarker(
       d,
       failThreshold: failThreshold,
@@ -844,7 +928,8 @@ void _printDeltaTableSection(
     );
 
     sink.writeln(
-      '${deltaStr.padLeft(6)}  $scoreStr$linesStr  $nameStr  $locStr$marker',
+      '${deltaStr.padLeft(6)}  $scoreStr$linesStr$coverageStr  $nameStr  '
+      '$locStr$uncoveredStr$marker',
     );
   }
 
